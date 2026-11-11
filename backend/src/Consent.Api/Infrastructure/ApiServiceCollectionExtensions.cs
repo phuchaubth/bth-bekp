@@ -1,7 +1,9 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Consent.Api.Authorization;
 using Consent.Application.Abstractions;
 using Consent.Application.Auth;
+using Consent.Application.Patients;
 using Consent.Infrastructure.Security;
 using Consent.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -39,7 +41,14 @@ internal static class ApiServiceCollectionExtensions
         });
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
+        services.AddOptions<HisOptions>()
+            .Bind(configuration.GetSection(HisOptions.SectionName))
+            .Validate(o => o.TimeoutSeconds is > 0 and <= 60, "His:TimeoutSeconds phải trong khoảng 1–60 giây.")
+            .ValidateOnStart();
+
         services.AddControllers()
+            // Enum dạng chuỗi ("Male", "Found"…) để API dễ đọc và ổn định khi thêm giá trị mới.
+            .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
             .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
             {
                 var details = new ValidationProblemDetails(context.ModelState)

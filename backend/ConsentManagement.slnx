@@ -12,5 +12,6 @@
     <Project Path="tests/Consent.Application.Tests/Consent.Application.Tests.csproj" />
     <Project Path="tests/Consent.ArchitectureTests/Consent.ArchitectureTests.csproj" />
     <Project Path="tests/Consent.Domain.Tests/Consent.Domain.Tests.csproj" />
+    <Project Path="tests/Consent.Infrastructure.Tests/Consent.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,6 +1,7 @@
 using Consent.Application.Auditing;
 using Consent.Application.Auth;
 using Consent.Application.Departments;
+using Consent.Application.Patients;
 using Consent.Application.Roles;
 using Consent.Application.Users;
 using FluentValidation;
@@ -20,6 +21,7 @@ public static class DependencyInjection
         services.AddScoped<UserAdminService>();
         services.AddScoped<RoleService>();
         services.AddScoped<AuditLogService>();
+        services.AddScoped<PatientService>();
 
         RegisterValidators(services);
         return services;

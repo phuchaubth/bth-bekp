@@ -15,10 +15,9 @@ public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary
     {
         get
         {
-            var settings = new Dictionary<string, string?>
+            var settings = new Dictionary<string, string?>(TestSettings.RequiredSecrets())
             {
                 ["ConnectionStrings:Default"] = ConnectionString,
-                ["Jwt:SigningKey"] = TestSettings.SigningKey,
                 ["Database:ApplyMigrationsOnStartup"] = "true",
                 ["Seed:Enabled"] = "true",
                 ["Seed:AdminPassword"] = TestSettings.AdminPassword,

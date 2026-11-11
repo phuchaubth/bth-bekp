@@ -12,4 +12,7 @@
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Consent.Infrastructure.Tests" />
+  </ItemGroup>
 </Project>

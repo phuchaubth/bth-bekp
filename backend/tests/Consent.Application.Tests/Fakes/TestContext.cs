@@ -1,5 +1,6 @@
 using Consent.Application.Auth;
 using Consent.Application.Departments;
+using Consent.Application.Patients;
 using Consent.Application.Roles;
 using Consent.Application.Users;
 using Consent.Domain.Departments;
@@ -44,6 +45,10 @@ internal sealed class AppTestContext
     public FakeCurrentUser CurrentUser { get; } = new();
 
     public AuthOptions Options { get; }
+
+    public StubHisGateway His { get; } = new();
+
+    public HisOptions HisOptions { get; } = new() { TimeoutSeconds = 1 };
 
     public Role RoleByCode(string code) => Store.Roles.Single(r => r.Code == code);
 
@@ -115,4 +120,17 @@ internal sealed class AppTestContext
         new DepartmentRequestValidator());
 
     public RoleService CreateRoleService() => new(new InMemoryRoleRepository(Store), Store);
+
+    public PatientService CreatePatientService() => new(
+        new InMemoryPatientRepository(Store),
+        His,
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        Microsoft.Extensions.Options.Options.Create(HisOptions),
+        new PatientRequestValidator(Clock),
+        new RepresentativeRequestValidator(Clock),
+        new PatientLookupRequestValidator());
 }

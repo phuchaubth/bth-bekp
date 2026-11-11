@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Unicode;
 using Consent.Application.Abstractions;
 using Consent.Domain.Auditing;
+using System.Reflection;
 using Consent.Domain.Common;
 using Consent.Domain.Identity;
 using Consent.Persistence.Configurations;
@@ -23,18 +24,14 @@ internal sealed class AuditSaveChangesInterceptor(
 {
     public const string MaskedValue = "***";
 
-    /// <summary>Thuộc tính kỹ thuật, thay đổi thường xuyên; đã có sự kiện xác thực riêng ghi nhận.</summary>
+    /// <summary>Thuộc tính kỹ thuật, thay đổi thường xuyên hoặc dẫn xuất; không cần ghi vào nhật ký.</summary>
     private static readonly HashSet<string> IgnoredProperties = new(StringComparer.Ordinal)
     {
         ConfigurationExtensions.RowVersion,
+        PatientConfiguration.CitizenIdHash,
         nameof(User.FailedLoginCount),
         nameof(User.LockoutEndUtc),
         nameof(User.LastLoginAtUtc),
-    };
-
-    private static readonly HashSet<string> MaskedProperties = new(StringComparer.Ordinal)
-    {
-        nameof(User.PasswordHash),
     };
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -112,9 +109,14 @@ internal sealed class AuditSaveChangesInterceptor(
             .Where(p => !IgnoredProperties.Contains(p.Metadata.Name))
             .ToDictionary(
                 p => p.Metadata.Name,
-                p => MaskedProperties.Contains(p.Metadata.Name)
-                    ? MaskedValue
-                    : useOriginalValues ? p.OriginalValue : p.CurrentValue);
+                p => MaskIfSensitive(p, useOriginalValues ? p.OriginalValue : p.CurrentValue));
+
+    private static object? MaskIfSensitive(PropertyEntry property, object? value) =>
+        value is not null && IsSensitive(property) ? MaskedValue : value;
+
+    /// <summary>Thuộc tính gắn <see cref="SensitiveDataAttribute"/> (số CCCD, số điện thoại, mã BHYT, mật khẩu đã băm…).</summary>
+    private static bool IsSensitive(PropertyEntry property) =>
+        property.Metadata.PropertyInfo?.GetCustomAttribute<SensitiveDataAttribute>() is not null;
 
     /// <summary>Chỉ các thuộc tính thực sự thay đổi; trả về <c>null</c> nếu chỉ thay đổi thuộc tính kỹ thuật.</summary>
     private static Dictionary<string, object?>? ModifiedValues(EntityEntry entry)
@@ -125,9 +127,7 @@ internal sealed class AuditSaveChangesInterceptor(
                         && !Equals(p.OriginalValue, p.CurrentValue))
             .ToDictionary(
                 p => p.Metadata.Name,
-                p => MaskedProperties.Contains(p.Metadata.Name)
-                    ? (object?)new { old = MaskedValue, @new = MaskedValue }
-                    : new { old = p.OriginalValue, @new = p.CurrentValue });
+                p => (object?)new { old = MaskIfSensitive(p, p.OriginalValue), @new = MaskIfSensitive(p, p.CurrentValue) });
         return changes.Count == 0 ? null : changes;
     }
 

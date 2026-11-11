@@ -42,6 +42,7 @@ public sealed class User : Entity, IAuditableEntity
     /// <summary>Định danh tài khoản VNPT SmartCA (thường là số CCCD). Không phải bí mật.</summary>
     public string? SmartCaUserId { get; private set; }
 
+    [SensitiveData]
     public string PasswordHash { get; private set; } = string.Empty;
 
     /// <summary>Bắt buộc đổi mật khẩu ở lần đăng nhập tiếp theo.</summary>

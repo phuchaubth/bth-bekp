@@ -30,9 +30,13 @@ public static class DependencyInjection
         }
 
         services.AddScoped<AuditSaveChangesInterceptor>();
+        services.AddScoped<BlindIndexInterceptor>();
         services.AddDbContext<ConsentDbContext>((serviceProvider, options) => options
             .UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure())
-            .AddInterceptors(serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>()));
+            // Thứ tự: cập nhật chỉ mục mù trước, rồi ghi audit.
+            .AddInterceptors(
+                serviceProvider.GetRequiredService<BlindIndexInterceptor>(),
+                serviceProvider.GetRequiredService<AuditSaveChangesInterceptor>()));
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IUserRepository, UserRepository>();
@@ -40,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IDepartmentRepository, DepartmentRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+        services.AddScoped<IPatientRepository, PatientRepository>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

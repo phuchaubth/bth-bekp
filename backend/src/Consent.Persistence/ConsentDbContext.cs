@@ -1,12 +1,18 @@
+using Consent.Application.Abstractions;
 using Consent.Domain.Auditing;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
+using Consent.Domain.Patients;
+using Consent.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace Consent.Persistence;
 
-/// <summary>DbContext chính của ứng dụng (SQL Server).</summary>
-public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options) : DbContext(options)
+/// <summary>
+/// DbContext chính của ứng dụng (SQL Server). Các cột nhạy cảm được mã hóa trong suốt bằng <see cref="IFieldEncryptor"/>.
+/// Lưu ý: EF Core lưu đệm mô hình cho mỗi kiểu DbContext, nên mọi instance phải dùng cùng một khóa mã hóa.
+/// </summary>
+public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options, IFieldEncryptor fieldEncryptor) : DbContext(options)
 {
     public DbSet<Department> Departments => Set<Department>();
 
@@ -17,6 +23,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+
+    public DbSet<Patient> Patients => Set<Patient>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
@@ -34,6 +42,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ConsentDbContext).Assembly);
+        var encrypted = new EncryptedStringConverter(fieldEncryptor);
+        PatientConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         base.OnModelCreating(modelBuilder);
     }
 

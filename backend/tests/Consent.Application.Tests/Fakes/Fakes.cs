@@ -2,10 +2,12 @@ using System.Security.Cryptography;
 using System.Text;
 using Consent.Application.Abstractions;
 using Consent.Application.Auditing;
+using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
+using Consent.Domain.Patients;
 using Consent.Shared;
 
 namespace Consent.Application.Tests.Fakes;
@@ -82,6 +84,8 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<RefreshToken> RefreshTokens { get; } = [];
 
     public List<AuditLog> AuditLogs { get; } = [];
+
+    public List<Patient> Patients { get; } = [];
 
     public int SaveCount { get; private set; }
 
@@ -171,4 +175,58 @@ internal sealed class InMemoryAuditLogRepository(InMemoryStore store) : IAuditLo
 
     public Task<PagedResult<AuditLogDto>> SearchAsync(AuditLogQuery query, CancellationToken cancellationToken) =>
         Task.FromResult(new PagedResult<AuditLogDto>([], query.Page, query.PageSize, 0));
+}
+
+internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientRepository
+{
+    public Task<Patient?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Patients.Find(p => p.Id == id));
+
+    public Task<Patient?> FindByCitizenIdAsync(string citizenId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Patients.Find(p => p.CitizenId == citizenId));
+
+    public Task<bool> PatientCodeExistsAsync(string patientCode, Guid? excludeId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Patients.Exists(p => p.PatientCode == patientCode && p.Id != excludeId));
+
+    public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken)
+    {
+        var items = store.Patients
+            .Select(p => new PatientSummary(p.Id, p.PatientCode, p.FullName, p.DateOfBirth, p.Gender, p.CitizenId, p.HisVerifiedAtUtc, p.UpdatedAtUtc))
+            .ToList();
+        return Task.FromResult(new PagedResult<PatientSummary>(items, query.Page, query.PageSize, items.Count));
+    }
+
+    public void Add(Patient patient) => store.Patients.Add(patient);
+}
+
+/// <summary>HIS giả cho kiểm thử: trả kết quả cấu hình sẵn, có thể mô phỏng lỗi hoặc treo (để kiểm tra timeout).</summary>
+internal sealed class StubHisGateway : IHisGateway
+{
+    public HisLookupResult Result { get; set; } = HisLookupResult.NotFound;
+
+    public bool Throw { get; set; }
+
+    public bool Hang { get; set; }
+
+    public int Calls { get; private set; }
+
+    public async Task<HisLookupResult> FindPatientByCitizenIdAsync(string citizenId, CancellationToken cancellationToken)
+    {
+        Calls++;
+        if (Throw)
+        {
+            throw new HttpRequestException("HIS lỗi (giả lập).");
+        }
+
+        if (Hang)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+        }
+
+        return Result;
+    }
+
+    public static HisLookupResult Found(string patientCode) => new(
+        HisLookupStatus.Found,
+        new HisPatient(patientCode, null, null, "BHYT", "DN4790000000002", null, new HisEncounter("TN001", null, "Khoa Khám bệnh", "Phòng khám 1")));
 }

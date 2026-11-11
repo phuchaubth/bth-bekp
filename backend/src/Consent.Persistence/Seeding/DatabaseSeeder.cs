@@ -1,6 +1,7 @@
 using Consent.Application.Abstractions;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
+using Consent.Domain.Patients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -35,6 +36,17 @@ internal sealed partial class DatabaseSeeder(
         ("mauphieu.demo", "Quản lý mẫu phiếu Demo", "Chuyên viên", SystemRoles.TemplateManager, "KHTH"),
         ("baocao.demo", "Báo cáo Demo", "Chuyên viên", SystemRoles.Reporter, "KHTH"),
         ("kiemtra.demo", "Kiểm tra Demo", "Chuyên viên", SystemRoles.Auditor, "KHTH"),
+    ];
+
+    /// <summary>Người bệnh demo: họ tên có "(giả lập)", số giấy tờ là số thử nghiệm, không phải người thật.</summary>
+    private static readonly PatientDetails[] DemoPatients =
+    [
+        new("Nguyễn Văn An (giả lập)", new DateOnly(1985, 3, 12), Gender.Male, "001085000001", null, new DateOnly(2021, 8, 15),
+            "Số 1 Đường Thử Nghiệm, Phường Mẫu, Hà Nội", null, "0900000001", "Kinh", "Kỹ sư", "Việt Nam", null, null),
+        new("Trần Thị Bình (giả lập)", new DateOnly(1992, 7, 25), Gender.Female, "079192000002", null, new DateOnly(2022, 1, 10),
+            "Số 2 Đường Thử Nghiệm, Phường Mẫu, TP. Hồ Chí Minh", null, "0900000002", "Kinh", "Giáo viên", "Việt Nam", "DN4790000000002", null),
+        new("Lê Minh Cường (giả lập)", new DateOnly(2010, 11, 2), Gender.Male, "048210000010", null, null,
+            "Số 3 Đường Thử Nghiệm, Phường Mẫu, Đà Nẵng", null, null, "Kinh", "Học sinh", "Việt Nam", null, null),
     ];
 
     private readonly SeedOptions _options = options.Value;
@@ -136,6 +148,14 @@ internal sealed partial class DatabaseSeeder(
         {
             throw new InvalidOperationException(
                 "Mật khẩu tài khoản demo (Seed:DemoPassword) chưa đủ mạnh: " + string.Join(" ", errors));
+        }
+
+        if (!await db.Patients.AnyAsync(cancellationToken).ConfigureAwait(false))
+        {
+            foreach (var details in DemoPatients)
+            {
+                db.Patients.Add(Patient.Create(details, clock.UtcNow));
+            }
         }
 
         var existingUserNames = await db.Users.Select(u => u.UserName).ToListAsync(cancellationToken).ConfigureAwait(false);

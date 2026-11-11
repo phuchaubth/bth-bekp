@@ -45,6 +45,11 @@ internal static class ProblemDetailsMapping
         details.Title = error.Message;
         details.Extensions["code"] = error.Code;
         details.Extensions["traceId"] = httpContext.TraceIdentifier;
+        foreach (var (key, value) in error.Metadata ?? new Dictionary<string, object?>())
+        {
+            details.Extensions[key] = value;
+        }
+
         return details;
     }
 

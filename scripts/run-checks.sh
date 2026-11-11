@@ -14,6 +14,8 @@ echo "==> Frontend: install, lint, typecheck, test, build"
 
 echo "==> Docker Compose: validate"
 (cd "$ROOT" && MSSQL_SA_PASSWORD="${MSSQL_SA_PASSWORD:-placeholder-for-validation}" \
-  JWT_SIGNING_KEY="${JWT_SIGNING_KEY:-placeholder-for-validation-0123456789abcdef}" docker compose config --quiet)
+  JWT_SIGNING_KEY="${JWT_SIGNING_KEY:-placeholder-for-validation-0123456789abcdef}" \
+  FIELD_ENCRYPTION_KEY="${FIELD_ENCRYPTION_KEY:-placeholder}" BLIND_INDEX_KEY="${BLIND_INDEX_KEY:-placeholder}" \
+  docker compose config --quiet)
 
 echo "Tất cả kiểm tra đều đạt."

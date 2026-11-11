@@ -63,6 +63,8 @@ jobs:
       # Giá trị giả chỉ để kiểm tra cấu hình; job này không khởi động các container.
       MSSQL_SA_PASSWORD: ci-placeholder-not-a-secret
       JWT_SIGNING_KEY: ci-placeholder-not-a-secret-0123456789abcdef
+      FIELD_ENCRYPTION_KEY: Y2ktcGxhY2Vob2xkZXItbm90LWEtc2VjcmV0LTAwMDA=
+      BLIND_INDEX_KEY: Y2ktcGxhY2Vob2xkZXItbm90LWEtc2VjcmV0LTExMTE=
     steps:
       - uses: actions/checkout@v4
       - name: Validate compose file

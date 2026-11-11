@@ -113,7 +113,7 @@ public sealed class AuthorizationTests(ConsentApiFactory factory) : IClassFixtur
 
     private sealed class MissingSigningKeyFactory : ConsentApiFactory
     {
-        protected override IReadOnlyDictionary<string, string?> Settings { get; } = new Dictionary<string, string?>
+        protected override IReadOnlyDictionary<string, string?> Settings { get; } = new Dictionary<string, string?>(TestSettings.RequiredSecrets())
         {
             ["ConnectionStrings:Default"] = "Server=127.0.0.1,1;Database=x;User Id=x;Password=x;TrustServerCertificate=True",
             ["Jwt:SigningKey"] = "",

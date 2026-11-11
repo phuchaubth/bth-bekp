@@ -35,6 +35,9 @@ public sealed record Error(
     ErrorType Type,
     IReadOnlyDictionary<string, string[]>? FieldErrors = null)
 {
+    /// <summary>Thông tin bổ sung trả về cho client (ví dụ mã hồ sơ đã tồn tại khi bị trùng).</summary>
+    public IReadOnlyDictionary<string, object?>? Metadata { get; init; }
+
     public static Error Validation(string code, string message, IReadOnlyDictionary<string, string[]>? fieldErrors = null) =>
         new(code, message, ErrorType.Validation, fieldErrors);
 

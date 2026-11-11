@@ -16,11 +16,10 @@ public class ConsentApiFactory : WebApplicationFactory<Program>
 {
     public const string ThrowingPath = "/__test/throw";
 
-    protected virtual IReadOnlyDictionary<string, string?> Settings { get; } = new Dictionary<string, string?>
+    protected virtual IReadOnlyDictionary<string, string?> Settings { get; } = new Dictionary<string, string?>(TestSettings.RequiredSecrets())
     {
         ["ConnectionStrings:Default"] =
             "Server=127.0.0.1,1;Database=ConsentTest;User Id=test;Password=not-a-real-password;Encrypt=True;TrustServerCertificate=True;Connect Timeout=1",
-        ["Jwt:SigningKey"] = TestSettings.SigningKey,
     };
 
     /// <summary>Tạo access token hợp lệ (cùng khóa ký với API) cho người dùng giả với các quyền chỉ định.</summary>

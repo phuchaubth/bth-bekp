@@ -91,4 +91,6 @@ public static class AuditActions
     public const string Logout = "Auth.Logout";
     public const string RefreshTokenReuseDetected = "Auth.RefreshTokenReuseDetected";
     public const string PasswordChanged = "Auth.PasswordChanged";
+    public const string PatientViewed = "Patients.Viewed";
+    public const string PatientLookedUp = "Patients.LookedUp";
 }
