@@ -463,7 +463,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 5. Dự án đặt trong repo `bth-bekp` này, dưới tên module `Consent.*`.
 
 **Câu hỏi**
-1. **Đã nhận tài liệu API VNPT SmartCA** (SP769 v4.0 và OAuth2 v1.1); chọn API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md). Còn chờ: thông tin kết nối UAT (`sp_id`/`sp_password`, gửi qua kênh bảo mật), code mẫu, và các câu hỏi ở mục 9 của tài liệu đó.
+1. **Đã nhận tài liệu API VNPT SmartCA** (SP769 v4.0 và OAuth2 v1.1); chọn API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md). **Hợp đồng cho phép người bệnh ký bằng SmartCA cá nhân** (đã xác nhận). Còn chờ: thông tin kết nối UAT (`sp_id`/`sp_password`, gửi qua kênh bảo mật), code mẫu, và các câu hỏi ở mục 9 của tài liệu đó.
 1a. **Đã xác nhận:** 3 phương án ký cho phía người bệnh, **thứ tự ưu tiên PA1 → PA3 → PA2**; nhân viên chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**; **danh sách lý do ký tay/ký thay bệnh viện bổ sung sau** (hệ thống làm danh mục cấu hình được). Danh sách quan hệ được phép ký thay vẫn cần pháp chế xác nhận.
 2. Danh sách **loại phiếu đồng thuận** cần làm trước là gì? Có mẫu giấy hiện hành (đã bỏ thông tin thật) để số hóa không?
 3. Có cần **tích hợp HIS** (lấy mã người bệnh, đợt điều trị) ngay giai đoạn 1 không? HIS hiện dùng là gì?
