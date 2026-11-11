@@ -333,7 +333,7 @@ Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog
 ```mermaid
 stateDiagram-v2
     [*] --> Draft: lập phiếu (theo phiên bản mẫu đang phát hành)
-    Draft --> PendingSignature: trình ký (đủ thông tin; đóng băng người bệnh, người ký)
+    Draft --> PendingSignature: trình ký (đủ thông tin, đóng băng người bệnh và người ký)
     PendingSignature --> Draft: trả về nháp
     Draft --> Cancelled: hủy (bắt buộc lý do)
     PendingSignature --> Cancelled: hủy (bắt buộc lý do)
