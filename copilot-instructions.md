@@ -2,33 +2,39 @@
 
 ## Project
 
-This repository contains the BTH Enterprise Knowledge Platform (BEKP), a hospital quality, JCI, risk, CAPA, evidence, survey, and AI governance platform.
+This repository (BEKP) hosts the hospital consent form management application ("Quản lý Phiếu đồng thuận"): patient consent/commitment forms, CCCD QR scanning, HIS (FPT eHospital) lookup, and VNPT SmartCA digital signatures.
+
+See `docs/KE_HOACH_TRIEN_KHAI.md` (approved plan), `docs/yeu-cau-nghiep-vu.md` (requirements) and `docs/kien-truc.md` (architecture).
 
 ## Technology stack
 
-- Backend: ASP.NET Core 9 Web API
+The stack below was mandated by the project owner and supersedes earlier defaults (PostgreSQL, Material UI, .NET 9).
+
+- Backend: ASP.NET Core .NET 10 Web API (RESTful, `/api/v1`)
 - Architecture: Clean Architecture
-- Database: PostgreSQL
-- ORM: Entity Framework Core
+- Database: Microsoft SQL Server
+- ORM: Entity Framework Core 10 (migrations with the local `dotnet-ef` tool)
 - Frontend: React, TypeScript, Vite
-- UI: Material UI
+- UI: Ant Design (Vietnamese locale `vi_VN`)
 - API client: TanStack Query
-- Infrastructure: Docker Compose
-- Testing: xUnit for backend and Vitest for frontend
+- Routing: React Router
+- Infrastructure: Docker Compose (development/testing), GitHub Actions (CI)
+- Testing: xUnit for backend and Vitest + Testing Library for frontend
+- Frontend lint: oxlint
 
 ## Required solution structure
 
 backend/
-- BEKP.Api
-- BEKP.Application
-- BEKP.Domain
-- BEKP.Infrastructure
-- BEKP.Persistence
-- BEKP.Shared
-- tests/
+- ConsentManagement.slnx
+- src/Consent.Api
+- src/Consent.Application
+- src/Consent.Domain
+- src/Consent.Infrastructure
+- src/Consent.Persistence
+- src/Consent.Shared
+- tests/ (Domain, Application, Api integration, Architecture tests)
 
 frontend/
-database/
 docs/
 scripts/
 
@@ -45,7 +51,10 @@ scripts/
 - Enable warnings as errors where practical.
 - Use UTC timestamps.
 - Use UUID primary keys internally.
-- Business entity codes such as DEP-0001 and AI-000001 are separate fields.
+- Business entity codes such as DEP-0001 and PDT-2026-000001 are separate fields.
+- Layer dependency rules are enforced by `backend/tests/Consent.ArchitectureTests`; keep them passing.
+- Return errors as ProblemDetails (RFC 9457) with Vietnamese titles; never expose exception details.
+- User-facing text is Vietnamese.
 
 ## Security rules
 
@@ -69,6 +78,8 @@ Before completing a task:
 7. Build frontend.
 8. Ensure Docker Compose configuration is valid.
 9. Update README when setup or behavior changes.
+
+`./scripts/run-checks.sh` runs steps 1–8 in the same way as CI.
 
 ## Pull requests
 

@@ -1,7 +1,7 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
-> Trạng thái: **BẢN ĐỀ XUẤT – CHỜ PHÊ DUYỆT**. Chưa có mã nguồn nào được viết.
-> Tài liệu này chỉ gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
+> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) và [kiến trúc](kien-truc.md).
+> Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
 ---
@@ -210,7 +210,7 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 
 | Mục đích | Backend | Frontend |
 |---|---|---|
-| Nền tảng | ASP.NET Core .NET 10, EF Core 10 (SQL Server) | React 18/19, TypeScript, Vite |
+| Nền tảng | ASP.NET Core .NET 10, EF Core 10 (SQL Server) | React 19, TypeScript, Vite |
 | UI | — | Ant Design (locale `vi_VN`), dayjs |
 | Validation | FluentValidation | Ant Design Form rules |
 | Xác thực | ASP.NET Core Identity + JWT Bearer | — |
@@ -222,7 +222,8 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 | Excel | ClosedXML (MIT) | — |
 | QR | — | `@zxing/browser` (đọc QR bằng camera) |
 | Chữ ký tay (phương án 2) | — | `signature_pad` (vẽ chữ ký trên màn hình cảm ứng) |
-| Test | xUnit, FluentAssertions/Shouldly, NSubstitute, Testcontainers (SQL Server) | Vitest, Testing Library, MSW; Playwright cho E2E (tùy chọn) |
+| Test | xUnit, NSubstitute, Testcontainers (SQL Server) | Vitest, Testing Library, MSW; Playwright cho E2E (tùy chọn) |
+| Lint | Roslyn analyzers, warnings-as-errors | oxlint |
 
 > Tránh MediatR và AutoMapper vì các thư viện này đã chuyển sang giấy phép thương mại từ năm 2025. Handler và mapping sẽ được viết tay.
 
@@ -283,7 +284,7 @@ Mỗi endpoint đều có: `[Authorize(Policy = "...")]` theo permission, valida
 ```
 bth-bekp/
 ├── backend/
-│   ├── ConsentManagement.sln
+│   ├── ConsentManagement.slnx
 │   ├── Directory.Build.props            # nullable, warnings-as-errors, analyzers
 │   ├── src/
 │   │   ├── Consent.Domain/              # Entities, ValueObjects (Cccd...), Enums, StateMachine
@@ -298,7 +299,7 @@ bth-bekp/
 │       ├── Consent.Api.IntegrationTests/        # WebApplicationFactory + Testcontainers SQL Server
 │       └── Consent.ArchitectureTests/           # kiểm tra quy tắc phụ thuộc giữa các tầng
 ├── frontend/
-│   ├── package.json, vite.config.ts, tsconfig.json, eslint.config.js
+│   ├── package.json, vite.config.ts, tsconfig.json, .oxlintrc.json
 │   └── src/
 │       ├── app/                 # providers, router, theme Ant Design, ConfigProvider vi_VN
 │       ├── api/                 # http client, kiểu dữ liệu, hooks TanStack Query
