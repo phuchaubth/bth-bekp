@@ -100,7 +100,7 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 
 - SmartCA là dịch vụ **ký số từ xa**: hệ thống tính băm (hash) của PDF → gửi yêu cầu ký → người ký xác nhận trên app VNPT SmartCA → hệ thống nhận chữ ký → nhúng vào PDF (chuẩn PAdES).
 - Mỗi phiếu có **2 lượt ký trên cùng một file PDF**: phía người bệnh ký trước, bác sĩ ký sau. Mỗi chữ ký được thêm theo kiểu *incremental update*, nên chữ ký trước vẫn hợp lệ sau khi có chữ ký sau.
-- **Bác sĩ luôn ký số SmartCA**. Định danh SmartCA của bác sĩ lưu trong hồ sơ người dùng.
+- **Người ký phía bệnh viện được cấu hình theo từng mẫu phiếu** (đã xác nhận): bác sĩ, điều dưỡng hoặc nhân viên tiếp đón. Ví dụ cam kết DV/BHYT do tiếp đón ký, khảo sát té ngã do điều dưỡng ký. **Trong tài liệu này, "bác sĩ" ở các bước ký được hiểu là "người ký phía bệnh viện" theo cấu hình của mẫu.** Người ký phía bệnh viện luôn ký số SmartCA; định danh SmartCA lưu trong hồ sơ người dùng.
 - Trước mỗi lượt ký SmartCA, hệ thống tra cứu chứng thư số của người ký. Chứng thư không tồn tại, hết hạn hoặc bị thu hồi → báo rõ và gợi ý phương án tiếp theo theo thứ tự ưu tiên.
 - Người ký xác nhận trên điện thoại cá nhân có cài app SmartCA. Màn hình ký hiển thị trạng thái chờ và đếm ngược.
 
@@ -485,6 +485,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 5 | Triển khai | Máy chủ **Windows Server** tại bệnh viện |
 | 6 | Lưu trữ | Theo thời hạn lưu trữ **hồ sơ bệnh án**, không tự động xóa |
 | 7 | Repo | Repo `bth-bekp` này, module `Consent.*` |
+| 8 | Người ký phía bệnh viện | **Cấu hình theo từng mẫu phiếu** (bác sĩ / điều dưỡng / tiếp đón); người chứng kiến (PA2) phải khác người ký phía bệnh viện |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
@@ -495,9 +496,8 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 2. **Mẫu giấy** của 3 loại phiếu (đã xóa thông tin thật).
 3. **Tài liệu API FPT eHospital** (hoặc đầu mối FPT).
 4. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
-5. **Ai ký phía bệnh viện** với từng loại phiếu giai đoạn 1? Ví dụ cam kết DV/BHYT thường do nhân viên tiếp đón ký, không phải bác sĩ. Đề xuất: cấu hình **vai trò ký phía bệnh viện theo từng mẫu phiếu**.
-6. Danh sách **lý do ký tay/ký thay** và **quan hệ được phép ký thay** (pháp chế xác nhận).
-7. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
+5. Danh sách **lý do ký tay/ký thay** và **quan hệ được phép ký thay** (pháp chế xác nhận).
+6. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
 
 ---
 
