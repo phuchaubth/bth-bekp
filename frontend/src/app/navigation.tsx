@@ -26,7 +26,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { path: '/', label: 'Tổng quan', icon: <DashboardOutlined /> },
   { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, sprint: 3, permission: Permissions.ConsentsRead },
-  { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, sprint: 2, permission: Permissions.PatientsRead },
+  { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, permission: Permissions.PatientsRead },
   { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, sprint: 3, permission: Permissions.TemplatesRead },
   { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, sprint: 5, permission: Permissions.ExportsRun },
   { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, sprint: 5, permission: Permissions.ReportsRead },

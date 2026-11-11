@@ -14,18 +14,12 @@ export default defineConfig({
     },
   },
   build: {
-    // Chunk Ant Design (~900 KB, ~290 KB gzip) là thư viện giao diện bắt buộc, được cache lâu dài;
-    // mã của ứng dụng nằm ở các chunk nhỏ và trang chức năng được tải khi cần.
-    chunkSizeWarningLimit: 1000,
     rolldownOptions: {
       output: {
-        // Tách thư viện ra chunk riêng: trình duyệt cache lâu dài, chỉ tải lại mã ứng dụng khi cập nhật.
+        // React (ổn định, ít thay đổi) tách riêng để trình duyệt cache lâu dài. Các thư viện khác (Ant Design,
+        // camera QR…) để bundler tự chia theo trang: thành phần chỉ dùng ở trang tải sau sẽ không bị tải ngay từ đầu.
         codeSplitting: {
-          groups: [
-            { name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 30 },
-            { name: 'antd', test: /node_modules[\\/](antd|@ant-design|@rc-component|rc-[^\\/]+)[\\/]/, priority: 20 },
-            { name: 'vendor', test: /node_modules[\\/]/, priority: 10 },
-          ],
+          groups: [{ name: 'react', test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/, priority: 30 }],
         },
       },
     },

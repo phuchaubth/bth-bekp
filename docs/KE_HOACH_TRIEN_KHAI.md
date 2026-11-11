@@ -1,6 +1,6 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
-> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0 và Sprint 1 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
+> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0, 1 và 2 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
@@ -403,7 +403,16 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - `IHisGateway` + `FakeHisGateway`; màn hình 4 tra cứu HIS sau khi quét CCCD. `FptEHospitalGateway` làm ngay khi có tài liệu API (có thể tách thành PR riêng).
 - Màn hình 4, 9, 10.
 
-**Tiêu chí nghiệm thu**
+**Điều chỉnh khi triển khai (ADR-014…016 trong [kiến trúc](kien-truc.md))**
+- Mã hóa cột ở tầng ứng dụng (AES-256-GCM) + chỉ mục mù HMAC để tra cứu/chặn trùng CCCD; thêm mã hóa số CMND cũ.
+- Đọc QR ở trình duyệt, máy chủ kiểm tra lại từng trường (gồm kiểm tra số CCCD khớp năm sinh/giới tính); không có API nhận chuỗi QR gốc.
+- Trạng thái "đã/chưa đối chiếu HIS" được lưu ở hồ sơ người bệnh (máy chủ tự đối chiếu khi lưu); từ Sprint 3 sẽ gắn thêm vào từng phiếu.
+- Mỗi lần xem hồ sơ người bệnh được ghi nhật ký; số CCCD không đi trong URL.
+- Kết nối FPT eHospital thật chưa làm vì chưa có tài liệu API (đang dùng HIS giả lập qua cùng interface).
+- Công cụ build frontend nâng lên Node.js 24 LTS (từ 24.15): thư viện quét QR bằng camera (`@zxing/browser`) yêu cầu Node ≥ 24, và Node 22 hết hỗ trợ tháng 4/2027. Chỉ ảnh hưởng máy phát triển, CI và bước build Docker; máy chủ chỉ phục vụ file tĩnh.
+- Thay các API Ant Design đã lỗi thời (`Alert.message` → `title`, `Space.direction` → `orientation`, `List` → `Menu` ở trang Vai trò, chọn được bằng bàn phím). Test frontend tự trượt khi Ant Design cảnh báo, vì Vitest ẩn console của test đạt.
+
+**Tiêu chí nghiệm thu** (✅ đã đạt, có test tự động)
 - Quét chuỗi QR mẫu (giả lập) → điền đúng 7 trường, ngày định dạng `dd/MM/yyyy`.
 - Quét CCCD đã có hồ sơ → hiển thị hồ sơ cũ và hỏi cập nhật, không tạo bản trùng.
 - CCCD trong DB được lưu ở dạng mã hóa (có test kiểm tra); API danh sách trả về CCCD đã che.

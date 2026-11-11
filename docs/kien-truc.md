@@ -102,20 +102,22 @@ backend/
   dotnet-tools.json            # dotnet-ef (công cụ migration)
   Dockerfile
   src/
-    Consent.Domain/            # Common (Entity, IAuditableEntity), Departments, Identity (User, Role,
+    Consent.Domain/            # Common (Entity, IAuditableEntity, SensitiveData), Departments, Patients (Patient,
+                               #   LegalRepresentative, CitizenIdNumber), Identity (User, Role,
                                #   RefreshToken, PasswordPolicy, SystemRoles), Authorization (Permissions), Auditing
     Consent.Shared/            # Result, Error (kèm lỗi theo trường), PagedResult
     Consent.Application/       # Abstractions (repository, IClock, ICurrentUser, ITokenService…), Auth, Users,
                                #   Departments, Roles, Auditing (service + validator FluentValidation)
     Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),
                                #   Seeding, Migrations
-    Consent.Infrastructure/    # Security (băm mật khẩu, JWT), Time
+    Consent.Infrastructure/    # Security (băm mật khẩu, JWT, mã hóa AES-GCM, chỉ mục mù), His (HIS giả lập), Time
     Consent.Api/               # Controllers, Authorization (HasPermission), Infrastructure (pipeline, lỗi,
                                #   security headers, correlation id, cookie, rate limiting)
   tests/
     Consent.Domain.Tests/
     Consent.Application.Tests/       # service với repository giả trong bộ nhớ
     Consent.Api.IntegrationTests/    # pipeline/phân quyền (không CSDL) + luồng thật với SQL Server (Testcontainers)
+    Consent.Infrastructure.Tests/    # mã hóa, chỉ mục mù, HIS giả lập
     Consent.ArchitectureTests/
 frontend/
   src/
@@ -123,7 +125,8 @@ frontend/
     api/                       # http client (ProblemDetails → ApiError, tự làm mới phiên), auth, admin (TanStack Query)
     auth/                      # AuthProvider, guards (RequireAuth/RequirePermission), permissions, tokenStore
     components/                # layout chung, PageHeader, PagePlaceholder
-    features/<module>/         # dashboard, account, admin (users, roles, departments); patients… (các sprint sau)
+    features/<module>/         # dashboard, account, admin (users, roles, departments), patients (QR CCCD, tiếp nhận,
+                               #   danh sách, hồ sơ, người đại diện); consent-forms… (các sprint sau)
     pages/                     # đăng nhập, đổi mật khẩu bắt buộc, 403, 404, lỗi
     utils/                     # định dạng ngày, quy tắc mật khẩu, tìm kiếm không dấu, lỗi form
     test/                      # setup Vitest, giả lập API, dữ liệu mẫu
@@ -139,7 +142,7 @@ docker-compose.yml, .env.example
 
 Bảng được thêm dần theo sprint.
 
-**Đã có (Sprint 1, migration `AddUsersRolesAndAudit`):** `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`.
+**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`.
 
 ```mermaid
 erDiagram
@@ -191,6 +194,37 @@ erDiagram
         datetimeoffset RevokedAtUtc
         string RevokedReason
         uuid ReplacedByTokenId
+    }
+```
+
+```mermaid
+erDiagram
+    Patients ||--o{ LegalRepresentatives : "có người đại diện"
+
+    Patients {
+        uuid Id PK
+        string PatientCode UK "mã HIS (lọc NULL)"
+        string FullName "Latin1_General_100_CI_AI"
+        date DateOfBirth
+        string Gender
+        string CitizenIdEncrypted "AES-256-GCM"
+        char64 CitizenIdHash UK "HMAC, chỉ mục mù (lọc NULL)"
+        string OldIdNumberEncrypted "AES-256-GCM"
+        string PhoneNumberEncrypted "AES-256-GCM"
+        string HealthInsuranceNumberEncrypted "AES-256-GCM"
+        date CitizenIdIssueDate
+        string PermanentAddress
+        datetimeoffset HisVerifiedAtUtc "NULL = chưa đối chiếu HIS"
+        rowversion RowVersion
+    }
+    LegalRepresentatives {
+        uuid Id PK
+        uuid PatientId FK
+        string FullName
+        string Relationship
+        string CitizenIdEncrypted "AES-256-GCM"
+        char64 CitizenIdHash "HMAC"
+        string PhoneNumberEncrypted "AES-256-GCM"
     }
 ```
 
@@ -373,6 +407,25 @@ sequenceDiagram
 - Sự kiện xác thực được ghi tường minh: đăng nhập thành công/thất bại, khóa tạm, đăng xuất, đổi mật khẩu, phát hiện dùng lại refresh token.
 - **Chỉ ghi thêm:** không có API sửa/xóa; `ConsentDbContext` từ chối lưu nếu bản ghi audit bị sửa/xóa; trigger `TR_AuditLogs_AppendOnly` trong SQL Server chặn mọi `UPDATE`/`DELETE` (kể cả truy cập trực tiếp CSDL).
 
+### 8.4. Bảo vệ dữ liệu người bệnh
+
+| Biện pháp | Cách làm |
+|---|---|
+| Mã hóa cột | Số CCCD, số CMND cũ, số điện thoại, mã thẻ BHYT (người bệnh và người đại diện) mã hóa **AES-256-GCM** (có xác thực toàn vẹn, nonce ngẫu nhiên). Định dạng lưu `v1:` + Base64 để xoay vòng khóa sau này. Thực hiện trong suốt bằng EF Core value converter: Domain và Application làm việc với giá trị gốc |
+| Chỉ mục mù | `CitizenIdHash` = HMAC-SHA256 (khóa bí mật riêng) của số CCCD, cập nhật tự động bằng `BlindIndexInterceptor`. Dùng để tìm chính xác và **chặn trùng bằng chỉ mục duy nhất trong CSDL**. Khác SHA-256 thường: không thể thử hết 10^12 số CCCD nếu không có khóa |
+| Khóa | `DataProtection:FieldEncryptionKey` và `DataProtection:BlindIndexKey`, mỗi khóa 32 byte ngẫu nhiên, hai khóa phải khác nhau; thiếu khóa thì API không khởi động. **Mất khóa mã hóa = mất dữ liệu đã mã hóa**: phải sao lưu khóa an toàn, tách khỏi bản sao lưu CSDL |
+| Không đưa vào URL | Tra cứu theo CCCD dùng `POST` với body; danh sách không bao giờ trả số đầy đủ |
+| Che khi hiển thị | API danh sách che số CCCD (`0361******25`); giao diện che CCCD/SĐT/BHYT mặc định, bấm biểu tượng con mắt mới hiện số đầy đủ |
+| Nhật ký truy cập | Mỗi lần xem hồ sơ (`Patients.Viewed`) và tra cứu CCCD (`Patients.LookedUp`) đều được ghi, không ghi số CCCD |
+| Audit | Thuộc tính gắn `[SensitiveData]` luôn được che `***` trong nhật ký thay đổi |
+| QR | Chuỗi QR gốc không được lưu; chỉ lưu các trường đã kiểm tra |
+
+### 8.5. Quét CCCD và tích hợp HIS
+
+- **Đọc QR:** phân tích ở trình duyệt (`cccdQrParser.ts`) để điền form ngay. Hỗ trợ máy quét 2D chế độ bàn phím (nội dung + Enter) và camera (`@zxing/browser`, chỉ tải khi mở camera, cần HTTPS). Có cảnh báo khi họ tên có ký tự lạ (máy quét chưa hỗ trợ tiếng Việt có dấu) hoặc số CCCD không khớp ngày sinh/giới tính. Máy chủ kiểm tra lại mọi trường (`PatientRequestValidator`, `CitizenIdNumber`).
+- **HIS:** `IHisGateway` (Application) với `FakeHisGateway` (Infrastructure) cho phát triển/kiểm thử. Kết nối FPT eHospital thật sẽ là một cài đặt khác của cùng interface khi có tài liệu API. Mọi lời gọi HIS có thời gian chờ (`His:TimeoutSeconds`); HIS lỗi không chặn việc tiếp nhận (cho nhập tay, đánh dấu "Chưa đối chiếu HIS").
+- **Đối chiếu khi lưu:** máy chủ tự gọi HIS lúc tạo/cập nhật hồ sơ để đặt `HisVerifiedAtUtc`, không tin cờ do client gửi.
+
 ## 9. Cấu hình và bí mật
 
 | Khóa cấu hình | Biến môi trường | Ghi chú |
@@ -389,7 +442,11 @@ sequenceDiagram
 | `Seed:Enabled` | `Seed__Enabled` | Tạo vai trò hệ thống và tài khoản quản trị đầu tiên khi khởi động |
 | `Seed:AdminPassword` | `Seed__AdminPassword` | **Bí mật**; chỉ dùng khi chưa có người dùng nào. Tài khoản `admin` phải đổi mật khẩu ở lần đăng nhập đầu |
 | `Seed:DemoData`, `Seed:DemoPassword` | `Seed__…` | Khoa và tài khoản demo, **chỉ cho môi trường phát triển/thử nghiệm** |
-| `SmartCa:*`, `His:*` | `SmartCa__SpPassword`… | Sprint 2–4; xem [tich-hop-smartca.md](tich-hop-smartca.md) |
+| `DataProtection:FieldEncryptionKey` | `DataProtection__FieldEncryptionKey` | **Bí mật**, Base64 của 32 byte ngẫu nhiên (`openssl rand -base64 32`); khóa mã hóa cột |
+| `DataProtection:BlindIndexKey` | `DataProtection__BlindIndexKey` | **Bí mật**, Base64 của 32 byte, khác khóa mã hóa; khóa chỉ mục mù |
+| `His:Provider` | `His__Provider` | Hiện chỉ `Fake` (giả lập); FPT eHospital bổ sung khi có tài liệu API |
+| `His:TimeoutSeconds` | `His__TimeoutSeconds` | Mặc định 5 (1–60) |
+| `SmartCa:*` | `SmartCa__SpPassword`… | Sprint 4; xem [tich-hop-smartca.md](tich-hop-smartca.md) |
 
 Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; chỉ commit `.env.example`.
 
@@ -420,3 +477,6 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-011 | Quyền nằm trong access token (claim `perm`) | Phân quyền nhanh, không truy vấn CSDL mỗi yêu cầu; độ trễ tối đa 15 phút khi đổi quyền là chấp nhận được (khóa tài khoản có hiệu lực ngay với refresh token) |
 | ADR-012 | Audit bằng EF Core interceptor + trigger chặn sửa/xóa | Không thể quên ghi audit ở từng service; ghi cùng giao dịch; bảo vệ cả khi truy cập CSDL trực tiếp |
 | ADR-013 | Collation `Latin1_General_100_CI_AI` cho cột tên dùng để tìm kiếm | Tìm không dấu "nguyen van duc" khớp "Nguyễn Văn Đức" (kể cả Đ/D). Collation `Vietnamese_*` coi ư, ơ, ê, đ là chữ riêng nên không đáp ứng |
+| ADR-014 | Mã hóa cột ở tầng ứng dụng (AES-256-GCM qua EF value converter) + chỉ mục mù HMAC, thay vì Always Encrypted/TDE | Bảo vệ cả khi lộ bản sao lưu/CSDL hoặc người quản trị CSDL xem trực tiếp; không phụ thuộc phiên bản/edition SQL Server và driver; vẫn tra cứu/chặn trùng được theo CCCD |
+| ADR-015 | Đọc QR CCCD ở trình duyệt; máy chủ kiểm tra lại từng trường | Điền form tức thì, chạy được với cả máy quét 2D và camera; máy chủ không nhận chuỗi QR gốc nên không có nguy cơ lưu nhầm |
+| ADR-016 | Máy chủ tự đối chiếu HIS khi lưu; HIS lỗi không chặn tiếp nhận | Trạng thái "đã đối chiếu HIS" đáng tin cậy; quầy tiếp đón vẫn làm việc được khi HIS gián đoạn |

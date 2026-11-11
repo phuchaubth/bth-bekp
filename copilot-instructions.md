@@ -64,7 +64,8 @@ scripts/
 - Do not include real patient data.
 - Every endpoint requires authentication by default (fallback policy); mark public endpoints with `[AllowAnonymous]` explicitly.
 - Protect actions with `[HasPermission(Permissions.X)]`; add new permission codes to `PermissionCatalog` and default roles in `SystemRoles`.
-- Entities whose changes must be audited implement `IAuditableEntity`; mask sensitive values in the audit interceptor. Never add update/delete paths for `AuditLogs`.
+- Entities whose changes must be audited implement `IAuditableEntity`; mark sensitive properties with `[SensitiveData]` so the audit interceptor masks them. Never add update/delete paths for `AuditLogs`.
+- Personal identifiers (CCCD, old ID, phone, health-insurance number) are encrypted at rest via the EF value converter (`ConfigureEncryption`) and looked up through the HMAC blind index; never put them in URLs or logs, and return them masked in lists.
 - Validate all input.
 - Use secure defaults.
 

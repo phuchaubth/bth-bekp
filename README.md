@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 1 hoàn thành (đăng nhập, phân quyền theo vai trò, nhật ký audit, quản trị người dùng/vai trò/khoa). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, tra cứu HIS giả lập, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -35,6 +35,7 @@ Yêu cầu: Docker (có Docker Compose v2).
 ```bash
 cp .env.example .env
 # Mở .env và điền: MSSQL_SA_PASSWORD, JWT_SIGNING_KEY (openssl rand -base64 48),
+# FIELD_ENCRYPTION_KEY và BLIND_INDEX_KEY (mỗi khóa: openssl rand -base64 32, hai khóa khác nhau),
 # SEED_ADMIN_PASSWORD, SEED_DEMO_PASSWORD (≥ 10 ký tự, có chữ hoa, chữ thường, chữ số, ký tự đặc biệt)
 docker compose up -d --build
 ```
@@ -52,11 +53,21 @@ docker compose up -d --build
 | `admin` | Quản trị hệ thống | `SEED_ADMIN_PASSWORD`; **phải đổi ở lần đăng nhập đầu** |
 | `bacsi.demo`, `dieuduong.demo`, `tiepdon.demo`, `truongkhoa.demo`, `mauphieu.demo`, `baocao.demo`, `kiemtra.demo` | Bác sĩ, Điều dưỡng, Tiếp đón, Trưởng khoa, Quản lý mẫu phiếu, Báo cáo, Kiểm tra | `SEED_DEMO_PASSWORD` |
 
-Tài khoản và khoa demo chỉ là dữ liệu giả lập; tắt bằng `SEED_DEMO_DATA=false`. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
+Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") chỉ là dữ liệu giả lập; tắt bằng `SEED_DEMO_DATA=false`.
+
+**Thử quét CCCD không cần thẻ thật:** ở màn hình *Người bệnh → Tiếp nhận người bệnh*, nhấn vào ô quét rồi dán/gõ một chuỗi QR giả lập và nhấn Enter, ví dụ:
+
+```
+036188000125||Phạm Thị Dung|05041988|Nữ|Số 9 Đường Thử Nghiệm, Phường Mẫu|01062021
+```
+
+HIS đang ở chế độ giả lập: số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
+
+> **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT được mã hóa bằng `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
 ## Phát triển cục bộ
 
-Yêu cầu: .NET SDK 10, Node.js 22, Docker (để chạy SQL Server).
+Yêu cầu: .NET SDK 10, Node.js 24 LTS (từ 24.15), Docker (để chạy SQL Server).
 
 **1. SQL Server** (chỉ mở cổng trên `127.0.0.1:14333`):
 
@@ -73,6 +84,8 @@ dotnet user-secrets set "ConnectionStrings:Default" \
   "Server=localhost,14333;Database=ConsentManagement;User Id=sa;Password=<mật khẩu trong .env>;Encrypt=True;TrustServerCertificate=True" \
   --project src/Consent.Api
 dotnet user-secrets set "Jwt:SigningKey" "<chuỗi ngẫu nhiên ≥ 32 ký tự>" --project src/Consent.Api
+dotnet user-secrets set "DataProtection:FieldEncryptionKey" "$(openssl rand -base64 32)" --project src/Consent.Api
+dotnet user-secrets set "DataProtection:BlindIndexKey" "$(openssl rand -base64 32)" --project src/Consent.Api
 dotnet user-secrets set "Seed:AdminPassword" "<mật khẩu quản trị ban đầu>" --project src/Consent.Api
 dotnet user-secrets set "Seed:DemoPassword" "<mật khẩu tài khoản demo>" --project src/Consent.Api
 dotnet run --project src/Consent.Api --launch-profile http
@@ -124,6 +137,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 - Không commit bí mật: mật khẩu, chuỗi kết nối, khóa ký JWT, thông tin SmartCA/HIS. Dùng biến môi trường, `dotnet user-secrets` hoặc file `.env` (đã nằm trong `.gitignore`). Thiếu khóa ký JWT thì API không khởi động.
 - Đăng nhập: mật khẩu băm PBKDF2 (ASP.NET Core Identity), khóa tạm 15 phút sau 5 lần sai, giới hạn tần suất theo IP. Access token 15 phút chỉ giữ trong bộ nhớ trình duyệt; refresh token trong cookie `HttpOnly` + `SameSite=Strict`, xoay vòng mỗi lần dùng và thu hồi cả phiên khi phát hiện dùng lại.
 - Mọi API mặc định yêu cầu đăng nhập; phân quyền theo quyền (permission) gán cho vai trò.
+- Dữ liệu người bệnh: số CCCD, CMND cũ, số điện thoại, mã BHYT được mã hóa AES-256-GCM trong CSDL; tra cứu/chặn trùng CCCD qua chỉ mục mù HMAC; danh sách chỉ hiện số đã che; mỗi lần xem hồ sơ đều được ghi nhật ký; số CCCD không bao giờ nằm trong URL.
 - Nhật ký audit ghi mọi thao tác thêm/sửa/xóa và sự kiện đăng nhập; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
 - API trả lỗi dạng ProblemDetails tiếng Việt, không lộ chi tiết nội bộ; có security headers; OpenAPI chỉ bật ở Development.
 - Cấu hình Docker Compose dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức dùng tài khoản SQL riêng với quyền tối thiểu (hướng dẫn trong `docs/trien-khai.md`, Sprint 6).
@@ -144,7 +158,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 |---|---|---|
 | 0 | Nền móng: khung backend/frontend, Docker, CI, tài liệu yêu cầu và kiến trúc | ✅ Hoàn thành |
 | 1 | Xác thực, phân quyền (RBAC), audit log, quản trị người dùng/vai trò/khoa | ✅ Hoàn thành |
-| 2 | Người bệnh, quét QR CCCD, tích hợp HIS (giả lập trước) | Chưa bắt đầu |
+| 2 | Người bệnh, quét QR CCCD, tích hợp HIS (giả lập trước) | ✅ Hoàn thành (kết nối FPT eHospital thật chờ tài liệu API) |
 | 3 | Mẫu phiếu và lập phiếu | Chưa bắt đầu |
 | 4 | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | Chưa bắt đầu |
 | 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |

@@ -6,11 +6,18 @@ export class ApiError extends Error {
   readonly code?: string
   readonly traceId?: string
   readonly fieldErrors?: Record<string, string[]>
+  /** Toàn bộ ProblemDetails (gồm thông tin bổ sung, ví dụ existingPatientId). */
+  readonly problem?: Record<string, unknown>
 
   constructor(
     message: string,
     status: number,
-    options: { code?: string; traceId?: string; fieldErrors?: Record<string, string[]> } = {},
+    options: {
+      code?: string
+      traceId?: string
+      fieldErrors?: Record<string, string[]>
+      problem?: Record<string, unknown>
+    } = {},
   ) {
     super(message)
     this.name = 'ApiError'
@@ -18,6 +25,7 @@ export class ApiError extends Error {
     this.code = options.code
     this.traceId = options.traceId
     this.fieldErrors = options.fieldErrors
+    this.problem = options.problem
   }
 }
 
@@ -119,5 +127,6 @@ async function toApiError(response: Response): Promise<ApiError> {
     code: problem?.code,
     traceId: problem?.traceId,
     fieldErrors: problem?.errors,
+    problem: problem as Record<string, unknown> | undefined,
   })
 }

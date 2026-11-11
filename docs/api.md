@@ -1,6 +1,6 @@
 # Tài liệu API — Quản lý Phiếu đồng thuận
 
-> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 1 — xác thực, phân quyền, quản trị, nhật ký).
+> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 2 — thêm người bệnh, tra cứu theo CCCD, HIS).
 > Ở môi trường Development, đặc tả OpenAPI tự sinh có tại `GET /openapi/v1.json`.
 >
 > Mọi ví dụ dưới đây dùng **dữ liệu giả lập**.
@@ -10,7 +10,7 @@
 | Chủ đề | Quy ước |
 |---|---|
 | Địa chỉ gốc | Cùng domain với giao diện web (qua reverse proxy): `/api/v1/...` |
-| Định dạng | JSON (UTF-8), tên trường camelCase, thời gian ISO 8601 UTC (ví dụ `2026-11-11T08:30:00+00:00`) |
+| Định dạng | JSON (UTF-8), tên trường camelCase, thời gian ISO 8601 UTC (ví dụ `2026-11-11T08:30:00+00:00`), ngày dạng `yyyy-MM-dd`, giá trị liệt kê (enum) dạng chuỗi (ví dụ `"Female"`) |
 | Xác thực | Header `Authorization: Bearer <accessToken>`. **Mọi endpoint đều yêu cầu đăng nhập**, trừ các endpoint ghi rõ "Không cần đăng nhập" |
 | Phân quyền | Mỗi endpoint ghi rõ quyền cần có (cột "Quyền"). Thiếu quyền → `403` |
 | Lỗi | ProblemDetails (RFC 9457), `Content-Type: application/problem+json`, có `title` tiếng Việt, `code` (mã ổn định để client xử lý), `traceId` (mã truy vết) |
@@ -179,7 +179,80 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 
 ---
 
-## 6. Nhật ký audit (`/api/v1/audit-logs`)
+## 6. Người bệnh (`/api/v1/patients`)
+
+**Bảo vệ dữ liệu cá nhân**
+
+- Số CCCD, số CMND cũ, số điện thoại, mã thẻ BHYT (của người bệnh và người đại diện) được **mã hóa AES-256-GCM** trong CSDL.
+- Tra cứu và phát hiện trùng số CCCD dùng **chỉ mục mù** (HMAC-SHA256 có khóa bí mật), không cần giải mã hay lưu số gốc dạng đọc được.
+- **Số CCCD không bao giờ nằm trong URL** (tránh lộ qua log máy chủ, proxy, lịch sử trình duyệt): tra cứu theo CCCD dùng `POST /lookup` với số CCCD trong body.
+- Danh sách chỉ trả số CCCD **đã che** (`0361******25`). Hồ sơ chi tiết trả số đầy đủ, và **mỗi lần xem đều được ghi nhật ký** (`Patients.Viewed`).
+- Nhật ký audit luôn che các giá trị nhạy cảm (`***`).
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**) |
+| GET | `/api/v1/patients/{id}` | `patients.read` | Hồ sơ đầy đủ, kèm người đại diện; ghi nhật ký `Patients.Viewed` |
+| POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS; ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
+| POST | `/api/v1/patients` | `patients.manage` | Tạo hồ sơ → `201`. Trùng CCCD → `409 patients.duplicate_citizen_id` kèm `existingPatientId`; trùng mã người bệnh → `409 patients.duplicate_patient_code` |
+| PUT | `/api/v1/patients/{id}` | `patients.manage` | Cập nhật hồ sơ |
+| POST | `/api/v1/patients/{id}/representatives` | `patients.manage` | Thêm người đại diện/người ký thay → trả hồ sơ cập nhật |
+| PUT | `/api/v1/patients/{id}/representatives/{representativeId}` | `patients.manage` | Sửa người đại diện |
+| DELETE | `/api/v1/patients/{id}/representatives/{representativeId}` | `patients.manage` | Xóa người đại diện |
+
+Dữ liệu tạo/cập nhật người bệnh (chỉ `fullName`, `dateOfBirth`, `gender` là bắt buộc):
+
+```json
+{
+  "fullName": "Phạm Thị Dung (giả lập)",
+  "dateOfBirth": "1988-04-05",
+  "gender": "Female",
+  "citizenId": "036188000125",
+  "oldIdNumber": null,
+  "citizenIdIssueDate": "2021-06-01",
+  "permanentAddress": "Số 9 Đường Thử Nghiệm, Phường Mẫu",
+  "currentAddress": null,
+  "phoneNumber": "0900000125",
+  "ethnicity": "Kinh",
+  "occupation": null,
+  "nationality": "Việt Nam",
+  "healthInsuranceNumber": null,
+  "patientCode": null
+}
+```
+
+**Quy tắc kiểm tra** (lỗi trả về theo từng trường, tiếng Việt):
+
+| Trường | Quy tắc |
+|---|---|
+| `citizenId` | 12 chữ số, 3 số đầu là mã tỉnh 001–096; **số thứ 4 (thế kỷ + giới tính) và số 5–6 (năm sinh) phải khớp** `dateOfBirth` và `gender` |
+| `dateOfBirth` | Từ 01/01/1900 đến hôm nay |
+| `citizenIdIssueDate` | Sau ngày sinh, không sau hôm nay |
+| `oldIdNumber` | 9 hoặc 12 chữ số |
+| `phoneNumber` | Bắt đầu bằng `0` hoặc `+84`, 9–10 chữ số tiếp theo |
+| `healthInsuranceNumber` | 15 ký tự (2 chữ + 13 số) hoặc mã số BHXH 10 chữ số |
+| `patientCode` | Chữ không dấu, số, `-`, `_`; tối đa 50 ký tự |
+
+Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth", "gender", "phoneNumber", "address" }`. `relationship` ∈ `Father`, `Mother`, `Spouse`, `Child`, `Sibling`, `Guardian`, `Relative`, `Other`.
+
+**Đối chiếu HIS (FPT eHospital)**
+
+- `POST /lookup` trả `hisStatus`: `Found` (kèm `hisPatient`: mã người bệnh, đối tượng BHYT/Dịch vụ, mã thẻ BHYT, đợt khám hiện tại), `NotFound`, hoặc `Unavailable` (HIS lỗi/quá thời gian `His:TimeoutSeconds`, mặc định 5 giây).
+- Khi **lưu** hồ sơ, máy chủ tự đối chiếu lại với HIS (không tin cờ từ client): tìm thấy và mã người bệnh khớp (hoặc để trống) → `hisVerified: true`, `patientCode` lấy từ HIS. HIS không khả dụng → vẫn lưu, `hisVerified: false` ("Chưa đối chiếu HIS").
+- Đổi mã người bệnh thủ công sẽ xóa trạng thái đã đối chiếu.
+
+**HIS giả lập** (môi trường phát triển/kiểm thử, `His:Provider = Fake`; kết nối FPT eHospital thật làm khi có tài liệu API). Kết quả xác định theo số CCCD:
+
+| Số CCCD | Kết quả |
+|---|---|
+| 3 số cuối `999` | HIS không khả dụng (`Unavailable`) |
+| Số cuối `0` | Không tìm thấy (`NotFound`) |
+| Số cuối chẵn khác 0 | Tìm thấy, đối tượng BHYT |
+| Số cuối lẻ | Tìm thấy, đối tượng Dịch vụ |
+
+---
+
+## 7. Nhật ký audit (`/api/v1/audit-logs`)
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
@@ -191,15 +264,16 @@ Hành động (`action`) được ghi:
 
 | Hành động | Nguồn |
 |---|---|
-| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); mật khẩu đã băm luôn hiển thị `***` |
+| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT) luôn hiển thị `***` |
 | `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`) |
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
+| `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
 
 ---
 
-## 7. Hệ thống
+## 8. Hệ thống
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
