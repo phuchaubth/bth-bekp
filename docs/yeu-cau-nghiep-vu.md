@@ -15,7 +15,7 @@ Số hóa việc lập, ký và lưu trữ các phiếu đồng thuận/cam kế
 
 ### 1.2. Phạm vi giai đoạn 1
 
-> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA**. Các yêu cầu FR-HIS-01…03 và FR-SIGN (SmartCA) giữ nguyên làm thiết kế, sẽ thực hiện khi bệnh viện cần. Ba mẫu phiếu dùng [mẫu đề xuất](mau-phieu-de-xuat.md) trong khi chờ duyệt.
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA**. Các yêu cầu FR-HIS-01…03 và FR-SIGN (SmartCA) giữ nguyên làm thiết kế, sẽ thực hiện khi bệnh viện cần. Trong giai đoạn này, phiếu được **ký tay trên máy tính bảng** (mục 3.6a). Ba mẫu phiếu dùng [mẫu đề xuất](mau-phieu-de-xuat.md) trong khi chờ duyệt.
 
 | Trong phạm vi | Ngoài phạm vi (giai đoạn sau) |
 |---|---|
@@ -111,7 +111,9 @@ Mức ưu tiên: **M** = bắt buộc giai đoạn 1, **S** = nên có. Cột Sp
 | FR-FORM-05 | Thu hồi phiếu đã hoàn tất, bắt buộc nhập lý do; lập phiếu mới tham chiếu phiếu cũ | M | 4 |
 | FR-FORM-06 | Ghi nhận quyết định của người bệnh theo nội dung mẫu (ví dụ chọn khám DV hay BHYT; đồng ý/từ chối) | M | 3 |
 
-### 3.6. Ký số (SIGN)
+### 3.6. Ký số (SIGN) — tạm hoãn
+
+> Quyết định 11/11/2026: chưa tích hợp SmartCA. Các yêu cầu FR-SIGN dưới đây thực hiện khi bật lại; giai đoạn hiện tại dùng **ký tay trên máy tính bảng** (mục 3.6a).
 
 | Mã | Yêu cầu | Ưu tiên | Sprint |
 |---|---|---|---|
@@ -124,6 +126,16 @@ Mức ưu tiên: **M** = bắt buộc giai đoạn 1, **S** = nên có. Cột Sp
 | FR-SIGN-07 | Màn hình ký hiển thị mã giao dịch trùng với mã trên app SmartCA và đếm ngược thời gian chờ (300 giây) | M | 4 |
 | FR-SIGN-08 | Xử lý được: thành công, người ký từ chối, hết hạn, lỗi mạng/hệ thống (thử lại có giới hạn) | M | 4 |
 | FR-SIGN-09 | Lý do ký tay/ký thay chọn từ **danh mục cấu hình được** (bệnh viện bổ sung danh sách chính thức sau) | M | 4 |
+
+### 3.6a. Ký tay trên máy tính bảng (HSIGN) — đang áp dụng
+
+| Mã | Yêu cầu | Ưu tiên | Sprint |
+|---|---|---|---|
+| FR-HSIGN-01 | Người bệnh, hoặc người đại diện chọn từ hồ sơ, **ký tay trên máy tính bảng** bằng ngón tay hoặc bút cảm ứng; có "Ký lại"; khung trống thì không xác nhận được | M | 4 |
+| FR-HSIGN-02 | **Chế độ ký** toàn màn hình: chỉ hiện nội dung phiếu (chỉ đọc) và khung ký; thoát phải nhập lại mật khẩu nhân viên | M | 4 |
+| FR-HSIGN-03 | Chỉ lưu **ảnh chữ ký (PNG)**, không lưu dữ liệu nét ký; ảnh chỉ người có quyền xem phiếu mới xem được | M | 4 |
+| FR-HSIGN-04 | PDF hoàn tất có ảnh chữ ký đúng ô ký, kèm họ tên (quan hệ, số CCCD nếu là người đại diện) và thời điểm ký. Lưu mã băm SHA-256, khóa phiếu, ghi nhật ký | M | 4 |
+| FR-HSIGN-05 | Người ký phía bệnh viện (theo cấu hình mẫu) xác nhận bằng tài khoản; có ký tay thêm hay không **chờ bệnh viện chọn** | M | 4 |
 
 ### 3.7. Xuất dữ liệu, báo cáo, nhật ký (EXP, RPT, AUD)
 

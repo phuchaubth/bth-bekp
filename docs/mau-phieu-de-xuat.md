@@ -53,7 +53,10 @@ Nhân viên **sửa được** các trường tự điền trước khi trình k
   - Phiếu ghi rõ họ tên, quan hệ với người bệnh và số CCCD của người đại diện.
   - Thông tin này chọn từ danh sách người đại diện trong hồ sơ, đã quét CCCD ở màn hình 10.
 - **Ngưỡng tuổi tự ký** và cách xử lý khi người bệnh không ký được (không biết chữ, khuyết tật…) **chờ pháp chế xác nhận** (mục 6).
-- **Hình thức ký** chưa chốt, vì SmartCA đang tạm hoãn. Có thể là ký tay trên máy tính bảng, hoặc in ra ký giấy rồi lưu bản quét. Mẫu phiếu không phụ thuộc lựa chọn này: khối chữ ký chỉ in "(Ký, ghi rõ họ tên)".
+- **Hình thức ký (đã chốt 11/11/2026): ký tay trên máy tính bảng.**
+  - Ảnh chữ ký được chèn vào ô ký trên phiếu PDF, kèm họ tên và thời điểm ký.
+  - Khối chữ ký vẫn in "(Ký, ghi rõ họ tên)" như mẫu giấy.
+  - Quy trình chi tiết ở [kế hoạch, mục 2.5a](KE_HOACH_TRIEN_KHAI.md#25a-ký-tay-trên-máy-tính-bảng-đang-áp-dụng-quyết-định-10).
 
 ### 1.4. Kiểu trường dùng trong mẫu
 
@@ -104,7 +107,7 @@ Nhân viên **sửa được** các trường tự điền trước khi trình k
 ## 3. TT-01 — Phiếu cung cấp thông tin và cam kết chung
 
 **Mục đích:** bệnh viện cung cấp các thông tin cần thiết cho người bệnh và ghi nhận các lựa chọn chung. Người bệnh hoặc người đại diện xác nhận đã được cung cấp, đã hiểu, và ghi nhận các lựa chọn đó.
-**Cách hiểu đang áp dụng:** theo mô tả đã xác nhận trong kế hoạch ("người bệnh xác nhận đã được cung cấp thông tin"). Nếu bệnh viện muốn đây là phiếu **người bệnh khai thông tin** (tiền sử, dị ứng…), xin báo lại để chỉnh.
+**Đã xác nhận (11/11/2026):** đây là phiếu bệnh viện cung cấp thông tin, người bệnh xác nhận đã được cung cấp. Không phải phiếu người bệnh khai thông tin.
 **Thời điểm lập:** lần đầu đến khám hoặc khi nhập viện. Có hiệu lực cho đến khi người bệnh thay đổi lựa chọn.
 
 ### 3.1. Phần A — Nội dung đã được cung cấp
@@ -229,8 +232,7 @@ Kèm theo: **thời điểm hẹn đánh giá lại** (bắt buộc khi nguy cơ
    - Các hình thức khám và danh mục dịch vụ theo yêu cầu đang áp dụng.
    - Thời hạn xuất trình thẻ BHYT và giấy chuyển tuyến.
    - Có cần ghi số tiền tạm ứng hay không.
-3. **TT-01:**
-   - Xác nhận cách hiểu "phiếu cung cấp thông tin".
+3. **TT-01** (cách hiểu đã được xác nhận):
    - Danh sách nội dung ở phần A và số đường dây nóng.
    - Có lấy đồng ý dùng dữ liệu cho đào tạo, nghiên cứu hay không. Mục này cần pháp chế rà soát theo quy định về bảo vệ dữ liệu cá nhân.
 4. **TN-01:**
@@ -241,5 +243,5 @@ Kèm theo: **thời điểm hẹn đánh giá lại** (bắt buộc khi nguy cơ
    - Ngưỡng tuổi người bệnh tự ký.
    - Cách xử lý khi người bệnh không ký được.
    - Vai trò ký phía bệnh viện của từng mẫu (đề xuất ở bảng đầu trang).
-6. **Hình thức xác nhận khi chưa có SmartCA:** ký tay trên máy tính bảng, in ra ký giấy rồi lưu bản quét, hay cả hai.
+6. **Phía bệnh viện khi ký tay:** chỉ xác nhận bằng tài khoản (đề xuất), hay ký tay thêm trên máy tính bảng. Phía người bệnh đã chốt ký tay trên máy tính bảng.
 7. **Pháp chế rà soát** toàn bộ câu chữ cam kết và căn cứ pháp lý: Luật Khám bệnh, chữa bệnh số 15/2023/QH15; pháp luật về bảo hiểm y tế và bảo vệ dữ liệu cá nhân hiện hành.

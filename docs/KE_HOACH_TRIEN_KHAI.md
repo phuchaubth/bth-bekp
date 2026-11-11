@@ -1,7 +1,7 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
 > Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0, 1 và 2 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
-> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10); người bệnh **ký tay trên máy tính bảng** (quyết định số 10, mục 2.5a). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
@@ -97,7 +97,7 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 
 ### 2.5. Ký số VNPT SmartCA và các phương án ký của người bệnh
 
-> **Tạm hoãn** (quyết định 9): chưa tích hợp SmartCA. Thiết kế dưới đây giữ nguyên để dùng khi bật lại.
+> **Tạm hoãn** (quyết định 9): chưa tích hợp SmartCA. Thiết kế dưới đây giữ nguyên để dùng khi bật lại. Trong giai đoạn hiện tại, phiếu được **ký tay trên máy tính bảng** (mục 2.5a).
 
 #### Nguyên tắc chung
 
@@ -148,6 +148,29 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 - Thông tin xác thực SmartCA chỉ lấy từ **biến môi trường / secret store**, tuyệt đối không commit.
 - Mọi giao dịch ký được ghi bảng `SignatureTransactions` và audit log. Hệ thống xử lý được các trường hợp hết hạn, người ký từ chối, lỗi mạng (thử lại có giới hạn).
 - Sau khi ký, hệ thống kiểm tra lại chữ ký trong PDF và lưu thông tin chứng thư (serial, chủ thể, thời điểm ký).
+
+### 2.5a. Ký tay trên máy tính bảng (đang áp dụng, quyết định 10)
+
+Thay cho ký số SmartCA trong giai đoạn hiện tại. Khác phương án 2 ở mục 2.5: đây là cách ký chính, không cần chọn lý do và không cần người chứng kiến ký số.
+
+- **Người ký phía người bệnh:**
+  - Người bệnh tự ký; hoặc
+  - Người đại diện, chọn từ danh sách người đại diện trong hồ sơ (đã quét CCCD). Phiếu ghi họ tên, quan hệ và số CCCD của người đại diện.
+- **Chế độ ký:**
+  - Nhân viên bấm "Trình ký", máy tính bảng chuyển sang màn hình ký toàn màn hình. Màn hình chỉ có nội dung phiếu (chỉ đọc, phóng to được) và khung ký; menu bị ẩn.
+  - **Muốn thoát chế độ ký phải nhập lại mật khẩu nhân viên**, để người bệnh cầm máy không vào được phần khác của hệ thống.
+- **Khung ký:**
+  - Ký bằng ngón tay hoặc bút cảm ứng; có nút "Ký lại"; khung trống thì không xác nhận được.
+  - Hệ thống chỉ lưu **ảnh chữ ký (PNG)**. Không lưu dữ liệu nét ký và thời gian từng nét, để không phát sinh dữ liệu sinh trắc học.
+- **Phía bệnh viện:** người ký theo cấu hình mẫu xác nhận bằng tài khoản đang đăng nhập. Có ký tay thêm hay không: **chờ bệnh viện chọn** (mục 10, việc còn chờ số 1).
+- **Hoàn tất:**
+  - Sinh PDF có ảnh chữ ký đúng ô ký, kèm họ tên và thời điểm ký.
+  - Lưu PDF cùng mã băm SHA-256; nếu file bị sửa sau khi lưu, mã băm không còn khớp.
+  - Khóa nội dung phiếu và ghi nhật ký: người trình ký, người ký, thời điểm, thiết bị.
+- **Thu hồi:** phiếu đã ký không sửa được. Muốn thay đổi thì thu hồi (bắt buộc lý do, có nhật ký) rồi lập phiếu mới.
+- **Giới hạn:** chữ ký tay trên máy tính bảng là chữ ký điện tử thông thường, **không phải chữ ký số**.
+  - Pháp chế cần xác nhận giá trị pháp lý cho 3 loại phiếu giai đoạn 1.
+  - Khi tích hợp SmartCA, có thể bổ sung chữ ký số lên PDF mà không phải đổi quy trình ký tay.
 
 ### 2.6. Tích hợp HIS FPT eHospital (giai đoạn 1)
 
@@ -436,9 +459,29 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - PDF hiển thị đúng tiếng Việt có dấu, đủ thông tin người bệnh và nội dung.
 - Danh sách lọc/phân trang ở server; người dùng chỉ thấy phiếu trong phạm vi khoa (trừ vai trò toàn viện).
 
-### Sprint 4 – Ký số VNPT SmartCA cho người bệnh và bác sĩ — TẠM HOÃN
+### Sprint 4 – Ký tay trên máy tính bảng (quyết định 10)
+- **Màn hình 6:** ghi nhận Đồng ý/Từ chối; chọn người ký phía người bệnh (người bệnh, hoặc người đại diện trong hồ sơ).
+- **Chế độ ký:** toàn màn hình trên máy tính bảng; thoát phải nhập lại mật khẩu nhân viên.
+- **Khung ký:** canvas dùng Pointer Events (ngón tay, bút cảm ứng, chuột); có "Ký lại", chặn khung trống. Lưu ảnh PNG, không lưu dữ liệu nét.
+- **Phía bệnh viện:** xác nhận bằng tài khoản; ký tay thêm nếu bệnh viện chọn.
+- **Hoàn tất:** chèn ảnh chữ ký vào PDF (Sprint 3 đã sinh PDF); lưu PDF và SHA-256; khóa phiếu; ghi nhật ký đầy đủ; thu hồi phải có lý do.
 
-> Quyết định 9 (11/11/2026): chưa tích hợp SmartCA. Nội dung dưới đây giữ làm thiết kế khi bật lại. Hình thức xác nhận phiếu trong thời gian chưa có SmartCA **chờ bệnh viện chọn** (mục 10, việc còn chờ số 1) và sẽ được lập thành sprint riêng sau Sprint 3.
+**Tiêu chí nghiệm thu**
+- **Dữ liệu chữ ký:**
+  - Khung ký trống → không xác nhận được (test giao diện + API 422).
+  - Ảnh chữ ký không phải PNG hợp lệ hoặc quá lớn → API từ chối.
+  - Không lưu dữ liệu nét ký. Chỉ người có quyền xem phiếu mới xem được ảnh chữ ký.
+- **Chế độ ký:** chưa nhập đúng mật khẩu nhân viên thì không thoát được (test giao diện + API).
+- **PDF:**
+  - Khi người đại diện ký: PDF ghi đúng họ tên, quan hệ, số CCCD của người đại diện (có test).
+  - PDF hoàn tất có ảnh chữ ký đúng ô ký, kèm họ tên và thời điểm ký.
+  - SHA-256 lưu trong CSDL khớp file (integration test).
+- **Sau khi ký:** phiếu không sửa được (test API); thu hồi bắt buộc lý do và có audit.
+- **Thiết bị:** ký được trên máy tính bảng (Safari iPad, Chrome Android) bằng ngón tay và bút. Kiểm bằng E2E giả lập cảm ứng, và thử trên máy thật khi bệnh viện có máy.
+
+### Giai đoạn sau – Ký số VNPT SmartCA cho người bệnh và bác sĩ (TẠM HOÃN)
+
+> Quyết định 9 (11/11/2026): chưa tích hợp SmartCA. Nội dung dưới đây giữ làm thiết kế khi bật lại. Giai đoạn hiện tại dùng ký tay trên máy tính bảng (Sprint 4).
 
 - Ghi nhận Đồng ý/Từ chối, chọn người ký (người bệnh/người đại diện) (màn hình 6).
 - Phương án 2: ký tay trên thiết bị cảm ứng cho người bệnh, bắt buộc lý do, có cấu hình bật/tắt.
@@ -504,7 +547,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 |---|---|---|
 | 1 | Ký số (*tạm hoãn, xem #9*) | Người bệnh và phía bệnh viện đều ký **VNPT SmartCA** (API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md)). Hợp đồng cho phép người bệnh dùng SmartCA cá nhân; **lượt ký trừ vào gói của người bệnh**, hết lượt thì gợi ý PA3 rồi PA2 |
 | 1a | Phương án ký phía người bệnh | **PA1 → PA3 → PA2**. PA2 (ký tay) bắt buộc nhân viên chứng kiến ký SmartCA; người chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**. Danh sách lý do ký tay/ký thay **bệnh viện bổ sung sau** (danh mục cấu hình được) |
-| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Đánh giá nguy cơ té ngã. Dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** (chờ bệnh viện duyệt) |
+| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Đánh giá nguy cơ té ngã. Dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** (chờ bệnh viện duyệt). **Phiếu cung cấp thông tin: bệnh viện cung cấp, người bệnh xác nhận** (đã xác nhận 11/11/2026) |
 | 3 | HIS | **FPT eHospital**, chỉ đọc. **Tạm chưa kết nối** (xem #9) |
 | 4 | Quy mô | Mức vừa: 50–200 người dùng đồng thời, 500–3.000 phiếu/ngày |
 | 5 | Triển khai | Máy chủ **Windows Server** tại bệnh viện |
@@ -512,14 +555,15 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 7 | Repo | Repo `bth-bekp` này, module `Consent.*` |
 | 8 | Người ký phía bệnh viện | **Cấu hình theo từng mẫu phiếu** (bác sĩ / điều dưỡng / tiếp đón); người chứng kiến (PA2) phải khác người ký phía bệnh viện |
 | 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
+| 10 | Hình thức ký khi chưa có SmartCA (11/11/2026) | **Người bệnh (hoặc người đại diện) ký tay trên máy tính bảng.** Ảnh chữ ký chèn vào PDF, lưu mã băm, khóa phiếu (mục 2.5a, ADR-018) |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. **Hình thức xác nhận phiếu khi chưa có SmartCA** (cần chốt trước sprint ký phiếu): ký tay trên máy tính bảng (ảnh chữ ký đưa vào PDF, nhân viên xác nhận bằng tài khoản), in phiếu ký giấy rồi quét/chụp lưu lại, hay cả hai.
-2. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật).
+1. **Phía bệnh viện khi ký tay** (cần trước Sprint 4): người ký theo cấu hình mẫu chỉ **xác nhận bằng tài khoản** (PDF ghi họ tên, chức danh, thời điểm xác nhận), hay **ký tay thêm** trên máy tính bảng. Đề xuất: xác nhận bằng tài khoản, vì nhanh hơn với 500–3.000 phiếu/ngày và gắn chặt với danh tính đăng nhập.
+2. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật). Cách hiểu phiếu TT-01 đã được xác nhận.
 3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
 4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
 
@@ -529,4 +573,4 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 ## 11. Bước tiếp theo
 
-**Sprint 3** (mẫu phiếu, lập phiếu, sinh PDF) dựng trên [mẫu phiếu đề xuất](mau-phieu-de-xuat.md); góp ý của bệnh viện chỉ thay nội dung mẫu, không chặn tiến độ. Sprint ký phiếu được lập sau khi bệnh viện chọn hình thức xác nhận (việc còn chờ số 1).
+**Sprint 3** (mẫu phiếu, lập phiếu, sinh PDF) dựng trên [mẫu phiếu đề xuất](mau-phieu-de-xuat.md); góp ý của bệnh viện chỉ thay nội dung mẫu, không chặn tiến độ. Tiếp theo là **Sprint 4: ký tay trên máy tính bảng** (mục 2.5a).

@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026); người bệnh sẽ **ký tay trên máy tính bảng**. Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -160,6 +160,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | 1 | Xác thực, phân quyền (RBAC), audit log, quản trị người dùng/vai trò/khoa | ✅ Hoàn thành |
 | 2 | Người bệnh, quét QR CCCD (HIS tạm chưa kết nối) | ✅ Hoàn thành |
 | 3 | Mẫu phiếu và lập phiếu (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | Chưa bắt đầu |
-| 4 | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn; hình thức xác nhận phiếu khi chưa có SmartCA chờ bệnh viện chọn |
+| 4 | Ký tay trên máy tính bảng (thay cho SmartCA trong giai đoạn hiện tại) | Chưa bắt đầu |
+| — | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn |
 | 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |
 | 6 | Hoàn thiện, rà soát bảo mật, hướng dẫn triển khai | Chưa bắt đầu |
