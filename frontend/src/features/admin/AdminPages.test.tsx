@@ -160,7 +160,7 @@ describe('Vai trò và quyền', () => {
     renderApp('/quan-tri/vai-tro')
     const user = userEvent.setup()
 
-    await user.click(await screen.findByText('DOCTOR'))
+    await user.click(await screen.findByRole('menuitem', { name: /Bác sĩ/ }))
     const save = await screen.findByRole('button', { name: 'Lưu thay đổi' })
     expect(save).toBeDisabled()
 

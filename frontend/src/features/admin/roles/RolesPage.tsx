@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Checkbox, Col, Flex, List, Row, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Checkbox, Col, Flex, Menu, Row, Space, Spin, Tag, Typography } from 'antd'
 import { useMemo, useState } from 'react'
 import {
   adminApi,
@@ -71,7 +71,7 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="Vai trò Quản trị hệ thống luôn có toàn bộ quyền và không thể thay đổi."
+          title="Vai trò Quản trị hệ thống luôn có toàn bộ quyền và không thể thay đổi."
         />
       )}
       {groups.map(([group, permissions]) => (
@@ -112,7 +112,7 @@ export function RolesPage() {
   }
 
   if (roles.isError || catalog.isError) {
-    return <Alert type="error" showIcon message={errorMessage(roles.error ?? catalog.error)} />
+    return <Alert type="error" showIcon title={errorMessage(roles.error ?? catalog.error)} />
   }
 
   const selectedRole = roles.data.find((r) => r.id === selectedId) ?? roles.data[0]
@@ -122,30 +122,31 @@ export function RolesPage() {
       <PageHeader title="Vai trò và quyền" />
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
-          <Card title="Vai trò" styles={{ body: { padding: 0 } }}>
-            <List<Role>
-              dataSource={roles.data}
-              renderItem={(role) => (
-                <List.Item
-                  onClick={() => setSelectedId(role.id)}
-                  style={{
-                    cursor: 'pointer',
-                    padding: '12px 16px',
-                    background: role.id === selectedRole?.id ? '#e6f4ff' : undefined,
-                  }}
-                  aria-current={role.id === selectedRole?.id}
-                >
-                  <Flex vertical style={{ width: '100%' }}>
+          <Card title="Vai trò" styles={{ body: { padding: 8 } }}>
+            {/* Menu: chọn được bằng bàn phím (phím mũi tên, Enter) và đánh dấu vai trò đang chọn. */}
+            <Menu
+              mode="inline"
+              aria-label="Danh sách vai trò"
+              selectedKeys={selectedRole ? [selectedRole.id] : []}
+              onClick={({ key }) => setSelectedId(key)}
+              style={{ borderInlineEnd: 'none' }}
+              items={roles.data.map((role) => ({
+                key: role.id,
+                style: { height: 'auto', lineHeight: 1.5, paddingBlock: 8 },
+                label: (
+                  <Flex vertical>
                     <Flex justify="space-between" align="center" gap={8}>
                       <Typography.Text strong>{role.name}</Typography.Text>
-                      <Tag>{role.isAdministrator ? 'Toàn quyền' : `${role.permissions.length} quyền`}</Tag>
+                      <Tag style={{ marginInlineEnd: 0 }}>
+                        {role.isAdministrator ? 'Toàn quyền' : `${role.permissions.length} quyền`}
+                      </Tag>
                     </Flex>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                       {role.code}
                     </Typography.Text>
                   </Flex>
-                </List.Item>
-              )}
+                ),
+              }))}
             />
           </Card>
         </Col>

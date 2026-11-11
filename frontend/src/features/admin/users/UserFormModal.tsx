@@ -85,7 +85,7 @@ export function UserFormModal({ userId, onClose }: Props) {
       onCancel={onClose}
     >
       {loadError ? (
-        <Alert type="error" showIcon message={errorMessage(loadError)} />
+        <Alert type="error" showIcon title={errorMessage(loadError)} />
       ) : loading ? (
         <Spin style={{ display: 'block', padding: 32 }} />
       ) : (

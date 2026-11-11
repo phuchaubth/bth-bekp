@@ -55,6 +55,7 @@ scripts/
 - Layer dependency rules are enforced by `backend/tests/Consent.ArchitectureTests`; keep them passing.
 - Return errors as ProblemDetails (RFC 9457) with Vietnamese titles; never expose exception details.
 - User-facing text is Vietnamese.
+- Do not use deprecated Ant Design APIs (e.g. `Alert` `title`, not `message`; `Space` `orientation`, not `direction`). Frontend tests fail on any Ant Design console warning, because Vitest hides the console output of passing tests.
 
 ## Security rules
 

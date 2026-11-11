@@ -18,7 +18,7 @@ export function ForcedChangePasswordPage() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message={`Xin chào ${user?.fullName ?? ''}. Bạn cần đổi mật khẩu trước khi sử dụng hệ thống.`}
+          title={`Xin chào ${user?.fullName ?? ''}. Bạn cần đổi mật khẩu trước khi sử dụng hệ thống.`}
         />
         <ChangePasswordForm onSuccess={() => navigate('/', { replace: true })} />
         <Button type="link" style={{ paddingLeft: 0, marginTop: 8 }} onClick={() => void logout()}>

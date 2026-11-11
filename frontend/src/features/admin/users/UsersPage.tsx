@@ -190,7 +190,7 @@ export function UsersPage() {
             }
           />
         </Flex>
-        {isError && <Alert type="error" showIcon message={errorMessage(error)} style={{ marginBottom: 16 }} />}
+        {isError && <Alert type="error" showIcon title={errorMessage(error)} style={{ marginBottom: 16 }} />}
         <Table<UserListItem>
           rowKey="id"
           columns={columns}

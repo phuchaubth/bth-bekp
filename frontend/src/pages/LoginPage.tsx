@@ -56,7 +56,7 @@ export function LoginPage() {
           <Typography.Text type="secondary">Đăng nhập bằng tài khoản được cấp</Typography.Text>
         </Flex>
 
-        {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 16 }} role="alert" />}
+        {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} role="alert" />}
 
         <Form<LoginValues> layout="vertical" onFinish={onFinish} requiredMark={false} disabled={submitting}>
           <Form.Item

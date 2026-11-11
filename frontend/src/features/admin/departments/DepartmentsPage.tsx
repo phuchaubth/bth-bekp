@@ -85,7 +85,7 @@ export function DepartmentsPage() {
           style={{ maxWidth: 360, marginBottom: 16 }}
           onChange={(e) => setKeyword(e.target.value)}
         />
-        {isError && <Alert type="error" showIcon message={errorMessage(error)} style={{ marginBottom: 16 }} />}
+        {isError && <Alert type="error" showIcon title={errorMessage(error)} style={{ marginBottom: 16 }} />}
         <Table<Department>
           rowKey="id"
           columns={columns}
