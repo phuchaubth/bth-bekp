@@ -195,6 +195,6 @@ CI **không bao giờ** gọi tới hệ thống VNPT thật.
 
 1. Bệnh viện đã được VNPT cấp **`sp_id`/`sp_password` cho UAT** chưa? (Gửi qua kênh bảo mật cho người vận hành, **không gửi qua chat hay đưa vào repo**.)
 2. Có thể lấy **code mẫu** từ link Google Drive trong tài liệu không? Code mẫu viết bằng ngôn ngữ nào, giấy phép thế nào? Code mẫu sẽ giúp trả lời các câu hỏi ở mục 6.
-3. **Đã xác nhận:** hợp đồng **cho phép người bệnh dùng SmartCA cá nhân của họ** ký trên hệ thống bệnh viện. Còn cần làm rõ: **lượt ký tính vào gói của ai** (bệnh viện hay người bệnh)? Nếu tính vào gói của người bệnh, cần xử lý lỗi hết lượt ký (mã `65000 SERVICE_PACK_EXEED_OR_INVALID` trong tài liệu OAuth2) bằng cách gợi ý phương án 3/2.
+3. **Đã xác nhận:** hợp đồng **cho phép người bệnh dùng SmartCA cá nhân của họ** ký trên hệ thống bệnh viện. **Lượt ký trừ vào gói của người bệnh** (đã xác nhận), vì vậy cần xử lý lỗi hết lượt ký (mã `65000 SERVICE_PACK_EXEED_OR_INVALID` trong tài liệu OAuth2) bằng cách gợi ý phương án 3/2.
 4. VNPT có cung cấp **dải IP gọi webhook** hoặc cơ chế xác thực webhook không?
 5. Có dịch vụ **dấu thời gian (TSA)** đi kèm không?

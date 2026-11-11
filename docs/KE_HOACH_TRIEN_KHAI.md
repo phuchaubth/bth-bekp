@@ -10,12 +10,17 @@
 
 Xây dựng ứng dụng web giúp bệnh viện:
 
-1. Lập, quản lý và lưu trữ **phiếu đồng thuận** của người bệnh (hoặc người đại diện hợp pháp) trước khi khám bệnh, chữa bệnh (KCB): phẫu thuật, thủ thuật, gây mê, truyền máu, dùng thuốc cản quang, v.v.
-2. **Quét mã QR trên CCCD** để tự động điền thông tin nhân thân vào phiếu, sau đó nhân viên bổ sung các thông tin còn thiếu.
+1. Lập, quản lý và lưu trữ **phiếu đồng thuận / cam kết** của người bệnh (hoặc người đại diện hợp pháp) trước khi khám bệnh, chữa bệnh (KCB). **Giai đoạn 1 (đã xác nhận) gồm 3 loại:**
+   - **Giấy cam kết sử dụng dịch vụ khám** (người bệnh chọn khám dịch vụ hay khám BHYT).
+   - **Phiếu cung cấp thông tin** cho người bệnh (người bệnh xác nhận đã được cung cấp thông tin).
+   - **Phiếu khảo sát / đánh giá nguy cơ té ngã** (có thể có câu hỏi tính điểm, chờ mẫu của bệnh viện).
+
+   Các phiếu đồng thuận chuyên môn (phẫu thuật, thủ thuật, gây mê, truyền máu…) để **giai đoạn sau**. Hệ thống mẫu phiếu được thiết kế chung để thêm loại mới mà không phải sửa code.
+2. **Quét mã QR trên CCCD** để tự động điền thông tin nhân thân vào phiếu, **lấy thêm thông tin từ HIS FPT eHospital** (mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ), sau đó nhân viên bổ sung các thông tin còn thiếu.
 3. **Ký số bằng VNPT SmartCA** lên file PDF của phiếu, bảo đảm toàn vẹn và giá trị pháp lý.
 4. Lưu trữ tập trung trên **SQL Server**, hỗ trợ tra cứu và **xuất dữ liệu** (Excel/CSV/PDF) có phân quyền và ghi vết.
 
-Ngoài phạm vi giai đoạn 1 (có thể làm sau): tích hợp HIS/EMR, đăng nhập một lần (SSO/AD), ứng dụng di động riêng, chữ ký sinh trắc học.
+Ngoài phạm vi giai đoạn 1 (có thể làm sau): phiếu đồng thuận chuyên môn, ghi ngược dữ liệu/PDF vào HIS/EMR (chờ xác nhận), đăng nhập một lần (SSO/AD), ứng dụng di động riêng, chữ ký sinh trắc học.
 
 ---
 
@@ -141,14 +146,27 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 - Mọi giao dịch ký được ghi bảng `SignatureTransactions` và audit log. Hệ thống xử lý được các trường hợp hết hạn, người ký từ chối, lỗi mạng (thử lại có giới hạn).
 - Sau khi ký, hệ thống kiểm tra lại chữ ký trong PDF và lưu thông tin chứng thư (serial, chủ thể, thời điểm ký).
 
-### 2.6. Yêu cầu phi chức năng
+### 2.6. Tích hợp HIS FPT eHospital (giai đoạn 1)
+
+- Bệnh viện dùng **FPT eHospital** và cần kết nối ngay giai đoạn 1 (đã xác nhận). Tài liệu API bệnh viện sẽ gửi sau.
+- Thiết kế qua interface `IHisGateway` (tầng Application), gồm các thao tác dự kiến: tìm người bệnh theo số CCCD hoặc mã người bệnh; lấy đợt khám/tiếp nhận hiện tại; lấy đối tượng (BHYT/dịch vụ), số thẻ BHYT, khoa/phòng khám. Có hai cài đặt:
+  - `FakeHisGateway`: dữ liệu giả lập, dùng cho dev/test/CI.
+  - `FptEHospitalGateway`: viết khi có tài liệu API từ FPT.
+- **Giai đoạn 1 chỉ đọc từ HIS.** Việc ghi ngược phiếu/PDF đã ký vào HIS/EMR cần xác nhận thêm.
+- Khi HIS không truy cập được, nhân viên vẫn **nhập tay** được để không chặn công việc tiếp đón. Phiếu được đánh dấu "chưa đối chiếu HIS".
+- Không lưu thông tin xác thực HIS trong mã nguồn; có timeout, retry giới hạn, ghi log đã che dữ liệu cá nhân.
+
+### 2.7. Yêu cầu phi chức năng
 
 - **Bảo mật**: HTTPS; JWT (access token ngắn hạn + refresh token xoay vòng, lưu trong cookie HttpOnly); mật khẩu băm bằng ASP.NET Core Identity; khóa tài khoản khi đăng nhập sai nhiều lần; rate limiting; CORS chặt; security headers.
 - **Dữ liệu cá nhân**: số CCCD, SĐT, mã BHYT được **mã hóa ở mức cột** và **che một phần** trên giao diện (ví dụ `0790******12`). Xuất dữ liệu bắt buộc có quyền và được ghi audit. Cần đối chiếu với quy định pháp luật về bảo vệ dữ liệu cá nhân và quy định của Bộ Y tế về hồ sơ bệnh án điện tử (pháp chế bệnh viện xác nhận).
 - **Audit log**: ghi ai, làm gì, lúc nào, từ IP nào, với đối tượng nào, giá trị trước/sau (đã che dữ liệu nhạy cảm). Bảng chỉ cho phép ghi thêm, không có API sửa/xóa.
 - **Validation**: FluentValidation ở backend; Ant Design Form rules ở frontend. Lỗi trả về theo chuẩn `ProblemDetails` (RFC 9457) với thông báo tiếng Việt.
 - **Thời gian**: lưu UTC, hiển thị theo giờ Việt Nam (UTC+7).
-- **Hiệu năng**: danh sách phân trang ở server; tra cứu theo chỉ mục.
+- **Hiệu năng (quy mô đã xác nhận: mức vừa)**: khoảng **50–200 người dùng đồng thời, 500–3.000 phiếu/ngày**. Danh sách phân trang ở server, tra cứu theo chỉ mục.
+- **Dung lượng lưu trữ PDF** (ước tính, sẽ đo lại khi có mẫu thật): khoảng 200–500 KB/phiếu hoàn tất → khoảng 0,6–1,5 GB/ngày, tức 200–550 GB/năm. Chỉ giữ PDF cuối cùng; file trung gian giữa các lượt ký sẽ được dọn sau khi phiếu hoàn tất. Cần kế hoạch dung lượng và sao lưu cho máy chủ.
+- **Lưu trữ (đã xác nhận)**: theo **thời hạn lưu trữ hồ sơ bệnh án** của Bộ Y tế; pháp chế bệnh viện xác nhận số năm cụ thể. Hệ thống **không tự động xóa** phiếu.
+- **Triển khai (đã xác nhận)**: **máy chủ Windows Server tại bệnh viện**. Hình thức chạy (IIS + SQL Server có sẵn, hay Docker trên Windows) bệnh viện kiểm tra và trả lời sau. Docker Compose vẫn dùng cho môi trường phát triển và kiểm thử.
 - **Khả năng vận hành**: log có cấu trúc, health check (`/health`), Docker Compose.
 
 ---
@@ -222,7 +240,7 @@ Quy ước: khóa chính `UNIQUEIDENTIFIER` (UUID), mã nghiệp vụ là cột 
 | `Permissions`, `RolePermissions` | Quyền chi tiết | Code, Description |
 | `Patients` | Người bệnh | Id, PatientCode, FullName, DateOfBirth, Gender, **CitizenIdEncrypted**, **CitizenIdHash** (tra cứu), OldIdNumber, IdIssueDate, PermanentAddress, CurrentAddress, Phone (mã hóa), Ethnicity, Occupation, HealthInsuranceNo (mã hóa) |
 | `LegalRepresentatives` | Người đại diện/thân nhân/người ký thay | Id, PatientId, FullName, DateOfBirth, Relationship, CitizenIdEncrypted, CitizenIdHash, Phone |
-| `ConsentTemplates` | Loại mẫu phiếu | Id, Code, Name, Category (Phẫu thuật/Thủ thuật/Gây mê/Truyền máu…), DepartmentId (null = toàn viện) |
+| `ConsentTemplates` | Loại mẫu phiếu | Id, Code, Name, Category (Cam kết DV/BHYT, Cung cấp thông tin, Khảo sát té ngã; giai đoạn sau: Phẫu thuật/Thủ thuật/Gây mê/Truyền máu…), HospitalSignerRole (vai trò ký phía bệnh viện), DepartmentId (null = toàn viện) |
 | `ConsentTemplateVersions` | Phiên bản mẫu | Id, TemplateId, VersionNo, ContentSchemaJson (định nghĩa trường), LayoutHtml/Body, Status (Draft/Published/Retired), PublishedAt |
 | `ConsentForms` | Phiếu đồng thuận | Id, FormNo, PatientId, RepresentativeId?, TemplateVersionId, DepartmentId, EncounterCode (mã đợt KCB/HSBA), ProcedureName, PlannedDate, DoctorId, Status, Decision (Đồng ý/Từ chối), DataJson (nội dung điền theo schema), CreatedBy, CreatedAt, CompletedAt, RevokedReason, ReplacesFormId? |
 | `ConsentSignatures` | Chữ ký trên phiếu | Id, FormId, SignerType (Patient/Representative/Doctor/Witness), SignerName, Method (SmartCA/Handwritten/ProxySmartCA), OnBehalfOfPatient (bool), RepresentativeId (khi ký thay), Relationship (khi ký thay), FallbackReason (khi ký tay/ký thay), WitnessUserId (khi ký tay; người chứng kiến cũng có một dòng chữ ký riêng với SignerType = Witness), SignatureImagePath (khi ký tay), SignOrder, SignedAt, CertificateSerial, CertificateSubject, CertificateValidTo, SignatureTransactionId |
@@ -375,6 +393,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Parser QR CCCD (frontend) và validator (backend) với bộ test gồm chuỗi hợp lệ, thiếu trường, sai ngày, sai số chữ số, ký tự lạ.
 - Component `QrScanner` (camera) và ô nhận dữ liệu từ máy quét 2D.
 - CRUD người bệnh, phát hiện trùng theo hash CCCD, mã hóa CCCD/SĐT/BHYT, che dữ liệu trên UI.
+- `IHisGateway` + `FakeHisGateway`; màn hình 4 tra cứu HIS sau khi quét CCCD. `FptEHospitalGateway` làm ngay khi có tài liệu API (có thể tách thành PR riêng).
 - Màn hình 4, 9, 10.
 
 **Tiêu chí nghiệm thu**
@@ -382,9 +401,10 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Quét CCCD đã có hồ sơ → hiển thị hồ sơ cũ và hỏi cập nhật, không tạo bản trùng.
 - CCCD trong DB được lưu ở dạng mã hóa (có test kiểm tra); API danh sách trả về CCCD đã che.
 - Hoạt động trên Chrome máy tính bàn và máy tính bảng (camera qua HTTPS).
+- Quét CCCD → tự lấy mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ từ HIS (giả lập); HIS lỗi/timeout → vẫn nhập tay được và phiếu được đánh dấu "chưa đối chiếu HIS" (có test).
 
 ### Sprint 3 – Mẫu phiếu và lập phiếu đồng thuận
-- Quản lý mẫu phiếu có phiên bản, schema trường động; seed 3–5 mẫu minh họa (nội dung mẫu cần bệnh viện cung cấp/duyệt).
+- Quản lý mẫu phiếu có phiên bản, schema trường động; dựng **3 mẫu giai đoạn 1** (cam kết DV/BHYT, cung cấp thông tin, khảo sát nguy cơ té ngã) theo mẫu giấy bệnh viện gửi. Schema hỗ trợ câu hỏi chọn/điểm cho phiếu khảo sát.
 - Wizard lập phiếu (màn hình 5), state machine, danh sách và chi tiết phiếu (3, 8, 11, 12).
 - Sinh PDF từ mẫu + dữ liệu, có font tiếng Việt.
 
@@ -451,26 +471,33 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 ---
 
-## 10. Giả định và câu hỏi cần anh/chị xác nhận
+## 10. Quyết định đã chốt và việc còn chờ
 
-**Giả định (sẽ áp dụng nếu không có ý kiến khác)**
-1. **Đã xác nhận:** cả **người bệnh (hoặc người đại diện) và bác sĩ đều ký số bằng VNPT SmartCA**. Người bệnh ký trước, bác sĩ ký sau, trên cùng một file PDF.
-   **Phương án 2 (dự phòng) cho người bệnh:** ký tay trên máy tính bảng, bắt buộc ghi lý do, và **nhân viên chứng kiến bắt buộc ký số SmartCA xác nhận**.
-   **Phương án 3:** người khác ký thay bằng SmartCA của họ, bắt buộc ghi quan hệ và lý do. Bác sĩ luôn ký số SmartCA.
-2. Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO hay HIS.
-3. Mã người bệnh / mã HSBA được **nhập tay** (chưa đồng bộ từ HIS).
-4. PDF đã ký được lưu trên **volume/thư mục mạng**; metadata và hash lưu trong SQL Server.
-5. Dự án đặt trong repo `bth-bekp` này, dưới tên module `Consent.*`.
+**Đã xác nhận**
 
-**Câu hỏi**
-1. **Đã nhận tài liệu API VNPT SmartCA** (SP769 v4.0 và OAuth2 v1.1); chọn API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md). **Hợp đồng cho phép người bệnh ký bằng SmartCA cá nhân** (đã xác nhận). Còn chờ: thông tin kết nối UAT (`sp_id`/`sp_password`, gửi qua kênh bảo mật), code mẫu, và các câu hỏi ở mục 9 của tài liệu đó.
-1a. **Đã xác nhận:** 3 phương án ký cho phía người bệnh, **thứ tự ưu tiên PA1 → PA3 → PA2**; nhân viên chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**; **danh sách lý do ký tay/ký thay bệnh viện bổ sung sau** (hệ thống làm danh mục cấu hình được). Danh sách quan hệ được phép ký thay vẫn cần pháp chế xác nhận.
-2. Danh sách **loại phiếu đồng thuận** cần làm trước là gì? Có mẫu giấy hiện hành (đã bỏ thông tin thật) để số hóa không?
-3. Có cần **tích hợp HIS** (lấy mã người bệnh, đợt điều trị) ngay giai đoạn 1 không? HIS hiện dùng là gì?
-4. Quy mô dự kiến: số người dùng đồng thời và số phiếu/ngày?
-5. Triển khai **on-premise** (máy chủ bệnh viện, Windows hay Linux) hay cloud? Đã có giấy phép SQL Server chưa?
-6. Thời gian **lưu trữ** phiếu và chính sách sao lưu theo quy định của bệnh viện?
-7. Có giữ tên dự án/repo hiện tại (`bth-bekp`) hay tạo repo riêng cho ứng dụng này?
+| # | Chủ đề | Quyết định |
+|---|---|---|
+| 1 | Ký số | Người bệnh và phía bệnh viện đều ký **VNPT SmartCA** (API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md)). Hợp đồng cho phép người bệnh dùng SmartCA cá nhân; **lượt ký trừ vào gói của người bệnh**, hết lượt thì gợi ý PA3 rồi PA2 |
+| 1a | Phương án ký phía người bệnh | **PA1 → PA3 → PA2**. PA2 (ký tay) bắt buộc nhân viên chứng kiến ký SmartCA; người chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**. Danh sách lý do ký tay/ký thay **bệnh viện bổ sung sau** (danh mục cấu hình được) |
+| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Khảo sát nguy cơ té ngã. Mẫu giấy **bệnh viện gửi sau** |
+| 3 | HIS | **FPT eHospital**, kết nối ngay giai đoạn 1 (chỉ đọc). Tài liệu API **gửi sau** |
+| 4 | Quy mô | Mức vừa: 50–200 người dùng đồng thời, 500–3.000 phiếu/ngày |
+| 5 | Triển khai | Máy chủ **Windows Server** tại bệnh viện |
+| 6 | Lưu trữ | Theo thời hạn lưu trữ **hồ sơ bệnh án**, không tự động xóa |
+| 7 | Repo | Repo `bth-bekp` này, module `Consent.*` |
+
+**Giả định đang áp dụng**
+- Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
+- PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
+
+**Còn chờ bệnh viện cung cấp / trả lời**
+1. **Thông tin kết nối SmartCA UAT** (`sp_id`/`sp_password`, gửi qua kênh bảo mật) và **code mẫu** VNPT.
+2. **Mẫu giấy** của 3 loại phiếu (đã xóa thông tin thật).
+3. **Tài liệu API FPT eHospital** (hoặc đầu mối FPT).
+4. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
+5. **Ai ký phía bệnh viện** với từng loại phiếu giai đoạn 1? Ví dụ cam kết DV/BHYT thường do nhân viên tiếp đón ký, không phải bác sĩ. Đề xuất: cấu hình **vai trò ký phía bệnh viện theo từng mẫu phiếu**.
+6. Danh sách **lý do ký tay/ký thay** và **quan hệ được phép ký thay** (pháp chế xác nhận).
+7. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
 
 ---
 
