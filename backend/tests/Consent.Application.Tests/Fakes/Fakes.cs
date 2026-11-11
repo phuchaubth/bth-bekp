@@ -202,6 +202,8 @@ internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientR
 /// <summary>HIS giả cho kiểm thử: trả kết quả cấu hình sẵn, có thể mô phỏng lỗi hoặc treo (để kiểm tra timeout).</summary>
 internal sealed class StubHisGateway : IHisGateway
 {
+    public bool IsEnabled { get; set; } = true;
+
     public HisLookupResult Result { get; set; } = HisLookupResult.NotFound;
 
     public bool Throw { get; set; }

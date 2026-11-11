@@ -19,18 +19,19 @@ flowchart LR
         DB[("SQL Server")]
         FS[("Thư mục lưu PDF")]
     end
-    SMARTCA["VNPT SmartCA<br/>(API SP769)"]
-    HIS["HIS FPT eHospital"]
+    SMARTCA["VNPT SmartCA<br/>(API SP769, tạm hoãn)"]
+    HIS["HIS FPT eHospital<br/>(tạm chưa kết nối)"]
 
     CAM --> SPA
     SPA -- "HTTPS /api, /health" --> RP --> API
     API -- EF Core --> DB
     API --> FS
-    API -- HTTPS --> SMARTCA
-    API -- "chỉ đọc" --> HIS
+    API -. HTTPS .-> SMARTCA
+    API -. "chỉ đọc" .-> HIS
 ```
 
 - Trình duyệt chỉ gọi API của bệnh viện. **Không gọi trực tiếp** SmartCA hay HIS, nên bí mật kết nối chỉ nằm trên máy chủ.
+- **Hiện tạm chưa kết nối HIS và SmartCA** (ADR-017, nét đứt trong sơ đồ): ứng dụng chạy độc lập; hai kết nối này bổ sung sau qua các interface đã có.
 - Web và API chạy chung một domain qua reverse proxy, nên không cần CORS ở môi trường chính thức.
 
 ---
@@ -423,8 +424,9 @@ sequenceDiagram
 ### 8.5. Quét CCCD và tích hợp HIS
 
 - **Đọc QR:** phân tích ở trình duyệt (`cccdQrParser.ts`) để điền form ngay. Hỗ trợ máy quét 2D chế độ bàn phím (nội dung + Enter) và camera (`@zxing/browser`, chỉ tải khi mở camera, cần HTTPS). Có cảnh báo khi họ tên có ký tự lạ (máy quét chưa hỗ trợ tiếng Việt có dấu) hoặc số CCCD không khớp ngày sinh/giới tính. Máy chủ kiểm tra lại mọi trường (`PatientRequestValidator`, `CitizenIdNumber`).
-- **HIS:** `IHisGateway` (Application) với `FakeHisGateway` (Infrastructure) cho phát triển/kiểm thử. Kết nối FPT eHospital thật sẽ là một cài đặt khác của cùng interface khi có tài liệu API. Mọi lời gọi HIS có thời gian chờ (`His:TimeoutSeconds`); HIS lỗi không chặn việc tiếp nhận (cho nhập tay, đánh dấu "Chưa đối chiếu HIS").
-- **Đối chiếu khi lưu:** máy chủ tự gọi HIS lúc tạo/cập nhật hồ sơ để đặt `HisVerifiedAtUtc`, không tin cờ do client gửi.
+- **HIS — hiện chưa kết nối (ADR-017):** mặc định `His:Provider=None` → `DisabledHisGateway`: không gọi ra ngoài, tra cứu trả `hisStatus: "Disabled"`, không đối chiếu khi lưu; giao diện (qua `GET /api/v1/features`) ẩn mọi thông tin HIS và mã người bệnh được nhập tay.
+- **Khi bật lại HIS:** `IHisGateway` (Application) có `FakeHisGateway` (Infrastructure, `His:Provider=Fake`) cho phát triển/kiểm thử; **API từ chối khởi động nếu dùng HIS giả lập ở Production** (để không sinh mã người bệnh/thẻ BHYT không có thật). Kết nối FPT eHospital sẽ là một cài đặt khác của cùng interface. Mọi lời gọi HIS có thời gian chờ (`His:TimeoutSeconds`); HIS lỗi không chặn việc tiếp nhận (cho nhập tay, đánh dấu "Chưa đối chiếu HIS").
+- **Đối chiếu khi lưu (khi đã kết nối HIS):** máy chủ tự gọi HIS lúc tạo/cập nhật hồ sơ để đặt `HisVerifiedAtUtc`, không tin cờ do client gửi.
 
 ## 9. Cấu hình và bí mật
 
@@ -444,9 +446,9 @@ sequenceDiagram
 | `Seed:DemoData`, `Seed:DemoPassword` | `Seed__…` | Khoa và tài khoản demo, **chỉ cho môi trường phát triển/thử nghiệm** |
 | `DataProtection:FieldEncryptionKey` | `DataProtection__FieldEncryptionKey` | **Bí mật**, Base64 của 32 byte ngẫu nhiên (`openssl rand -base64 32`); khóa mã hóa cột |
 | `DataProtection:BlindIndexKey` | `DataProtection__BlindIndexKey` | **Bí mật**, Base64 của 32 byte, khác khóa mã hóa; khóa chỉ mục mù |
-| `His:Provider` | `His__Provider` | Hiện chỉ `Fake` (giả lập); FPT eHospital bổ sung khi có tài liệu API |
+| `His:Provider` | `His__Provider` | `None` (mặc định: chưa kết nối HIS) hoặc `Fake` (HIS giả lập, chỉ dev/test; bị từ chối ở Production). Giá trị khác → API không khởi động |
 | `His:TimeoutSeconds` | `His__TimeoutSeconds` | Mặc định 5 (1–60) |
-| `SmartCa:*` | `SmartCa__SpPassword`… | Sprint 4; xem [tich-hop-smartca.md](tich-hop-smartca.md) |
+| `SmartCa:*` | `SmartCa__SpPassword`… | **Tạm hoãn** (chưa tích hợp SmartCA); thiết kế giữ trong [tich-hop-smartca.md](tich-hop-smartca.md) |
 
 Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; chỉ commit `.env.example`.
 
@@ -480,3 +482,4 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-014 | Mã hóa cột ở tầng ứng dụng (AES-256-GCM qua EF value converter) + chỉ mục mù HMAC, thay vì Always Encrypted/TDE | Bảo vệ cả khi lộ bản sao lưu/CSDL hoặc người quản trị CSDL xem trực tiếp; không phụ thuộc phiên bản/edition SQL Server và driver; vẫn tra cứu/chặn trùng được theo CCCD |
 | ADR-015 | Đọc QR CCCD ở trình duyệt; máy chủ kiểm tra lại từng trường | Điền form tức thì, chạy được với cả máy quét 2D và camera; máy chủ không nhận chuỗi QR gốc nên không có nguy cơ lưu nhầm |
 | ADR-016 | Máy chủ tự đối chiếu HIS khi lưu; HIS lỗi không chặn tiếp nhận | Trạng thái "đã đối chiếu HIS" đáng tin cậy; quầy tiếp đón vẫn làm việc được khi HIS gián đoạn |
+| ADR-017 | Tạm chưa kết nối HIS và SmartCA (quyết định 11/11/2026): HIS tắt mặc định (`His:Provider=None`), giao diện ẩn theo `GET /api/v1/features`; HIS giả lập bị chặn ở Production; giữ interface để bật lại | Ứng dụng chạy độc lập, không hiển thị hay lưu dữ liệu HIS giả; khi bệnh viện cần, chỉ thêm cài đặt `IHisGateway`/dịch vụ ký số mà không sửa nghiệp vụ |

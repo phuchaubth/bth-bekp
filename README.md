@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, tra cứu HIS giả lập, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -61,7 +61,7 @@ Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") ch
 036188000125||Phạm Thị Dung|05041988|Nữ|Số 9 Đường Thử Nghiệm, Phường Mẫu|01062021
 ```
 
-HIS đang ở chế độ giả lập: số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
+**HIS:** mặc định **chưa kết nối** (`His__Provider=None`): sau khi quét chỉ kiểm tra hồ sơ đã có, mã người bệnh nhập tay, giao diện không hiển thị thông tin HIS. Để thử luồng HIS khi phát triển, đặt `His__Provider=Fake` (HIS giả lập; API từ chối khởi động nếu bật ở Production): số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
 
 > **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT được mã hóa bằng `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
@@ -158,8 +158,8 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 |---|---|---|
 | 0 | Nền móng: khung backend/frontend, Docker, CI, tài liệu yêu cầu và kiến trúc | ✅ Hoàn thành |
 | 1 | Xác thực, phân quyền (RBAC), audit log, quản trị người dùng/vai trò/khoa | ✅ Hoàn thành |
-| 2 | Người bệnh, quét QR CCCD, tích hợp HIS (giả lập trước) | ✅ Hoàn thành (kết nối FPT eHospital thật chờ tài liệu API) |
-| 3 | Mẫu phiếu và lập phiếu | Chưa bắt đầu |
-| 4 | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | Chưa bắt đầu |
+| 2 | Người bệnh, quét QR CCCD (HIS tạm chưa kết nối) | ✅ Hoàn thành |
+| 3 | Mẫu phiếu và lập phiếu (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | Chưa bắt đầu |
+| 4 | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn; hình thức xác nhận phiếu khi chưa có SmartCA chờ bệnh viện chọn |
 | 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |
 | 6 | Hoàn thiện, rà soát bảo mật, hướng dẫn triển khai | Chưa bắt đầu |

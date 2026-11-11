@@ -15,6 +15,8 @@ Số hóa việc lập, ký và lưu trữ các phiếu đồng thuận/cam kế
 
 ### 1.2. Phạm vi giai đoạn 1
 
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA**. Các yêu cầu FR-HIS-01…03 và FR-SIGN (SmartCA) giữ nguyên làm thiết kế, sẽ thực hiện khi bệnh viện cần. Ba mẫu phiếu dùng [mẫu đề xuất](mau-phieu-de-xuat.md) trong khi chờ duyệt.
+
 | Trong phạm vi | Ngoài phạm vi (giai đoạn sau) |
 |---|---|
 | 3 loại phiếu: **Cam kết sử dụng dịch vụ khám (DV/BHYT)**, **Phiếu cung cấp thông tin**, **Phiếu khảo sát nguy cơ té ngã** | Phiếu đồng thuận chuyên môn: phẫu thuật, thủ thuật, gây mê, truyền máu… |

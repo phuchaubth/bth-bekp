@@ -2,6 +2,7 @@ import { PlusOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Flex, Input, Table, Tag, Typography, type TableColumnsType } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useFeatures } from '../../api/features'
 import { usePatients, type PatientListItem, type PatientQuery } from '../../api/patients'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
@@ -20,6 +21,7 @@ export function PatientsPage() {
   const navigate = useNavigate()
   const [query, setQuery] = useState<PatientQuery>({ page: 1, pageSize: 20 })
   const { data, isPending, isFetching, isError, error } = usePatients(query)
+  const { his } = useFeatures()
 
   const columns: TableColumnsType<PatientListItem> = [
     {
@@ -46,7 +48,9 @@ export function PatientsPage() {
       width: 150,
       render: (value: string | null) => <span style={{ fontFamily: 'monospace' }}>{value ?? '—'}</span>,
     },
-    { title: 'HIS', dataIndex: 'hisVerified', width: 170, render: (value: boolean) => <HisTag verified={value} /> },
+    ...(his
+      ? [{ title: 'HIS', dataIndex: 'hisVerified', width: 170, render: (value: boolean) => <HisTag verified={value} /> }]
+      : []),
     { title: 'Cập nhật', dataIndex: 'updatedAtUtc', width: 160, render: (value: string) => formatDateTime(value) },
   ]
 

@@ -94,6 +94,47 @@ describe('Người dùng', () => {
     expect(screen.queryByRole('menuitem', { name: /Khóa tài khoản/ })).not.toBeInTheDocument()
   })
 
+  it('chưa tích hợp SmartCA: ẩn ô mã SmartCA khi sửa người dùng nhưng vẫn giữ giá trị đã lưu', async () => {
+    const doctor = {
+      id: 'u-bacsi',
+      userName: 'bacsi.demo',
+      fullName: 'Bác sĩ Demo',
+      email: null,
+      phoneNumber: null,
+      title: 'Bác sĩ',
+      departmentId: 'd-noi',
+      departmentName: 'Khoa Nội tổng hợp',
+      smartCaUserId: 'SMARTCA0001',
+      roles: [{ id: 'r-doctor', code: 'DOCTOR', name: 'Bác sĩ' }],
+      isActive: true,
+      isLockedOut: false,
+      lockoutEndUtc: null,
+      mustChangePassword: false,
+      lastLoginAtUtc: null,
+      createdAtUtc: '2026-11-01T00:00:00Z',
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'GET /api/v1/roles': roles,
+      'GET /api/v1/users/u-bacsi': doctor,
+      'PUT /api/v1/users/u-bacsi': doctor,
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+
+    const row = (await screen.findByText('bacsi.demo')).closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /Sửa/ }))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByLabelText('Họ tên')).toHaveValue('Bác sĩ Demo'))
+    expect(within(dialog).queryByLabelText('Mã tài khoản SmartCA')).not.toBeInTheDocument()
+
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
+    expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ fullName: 'Bác sĩ Demo', smartCaUserId: 'SMARTCA0001' })
+  })
+
   it('khóa tài khoản sau khi xác nhận', async () => {
     const { calls } = mockApi({
       ...baseRoutes(adminSession()),
@@ -120,7 +161,7 @@ describe('Người dùng', () => {
 
     expect(await screen.findByText('bacsi.demo')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Thêm người dùng/ })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sửa' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sửa/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Thao tác khác/ })).not.toBeInTheDocument()
   })
 

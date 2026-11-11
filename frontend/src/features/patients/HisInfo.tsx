@@ -3,8 +3,12 @@ import type { HisPatient, HisStatus } from '../../api/patients'
 import { formatDate, formatDateTime } from '../../utils/format'
 import { maskInsurance } from './cccd'
 
-/** Hiển thị kết quả tra cứu HIS (FPT eHospital) sau khi quét CCCD. */
+/** Hiển thị kết quả tra cứu HIS (FPT eHospital) sau khi quét CCCD. Chưa kết nối HIS thì không hiển thị gì. */
 export function HisInfo({ status, patient }: { status: HisStatus; patient: HisPatient | null }) {
+  if (status === 'Disabled') {
+    return null
+  }
+
   if (status === 'Unavailable') {
     return (
       <Alert

@@ -4,19 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace Consent.Infrastructure.His;
 
-/// <summary>Cấu hình HIS phía hạ tầng (mục <c>His</c>).</summary>
-public sealed class HisGatewayOptions
-{
-    public const string SectionName = "His";
-    public const string FakeProvider = "Fake";
-
-    /// <summary>Hiện chỉ có <c>Fake</c> (giả lập). Bản kết nối FPT eHospital làm khi có tài liệu API.</summary>
-    public string Provider { get; set; } = FakeProvider;
-
-    /// <summary>Độ trễ giả lập (mili giây).</summary>
-    public int FakeLatencyMilliseconds { get; set; } = 150;
-}
-
 /// <summary>
 /// HIS giả lập, kết quả xác định theo số CCCD (để kiểm thử và demo, không có dữ liệu thật):
 /// 3 số cuối "999" → HIS không khả dụng; số cuối "0" → không tìm thấy; còn lại → tìm thấy,
@@ -27,6 +14,8 @@ internal sealed partial class FakeHisGateway(
     IClock clock,
     ILogger<FakeHisGateway> logger) : IHisGateway
 {
+    public bool IsEnabled => true;
+
     public async Task<HisLookupResult> FindPatientByCitizenIdAsync(string citizenId, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(citizenId);

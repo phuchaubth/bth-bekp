@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace Consent.Api.IntegrationTests;
 
-/// <summary>Người bệnh với SQL Server thật: mã hóa cột, chỉ mục mù, che dữ liệu, HIS giả lập, phân quyền, audit.</summary>
+/// <summary>Người bệnh với SQL Server thật: mã hóa cột, chỉ mục mù, che dữ liệu, HIS (giả lập/tắt), phân quyền, audit.</summary>
 [Collection(SqlServerCollection.Name)]
 public sealed class PatientsApiTests(SqlServerFixture sql) : IAsyncLifetime
 {
@@ -13,7 +13,8 @@ public sealed class PatientsApiTests(SqlServerFixture sql) : IAsyncLifetime
     private const string NewCitizenId = "036188000125";
     private const string DemoCitizenId = "001085000001";
 
-    private readonly DatabaseApiFactory _factory = new(sql);
+    // Các test dưới đây kiểm tra luồng HIS bằng HIS giả lập. Chế độ mặc định (chưa kết nối HIS) có test riêng.
+    private readonly DatabaseApiFactory _factory = new(sql, new Dictionary<string, string?> { ["His:Provider"] = "Fake" });
     private HttpClient _client = null!;
     private string _admin = null!;
 
@@ -115,6 +116,25 @@ public sealed class PatientsApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, notFound.GetProperty("existingPatient").ValueKind);
         Assert.Equal("NotFound", notFound.GetProperty("hisStatus").GetString());
         Assert.Equal("Unavailable", unavailable.GetProperty("hisStatus").GetString());
+    }
+
+    [Fact]
+    public async Task WithoutHis_ByDefault_LookupReportsDisabled_AndPatientIsNotVerified()
+    {
+        await using var factory = new DatabaseApiFactory(sql);
+        using var client = factory.CreateHttpsClient();
+        var admin = await client.LoginAsAdministratorAsync();
+
+        var (created, patient) = await client.SendJsonAsync(HttpMethod.Post, "/api/v1/patients", admin, NewPatient());
+        var (status, lookup) = await client.SendJsonAsync(HttpMethod.Post, "/api/v1/patients/lookup", admin, new { citizenId = NewCitizenId });
+
+        Assert.Equal(HttpStatusCode.Created, created);
+        Assert.False(patient.GetProperty("hisVerified").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, patient.GetProperty("patientCode").ValueKind);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal("Disabled", lookup.GetProperty("hisStatus").GetString());
+        Assert.Equal(JsonValueKind.Null, lookup.GetProperty("hisPatient").ValueKind);
+        Assert.Equal(patient.GetProperty("id").GetString(), lookup.GetProperty("existingPatient").GetProperty("id").GetString());
     }
 
     [Fact]

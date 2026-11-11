@@ -9,6 +9,7 @@ import {
   type CreateUserInput,
   type UserProfileInput,
 } from '../../../api/admin'
+import { useFeatures } from '../../../api/features'
 import { applyServerFieldErrors, errorMessage } from '../../../utils/formErrors'
 import { passwordHint, passwordRules } from '../../../utils/passwordRules'
 
@@ -29,6 +30,7 @@ export function UserFormModal({ userId, onClose }: Props) {
   const detail = useUser(userId)
   const roles = useRoles()
   const departments = useDepartments(false)
+  const { smartCa } = useFeatures()
 
   const save = useMutation({
     mutationFn: (values: UserFormValues) => {
@@ -38,7 +40,8 @@ export function UserFormModal({ userId, onClose }: Props) {
         phoneNumber: values.phoneNumber || null,
         title: values.title || null,
         departmentId: values.departmentId ?? null,
-        smartCaUserId: values.smartCaUserId || null,
+        // Chưa tích hợp SmartCA thì ô bị ẩn: giữ nguyên giá trị đã lưu (nếu có), không xóa mất.
+        smartCaUserId: smartCa ? values.smartCaUserId || null : (detail.data?.smartCaUserId ?? null),
         roleIds: values.roleIds,
       }
       return isEdit
@@ -170,16 +173,18 @@ export function UserFormModal({ userId, onClose }: Props) {
                 <Input inputMode="tel" />
               </Form.Item>
             </Col>
-            <Col xs={24} md={12}>
-              <Form.Item
-                label="Mã tài khoản SmartCA"
-                name="smartCaUserId"
-                extra="Thường là số CCCD của nhân viên, dùng để ký số."
-                rules={[{ pattern: /^[A-Za-z0-9]{1,50}$/, message: 'Mã SmartCA chỉ gồm chữ không dấu và số.' }]}
-              >
-                <Input />
-              </Form.Item>
-            </Col>
+            {smartCa && (
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label="Mã tài khoản SmartCA"
+                  name="smartCaUserId"
+                  extra="Thường là số CCCD của nhân viên, dùng để ký số."
+                  rules={[{ pattern: /^[A-Za-z0-9]{1,50}$/, message: 'Mã SmartCA chỉ gồm chữ không dấu và số.' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+            )}
             {!isEdit && (
               <Col xs={24} md={12}>
                 <Form.Item

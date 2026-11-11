@@ -1,6 +1,7 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
 > Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0, 1 và 2 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
@@ -16,8 +17,8 @@ Xây dựng ứng dụng web giúp bệnh viện:
    - **Phiếu khảo sát / đánh giá nguy cơ té ngã** (có thể có câu hỏi tính điểm, chờ mẫu của bệnh viện).
 
    Các phiếu đồng thuận chuyên môn (phẫu thuật, thủ thuật, gây mê, truyền máu…) để **giai đoạn sau**. Hệ thống mẫu phiếu được thiết kế chung để thêm loại mới mà không phải sửa code.
-2. **Quét mã QR trên CCCD** để tự động điền thông tin nhân thân vào phiếu, **lấy thêm thông tin từ HIS FPT eHospital** (mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ), sau đó nhân viên bổ sung các thông tin còn thiếu.
-3. **Ký số bằng VNPT SmartCA** lên file PDF của phiếu, bảo đảm toàn vẹn và giá trị pháp lý.
+2. **Quét mã QR trên CCCD** để tự động điền thông tin nhân thân vào phiếu, **lấy thêm thông tin từ HIS FPT eHospital** (mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ; *tạm chưa kết nối — quyết định 9*), sau đó nhân viên bổ sung các thông tin còn thiếu.
+3. **Ký số bằng VNPT SmartCA** lên file PDF của phiếu, bảo đảm toàn vẹn và giá trị pháp lý (*tạm hoãn — quyết định 9*).
 4. Lưu trữ tập trung trên **SQL Server**, hỗ trợ tra cứu và **xuất dữ liệu** (Excel/CSV/PDF) có phân quyền và ghi vết.
 
 Ngoài phạm vi giai đoạn 1 (có thể làm sau): phiếu đồng thuận chuyên môn, ghi ngược dữ liệu/PDF vào HIS/EMR (chờ xác nhận), đăng nhập một lần (SSO/AD), ứng dụng di động riêng, chữ ký sinh trắc học.
@@ -96,6 +97,8 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 
 ### 2.5. Ký số VNPT SmartCA và các phương án ký của người bệnh
 
+> **Tạm hoãn** (quyết định 9): chưa tích hợp SmartCA. Thiết kế dưới đây giữ nguyên để dùng khi bật lại.
+
 #### Nguyên tắc chung
 
 - SmartCA là dịch vụ **ký số từ xa**: hệ thống tính băm (hash) của PDF → gửi yêu cầu ký → người ký xác nhận trên app VNPT SmartCA → hệ thống nhận chữ ký → nhúng vào PDF (chuẩn PAdES).
@@ -147,6 +150,8 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 - Sau khi ký, hệ thống kiểm tra lại chữ ký trong PDF và lưu thông tin chứng thư (serial, chủ thể, thời điểm ký).
 
 ### 2.6. Tích hợp HIS FPT eHospital (giai đoạn 1)
+
+> **Tạm chưa kết nối** (quyết định 9): HIS tắt mặc định (`His:Provider=None`), giao diện ẩn thông tin HIS, mã người bệnh nhập tay. Interface `IHisGateway` giữ sẵn để bật lại.
 
 - Bệnh viện dùng **FPT eHospital** và cần kết nối ngay giai đoạn 1 (đã xác nhận). Tài liệu API bệnh viện sẽ gửi sau.
 - Thiết kế qua interface `IHisGateway` (tầng Application), gồm các thao tác dự kiến: tìm người bệnh theo số CCCD hoặc mã người bệnh; lấy đợt khám/tiếp nhận hiện tại; lấy đối tượng (BHYT/dịch vụ), số thẻ BHYT, khoa/phòng khám. Có hai cài đặt:
@@ -409,6 +414,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Trạng thái "đã/chưa đối chiếu HIS" được lưu ở hồ sơ người bệnh (máy chủ tự đối chiếu khi lưu); từ Sprint 3 sẽ gắn thêm vào từng phiếu.
 - Mỗi lần xem hồ sơ người bệnh được ghi nhật ký; số CCCD không đi trong URL.
 - Kết nối FPT eHospital thật chưa làm vì chưa có tài liệu API (đang dùng HIS giả lập qua cùng interface).
+- Sau quyết định 9 (chưa kết nối HIS): HIS **tắt mặc định**, giao diện ẩn mọi thông tin HIS theo `GET /api/v1/features`; HIS giả lập chỉ dùng khi phát triển/kiểm thử và **bị chặn ở Production** (ADR-017).
 - Công cụ build frontend nâng lên Node.js 24 LTS (từ 24.15): thư viện quét QR bằng camera (`@zxing/browser`) yêu cầu Node ≥ 24, và Node 22 hết hỗ trợ tháng 4/2027. Chỉ ảnh hưởng máy phát triển, CI và bước build Docker; máy chủ chỉ phục vụ file tĩnh.
 - Thay các API Ant Design đã lỗi thời (`Alert.message` → `title`, `Space.direction` → `orientation`, `List` → `Menu` ở trang Vai trò, chọn được bằng bàn phím). Test frontend tự trượt khi Ant Design cảnh báo, vì Vitest ẩn console của test đạt.
 
@@ -417,10 +423,10 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Quét CCCD đã có hồ sơ → hiển thị hồ sơ cũ và hỏi cập nhật, không tạo bản trùng.
 - CCCD trong DB được lưu ở dạng mã hóa (có test kiểm tra); API danh sách trả về CCCD đã che.
 - Hoạt động trên Chrome máy tính bàn và máy tính bảng (camera qua HTTPS).
-- Quét CCCD → tự lấy mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ từ HIS (giả lập); HIS lỗi/timeout → vẫn nhập tay được và phiếu được đánh dấu "chưa đối chiếu HIS" (có test).
+- Quét CCCD → tự lấy mã người bệnh, đợt khám, đối tượng BHYT/dịch vụ từ HIS (giả lập, khi bật HIS); HIS lỗi/timeout → vẫn nhập tay được và phiếu được đánh dấu "chưa đối chiếu HIS" (có test). Mặc định chưa kết nối HIS: không hiển thị thông tin HIS (có test).
 
 ### Sprint 3 – Mẫu phiếu và lập phiếu đồng thuận
-- Quản lý mẫu phiếu có phiên bản, schema trường động; dựng **3 mẫu giai đoạn 1** (cam kết DV/BHYT, cung cấp thông tin, khảo sát nguy cơ té ngã) theo mẫu giấy bệnh viện gửi. Schema hỗ trợ câu hỏi chọn/điểm cho phiếu khảo sát.
+- Quản lý mẫu phiếu có phiên bản, schema trường động; dựng **3 mẫu giai đoạn 1** (cam kết DV/BHYT, cung cấp thông tin, đánh giá nguy cơ té ngã) theo **[mẫu đề xuất](mau-phieu-de-xuat.md)** (bệnh viện duyệt/chỉnh trên đó; khi có mẫu giấy chính thức thì cập nhật nội dung, không sửa code). Schema hỗ trợ câu hỏi chọn/điểm cho phiếu đánh giá.
 - Wizard lập phiếu (màn hình 5), state machine, danh sách và chi tiết phiếu (3, 8, 11, 12).
 - Sinh PDF từ mẫu + dữ liệu, có font tiếng Việt.
 
@@ -430,7 +436,10 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - PDF hiển thị đúng tiếng Việt có dấu, đủ thông tin người bệnh và nội dung.
 - Danh sách lọc/phân trang ở server; người dùng chỉ thấy phiếu trong phạm vi khoa (trừ vai trò toàn viện).
 
-### Sprint 4 – Ký số VNPT SmartCA cho người bệnh và bác sĩ
+### Sprint 4 – Ký số VNPT SmartCA cho người bệnh và bác sĩ — TẠM HOÃN
+
+> Quyết định 9 (11/11/2026): chưa tích hợp SmartCA. Nội dung dưới đây giữ làm thiết kế khi bật lại. Hình thức xác nhận phiếu trong thời gian chưa có SmartCA **chờ bệnh viện chọn** (mục 10, việc còn chờ số 1) và sẽ được lập thành sprint riêng sau Sprint 3.
+
 - Ghi nhận Đồng ý/Từ chối, chọn người ký (người bệnh/người đại diện) (màn hình 6).
 - Phương án 2: ký tay trên thiết bị cảm ứng cho người bệnh, bắt buộc lý do, có cấu hình bật/tắt.
 - Phương án 3: người khác ký thay bằng SmartCA của họ (quét CCCD người ký thay, quan hệ, lý do, kiểm tra chủ thể chứng thư), có cấu hình bật/tắt.
@@ -493,30 +502,31 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 | # | Chủ đề | Quyết định |
 |---|---|---|
-| 1 | Ký số | Người bệnh và phía bệnh viện đều ký **VNPT SmartCA** (API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md)). Hợp đồng cho phép người bệnh dùng SmartCA cá nhân; **lượt ký trừ vào gói của người bệnh**, hết lượt thì gợi ý PA3 rồi PA2 |
+| 1 | Ký số (*tạm hoãn, xem #9*) | Người bệnh và phía bệnh viện đều ký **VNPT SmartCA** (API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md)). Hợp đồng cho phép người bệnh dùng SmartCA cá nhân; **lượt ký trừ vào gói của người bệnh**, hết lượt thì gợi ý PA3 rồi PA2 |
 | 1a | Phương án ký phía người bệnh | **PA1 → PA3 → PA2**. PA2 (ký tay) bắt buộc nhân viên chứng kiến ký SmartCA; người chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**. Danh sách lý do ký tay/ký thay **bệnh viện bổ sung sau** (danh mục cấu hình được) |
-| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Khảo sát nguy cơ té ngã. Mẫu giấy **bệnh viện gửi sau** |
-| 3 | HIS | **FPT eHospital**, kết nối ngay giai đoạn 1 (chỉ đọc). Tài liệu API **gửi sau** |
+| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Đánh giá nguy cơ té ngã. Dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** (chờ bệnh viện duyệt) |
+| 3 | HIS | **FPT eHospital**, chỉ đọc. **Tạm chưa kết nối** (xem #9) |
 | 4 | Quy mô | Mức vừa: 50–200 người dùng đồng thời, 500–3.000 phiếu/ngày |
 | 5 | Triển khai | Máy chủ **Windows Server** tại bệnh viện |
 | 6 | Lưu trữ | Theo thời hạn lưu trữ **hồ sơ bệnh án**, không tự động xóa |
 | 7 | Repo | Repo `bth-bekp` này, module `Consent.*` |
 | 8 | Người ký phía bệnh viện | **Cấu hình theo từng mẫu phiếu** (bác sĩ / điều dưỡng / tiếp đón); người chứng kiến (PA2) phải khác người ký phía bệnh viện |
+| 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. **Thông tin kết nối SmartCA UAT** (`sp_id`/`sp_password`, gửi qua kênh bảo mật) và **code mẫu** VNPT.
-2. **Mẫu giấy** của 3 loại phiếu (đã xóa thông tin thật).
-3. **Tài liệu API FPT eHospital** (hoặc đầu mối FPT).
-4. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
-5. Danh sách **lý do ký tay/ký thay** và **quan hệ được phép ký thay** (pháp chế xác nhận).
-6. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
+1. **Hình thức xác nhận phiếu khi chưa có SmartCA** (cần chốt trước sprint ký phiếu): ký tay trên máy tính bảng (ảnh chữ ký đưa vào PDF, nhân viên xác nhận bằng tài khoản), in phiếu ký giấy rồi quét/chụp lưu lại, hay cả hai.
+2. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật).
+3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
+4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
+
+*Không còn chờ (tạm hoãn theo quyết định 9):* thông tin SmartCA UAT và code mẫu VNPT; tài liệu API FPT eHospital; danh sách lý do/quan hệ ký thay (dùng khi có SmartCA).
 
 ---
 
 ## 11. Bước tiếp theo
 
-Sau khi anh/chị **phê duyệt** kế hoạch này (hoặc góp ý chỉnh sửa), tôi sẽ bắt đầu **Sprint 0** trong một PR riêng, kèm kết quả build/test đầy đủ.
+**Sprint 3** (mẫu phiếu, lập phiếu, sinh PDF) dựng trên [mẫu phiếu đề xuất](mau-phieu-de-xuat.md); góp ý của bệnh viện chỉ thay nội dung mẫu, không chặn tiến độ. Sprint ký phiếu được lập sau khi bệnh viện chọn hình thức xác nhận (việc còn chờ số 1).

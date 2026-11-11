@@ -1,6 +1,7 @@
 using Consent.Api.Infrastructure;
 using Consent.Application;
 using Consent.Infrastructure;
+using Consent.Infrastructure.His;
 using Consent.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -11,6 +12,11 @@ builder.Services
     .AddPersistence(builder.Configuration);
 
 builder.Services.AddApiServices(builder.Configuration);
+
+// HIS giả lập sinh dữ liệu không có thật (mã người bệnh, đợt khám, thẻ BHYT): không bao giờ chạy ở Production.
+builder.Services.AddOptions<HisGatewayOptions>()
+    .Validate(o => !(o.IsFake && builder.Environment.IsProduction()),
+        "HIS giả lập (His:Provider=Fake) không được dùng ở môi trường Production. Đặt His:Provider=None.");
 
 var app = builder.Build();
 

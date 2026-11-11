@@ -114,3 +114,41 @@ public sealed class FakeHisGatewayTests
         public DateTimeOffset UtcNow => new(2026, 11, 11, 8, 0, 0, TimeSpan.Zero);
     }
 }
+
+public sealed class HisGatewayOptionsTests
+{
+    [Fact]
+    public void DefaultProvider_IsNone_HisNotConnected()
+    {
+        var options = new HisGatewayOptions();
+
+        Assert.Equal(HisGatewayOptions.NoneProvider, options.Provider);
+        Assert.False(options.IsFake);
+        Assert.True(options.IsKnownProvider);
+    }
+
+    [Theory]
+    [InlineData("None", true, false)]
+    [InlineData("fake", true, true)]
+    [InlineData("FptEHospital", false, false)]
+    [InlineData("", false, false)]
+    public void Provider_OnlyNoneOrFakeAreAccepted(string provider, bool known, bool fake)
+    {
+        var options = new HisGatewayOptions { Provider = provider };
+
+        Assert.Equal(known, options.IsKnownProvider);
+        Assert.Equal(fake, options.IsFake);
+    }
+
+    [Fact]
+    public async Task DisabledGateway_ReportsDisabled_WithoutPatientData()
+    {
+        var gateway = new DisabledHisGateway();
+
+        var result = await gateway.FindPatientByCitizenIdAsync("001085000001", CancellationToken.None);
+
+        Assert.False(gateway.IsEnabled);
+        Assert.Equal(HisLookupStatus.Disabled, result.Status);
+        Assert.Null(result.Patient);
+    }
+}

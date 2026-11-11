@@ -18,6 +18,7 @@ import {
 } from 'antd'
 import { useState } from 'react'
 import { useParams } from 'react-router'
+import { useFeatures } from '../../api/features'
 import { patientKeys, patientsApi, usePatient, type PatientDetail, type Representative } from '../../api/patients'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
@@ -52,17 +53,20 @@ function SensitiveValue({ value, mask, label }: { value: string | null; mask: (v
 }
 
 function PatientDetails({ patient }: { patient: PatientDetail }) {
+  const { his } = useFeatures()
   return (
     <Descriptions column={{ xs: 1, md: 2 }} size="small" bordered>
       <Descriptions.Item label="Mã người bệnh">{patient.patientCode ?? '—'}</Descriptions.Item>
-      <Descriptions.Item label="Đối chiếu HIS">
-        <HisTag verified={patient.hisVerified} />
-        {patient.hisVerifiedAtUtc && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {formatDateTime(patient.hisVerifiedAtUtc)}
-          </Typography.Text>
-        )}
-      </Descriptions.Item>
+      {his && (
+        <Descriptions.Item label="Đối chiếu HIS">
+          <HisTag verified={patient.hisVerified} />
+          {patient.hisVerifiedAtUtc && (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {formatDateTime(patient.hisVerifiedAtUtc)}
+            </Typography.Text>
+          )}
+        </Descriptions.Item>
+      )}
       <Descriptions.Item label="Ngày sinh">
         {formatDate(patient.dateOfBirth)} ({ageFrom(patient.dateOfBirth)} tuổi)
       </Descriptions.Item>
@@ -74,7 +78,8 @@ function PatientDetails({ patient }: { patient: PatientDetail }) {
       <Descriptions.Item label="Số CMND cũ">
         <SensitiveValue value={patient.oldIdNumber} mask={maskCitizenId} label="số CMND cũ" />
       </Descriptions.Item>
-      <Descriptions.Item label="Số điện thoại">
+      {/* "filled": lấp phần còn lại của hàng, để bảng vẫn cân khi ẩn dòng HIS (chưa kết nối HIS). */}
+      <Descriptions.Item label="Số điện thoại" span="filled">
         <SensitiveValue value={patient.phoneNumber} mask={maskPhone} label="số điện thoại" />
       </Descriptions.Item>
       <Descriptions.Item label="Nơi thường trú" span={{ xs: 1, md: 2 }}>

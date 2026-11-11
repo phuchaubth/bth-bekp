@@ -41,6 +41,9 @@ const detail = (overrides: Partial<PatientDetail> = {}): PatientDetail => ({
   ...overrides,
 })
 
+// Máy chủ mặc định chưa kết nối HIS (baseRoutes); các kịch bản HIS bật cờ này.
+const withHis = { 'GET /api/v1/features': { his: true, smartCa: false } }
+
 const hisFound: PatientLookupResult = {
   existingPatient: null,
   hisStatus: 'Found',
@@ -65,6 +68,7 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
   it('quét CCCD bằng máy quét 2D: tự điền, tra cứu HIS và lưu hồ sơ', async () => {
     const { calls } = mockApi({
       ...baseRoutes(nurse()),
+      ...withHis,
       'POST /api/v1/patients/lookup': hisFound,
       'POST /api/v1/patients': () => json(detail(), 201),
       'GET /api/v1/patients/p-1': detail(),
@@ -114,6 +118,7 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
   it('người bệnh đã có hồ sơ: cảnh báo và cho mở hồ sơ', async () => {
     mockApi({
       ...baseRoutes(nurse()),
+      ...withHis,
       'POST /api/v1/patients/lookup': { ...hisFound, existingPatient: detail() },
       'GET /api/v1/patients/p-1': detail(),
     })
@@ -130,6 +135,7 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
     const existing = detail({ permanentAddress: 'Địa chỉ cũ trước khi đổi thẻ', occupation: 'Giáo viên' })
     const { calls } = mockApi({
       ...baseRoutes(nurse()),
+      ...withHis,
       'POST /api/v1/patients/lookup': { ...hisFound, existingPatient: existing },
       'PUT /api/v1/patients/p-1': detail(),
       'GET /api/v1/patients/p-1': detail(),
@@ -155,6 +161,7 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
   it('HIS không khả dụng: vẫn cho nhập tay', async () => {
     mockApi({
       ...baseRoutes(nurse()),
+      ...withHis,
       'POST /api/v1/patients/lookup': { existingPatient: null, hisStatus: 'Unavailable', hisPatient: null },
     })
     renderApp('/nguoi-benh/tiep-nhan')
@@ -168,6 +175,7 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
   it('trùng số CCCD khi lưu: hiển thị liên kết tới hồ sơ đã có', async () => {
     mockApi({
       ...baseRoutes(nurse()),
+      ...withHis,
       'POST /api/v1/patients/lookup': { existingPatient: null, hisStatus: 'NotFound', hisPatient: null },
       'POST /api/v1/patients': () =>
         problem(409, 'Đã có hồ sơ người bệnh với số CCCD này.', { code: 'patients.duplicate_citizen_id', existingPatientId: 'p-9' }),
@@ -190,6 +198,64 @@ describe('Tiếp nhận người bệnh (màn hình 4)', () => {
     await user.click(await screen.findByRole('button', { name: /Quét bằng camera/ }))
 
     expect(await screen.findByText(/Camera chỉ hoạt động khi truy cập qua HTTPS/)).toBeInTheDocument()
+  })
+})
+
+describe('Chưa kết nối HIS (mặc định)', () => {
+  it('tiếp nhận: chỉ tra cứu hồ sơ đã có, không hiển thị thông tin HIS; mã người bệnh nhập tay', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'POST /api/v1/patients/lookup': { existingPatient: null, hisStatus: 'Disabled', hisPatient: null },
+      'POST /api/v1/patients': () => json(detail({ patientCode: 'BN-NHAP-TAY', hisVerified: false, hisVerifiedAtUtc: null }), 201),
+      'GET /api/v1/patients/p-1': detail({ patientCode: 'BN-NHAP-TAY', hisVerified: false, hisVerifiedAtUtc: null }),
+    })
+    const { router } = renderApp('/nguoi-benh/tiep-nhan')
+
+    const user = await scan(QR)
+
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/patients/lookup')).toBe(true))
+    expect(screen.getByLabelText('Họ và tên')).toHaveValue('Phạm Thị Dung')
+    expect(await screen.findByText('Mã người bệnh trên HIS (nếu có), nhập tay.')).toBeInTheDocument()
+    for (const hisText of [/Đã tìm thấy người bệnh trên HIS/, /Không kết nối được HIS/, /Chưa có thông tin người bệnh này trên HIS/]) {
+      expect(screen.queryByText(hisText)).not.toBeInTheDocument()
+    }
+
+    await user.type(screen.getByLabelText('Mã người bệnh'), 'BN-NHAP-TAY')
+    await user.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/nguoi-benh/p-1'))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/patients')!.body).toMatchObject({ patientCode: 'BN-NHAP-TAY' })
+    expect(await screen.findByText('BN-NHAP-TAY')).toBeInTheDocument()
+    expect(screen.queryByText('Đối chiếu HIS')).not.toBeInTheDocument()
+  })
+
+  it('danh sách: không có cột đối chiếu HIS', async () => {
+    mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/patients': {
+        items: [
+          {
+            id: 'p-1',
+            patientCode: null,
+            fullName: 'Phạm Thị Dung',
+            dateOfBirth: '1988-04-05',
+            gender: 'Female',
+            citizenIdMasked: '0361******25',
+            hisVerified: false,
+            updatedAtUtc: '2026-11-11T02:00:00Z',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1,
+        totalPages: 1,
+      },
+    })
+    renderApp('/nguoi-benh')
+
+    expect(await screen.findByText('0361******25')).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'HIS' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Chưa đối chiếu HIS')).not.toBeInTheDocument()
   })
 })
 
@@ -224,11 +290,11 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
   }
 
   it('hiển thị số CCCD đã che và trạng thái đối chiếu HIS', async () => {
-    mockApi({ ...baseRoutes(nurse()), 'GET /api/v1/patients': list })
+    mockApi({ ...baseRoutes(nurse()), ...withHis, 'GET /api/v1/patients': list })
     renderApp('/nguoi-benh')
 
     expect(await screen.findByText('0361******25')).toBeInTheDocument()
-    expect(screen.getByText('Đã đối chiếu HIS')).toBeInTheDocument()
+    expect(await screen.findByText('Đã đối chiếu HIS')).toBeInTheDocument()
     expect(screen.getByText('Chưa đối chiếu HIS')).toBeInTheDocument()
     expect(screen.getByText('05/04/1988')).toBeInTheDocument()
   })

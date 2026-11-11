@@ -63,7 +63,7 @@ public sealed class PatientService(
         return PatientDetailDto.From(patient);
     }
 
-    /// <summary>Tra cứu khi quét CCCD: hồ sơ đã có trong hệ thống và thông tin người bệnh trên HIS.</summary>
+    /// <summary>Tra cứu khi quét CCCD: hồ sơ đã có trong hệ thống và (nếu đã kết nối) thông tin người bệnh trên HIS.</summary>
     public async Task<Result<PatientLookupResult>> LookupAsync(PatientLookupRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -216,11 +216,11 @@ public sealed class PatientService(
 
     /// <summary>
     /// Đối chiếu với HIS khi lưu (máy chủ tự kiểm tra, không tin cờ do client gửi lên).
-    /// HIS không khả dụng thì vẫn lưu và hồ sơ ở trạng thái "chưa đối chiếu HIS".
+    /// HIS không khả dụng thì vẫn lưu và hồ sơ ở trạng thái "chưa đối chiếu HIS". Chưa kết nối HIS thì bỏ qua.
     /// </summary>
     private async Task ApplyHisVerificationAsync(Patient patient, CancellationToken cancellationToken)
     {
-        if (patient.CitizenId is null)
+        if (!his.IsEnabled || patient.CitizenId is null)
         {
             return;
         }
@@ -235,6 +235,11 @@ public sealed class PatientService(
 
     private async Task<HisLookupResult> LookupHisAsync(string citizenId, CancellationToken cancellationToken)
     {
+        if (!his.IsEnabled)
+        {
+            return HisLookupResult.Disabled;
+        }
+
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(Math.Max(1, hisOptions.Value.TimeoutSeconds)));
         try

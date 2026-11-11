@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Flex, Form, Space, Spin, Typography } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useFeatures } from '../../api/features'
 import { ApiError } from '../../api/http'
 import { patientKeys, patientsApi, type PatientLookupResult } from '../../api/patients'
 import { PageHeader } from '../../components/PageHeader'
@@ -15,7 +16,7 @@ import { cardToFormValues, formValuesToInput, patientToFormValues, type PatientF
 import { QrScanInput } from './QrScanInput'
 
 /**
- * Màn hình 4: tiếp nhận người bệnh. Quét QR CCCD → tự điền thông tin → tra cứu hồ sơ đã có và HIS →
+ * Màn hình 4: tiếp nhận người bệnh. Quét QR CCCD → tự điền thông tin → tra cứu hồ sơ đã có (và HIS nếu đã kết nối) →
  * bổ sung thông tin còn thiếu → lưu. Khi lập phiếu (Sprint 3), bước này được dùng lại làm bước 1.
  */
 export function PatientIntakePage() {
@@ -23,6 +24,7 @@ export function PatientIntakePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { message } = App.useApp()
+  const { his } = useFeatures()
   const [scanErrors, setScanErrors] = useState<string[]>([])
   const [scanWarnings, setScanWarnings] = useState<string[]>([])
   const [lookup, setLookup] = useState<PatientLookupResult | null>(null)
@@ -133,7 +135,7 @@ export function PatientIntakePage() {
           )}
           {lookupMutation.isPending && (
             <Flex gap={8} align="center" style={{ marginTop: 12 }}>
-              <Spin size="small" /> Đang tra cứu hồ sơ và HIS…
+              <Spin size="small" /> {his ? 'Đang tra cứu hồ sơ và HIS…' : 'Đang tra cứu hồ sơ…'}
             </Flex>
           )}
           {existing && (
@@ -157,7 +159,7 @@ export function PatientIntakePage() {
               }
             />
           )}
-          {lookup && (
+          {lookup && lookup.hisStatus !== 'Disabled' && (
             <div style={{ marginTop: 12 }}>
               <HisInfo status={lookup.hisStatus} patient={lookup.hisPatient} />
             </div>

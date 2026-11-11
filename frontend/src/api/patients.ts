@@ -4,7 +4,8 @@ import { apiRequest } from './http'
 
 export type Gender = 'Male' | 'Female'
 export type Relationship = 'Father' | 'Mother' | 'Spouse' | 'Child' | 'Sibling' | 'Guardian' | 'Relative' | 'Other'
-export type HisStatus = 'Found' | 'NotFound' | 'Unavailable'
+// Disabled: chưa kết nối HIS (tắt trong cấu hình máy chủ).
+export type HisStatus = 'Found' | 'NotFound' | 'Unavailable' | 'Disabled'
 
 export interface PatientListItem {
   id: string

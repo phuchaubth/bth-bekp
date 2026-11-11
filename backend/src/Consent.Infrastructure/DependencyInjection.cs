@@ -5,6 +5,7 @@ using Consent.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Consent.Infrastructure;
 
@@ -37,12 +38,15 @@ public static class DependencyInjection
             .Validate(o => o.FieldEncryptionKey != o.BlindIndexKey, "Khóa mã hóa và khóa chỉ mục mù phải khác nhau.")
             .ValidateOnStart();
 
+        // Hiện chưa kết nối HIS (mặc định "None"). "Fake" chỉ để phát triển/kiểm thử; Program.cs chặn ở Production.
         services.AddOptions<HisGatewayOptions>()
             .Bind(configuration.GetSection(HisGatewayOptions.SectionName))
-            .Validate(o => string.Equals(o.Provider, HisGatewayOptions.FakeProvider, StringComparison.OrdinalIgnoreCase),
-                "His:Provider hiện chỉ hỗ trợ 'Fake' (kết nối FPT eHospital sẽ bổ sung khi có tài liệu API).")
+            .Validate(o => o.IsKnownProvider,
+                "His:Provider chỉ nhận 'None' (chưa kết nối HIS, mặc định) hoặc 'Fake' (HIS giả lập để phát triển và kiểm thử).")
             .ValidateOnStart();
-        services.AddSingleton<IHisGateway, FakeHisGateway>();
+        services.AddSingleton<IHisGateway>(sp => sp.GetRequiredService<IOptions<HisGatewayOptions>>().Value.IsFake
+            ? ActivatorUtilities.CreateInstance<FakeHisGateway>(sp)
+            : new DisabledHisGateway());
 
         return services;
     }

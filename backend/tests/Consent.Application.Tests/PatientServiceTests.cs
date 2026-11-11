@@ -30,6 +30,39 @@ public sealed class PatientServiceTests
     }
 
     [Fact]
+    public async Task Create_WhenHisIsNotConnected_SavesWithoutCallingHis_AndKeepsManualPatientCode()
+    {
+        var ctx = new AppTestContext();
+        ctx.His.IsEnabled = false;
+        ctx.His.Result = StubHisGateway.Found("BN85000001");
+        var service = ctx.CreatePatientService();
+
+        var result = await service.CreateAsync(Request(patientCode: "BN-NHAP-TAY"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value.HisVerified);
+        Assert.Equal("BN-NHAP-TAY", result.Value.PatientCode);
+        Assert.Equal(0, ctx.His.Calls);
+    }
+
+    [Fact]
+    public async Task Lookup_WhenHisIsNotConnected_ReturnsDisabled_WithoutCallingHis()
+    {
+        var ctx = new AppTestContext();
+        ctx.His.IsEnabled = false;
+        var service = ctx.CreatePatientService();
+        var existing = (await service.CreateAsync(Request(), CancellationToken.None)).Value;
+
+        var result = await service.LookupAsync(new PatientLookupRequest(CitizenId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(HisLookupStatus.Disabled, result.Value.HisStatus);
+        Assert.Null(result.Value.HisPatient);
+        Assert.Equal(existing.Id, result.Value.ExistingPatient?.Id);
+        Assert.Equal(0, ctx.His.Calls);
+    }
+
+    [Fact]
     public async Task Create_WhenHisIsDown_StillSaves_ButNotVerified()
     {
         var ctx = new AppTestContext();

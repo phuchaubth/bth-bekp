@@ -1,6 +1,6 @@
 # Thiết kế tích hợp VNPT SmartCA
 
-> Trạng thái: **BẢN THIẾT KẾ – CHỜ PHÊ DUYỆT**. Chưa có mã nguồn.
+> Trạng thái: **TẠM HOÃN** (quyết định 11/11/2026: chưa cần kết nối SmartCA). Bản thiết kế giữ lại để dùng khi bật lại; chưa có mã nguồn.
 > Nguồn: hai tài liệu VNPT do bệnh viện cung cấp:
 > - *Tài liệu tích hợp VNPT SmartCA* v4.0 (03/05/2024), API cho bên thứ ba theo QĐ 769/QĐ-BTTTT, gọi tắt là **API SP769**.
 > - *Dịch vụ VNPT-SmartCA – Tài liệu đặc tả và hướng dẫn tích hợp* v1.1 (15/05/2024), API OAuth2/CSC, gọi tắt là **API OAuth2**.

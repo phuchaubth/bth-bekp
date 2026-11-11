@@ -1,4 +1,4 @@
-import type { Gender, HisStatus, Relationship } from '../../api/patients'
+import type { Gender, Relationship } from '../../api/patients'
 
 export const genderLabels: Record<Gender, string> = { Male: 'Nam', Female: 'Nữ' }
 
@@ -11,12 +11,6 @@ export const relationshipLabels: Record<Relationship, string> = {
   Guardian: 'Người giám hộ',
   Relative: 'Người thân khác',
   Other: 'Khác',
-}
-
-export const hisStatusLabels: Record<HisStatus, string> = {
-  Found: 'Đã tìm thấy trên HIS',
-  NotFound: 'Chưa có trên HIS',
-  Unavailable: 'Không kết nối được HIS',
 }
 
 /** Một số dân tộc thường gặp (vẫn cho phép nhập tự do). */

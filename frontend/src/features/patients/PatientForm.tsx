@@ -1,5 +1,6 @@
 import { AutoComplete, Button, Col, DatePicker, Divider, Form, Input, Radio, Row, type FormInstance } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
+import { useFeatures } from '../../api/features'
 import { citizenIdMismatch, isValidCitizenId } from './cccd'
 import { commonEthnicities } from './labels'
 import type { PatientFormValues } from './patientFormValues'
@@ -18,6 +19,7 @@ interface Props {
 
 /** Form thông tin người bệnh (dùng cho tiếp nhận và sửa hồ sơ). Quy tắc kiểm tra khớp với máy chủ. */
 export function PatientForm({ form, onFinish, disabled = false, initialValues }: Props) {
+  const { his } = useFeatures()
   return (
     <Form<PatientFormValues>
       form={form}
@@ -193,9 +195,9 @@ export function PatientForm({ form, onFinish, disabled = false, initialValues }:
         </Col>
         <Col xs={24} md={8}>
           <Form.Item
-            label="Mã người bệnh (HIS)"
+            label="Mã người bệnh"
             name="patientCode"
-            extra="Tự điền khi tìm thấy trên HIS."
+            extra={his ? 'Tự điền khi tìm thấy trên HIS.' : 'Mã người bệnh trên HIS (nếu có), nhập tay.'}
             rules={[
               { max: 50, message: 'Tối đa 50 ký tự.' },
               { pattern: /^[A-Za-z0-9_-]+$/, message: 'Chỉ gồm chữ không dấu, số, gạch ngang hoặc gạch dưới.' },

@@ -193,7 +193,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 |---|---|---|---|
 | GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**) |
 | GET | `/api/v1/patients/{id}` | `patients.read` | Hồ sơ đầy đủ, kèm người đại diện; ghi nhật ký `Patients.Viewed` |
-| POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS; ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
+| POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS (`Disabled` khi chưa kết nối HIS); ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
 | POST | `/api/v1/patients` | `patients.manage` | Tạo hồ sơ → `201`. Trùng CCCD → `409 patients.duplicate_citizen_id` kèm `existingPatientId`; trùng mã người bệnh → `409 patients.duplicate_patient_code` |
 | PUT | `/api/v1/patients/{id}` | `patients.manage` | Cập nhật hồ sơ |
 | POST | `/api/v1/patients/{id}/representatives` | `patients.manage` | Thêm người đại diện/người ký thay → trả hồ sơ cập nhật |
@@ -235,13 +235,14 @@ Dữ liệu tạo/cập nhật người bệnh (chỉ `fullName`, `dateOfBirth`,
 
 Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth", "gender", "phoneNumber", "address" }`. `relationship` ∈ `Father`, `Mother`, `Spouse`, `Child`, `Sibling`, `Guardian`, `Relative`, `Other`.
 
-**Đối chiếu HIS (FPT eHospital)**
+**Đối chiếu HIS (FPT eHospital) — hiện chưa kết nối**
 
-- `POST /lookup` trả `hisStatus`: `Found` (kèm `hisPatient`: mã người bệnh, đối tượng BHYT/Dịch vụ, mã thẻ BHYT, đợt khám hiện tại), `NotFound`, hoặc `Unavailable` (HIS lỗi/quá thời gian `His:TimeoutSeconds`, mặc định 5 giây).
-- Khi **lưu** hồ sơ, máy chủ tự đối chiếu lại với HIS (không tin cờ từ client): tìm thấy và mã người bệnh khớp (hoặc để trống) → `hisVerified: true`, `patientCode` lấy từ HIS. HIS không khả dụng → vẫn lưu, `hisVerified: false` ("Chưa đối chiếu HIS").
+- **Mặc định (`His:Provider = None`)**: `POST /lookup` trả `hisStatus: "Disabled"`, `hisPatient: null`; khi lưu không đối chiếu (`hisVerified: false`), `patientCode` là giá trị nhân viên nhập tay. Giao diện ẩn mọi thông tin HIS (xem mục 6a).
+- Khi đã kết nối HIS, `POST /lookup` trả `hisStatus`: `Found` (kèm `hisPatient`: mã người bệnh, đối tượng BHYT/Dịch vụ, mã thẻ BHYT, đợt khám hiện tại), `NotFound`, hoặc `Unavailable` (HIS lỗi/quá thời gian `His:TimeoutSeconds`, mặc định 5 giây).
+- Khi **lưu** hồ sơ (đã kết nối HIS), máy chủ tự đối chiếu lại với HIS (không tin cờ từ client): tìm thấy và mã người bệnh khớp (hoặc để trống) → `hisVerified: true`, `patientCode` lấy từ HIS. HIS không khả dụng → vẫn lưu, `hisVerified: false` ("Chưa đối chiếu HIS").
 - Đổi mã người bệnh thủ công sẽ xóa trạng thái đã đối chiếu.
 
-**HIS giả lập** (môi trường phát triển/kiểm thử, `His:Provider = Fake`; kết nối FPT eHospital thật làm khi có tài liệu API). Kết quả xác định theo số CCCD:
+**HIS giả lập** (chỉ dùng khi phát triển/kiểm thử, `His:Provider = Fake`; API **từ chối khởi động** nếu bật ở môi trường Production). Kết quả xác định theo số CCCD:
 
 | Số CCCD | Kết quả |
 |---|---|
@@ -249,6 +250,19 @@ Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth
 | Số cuối `0` | Không tìm thấy (`NotFound`) |
 | Số cuối chẵn khác 0 | Tìm thấy, đối tượng BHYT |
 | Số cuối lẻ | Tìm thấy, đối tượng Dịch vụ |
+
+## 6a. Tính năng tích hợp (`/api/v1/features`)
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/features` | Đăng nhập | Tích hợp đang bật, để giao diện ẩn/hiện phần tương ứng |
+
+```json
+{ "his": false, "smartCa": false }
+```
+
+- `his`: đã kết nối HIS (theo `His:Provider`). `false` → giao diện ẩn khung kết quả HIS, cột/nhãn "Đối chiếu HIS"; mã người bệnh nhập tay.
+- `smartCa`: đã tích hợp ký số VNPT SmartCA. Hiện luôn `false` (tạm hoãn) → ẩn ô "Mã tài khoản SmartCA" ở màn hình người dùng (giá trị đã lưu được giữ nguyên khi sửa).
 
 ---
 
