@@ -28,6 +28,7 @@ jobs:
         run: dotnet restore
       - name: Build (warnings as errors)
         run: dotnet build --no-restore -c Release
+      # Integration test khởi động SQL Server bằng Testcontainers (Docker có sẵn trên runner).
       - name: Test
         run: dotnet test --no-build -c Release --verbosity normal
 
@@ -59,8 +60,9 @@ jobs:
     name: Docker Compose
     runs-on: ubuntu-latest
     env:
-      # Giá trị giả chỉ để kiểm tra cấu hình; job này không khởi động SQL Server.
+      # Giá trị giả chỉ để kiểm tra cấu hình; job này không khởi động các container.
       MSSQL_SA_PASSWORD: ci-placeholder-not-a-secret
+      JWT_SIGNING_KEY: ci-placeholder-not-a-secret-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
       - name: Validate compose file

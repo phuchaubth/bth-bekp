@@ -9,6 +9,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
+import { Permissions } from '../auth/permissions'
 
 export interface NavItem {
   path: string
@@ -16,30 +17,46 @@ export interface NavItem {
   icon?: ReactNode
   /** Sprint dự kiến hoàn thành chức năng (hiển thị trên trang đang phát triển). */
   sprint?: number
+  /** Quyền cần có để thấy mục menu và mở trang. */
+  permission?: string
   children?: NavItem[]
 }
 
 /** Menu chính. Dùng chung cho thanh điều hướng và định nghĩa route. */
 export const navItems: NavItem[] = [
   { path: '/', label: 'Tổng quan', icon: <DashboardOutlined /> },
-  { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, sprint: 3 },
-  { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, sprint: 2 },
-  { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, sprint: 3 },
-  { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, sprint: 5 },
-  { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, sprint: 5 },
-  { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, sprint: 5 },
+  { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, sprint: 3, permission: Permissions.ConsentsRead },
+  { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, sprint: 2, permission: Permissions.PatientsRead },
+  { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, sprint: 3, permission: Permissions.TemplatesRead },
+  { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, sprint: 5, permission: Permissions.ExportsRun },
+  { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, sprint: 5, permission: Permissions.ReportsRead },
+  { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, sprint: 5, permission: Permissions.AuditRead },
   {
     path: '/quan-tri',
     label: 'Quản trị',
     icon: <SettingOutlined />,
     children: [
-      { path: '/quan-tri/nguoi-dung', label: 'Người dùng', sprint: 1 },
-      { path: '/quan-tri/vai-tro', label: 'Vai trò và quyền', sprint: 1 },
-      { path: '/quan-tri/khoa-phong', label: 'Khoa/phòng', sprint: 1 },
-      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', sprint: 4 },
+      { path: '/quan-tri/nguoi-dung', label: 'Người dùng', permission: Permissions.UsersRead },
+      { path: '/quan-tri/vai-tro', label: 'Vai trò và quyền', permission: Permissions.RolesManage },
+      { path: '/quan-tri/khoa-phong', label: 'Khoa/phòng', permission: Permissions.DepartmentsManage },
+      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', sprint: 4, permission: Permissions.SettingsManage },
     ],
   },
 ]
+
+/** Lọc menu theo quyền; bỏ nhóm không còn mục con nào. */
+export function filterNavItems(items: NavItem[], hasPermission: (permission: string) => boolean): NavItem[] {
+  return items.flatMap((item) => {
+    if (item.permission && !hasPermission(item.permission)) {
+      return []
+    }
+    if (!item.children) {
+      return [item]
+    }
+    const children = filterNavItems(item.children, hasPermission)
+    return children.length > 0 ? [{ ...item, children }] : []
+  })
+}
 
 /** Danh sách phẳng các mục có trang riêng (bỏ nhóm cha). */
 export function flattenNavItems(items: NavItem[] = navItems): NavItem[] {

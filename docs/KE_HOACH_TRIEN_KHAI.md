@@ -1,6 +1,6 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
-> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) và [kiến trúc](kien-truc.md).
+> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0 và Sprint 1 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
@@ -384,7 +384,13 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Middleware lỗi → `ProblemDetails` tiếng Việt; correlation id; audit log tự động cho thao tác ghi và đăng nhập.
 - Frontend: màn hình 1, 20, 21, guard theo quyền, quản lý người dùng/vai trò/khoa (16, 17, 18).
 
-**Tiêu chí nghiệm thu**
+**Điều chỉnh khi triển khai (đã ghi vào ADR-009…013 trong [kiến trúc](kien-truc.md))**
+- Dùng mô hình người dùng/vai trò riêng trong Domain, chỉ dùng thuật toán băm mật khẩu của ASP.NET Core Identity (không dùng các bảng Identity).
+- Danh mục quyền định nghĩa trong mã nguồn; gán cho vai trò qua bảng `RolePermissions` (không cần bảng `Permissions`).
+- Thêm vai trò **Tiếp đón** (`RECEPTIONIST`) do phiếu cam kết DV/BHYT do tiếp đón ký.
+- Tìm kiếm tên không dấu dùng collation `Latin1_General_100_CI_AI`.
+
+**Tiêu chí nghiệm thu** (✅ đã đạt, có test tự động)
 - Truy cập không có token → 401; thiếu quyền → 403 (có integration test).
 - Đăng nhập sai 5 lần → khóa tạm thời; refresh token dùng lại sau khi đã xoay vòng → bị từ chối.
 - Mọi thao tác tạo/sửa/xóa và đăng nhập đều có bản ghi audit; không có API sửa/xóa audit.

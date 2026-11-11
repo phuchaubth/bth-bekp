@@ -35,14 +35,14 @@ flowchart LR
 
 ---
 
-## 2. Công nghệ (phiên bản dùng ở Sprint 0)
+## 2. Công nghệ (phiên bản đang dùng)
 
 | Thành phần | Công nghệ |
 |---|---|
-| Backend | ASP.NET Core .NET 10, EF Core 10.0.15 (SQL Server), OpenAPI (`Microsoft.AspNetCore.OpenApi`), Health Checks |
+| Backend | ASP.NET Core .NET 10, EF Core 10.0.15 (SQL Server), JWT Bearer, FluentValidation 12, OpenAPI (`Microsoft.AspNetCore.OpenApi`), Health Checks, Rate Limiting |
 | Cơ sở dữ liệu | Microsoft SQL Server (Docker dev: SQL Server 2022 Developer) |
 | Frontend | React 19.3, TypeScript 7.0, Vite 8.3, Ant Design 6.7 (locale `vi_VN`), React Router 8.5, TanStack Query 5, dayjs |
-| Kiểm thử backend | xUnit 2.9, `Microsoft.AspNetCore.Mvc.Testing` (integration), test kiến trúc bằng reflection |
+| Kiểm thử backend | xUnit 2.9, `Microsoft.AspNetCore.Mvc.Testing` (integration), Testcontainers (SQL Server thật trong Docker), test kiến trúc bằng reflection |
 | Kiểm thử frontend | Vitest 5, Testing Library, jsdom |
 | Lint frontend | oxlint (mặc định của template Vite hiện tại, cảnh báo bị coi là lỗi) |
 | Hạ tầng | Docker Compose (dev/test), GitHub Actions (CI) |
@@ -102,25 +102,31 @@ backend/
   dotnet-tools.json            # dotnet-ef (công cụ migration)
   Dockerfile
   src/
-    Consent.Domain/            # Common/Entity, DomainException
-    Consent.Shared/            # Result, Error, PagedResult
-    Consent.Application/       # Abstractions (IClock…), DependencyInjection
-    Consent.Persistence/       # ConsentDbContext, Migrations, DependencyInjection
-    Consent.Infrastructure/    # Time/SystemClock, DependencyInjection
-    Consent.Api/               # Program.cs, Infrastructure/ (pipeline, lỗi, security headers)
+    Consent.Domain/            # Common (Entity, IAuditableEntity), Departments, Identity (User, Role,
+                               #   RefreshToken, PasswordPolicy, SystemRoles), Authorization (Permissions), Auditing
+    Consent.Shared/            # Result, Error (kèm lỗi theo trường), PagedResult
+    Consent.Application/       # Abstractions (repository, IClock, ICurrentUser, ITokenService…), Auth, Users,
+                               #   Departments, Roles, Auditing (service + validator FluentValidation)
+    Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),
+                               #   Seeding, Migrations
+    Consent.Infrastructure/    # Security (băm mật khẩu, JWT), Time
+    Consent.Api/               # Controllers, Authorization (HasPermission), Infrastructure (pipeline, lỗi,
+                               #   security headers, correlation id, cookie, rate limiting)
   tests/
     Consent.Domain.Tests/
-    Consent.Application.Tests/
-    Consent.Api.IntegrationTests/
+    Consent.Application.Tests/       # service với repository giả trong bộ nhớ
+    Consent.Api.IntegrationTests/    # pipeline/phân quyền (không CSDL) + luồng thật với SQL Server (Testcontainers)
     Consent.ArchitectureTests/
 frontend/
   src/
-    app/                       # App (providers), routes, navigation, theme, queryClient
-    api/                       # http client (ProblemDetails → ApiError), hooks TanStack Query
-    components/                # layout chung, PagePlaceholder
-    features/<module>/         # dashboard (Sprint 0); patients, consent-forms… (các sprint sau)
-    pages/                     # 404
-    test/                      # setup Vitest, tiện ích render
+    app/                       # App (providers), routes, navigation (theo quyền), lazyPages, theme
+    api/                       # http client (ProblemDetails → ApiError, tự làm mới phiên), auth, admin (TanStack Query)
+    auth/                      # AuthProvider, guards (RequireAuth/RequirePermission), permissions, tokenStore
+    components/                # layout chung, PageHeader, PagePlaceholder
+    features/<module>/         # dashboard, account, admin (users, roles, departments); patients… (các sprint sau)
+    pages/                     # đăng nhập, đổi mật khẩu bắt buộc, 403, 404, lỗi
+    utils/                     # định dạng ngày, quy tắc mật khẩu, tìm kiếm không dấu, lỗi form
+    test/                      # setup Vitest, giả lập API, dữ liệu mẫu
   nginx.conf, Dockerfile
 docs/                          # kế hoạch, SRS, kiến trúc, tích hợp
 scripts/run-checks.sh          # chạy mọi kiểm tra giống CI
@@ -129,9 +135,68 @@ docker-compose.yml, .env.example
 
 ---
 
-## 5. Mô hình dữ liệu (dự kiến)
+## 5. Mô hình dữ liệu
 
-Bảng sẽ được thêm dần theo sprint. Sprint 0 mới chỉ có migration khởi tạo (`InitialCreate`).
+Bảng được thêm dần theo sprint.
+
+**Đã có (Sprint 1, migration `AddUsersRolesAndAudit`):** `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`.
+
+```mermaid
+erDiagram
+    Departments ||--o{ Users : "thuộc"
+    Users ||--o{ UserRoles : "có"
+    Roles ||--o{ UserRoles : "gán cho"
+    Roles ||--o{ RolePermissions : "có quyền"
+    Users ||--o{ RefreshTokens : "phiên"
+
+    Departments {
+        uuid Id PK
+        string Code UK "chữ hoa, duy nhất"
+        string Name "Latin1_General_100_CI_AI"
+        bool IsActive
+        rowversion RowVersion
+    }
+    Users {
+        uuid Id PK
+        string UserName UK "chữ thường"
+        string FullName "Latin1_General_100_CI_AI"
+        uuid DepartmentId FK
+        string SmartCaUserId
+        string PasswordHash "PBKDF2 (ASP.NET Core Identity)"
+        bool MustChangePassword
+        bool IsActive
+        int FailedLoginCount
+        datetimeoffset LockoutEndUtc
+        rowversion RowVersion
+    }
+    Roles {
+        uuid Id PK
+        string Code UK
+        string Name
+        bool IsSystem
+    }
+    RolePermissions {
+        uuid RoleId PK
+        string PermissionCode PK
+    }
+    UserRoles {
+        uuid UserId PK
+        uuid RoleId PK
+    }
+    RefreshTokens {
+        uuid Id PK
+        char64 TokenHash UK "SHA-256, không lưu token gốc"
+        uuid FamilyId "họ token (một thiết bị)"
+        datetimeoffset ExpiresAtUtc
+        datetimeoffset RevokedAtUtc
+        string RevokedReason
+        uuid ReplacedByTokenId
+    }
+```
+
+`AuditLogs` không có khóa ngoại (giữ nguyên lịch sử kể cả khi đối tượng bị xóa) và có trigger chặn UPDATE/DELETE.
+
+**Dự kiến (các sprint sau):**
 
 ```mermaid
 erDiagram
@@ -215,7 +280,7 @@ erDiagram
     }
 ```
 
-Bảng `Users`, `Roles`, `Permissions`, `RefreshTokens`, `ExportJobs` và `AuditLogs` được mô tả ở mục 4 của [kế hoạch](KE_HOACH_TRIEN_KHAI.md).
+Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog`) và gán cho vai trò qua bảng `RolePermissions` (thay cho bảng `Permissions` dự kiến trong kế hoạch). Bảng `ExportJobs` được mô tả ở mục 4 của [kế hoạch](KE_HOACH_TRIEN_KHAI.md).
 
 ---
 
@@ -261,20 +326,76 @@ stateDiagram-v2
 
 ---
 
-## 8. Cấu hình và bí mật
+## 8. Xác thực, phân quyền và nhật ký audit
+
+### 8.1. Phiên đăng nhập
+
+```mermaid
+sequenceDiagram
+    participant B as Trình duyệt (SPA)
+    participant A as API
+    participant D as SQL Server
+    B->>A: POST /auth/login {userName, password}
+    A->>D: Kiểm tra mật khẩu (PBKDF2), khóa tạm sau 5 lần sai
+    A->>D: Lưu băm refresh token (họ token mới) + audit Auth.LoginSucceeded
+    A-->>B: accessToken (JWT 15 phút, giữ trong bộ nhớ) + Set-Cookie consent_rt (HttpOnly, SameSite=Strict)
+    B->>A: GET /api/v1/... (Authorization: Bearer)
+    Note over B,A: Access token sắp hết hạn hoặc trang được tải lại
+    B->>A: POST /auth/refresh (cookie + X-Requested-With)
+    A->>D: Thu hồi token cũ (rotated), cấp token mới cùng họ
+    A-->>B: accessToken mới + cookie mới
+    Note over A,D: Token đã bị thay thế mà bị dùng lại → thu hồi cả họ + audit
+```
+
+| Thành phần | Thiết kế |
+|---|---|
+| Mật khẩu | Băm bằng `PasswordHasher` của ASP.NET Core Identity (PBKDF2 có salt, tự nâng cấp tham số khi đăng nhập). Chính sách: ≥ 10 ký tự, chữ hoa, chữ thường, số, ký tự đặc biệt, không chứa tên đăng nhập |
+| Chống dò tài khoản | Cùng thông báo cho sai tên và sai mật khẩu; vẫn băm mật khẩu khi tài khoản không tồn tại để thời gian phản hồi tương đương; trạng thái "bị khóa bởi quản trị" chỉ báo khi mật khẩu đúng |
+| Khóa tạm | 5 lần sai liên tiếp → khóa 15 phút (cấu hình `Auth:*`) |
+| Access token | JWT HMAC-SHA256, 15 phút, claim: `sub`, `name`, `full_name`, `dept`, `role`, `perm`. Khóa ký ≥ 32 byte; thiếu khóa thì API không khởi động |
+| Refresh token | 32 byte ngẫu nhiên, chỉ lưu SHA-256; cookie `HttpOnly`, `Secure`, `SameSite=Strict`, `Path=/api/v1/auth`; hạn 12 giờ, xoay vòng mỗi lần dùng; phát hiện dùng lại → thu hồi cả họ token |
+| CSRF | Cookie `SameSite=Strict` + bắt buộc header `X-Requested-With` ở endpoint dùng cookie |
+| Giới hạn tần suất | Đăng nhập/đổi mật khẩu 10 lần/phút/IP, làm mới phiên 30 lần/phút/IP (cấu hình `RateLimiting:*`) |
+| Phía trình duyệt | Access token chỉ trong bộ nhớ; tự làm mới trước khi hết hạn; khi gặp 401 thì làm mới một lần rồi gửi lại; đăng xuất chủ động không giữ lại đường dẫn cũ (máy dùng chung) |
+
+### 8.2. Phân quyền
+
+- **Mặc định an toàn:** `FallbackPolicy` yêu cầu đăng nhập cho mọi endpoint; chỉ endpoint đánh dấu `[AllowAnonymous]` (đăng nhập, làm mới, đăng xuất, health) mới mở.
+- **Theo quyền:** `[HasPermission(Permissions.UsersManage)]` tạo policy động `perm:<mã>` kiểm tra claim `perm` trong access token.
+- **Quyền thuộc vai trò:** người dùng có nhiều vai trò; quyền hiệu lực là hợp các quyền. Vai trò `ADMIN` luôn có toàn bộ quyền và không sửa được. Thay đổi quyền có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút); khóa tài khoản thu hồi refresh token ngay.
+- **Phạm vi theo khoa:** access token chứa khoa của người dùng (`dept`) và quyền `scope.all_departments` cho vai trò toàn viện. `ICurrentUser` cung cấp hai thông tin này để lọc dữ liệu phiếu/người bệnh theo khoa từ Sprint 2–3.
+- **Giao diện:** menu và nút được ẩn/hiện theo quyền; trang không có quyền hiển thị 403. Đây chỉ là trải nghiệm người dùng, kiểm soát thật luôn nằm ở API.
+
+### 8.3. Nhật ký audit
+
+- `AuditSaveChangesInterceptor` (EF Core) ghi **trong cùng giao dịch** mọi thao tác tạo/sửa/xóa trên thực thể `IAuditableEntity` (khoa, người dùng, vai trò, gán vai trò, gán quyền): người thực hiện, IP, User-Agent, mã truy vết, giá trị trước/sau.
+- Che dữ liệu nhạy cảm: `PasswordHash` luôn ghi `***`; bỏ qua thuộc tính kỹ thuật (`RowVersion`, bộ đếm đăng nhập sai…), vốn đã có sự kiện xác thực riêng.
+- Sự kiện xác thực được ghi tường minh: đăng nhập thành công/thất bại, khóa tạm, đăng xuất, đổi mật khẩu, phát hiện dùng lại refresh token.
+- **Chỉ ghi thêm:** không có API sửa/xóa; `ConsentDbContext` từ chối lưu nếu bản ghi audit bị sửa/xóa; trigger `TR_AuditLogs_AppendOnly` trong SQL Server chặn mọi `UPDATE`/`DELETE` (kể cả truy cập trực tiếp CSDL).
+
+## 9. Cấu hình và bí mật
 
 | Khóa cấu hình | Biến môi trường | Ghi chú |
 |---|---|---|
 | `ConnectionStrings:Default` | `ConnectionStrings__Default` | Bắt buộc; thiếu thì API dừng khởi động với thông báo rõ |
 | `Database:ApplyMigrationsOnStartup` | `Database__ApplyMigrationsOnStartup` | Mặc định `false`; chỉ bật ở dev/test. Production chạy migration bằng script có kiểm soát |
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0`… | Mặc định rỗng; Development cho phép `http://localhost:5173` |
+| `Jwt:SigningKey` | `Jwt__SigningKey` | **Bí mật**, ≥ 32 ký tự ngẫu nhiên; thiếu thì API không khởi động |
+| `Jwt:AccessTokenMinutes` | `Jwt__AccessTokenMinutes` | Mặc định 15 (1–60) |
+| `Auth:MaxFailedAttempts`, `Auth:LockoutMinutes` | `Auth__…` | Mặc định 5 lần, 15 phút |
+| `Auth:RefreshTokenLifetimeHours`, `Auth:RefreshReuseGraceSeconds` | `Auth__…` | Mặc định 12 giờ, 30 giây |
+| `RateLimiting:AuthPermitLimit`, `RefreshPermitLimit`, `WindowSeconds` | `RateLimiting__…` | Mặc định 10, 30 lần / 60 giây / IP |
+| `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | Mặc định `false`. Chỉ bật khi API không mở cổng ra ngoài và chỉ nhận yêu cầu từ reverse proxy (để lấy đúng IP người dùng) |
+| `Seed:Enabled` | `Seed__Enabled` | Tạo vai trò hệ thống và tài khoản quản trị đầu tiên khi khởi động |
+| `Seed:AdminPassword` | `Seed__AdminPassword` | **Bí mật**; chỉ dùng khi chưa có người dùng nào. Tài khoản `admin` phải đổi mật khẩu ở lần đăng nhập đầu |
+| `Seed:DemoData`, `Seed:DemoPassword` | `Seed__…` | Khoa và tài khoản demo, **chỉ cho môi trường phát triển/thử nghiệm** |
 | `SmartCa:*`, `His:*` | `SmartCa__SpPassword`… | Sprint 2–4; xem [tich-hop-smartca.md](tich-hop-smartca.md) |
 
 Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; chỉ commit `.env.example`.
 
 ---
 
-## 9. Triển khai
+## 10. Triển khai
 
 **Phát triển/kiểm thử (Docker Compose):** `sqlserver` (SQL Server 2022 Developer, có health check) → `api` (cổng nội bộ 8080, chạy user không phải root) → `web` (nginx không đặc quyền, cổng 8080, phục vụ SPA và chuyển tiếp `/api`, `/health` tới `api`).
 
@@ -282,7 +403,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 
 ---
 
-## 10. Nhật ký quyết định kiến trúc (ADR)
+## 11. Nhật ký quyết định kiến trúc (ADR)
 
 | Mã | Quyết định | Lý do |
 |---|---|---|
@@ -294,3 +415,8 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-006 | Ký PDF 2 pha (deferred signing), PDFsharp + BouncyCastle | SmartCA chỉ ký hash và có thời gian chờ xác nhận; cần spike trên UAT |
 | ADR-007 | Tự động migrate khi khởi động chỉ ở dev/test | An toàn cho production; tiện cho phát triển |
 | ADR-008 | oxlint cho frontend | Mặc định của template Vite hiện tại, nhanh, ít phụ thuộc |
+| ADR-009 | Mô hình người dùng/vai trò/quyền trong Domain; chỉ dùng `PasswordHasher` của ASP.NET Core Identity (không dùng Identity stores) | Quy tắc khóa tài khoản, vai trò, quản trị viên cuối cùng nằm trong Domain và kiểm thử được; không phát sinh bảng Identity không dùng; vẫn dùng thuật toán băm chuẩn của Identity |
+| ADR-010 | Access token trong bộ nhớ + refresh token trong cookie HttpOnly, xoay vòng, phát hiện dùng lại | Giảm rủi ro XSS đánh cắp token dài hạn; thu hồi được phiên; phát hiện token bị lộ |
+| ADR-011 | Quyền nằm trong access token (claim `perm`) | Phân quyền nhanh, không truy vấn CSDL mỗi yêu cầu; độ trễ tối đa 15 phút khi đổi quyền là chấp nhận được (khóa tài khoản có hiệu lực ngay với refresh token) |
+| ADR-012 | Audit bằng EF Core interceptor + trigger chặn sửa/xóa | Không thể quên ghi audit ở từng service; ghi cùng giao dịch; bảo vệ cả khi truy cập CSDL trực tiếp |
+| ADR-013 | Collation `Latin1_General_100_CI_AI` cho cột tên dùng để tìm kiếm | Tìm không dấu "nguyen van duc" khớp "Nguyễn Văn Đức" (kể cả Đ/D). Collation `Vietnamese_*` coi ư, ơ, ê, đ là chữ riêng nên không đáp ứng |

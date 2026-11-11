@@ -30,6 +30,16 @@ services:
       Database__ApplyMigrationsOnStartup: "true"
       # Chỉ dùng cho môi trường dev trong mạng nội bộ Docker. Production dùng login riêng, không dùng sa.
       ConnectionStrings__Default: "Server=sqlserver,1433;Database=ConsentManagement;User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+      # Khóa ký JWT (bí mật, ≥ 32 ký tự). Tạo bằng: openssl rand -base64 48
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Đặt JWT_SIGNING_KEY trong file .env}
+      # Tài khoản quản trị đầu tiên (chỉ tạo khi chưa có người dùng nào; phải đổi mật khẩu ở lần đăng nhập đầu).
+      Seed__Enabled: "true"
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-}
+      # Dữ liệu minh họa (khoa, tài khoản demo) chỉ cho môi trường phát triển.
+      Seed__DemoData: ${SEED_DEMO_DATA:-true}
+      Seed__DemoPassword: ${SEED_DEMO_PASSWORD:-}
+      # API không mở cổng ra ngoài, chỉ nhận yêu cầu từ nginx nên tin header X-Forwarded-*.
+      ReverseProxy__TrustAllProxies: "true"
     depends_on:
       sqlserver:
         condition: service_healthy

@@ -1,4 +1,5 @@
 import { Card, Col, Row, Statistic, Typography } from 'antd'
+import { useAuth } from '../../auth/authContext'
 import { SystemStatus } from './SystemStatus'
 
 const statusCards = [
@@ -9,11 +10,17 @@ const statusCards = [
 ]
 
 export function DashboardPage() {
+  const { user } = useAuth()
+
   return (
     <>
       <Typography.Title level={3} style={{ marginTop: 0 }}>
         Tổng quan
       </Typography.Title>
+      <Typography.Paragraph type="secondary">
+        Xin chào {user?.fullName}
+        {user?.departmentName ? ` – ${user.departmentName}` : ''}.
+      </Typography.Paragraph>
       <Row gutter={[16, 16]}>
         {statusCards.map((card) => (
           <Col key={card.title} xs={12} md={6}>

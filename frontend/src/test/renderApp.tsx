@@ -10,10 +10,3 @@ export function renderApp(path = '/') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return { router, ...render(<App router={router} queryClient={queryClient} />) }
 }
-
-export function mockFetchJson(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': status >= 400 ? 'application/problem+json' : 'application/json' },
-  })
-}

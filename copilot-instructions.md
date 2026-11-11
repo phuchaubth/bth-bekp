@@ -61,7 +61,9 @@ scripts/
 - Never commit secrets, passwords, connection strings, access tokens, or patient data.
 - Use environment variables for secrets.
 - Do not include real patient data.
-- Prepare the application for RBAC and audit logging.
+- Every endpoint requires authentication by default (fallback policy); mark public endpoints with `[AllowAnonymous]` explicitly.
+- Protect actions with `[HasPermission(Permissions.X)]`; add new permission codes to `PermissionCatalog` and default roles in `SystemRoles`.
+- Entities whose changes must be audited implement `IAuditableEntity`; mask sensitive values in the audit interceptor. Never add update/delete paths for `AuditLogs`.
 - Validate all input.
 - Use secure defaults.
 

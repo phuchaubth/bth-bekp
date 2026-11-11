@@ -1,8 +1,9 @@
-import { MenuOutlined, UserOutlined } from '@ant-design/icons'
-import { Avatar, Button, Drawer, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
-import { useState } from 'react'
+import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
+import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
+import { useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { navItems, type NavItem } from '../../app/navigation'
+import { filterNavItems, navItems, type NavItem } from '../../app/navigation'
+import { useAuth } from '../../auth/authContext'
 
 const { Header, Sider, Content, Footer } = Layout
 
@@ -17,8 +18,8 @@ function toMenuItems(items: NavItem[]): MenuProps['items'] {
   }))
 }
 
-function openKeysFor(pathname: string): string[] {
-  return navItems
+function openKeysFor(items: NavItem[], pathname: string): string[] {
+  return items
     .filter((item) => item.children?.some((child) => pathname.startsWith(child.path)))
     .map((item) => item.path)
 }
@@ -30,14 +31,17 @@ export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { user, hasPermission, logout } = useAuth()
+
+  const visibleItems = useMemo(() => filterNavItems(navItems, hasPermission), [hasPermission])
 
   const menu = (
     <Menu
       theme="dark"
       mode="inline"
       selectedKeys={[pathname]}
-      defaultOpenKeys={openKeysFor(pathname)}
-      items={toMenuItems(navItems)}
+      defaultOpenKeys={openKeysFor(visibleItems, pathname)}
+      items={toMenuItems(visibleItems)}
       onClick={({ key }) => {
         navigate(key)
         setDrawerOpen(false)
@@ -46,10 +50,23 @@ export function AppLayout() {
   )
 
   const brand = (
-    <div style={{ color: '#fff', fontWeight: 600, padding: '16px 20px', lineHeight: 1.3 }}>
-      {APP_TITLE}
-    </div>
+    <div style={{ color: '#fff', fontWeight: 600, padding: '16px 20px', lineHeight: 1.3 }}>{APP_TITLE}</div>
   )
+
+  const userMenu: MenuProps = {
+    items: [
+      { key: 'account', icon: <UserOutlined />, label: 'Tài khoản của tôi' },
+      { type: 'divider' },
+      { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true },
+    ],
+    onClick: ({ key }) => {
+      if (key === 'account') {
+        navigate('/tai-khoan')
+      } else if (key === 'logout') {
+        void logout()
+      }
+    },
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -83,12 +100,7 @@ export function AppLayout() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
             {!isDesktop && (
-              <Button
-                type="text"
-                icon={<MenuOutlined />}
-                aria-label="Mở menu"
-                onClick={() => setDrawerOpen(true)}
-              />
+              <Button type="text" icon={<MenuOutlined />} aria-label="Mở menu" onClick={() => setDrawerOpen(true)} />
             )}
             {!isDesktop && (
               <Typography.Text strong ellipsis style={{ minWidth: 0 }}>
@@ -96,10 +108,14 @@ export function AppLayout() {
               </Typography.Text>
             )}
           </div>
-          <Space size={8} style={{ flexShrink: 0 }}>
-            <Avatar size="small" icon={<UserOutlined />} aria-label="Tài khoản" />
-            {isDesktop && <Typography.Text type="secondary">Chưa đăng nhập</Typography.Text>}
-          </Space>
+          <Dropdown menu={userMenu} trigger={['click']} placement="bottomRight">
+            <Button type="text" aria-label="Tài khoản" style={{ flexShrink: 0, height: 'auto', padding: '4px 8px' }}>
+              <Space size={8}>
+                <Avatar size="small" icon={<UserOutlined />} />
+                {isDesktop && <Typography.Text>{user?.fullName}</Typography.Text>}
+              </Space>
+            </Button>
+          </Dropdown>
         </Header>
         <Content style={{ padding: isDesktop ? 24 : 16 }}>
           <main>
