@@ -162,7 +162,7 @@ Thay cho ký số SmartCA trong giai đoạn hiện tại. Khác phương án 2 
 - **Khung ký:**
   - Ký bằng ngón tay hoặc bút cảm ứng; có nút "Ký lại"; khung trống thì không xác nhận được.
   - Hệ thống chỉ lưu **ảnh chữ ký (PNG)**. Không lưu dữ liệu nét ký và thời gian từng nét, để không phát sinh dữ liệu sinh trắc học.
-- **Phía bệnh viện:** người ký theo cấu hình mẫu xác nhận bằng tài khoản đang đăng nhập. Có ký tay thêm hay không: **chờ bệnh viện chọn** (mục 10, việc còn chờ số 1).
+- **Phía bệnh viện:** người ký theo cấu hình mẫu **chỉ xác nhận bằng tài khoản đang đăng nhập**, không ký tay thêm (quyết định 11). PDF ghi họ tên, chức danh và thời điểm xác nhận.
 - **Hoàn tất:**
   - Sinh PDF có ảnh chữ ký đúng ô ký, kèm họ tên và thời điểm ký.
   - Lưu PDF cùng mã băm SHA-256; nếu file bị sửa sau khi lưu, mã băm không còn khớp.
@@ -434,7 +434,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 **Điều chỉnh khi triển khai (ADR-014…016 trong [kiến trúc](kien-truc.md))**
 - Mã hóa cột ở tầng ứng dụng (AES-256-GCM) + chỉ mục mù HMAC để tra cứu/chặn trùng CCCD; thêm mã hóa số CMND cũ.
 - Đọc QR ở trình duyệt, máy chủ kiểm tra lại từng trường (gồm kiểm tra số CCCD khớp năm sinh/giới tính); không có API nhận chuỗi QR gốc.
-- Trạng thái "đã/chưa đối chiếu HIS" được lưu ở hồ sơ người bệnh (máy chủ tự đối chiếu khi lưu); từ Sprint 3 sẽ gắn thêm vào từng phiếu.
+- Trạng thái "đã/chưa đối chiếu HIS" được lưu ở hồ sơ người bệnh (máy chủ tự đối chiếu khi lưu); khi kết nối HIS sẽ gắn thêm vào từng phiếu.
 - Mỗi lần xem hồ sơ người bệnh được ghi nhật ký; số CCCD không đi trong URL.
 - Kết nối FPT eHospital thật chưa làm vì chưa có tài liệu API (đang dùng HIS giả lập qua cùng interface).
 - Sau quyết định 9 (chưa kết nối HIS): HIS **tắt mặc định**, giao diện ẩn mọi thông tin HIS theo `GET /api/v1/features`; HIS giả lập chỉ dùng khi phát triển/kiểm thử và **bị chặn ở Production** (ADR-017).
@@ -453,17 +453,25 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Wizard lập phiếu (màn hình 5), state machine, danh sách và chi tiết phiếu (3, 8, 11, 12).
 - Sinh PDF từ mẫu + dữ liệu, có font tiếng Việt.
 
-**Tiêu chí nghiệm thu**
-- Chỉ mẫu ở trạng thái `Published` mới được chọn; phiếu giữ nguyên phiên bản mẫu tại thời điểm lập.
-- Chuyển trạng thái sai quy tắc → 409/422 kèm thông báo rõ (unit test đầy đủ cho state machine).
-- PDF hiển thị đúng tiếng Việt có dấu, đủ thông tin người bệnh và nội dung.
-- Danh sách lọc/phân trang ở server; người dùng chỉ thấy phiếu trong phạm vi khoa (trừ vai trò toàn viện).
+**Điều chỉnh khi triển khai (ADR-019…022 trong [kiến trúc](kien-truc.md))**
+- **Vòng đời gọn hơn khi chưa có SmartCA:** `Nháp → Chờ ký → Hoàn tất → Thu hồi`, cùng `Hủy` (từ Nháp/Chờ ký, bắt buộc lý do) và "Trả về nháp". Các trạng thái theo từng người ký SmartCA giữ làm thiết kế khi bật lại. Sprint 3 làm đến "Chờ ký"; "Hoàn tất" và "Thu hồi" đã có trong Domain, dùng ở Sprint 4.
+- **Màn hình 12 soạn định nghĩa mẫu bằng JSON**, có tab xem trước dùng chính form nhập liệu và báo lỗi theo từng phần/khối. Chưa làm trình thiết kế kéo-thả. Ba mẫu đề xuất nằm sẵn trong mã nguồn và được tạo khi khởi động: dạng nháp ở môi trường thật (Phòng KHTH duyệt rồi phát hành), phát hành sẵn ở môi trường demo.
+- **Đóng băng khi trình ký:** thông tin người bệnh và người ký được chép (mã hóa) vào phiếu; trả về nháp thì bỏ bản đóng băng. Nội dung phiếu cũng được mã hóa trong CSDL.
+- **Phía bệnh viện xác nhận bằng tài khoản** (quyết định 11): mẫu chỉ cấu hình vai trò xác nhận; không có ô ký tay phía bệnh viện.
+- **PDF:** PDFsharp-MigraDoc 6.2.4 (MIT) và font Tinos nhúng sẵn. Không nâng lên 6.5 trở lên vì thư viện đã đổi sang giấy phép AGPL. Ghim `System.Security.Cryptography.Pkcs` 10.0.15 để vá lỗ hổng của gói phụ thuộc. PDF được sinh mỗi lần xem; chưa hoàn tất thì ghi "BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ". Tên đơn vị trên PDF lấy từ cấu hình `Hospital:*` (đang để giá trị mẫu).
+- Hồ sơ người bệnh (màn hình 10) có danh sách phiếu của người bệnh và nút "Lập phiếu".
+
+**Tiêu chí nghiệm thu** (✅ đã đạt, có test tự động)
+- Chỉ mẫu ở trạng thái `Published` mới được chọn; phiếu giữ nguyên phiên bản mẫu tại thời điểm lập. Có test ở tầng service và test API với SQL Server thật: phát hành phiên bản 2 thì phiếu đã lập vẫn theo phiên bản 1.
+- Chuyển trạng thái sai quy tắc → `409 consent_forms.invalid_status` kèm thông báo tiếng Việt. Unit test phủ toàn bộ bảng chuyển đổi (5 trạng thái × 6 thao tác). Thiếu thông tin khi trình ký → `400` kèm lỗi từng trường, giao diện đánh dấu đúng ô.
+- PDF hiển thị đúng tiếng Việt có dấu (font nhúng), đủ thông tin người bệnh và nội dung. Có test sinh PDF cho cả 3 mẫu, và test API tải PDF; đã đọc lại chữ trong file.
+- Danh sách lọc/phân trang ở server; người dùng chỉ thấy phiếu trong phạm vi khoa, trừ vai trò toàn viện. Phiếu khoa khác trả `404` (có test API).
 
 ### Sprint 4 – Ký tay trên máy tính bảng (quyết định 10)
 - **Màn hình 6:** ghi nhận Đồng ý/Từ chối; chọn người ký phía người bệnh (người bệnh, hoặc người đại diện trong hồ sơ).
 - **Chế độ ký:** toàn màn hình trên máy tính bảng; thoát phải nhập lại mật khẩu nhân viên.
 - **Khung ký:** canvas dùng Pointer Events (ngón tay, bút cảm ứng, chuột); có "Ký lại", chặn khung trống. Lưu ảnh PNG, không lưu dữ liệu nét.
-- **Phía bệnh viện:** xác nhận bằng tài khoản; ký tay thêm nếu bệnh viện chọn.
+- **Phía bệnh viện:** xác nhận bằng tài khoản (quyết định 11).
 - **Hoàn tất:** chèn ảnh chữ ký vào PDF (Sprint 3 đã sinh PDF); lưu PDF và SHA-256; khóa phiếu; ghi nhật ký đầy đủ; thu hồi phải có lý do.
 
 **Tiêu chí nghiệm thu**
@@ -556,14 +564,15 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 8 | Người ký phía bệnh viện | **Cấu hình theo từng mẫu phiếu** (bác sĩ / điều dưỡng / tiếp đón); người chứng kiến (PA2) phải khác người ký phía bệnh viện |
 | 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
 | 10 | Hình thức ký khi chưa có SmartCA (11/11/2026) | **Người bệnh (hoặc người đại diện) ký tay trên máy tính bảng.** Ảnh chữ ký chèn vào PDF, lưu mã băm, khóa phiếu (mục 2.5a, ADR-018) |
+| 11 | Phía bệnh viện khi ký tay (11/11/2026, đồng ý đề xuất) | Người ký theo cấu hình mẫu **chỉ xác nhận bằng tài khoản đang đăng nhập**, không ký tay thêm. PDF ghi họ tên, chức danh, thời điểm xác nhận |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. **Phía bệnh viện khi ký tay** (cần trước Sprint 4): người ký theo cấu hình mẫu chỉ **xác nhận bằng tài khoản** (PDF ghi họ tên, chức danh, thời điểm xác nhận), hay **ký tay thêm** trên máy tính bảng. Đề xuất: xác nhận bằng tài khoản, vì nhanh hơn với 500–3.000 phiếu/ngày và gắn chặt với danh tính đăng nhập.
-2. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật). Cách hiểu phiếu TT-01 đã được xác nhận.
+1. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật). Cách hiểu phiếu TT-01 đã được xác nhận. Khi có góp ý, chỉ cần sửa mẫu trên màn hình 12 (tạo phiên bản mới), không sửa code.
+2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh (cấu hình `Hospital:*`, đang để giá trị mẫu).
 3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
 4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
 
@@ -573,4 +582,6 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 ## 11. Bước tiếp theo
 
-**Sprint 3** (mẫu phiếu, lập phiếu, sinh PDF) dựng trên [mẫu phiếu đề xuất](mau-phieu-de-xuat.md); góp ý của bệnh viện chỉ thay nội dung mẫu, không chặn tiến độ. Tiếp theo là **Sprint 4: ký tay trên máy tính bảng** (mục 2.5a).
+Sprint 0–3 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
+
+Tiếp theo là **Sprint 4: ký tay trên máy tính bảng** (mục 2.5a): chế độ ký toàn màn hình, khung ký, xác nhận phía bệnh viện bằng tài khoản, PDF hoàn tất có ảnh chữ ký và mã băm, thu hồi phiếu.

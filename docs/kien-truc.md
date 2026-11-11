@@ -1,6 +1,6 @@
 # Kiến trúc — Quản lý Phiếu đồng thuận
 
-> Phiên bản: 1.0 (Sprint 0). Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
+> Cập nhật đến Sprint 3. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
 > Tài liệu liên quan: [Yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) · [Kế hoạch](KE_HOACH_TRIEN_KHAI.md) · [Tích hợp SmartCA](tich-hop-smartca.md)
 
 ---
@@ -46,6 +46,7 @@ flowchart LR
 | Kiểm thử backend | xUnit 2.9, `Microsoft.AspNetCore.Mvc.Testing` (integration), Testcontainers (SQL Server thật trong Docker), test kiến trúc bằng reflection |
 | Kiểm thử frontend | Vitest 5, Testing Library, jsdom |
 | Lint frontend | oxlint (mặc định của template Vite hiện tại, cảnh báo bị coi là lỗi) |
+| PDF | PDFsharp-MigraDoc **6.2.4** (MIT; không nâng lên 6.5 trở lên vì đã đổi sang AGPL, ADR-020), font Tinos nhúng sẵn (SIL OFL 1.1) |
 | Hạ tầng | Docker Compose (dev/test), GitHub Actions (CI) |
 
 Nguyên tắc chọn thư viện: chỉ thêm khi cần, ưu tiên giấy phép MIT/Apache. Không dùng MediatR, AutoMapper (đã chuyển sang giấy phép thương mại) và FluentAssertions 8+ (giấy phép thương mại).
@@ -105,20 +106,24 @@ backend/
   src/
     Consent.Domain/            # Common (Entity, IAuditableEntity, SensitiveData), Departments, Patients (Patient,
                                #   LegalRepresentative, CitizenIdNumber), Identity (User, Role,
-                               #   RefreshToken, PasswordPolicy, SystemRoles), Authorization (Permissions), Auditing
+                               #   RefreshToken, PasswordPolicy, SystemRoles), Authorization (Permissions), Auditing,
+                               #   ConsentTemplates (mẫu, phiên bản), ConsentForms (phiếu, vòng đời)
     Consent.Shared/            # Result, Error (kèm lỗi theo trường), PagedResult
     Consent.Application/       # Abstractions (repository, IClock, ICurrentUser, ITokenService…), Auth, Users,
-                               #   Departments, Roles, Auditing (service + validator FluentValidation)
+                               #   Departments, Roles, Auditing (service + validator FluentValidation),
+                               #   ConsentTemplates (định nghĩa mẫu, kiểm tra, đánh giá dữ liệu, 3 mẫu mặc định),
+                               #   ConsentForms (lập/soạn/trình ký/hủy phiếu, IConsentPdfRenderer)
     Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),
                                #   Seeding, Migrations
-    Consent.Infrastructure/    # Security (băm mật khẩu, JWT, mã hóa AES-GCM, chỉ mục mù), His (HIS giả lập), Time
+    Consent.Infrastructure/    # Security (băm mật khẩu, JWT, mã hóa AES-GCM, chỉ mục mù), His (HIS giả lập), Time,
+                               #   Pdf (MigraDoc, font Tinos)
     Consent.Api/               # Controllers, Authorization (HasPermission), Infrastructure (pipeline, lỗi,
                                #   security headers, correlation id, cookie, rate limiting)
   tests/
     Consent.Domain.Tests/
     Consent.Application.Tests/       # service với repository giả trong bộ nhớ
     Consent.Api.IntegrationTests/    # pipeline/phân quyền (không CSDL) + luồng thật với SQL Server (Testcontainers)
-    Consent.Infrastructure.Tests/    # mã hóa, chỉ mục mù, HIS giả lập
+    Consent.Infrastructure.Tests/    # mã hóa, chỉ mục mù, HIS giả lập, sinh PDF (file hợp lệ, nhúng font tiếng Việt)
     Consent.ArchitectureTests/
 frontend/
   src/
@@ -127,7 +132,8 @@ frontend/
     auth/                      # AuthProvider, guards (RequireAuth/RequirePermission), permissions, tokenStore
     components/                # layout chung, PageHeader, PagePlaceholder
     features/<module>/         # dashboard, account, admin (users, roles, departments), patients (QR CCCD, tiếp nhận,
-                               #   danh sách, hồ sơ, người đại diện); consent-forms… (các sprint sau)
+                               #   danh sách, hồ sơ, người đại diện), consents (danh sách, lập phiếu, soạn phiếu
+                               #   theo định nghĩa mẫu, xem PDF), templates (mẫu phiếu, phiên bản, soạn JSON)
     pages/                     # đăng nhập, đổi mật khẩu bắt buộc, 403, 404, lỗi
     utils/                     # định dạng ngày, quy tắc mật khẩu, tìm kiếm không dấu, lỗi form
     test/                      # setup Vitest, giả lập API, dữ liệu mẫu
@@ -143,7 +149,7 @@ docker-compose.yml, .env.example
 
 Bảng được thêm dần theo sprint.
 
-**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`.
+**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`.
 
 ```mermaid
 erDiagram
@@ -229,63 +235,73 @@ erDiagram
     }
 ```
 
-`AuditLogs` không có khóa ngoại (giữ nguyên lịch sử kể cả khi đối tượng bị xóa) và có trigger chặn UPDATE/DELETE.
-
-**Dự kiến (các sprint sau):**
-
 ```mermaid
 erDiagram
-    Departments ||--o{ Users : "thuộc"
-    Departments ||--o{ ConsentForms : "lập tại"
-    Patients ||--o{ LegalRepresentatives : "có"
-    Patients ||--o{ ConsentForms : "của"
     ConsentTemplates ||--o{ ConsentTemplateVersions : "có phiên bản"
-    ConsentTemplateVersions ||--o{ ConsentForms : "theo mẫu"
-    ConsentForms ||--o{ ConsentSignatures : "có chữ ký"
-    ConsentForms ||--o{ SignatureTransactions : "giao dịch SmartCA"
-    ConsentForms ||--o{ StoredDocuments : "PDF"
-    LegalRepresentatives ||--o{ ConsentSignatures : "ký thay"
-    SigningReasons ||--o{ ConsentSignatures : "lý do"
-    Users ||--o{ ConsentSignatures : "ký / chứng kiến"
+    ConsentTemplates ||--o{ ConsentForms : "mẫu"
+    ConsentTemplateVersions ||--o{ ConsentForms : "đúng phiên bản đã dùng"
+    Patients ||--o{ ConsentForms : "của"
+    Departments ||--o{ ConsentForms : "lập tại"
+    Users ||--o{ ConsentForms : "người lập"
 
-    Patients {
+    ConsentTemplates {
         uuid Id PK
-        string PatientCode "mã HIS"
-        string FullName
-        date DateOfBirth
-        string Gender
-        bytes CitizenIdEncrypted
-        bytes CitizenIdHash "tra cứu"
-        string HealthInsuranceNoEncrypted
+        string Code UK "chữ hoa, ví dụ CK-01"
+        string Name
+        string HospitalSignerRoleCode "vai trò xác nhận phía bệnh viện"
+        uuid DepartmentId FK "NULL = toàn viện"
+        bool IsActive
+        rowversion RowVersion
     }
     ConsentTemplateVersions {
         uuid Id PK
         uuid TemplateId FK
-        int VersionNo
-        json ContentSchemaJson
-        string HospitalSignerRole
-        bool AllowHandwritten
-        bool AllowProxy
-        string Status
+        int VersionNo "duy nhất trong mẫu"
+        string Status "Draft / Published / Retired"
+        json ContentJson "định nghĩa mẫu"
+        datetimeoffset PublishedAtUtc
+        datetimeoffset RetiredAtUtc
     }
     ConsentForms {
         uuid Id PK
-        string FormNo "PDT-yyyy-nnnnnn"
+        string FormNo UK "PDT-yyyy-nnnnnn (sequence)"
+        string Status "Draft / PendingSignature / Completed / Cancelled / Revoked"
         uuid PatientId FK
+        uuid TemplateId FK
         uuid TemplateVersionId FK
         uuid DepartmentId FK
-        string EncounterCode "đợt khám HIS"
-        bool HisVerified
-        string Status
-        json DataJson
-        datetime CreatedAt "UTC"
-        uuid ReplacesFormId "khi lập lại"
+        string DataEncrypted "nội dung phiếu, AES-256-GCM"
+        string SignerKind "Patient / Representative"
+        uuid RepresentativeId
+        string SnapshotEncrypted "thông tin đóng băng khi trình ký, AES-256-GCM"
+        uuid CreatedByUserId FK
+        datetimeoffset SubmittedAtUtc
+        string CancelReason
+        string RevokeReason
+        rowversion RowVersion
     }
+```
+
+Khóa ngoại của `ConsentForms` không xóa dây chuyền (phiếu là hồ sơ cần lưu trữ). Chỉ mục `(Status, DepartmentId, CreatedAtUtc)` phục vụ danh sách lọc theo trạng thái và khoa.
+
+`AuditLogs` không có khóa ngoại (giữ nguyên lịch sử kể cả khi đối tượng bị xóa) và có trigger chặn UPDATE/DELETE.
+
+**Dự kiến (các sprint sau):** chữ ký và PDF đã ký (Sprint 4), giao dịch SmartCA (tạm hoãn, quyết định 9). Khi kết nối HIS, `ConsentForms` có thêm mã đợt khám và trạng thái đối chiếu HIS.
+
+```mermaid
+erDiagram
+    ConsentForms ||--o{ ConsentSignatures : "có chữ ký"
+    ConsentForms ||--o{ StoredDocuments : "PDF đã ký"
+    ConsentForms ||--o{ SignatureTransactions : "giao dịch SmartCA (tạm hoãn)"
+    LegalRepresentatives ||--o{ ConsentSignatures : "ký thay"
+    SigningReasons ||--o{ ConsentSignatures : "lý do (SmartCA)"
+    Users ||--o{ ConsentSignatures : "xác nhận / chứng kiến"
+
     ConsentSignatures {
         uuid Id PK
         uuid FormId FK
         string SignerType "Patient/Representative/Witness/Hospital"
-        string Method "SmartCA/Handwritten/ProxySmartCA"
+        string Method "Handwritten/AccountConfirmation/SmartCA/ProxySmartCA"
         int SignOrder
         uuid ReasonId FK
         string CertificateSerial
@@ -304,15 +320,6 @@ erDiagram
         string StoragePath
         string Sha256
     }
-    AuditLogs {
-        uuid Id PK
-        datetime OccurredAt "UTC"
-        uuid UserId
-        string Action
-        string EntityType
-        uuid EntityId
-        json ChangesJson "đã che dữ liệu nhạy cảm"
-    }
 ```
 
 Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog`) và gán cho vai trò qua bảng `RolePermissions` (thay cho bảng `Permissions` dự kiến trong kế hoạch). Bảng `ExportJobs` được mô tả ở mục 4 của [kế hoạch](KE_HOACH_TRIEN_KHAI.md).
@@ -320,6 +327,27 @@ Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog
 ---
 
 ## 6. Vòng đời phiếu
+
+**Đang áp dụng (ký tay trên máy tính bảng, quyết định 10):**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Draft: lập phiếu (theo phiên bản mẫu đang phát hành)
+    Draft --> PendingSignature: trình ký (đủ thông tin; đóng băng người bệnh, người ký)
+    PendingSignature --> Draft: trả về nháp
+    Draft --> Cancelled: hủy (bắt buộc lý do)
+    PendingSignature --> Cancelled: hủy (bắt buộc lý do)
+    PendingSignature --> Completed: ký tay + xác nhận phía bệnh viện (Sprint 4)
+    Completed --> Revoked: thu hồi (bắt buộc lý do, Sprint 4)
+    Cancelled --> [*]
+    Revoked --> [*]
+```
+
+- Quy tắc chuyển trạng thái nằm trong Domain (`ConsentForm.CanEdit/CanSubmit/CanReturnToDraft/CanCancel/CanComplete/CanRevoke`). Toàn bộ bảng chuyển đổi (5 trạng thái × 6 thao tác) có unit test. Chuyển sai quy tắc → API trả `409 consent_forms.invalid_status` kèm thông báo tiếng Việt.
+- Sprint 3 dùng các bước lập, sửa nháp, trình ký, trả về nháp, hủy. `Complete`/`Revoke` đã có trong Domain và được dùng ở Sprint 4.
+- API trả kèm `actions` (thao tác người dùng được làm với phiếu) để giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại.
+
+**Khi bật lại SmartCA (tạm hoãn, quyết định 9):** bước chờ ký được tách theo từng người ký:
 
 ```mermaid
 stateDiagram-v2
@@ -398,12 +426,12 @@ sequenceDiagram
 - **Mặc định an toàn:** `FallbackPolicy` yêu cầu đăng nhập cho mọi endpoint; chỉ endpoint đánh dấu `[AllowAnonymous]` (đăng nhập, làm mới, đăng xuất, health) mới mở.
 - **Theo quyền:** `[HasPermission(Permissions.UsersManage)]` tạo policy động `perm:<mã>` kiểm tra claim `perm` trong access token.
 - **Quyền thuộc vai trò:** người dùng có nhiều vai trò; quyền hiệu lực là hợp các quyền. Vai trò `ADMIN` luôn có toàn bộ quyền và không sửa được. Thay đổi quyền có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút); khóa tài khoản thu hồi refresh token ngay.
-- **Phạm vi theo khoa:** access token chứa khoa của người dùng (`dept`) và quyền `scope.all_departments` cho vai trò toàn viện. `ICurrentUser` cung cấp hai thông tin này để lọc dữ liệu phiếu/người bệnh theo khoa từ Sprint 2–3.
+- **Phạm vi theo khoa:** access token chứa khoa của người dùng (`dept`) và quyền `scope.all_departments` cho vai trò toàn viện. `ICurrentUser` cung cấp hai thông tin này để lọc phiếu theo khoa (mục 8.6). Hồ sơ người bệnh dùng chung toàn viện, vì một người bệnh có thể khám ở nhiều khoa.
 - **Giao diện:** menu và nút được ẩn/hiện theo quyền; trang không có quyền hiển thị 403. Đây chỉ là trải nghiệm người dùng, kiểm soát thật luôn nằm ở API.
 
 ### 8.3. Nhật ký audit
 
-- `AuditSaveChangesInterceptor` (EF Core) ghi **trong cùng giao dịch** mọi thao tác tạo/sửa/xóa trên thực thể `IAuditableEntity` (khoa, người dùng, vai trò, gán vai trò, gán quyền): người thực hiện, IP, User-Agent, mã truy vết, giá trị trước/sau.
+- `AuditSaveChangesInterceptor` (EF Core) ghi **trong cùng giao dịch** mọi thao tác tạo/sửa/xóa trên thực thể `IAuditableEntity` (khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu): người thực hiện, IP, User-Agent, mã truy vết, giá trị trước/sau.
 - Che dữ liệu nhạy cảm: `PasswordHash` luôn ghi `***`; bỏ qua thuộc tính kỹ thuật (`RowVersion`, bộ đếm đăng nhập sai…), vốn đã có sự kiện xác thực riêng.
 - Sự kiện xác thực được ghi tường minh: đăng nhập thành công/thất bại, khóa tạm, đăng xuất, đổi mật khẩu, phát hiện dùng lại refresh token.
 - **Chỉ ghi thêm:** không có API sửa/xóa; `ConsentDbContext` từ chối lưu nếu bản ghi audit bị sửa/xóa; trigger `TR_AuditLogs_AppendOnly` trong SQL Server chặn mọi `UPDATE`/`DELETE` (kể cả truy cập trực tiếp CSDL).
@@ -428,6 +456,17 @@ sequenceDiagram
 - **Khi bật lại HIS:** `IHisGateway` (Application) có `FakeHisGateway` (Infrastructure, `His:Provider=Fake`) cho phát triển/kiểm thử; **API từ chối khởi động nếu dùng HIS giả lập ở Production** (để không sinh mã người bệnh/thẻ BHYT không có thật). Kết nối FPT eHospital sẽ là một cài đặt khác của cùng interface. Mọi lời gọi HIS có thời gian chờ (`His:TimeoutSeconds`); HIS lỗi không chặn việc tiếp nhận (cho nhập tay, đánh dấu "Chưa đối chiếu HIS").
 - **Đối chiếu khi lưu (khi đã kết nối HIS):** máy chủ tự gọi HIS lúc tạo/cập nhật hồ sơ để đặt `HisVerifiedAtUtc`, không tin cờ do client gửi.
 
+### 8.6. Mẫu phiếu, phiếu đồng thuận và PDF
+
+- **Mẫu là dữ liệu, không phải code (ADR-019):** mỗi phiên bản mẫu lưu một định nghĩa JSON gồm phần, khối nội dung và trường nhập liệu (10 kiểu khối, điều kiện hiển thị, câu hỏi tính điểm). Đặc tả ở mục 6b của [tài liệu API](api.md). `TemplateDefinitionValidator` kiểm tra định nghĩa khi lưu nháp và kiểm tra lại khi phát hành. Phiên bản đã phát hành không sửa được: muốn đổi thì tạo phiên bản mới. Phiếu lưu `TemplateVersionId` nên luôn hiển thị và in theo đúng phiên bản đã dùng.
+- **Một logic, hai nơi chạy:** giao diện (`DynamicForm`, `templateLogic.ts`) dựng form từ định nghĩa và tính điều kiện hiển thị, tổng điểm ngay khi nhập. Máy chủ (`FormDataEvaluator`) là nơi quyết định: chuẩn hóa kiểu dữ liệu, bỏ trường lạ, kiểm tra bắt buộc/định dạng và tính điểm. Lưu nháp giữ cả giá trị của trường đang ẩn (ví dụ số thẻ BHYT điền sẵn) nhưng không kiểm tra. Trình ký bỏ các giá trị đó, để nội dung đem ký chỉ gồm những gì hiển thị trên phiếu.
+- **Đóng băng khi trình ký (ADR-022):** thông tin người bệnh và người ký (người bệnh hoặc người đại diện) được chép vào phiếu. Sửa hồ sơ sau đó không làm đổi phiếu đang chờ ký; trả về nháp thì bỏ bản đóng băng.
+- **Mã hóa:** nội dung phiếu (`DataEncrypted`) và bản đóng băng (`SnapshotEncrypted`) có dữ liệu cá nhân nên được mã hóa AES-256-GCM như các cột khác (mục 8.4). Hai thuộc tính này gắn `[SensitiveData]` nên nhật ký audit chỉ ghi `***`.
+- **Phạm vi khoa:** người dùng thấy phiếu của khoa mình, phiếu do mình lập, hoặc mọi phiếu nếu có `scope.all_departments`. Lọc ở câu truy vấn (danh sách) và ở từng thao tác (xem, sửa, PDF). Phiếu ngoài phạm vi trả `404`, không tiết lộ phiếu có tồn tại. Chỉ lập phiếu được cho khoa của mình (trừ quyền toàn viện), bằng mẫu đang phát hành dùng cho khoa đó.
+- **Số phiếu:** `PDT-<năm>-<6 chữ số>`. Số thứ tự lấy từ sequence `ConsentFormNumbers` của SQL Server, nên không trùng khi nhiều quầy lập cùng lúc. Số tăng liên tục, không đặt lại theo năm. Năm theo giờ Việt Nam.
+- **PDF (ADR-020):** `IConsentPdfRenderer` (Application) do `MigraDocConsentPdfRenderer` (Infrastructure) cài đặt. File A4 gồm tiêu đề hành chính (tên đơn vị lấy từ cấu hình `Hospital:*`), mã mẫu và số phiếu, tiêu đề, khối thông tin người bệnh, nội dung theo định nghĩa (chỉ trường đang hiển thị), khối chữ ký và số trang. Phiếu chưa hoàn tất in dòng "BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ". Sprint 3 sinh PDF mỗi lần xem, không lưu file. Từ Sprint 4, PDF đã ký được lưu kèm SHA-256. Mỗi lần xem chi tiết phiếu và mỗi lần tải PDF đều ghi nhật ký (`ConsentForms.Viewed`, `ConsentForms.PdfViewed`).
+- **Xem PDF trên giao diện:** trình duyệt tải PDF qua API (có xác thực) rồi hiển thị trong khung bằng địa chỉ `blob:`. Vì vậy CSP của web có thêm `frame-src blob:`. Chỉ script của chính ứng dụng tạo được địa chỉ này. Khi triển khai bằng IIS phải đặt cùng CSP như `frontend/nginx.conf`.
+
 ## 9. Cấu hình và bí mật
 
 | Khóa cấu hình | Biến môi trường | Ghi chú |
@@ -448,6 +487,7 @@ sequenceDiagram
 | `DataProtection:BlindIndexKey` | `DataProtection__BlindIndexKey` | **Bí mật**, Base64 của 32 byte, khác khóa mã hóa; khóa chỉ mục mù |
 | `His:Provider` | `His__Provider` | `None` (mặc định: chưa kết nối HIS) hoặc `Fake` (HIS giả lập, chỉ dev/test; bị từ chối ở Production). Giá trị khác → API không khởi động |
 | `His:TimeoutSeconds` | `His__TimeoutSeconds` | Mặc định 5 (1–60) |
+| `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` | `Hospital__…` | Cơ quan chủ quản, tên bệnh viện, địa danh in ở đầu PDF. **Đang để giá trị mẫu, chờ bệnh viện cung cấp** |
 | `SmartCa:*` | `SmartCa__SpPassword`… | **Tạm hoãn** (chưa tích hợp SmartCA); thiết kế giữ trong [tich-hop-smartca.md](tich-hop-smartca.md) |
 
 Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; chỉ commit `.env.example`.
@@ -484,3 +524,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-016 | Máy chủ tự đối chiếu HIS khi lưu; HIS lỗi không chặn tiếp nhận | Trạng thái "đã đối chiếu HIS" đáng tin cậy; quầy tiếp đón vẫn làm việc được khi HIS gián đoạn |
 | ADR-017 | Tạm chưa kết nối HIS và SmartCA (quyết định 11/11/2026): HIS tắt mặc định (`His:Provider=None`), giao diện ẩn theo `GET /api/v1/features`; HIS giả lập bị chặn ở Production; giữ interface để bật lại | Ứng dụng chạy độc lập, không hiển thị hay lưu dữ liệu HIS giả; khi bệnh viện cần, chỉ thêm cài đặt `IHisGateway`/dịch vụ ký số mà không sửa nghiệp vụ |
 | ADR-018 | Khi chưa có SmartCA, phiếu được ký tay trên máy tính bảng. Chỉ lưu ảnh chữ ký (PNG, không lưu dữ liệu nét); ảnh được chèn vào PDF; PDF có mã băm SHA-256 và bị khóa sau khi ký; chế độ ký toàn màn hình phải nhập lại mật khẩu nhân viên mới thoát được | Đáp ứng quyết định của bệnh viện với ít thao tác nhất tại quầy. Không phát sinh dữ liệu sinh trắc học. Phát hiện được sửa file sau khi ký. Người bệnh cầm máy không vào được phần khác. Giới hạn: đây không phải chữ ký số, pháp chế cần xác nhận giá trị pháp lý |
+| ADR-019 | Mẫu phiếu là định nghĩa JSON có phiên bản (Nháp → Đang phát hành → Ngừng dùng), máy chủ kiểm tra; giao diện quản trị soạn JSON kèm xem trước, chưa làm trình thiết kế kéo-thả | Thêm/sửa mẫu không cần sửa code hay triển khai lại; phiếu cũ giữ nguyên phiên bản. Chỉ vài người quản trị soạn mẫu, nên trình kéo-thả tốn công mà ít lợi; làm sau nếu bệnh viện cần |
+| ADR-020 | Sinh PDF bằng PDFsharp-MigraDoc **6.2.4** (MIT, ghim phiên bản); font Tinos (SIL OFL 1.1) nhúng trong mã nguồn | Thư viện .NET thuần, không cần trình duyệt hay dịch vụ ngoài. Từ bản 6.5, thư viện đổi sang giấy phép AGPL nên không nâng cấp. Font nhúng sẵn nên PDF giống nhau trên Windows/Linux/Docker và đủ dấu tiếng Việt. Ô đánh dấu dùng □/■ vì font không có ☐/☒ |
+| ADR-021 | Ghim `System.Security.Cryptography.Pkcs` 10.0.15 | PDFsharp kéo theo bản 8.0.1 có lỗ hổng đã công bố (GHSA-846f-f764-76mx). Ghim bản đã vá thay vì tắt cảnh báo NU1903 |
+| ADR-022 | Đóng băng (mã hóa) thông tin người bệnh và người ký khi trình ký; phiếu ngoài phạm vi khoa trả 404 | Nội dung đem ký không đổi dù hồ sơ được sửa sau đó; không tiết lộ sự tồn tại của phiếu khoa khác |

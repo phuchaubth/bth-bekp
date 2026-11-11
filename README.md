@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 2 hoàn thành (tiếp nhận người bệnh bằng QR CCCD, hồ sơ người bệnh, mã hóa dữ liệu nhạy cảm). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026); người bệnh sẽ **ký tay trên máy tính bảng**. Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 3 hoàn thành (mẫu phiếu có phiên bản, lập và trình ký phiếu, xuất PDF tiếng Việt). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026); người bệnh sẽ **ký tay trên máy tính bảng** (Sprint 4). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -63,7 +63,9 @@ Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") ch
 
 **HIS:** mặc định **chưa kết nối** (`His__Provider=None`): sau khi quét chỉ kiểm tra hồ sơ đã có, mã người bệnh nhập tay, giao diện không hiển thị thông tin HIS. Để thử luồng HIS khi phát triển, đặt `His__Provider=Fake` (HIS giả lập; API từ chối khởi động nếu bật ở Production): số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
 
-> **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT được mã hóa bằng `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
+**Thử lập phiếu:** đăng nhập `dieuduong.demo` → *Người bệnh* → mở một hồ sơ → **Lập phiếu** → chọn mẫu (CK-01, TT-01, TN-01) → điền → **Lưu nháp** / **Trình ký** → **Xem PDF**. Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (đang để giá trị mẫu trong `appsettings.json`, chờ bệnh viện cung cấp).
+
+> **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT và nội dung phiếu được mã hóa bằng `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
 ## Phát triển cục bộ
 
@@ -138,6 +140,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 - Đăng nhập: mật khẩu băm PBKDF2 (ASP.NET Core Identity), khóa tạm 15 phút sau 5 lần sai, giới hạn tần suất theo IP. Access token 15 phút chỉ giữ trong bộ nhớ trình duyệt; refresh token trong cookie `HttpOnly` + `SameSite=Strict`, xoay vòng mỗi lần dùng và thu hồi cả phiên khi phát hiện dùng lại.
 - Mọi API mặc định yêu cầu đăng nhập; phân quyền theo quyền (permission) gán cho vai trò.
 - Dữ liệu người bệnh: số CCCD, CMND cũ, số điện thoại, mã BHYT được mã hóa AES-256-GCM trong CSDL; tra cứu/chặn trùng CCCD qua chỉ mục mù HMAC; danh sách chỉ hiện số đã che; mỗi lần xem hồ sơ đều được ghi nhật ký; số CCCD không bao giờ nằm trong URL.
+- Phiếu đồng thuận: nội dung phiếu và thông tin người bệnh/người ký đóng băng khi trình ký được mã hóa trong CSDL. Người dùng chỉ thấy phiếu của khoa mình hoặc do mình lập, trừ vai trò toàn viện. Mỗi lần xem phiếu và tải PDF đều được ghi nhật ký.
 - Nhật ký audit ghi mọi thao tác thêm/sửa/xóa và sự kiện đăng nhập; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
 - API trả lỗi dạng ProblemDetails tiếng Việt, không lộ chi tiết nội bộ; có security headers; OpenAPI chỉ bật ở Development.
 - Cấu hình Docker Compose dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức dùng tài khoản SQL riêng với quyền tối thiểu (hướng dẫn trong `docs/trien-khai.md`, Sprint 6).
@@ -149,7 +152,8 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | [docs/KE_HOACH_TRIEN_KHAI.md](docs/KE_HOACH_TRIEN_KHAI.md) | Kế hoạch triển khai, danh sách màn hình, sprint và tiêu chí nghiệm thu |
 | [docs/yeu-cau-nghiep-vu.md](docs/yeu-cau-nghiep-vu.md) | Yêu cầu nghiệp vụ (SRS) |
 | [docs/kien-truc.md](docs/kien-truc.md) | Kiến trúc, mô hình dữ liệu, xác thực/phân quyền/audit, ADR |
-| [docs/api.md](docs/api.md) | Tài liệu API (endpoint, quyền, mã lỗi, ví dụ) |
+| [docs/api.md](docs/api.md) | Tài liệu API (endpoint, quyền, mã lỗi, ví dụ; đặc tả định nghĩa mẫu phiếu) |
+| [docs/mau-phieu-de-xuat.md](docs/mau-phieu-de-xuat.md) | Ba mẫu phiếu giai đoạn 1 đề xuất (chờ bệnh viện duyệt) |
 | [docs/tich-hop-smartca.md](docs/tich-hop-smartca.md) | Thiết kế tích hợp VNPT SmartCA |
 
 ## Lộ trình
@@ -159,7 +163,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | 0 | Nền móng: khung backend/frontend, Docker, CI, tài liệu yêu cầu và kiến trúc | ✅ Hoàn thành |
 | 1 | Xác thực, phân quyền (RBAC), audit log, quản trị người dùng/vai trò/khoa | ✅ Hoàn thành |
 | 2 | Người bệnh, quét QR CCCD (HIS tạm chưa kết nối) | ✅ Hoàn thành |
-| 3 | Mẫu phiếu và lập phiếu (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | Chưa bắt đầu |
+| 3 | Mẫu phiếu có phiên bản, lập phiếu, xuất PDF (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | ✅ Hoàn thành |
 | 4 | Ký tay trên máy tính bảng (thay cho SmartCA trong giai đoạn hiện tại) | Chưa bắt đầu |
 | — | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn |
 | 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |

@@ -243,5 +243,5 @@ Kèm theo: **thời điểm hẹn đánh giá lại** (bắt buộc khi nguy cơ
    - Ngưỡng tuổi người bệnh tự ký.
    - Cách xử lý khi người bệnh không ký được.
    - Vai trò ký phía bệnh viện của từng mẫu (đề xuất ở bảng đầu trang).
-6. **Phía bệnh viện khi ký tay:** chỉ xác nhận bằng tài khoản (đề xuất), hay ký tay thêm trên máy tính bảng. Phía người bệnh đã chốt ký tay trên máy tính bảng.
+6. ~~Phía bệnh viện khi ký tay~~ — **đã chốt** (quyết định 11): chỉ xác nhận bằng tài khoản. Phía người bệnh ký tay trên máy tính bảng.
 7. **Pháp chế rà soát** toàn bộ câu chữ cam kết và căn cứ pháp lý: Luật Khám bệnh, chữa bệnh số 15/2023/QH15; pháp luật về bảo hiểm y tế và bảo vệ dữ liệu cá nhân hiện hành.

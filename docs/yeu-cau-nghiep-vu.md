@@ -135,7 +135,7 @@ Mức ưu tiên: **M** = bắt buộc giai đoạn 1, **S** = nên có. Cột Sp
 | FR-HSIGN-02 | **Chế độ ký** toàn màn hình: chỉ hiện nội dung phiếu (chỉ đọc) và khung ký; thoát phải nhập lại mật khẩu nhân viên | M | 4 |
 | FR-HSIGN-03 | Chỉ lưu **ảnh chữ ký (PNG)**, không lưu dữ liệu nét ký; ảnh chỉ người có quyền xem phiếu mới xem được | M | 4 |
 | FR-HSIGN-04 | PDF hoàn tất có ảnh chữ ký đúng ô ký, kèm họ tên (quan hệ, số CCCD nếu là người đại diện) và thời điểm ký. Lưu mã băm SHA-256, khóa phiếu, ghi nhật ký | M | 4 |
-| FR-HSIGN-05 | Người ký phía bệnh viện (theo cấu hình mẫu) xác nhận bằng tài khoản; có ký tay thêm hay không **chờ bệnh viện chọn** | M | 4 |
+| FR-HSIGN-05 | Người ký phía bệnh viện (theo cấu hình mẫu) **chỉ xác nhận bằng tài khoản** đang đăng nhập, không ký tay thêm (quyết định 11). PDF ghi họ tên, chức danh, thời điểm xác nhận | M | 4 |
 
 ### 3.7. Xuất dữ liệu, báo cáo, nhật ký (EXP, RPT, AUD)
 

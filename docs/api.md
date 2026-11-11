@@ -1,6 +1,6 @@
 # Tài liệu API — Quản lý Phiếu đồng thuận
 
-> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 2 — thêm người bệnh, tra cứu theo CCCD, HIS).
+> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 3 — thêm mẫu phiếu có phiên bản, phiếu đồng thuận, xuất PDF).
 > Ở môi trường Development, đặc tả OpenAPI tự sinh có tại `GET /openapi/v1.json`.
 >
 > Mọi ví dụ dưới đây dùng **dữ liệu giả lập**.
@@ -266,6 +266,90 @@ Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth
 
 ---
 
+## 6b. Mẫu phiếu (`/api/v1/consent-templates`)
+
+Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `Published` (đang phát hành, dùng để lập phiếu mới) → `Retired` (ngừng dùng). Mỗi mẫu có **tối đa một** phiên bản nháp và **tối đa một** phiên bản đang phát hành; phát hành phiên bản mới thì phiên bản cũ tự chuyển sang `Retired`. Phiếu đã lập **giữ nguyên phiên bản mẫu** tại thời điểm lập.
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/consent-templates?includeInactive=false` | `templates.read` | Danh sách mẫu (sắp theo mã), kèm phiên bản đang phát hành và phiên bản nháp |
+| GET | `/api/v1/consent-templates/available?departmentId=` | `consents.create` | Mẫu **đang phát hành** dùng được để lập phiếu cho khoa (mặc định: khoa của người dùng): mẫu toàn viện và mẫu riêng của khoa. Trả định nghĩa của phiên bản đang phát hành |
+| GET | `/api/v1/consent-templates/{id}` | `templates.read` | Chi tiết mẫu và các phiên bản (mới nhất trước) |
+| GET | `/api/v1/consent-templates/{id}/versions/{versionNo}` | `templates.read` | Một phiên bản, kèm định nghĩa (`definition`) |
+| POST | `/api/v1/consent-templates` | `templates.manage` | Tạo mẫu `{ code, name, hospitalSignerRoleCode, departmentId }` → `201`, có sẵn phiên bản nháp 1. `code`: 2–20 ký tự (chữ không dấu, số, `-`), lưu chữ hoa; trùng → `409 consent_templates.duplicate_code` |
+| PUT | `/api/v1/consent-templates/{id}` | `templates.manage` | Sửa tên, vai trò xác nhận phía bệnh viện, khoa áp dụng, `isActive` (mã mẫu không đổi được) |
+| POST | `/api/v1/consent-templates/{id}/versions` | `templates.manage` | Tạo phiên bản nháp mới, chép từ phiên bản mới nhất → `201`. Đã có nháp → `409 consent_templates.draft_exists` |
+| PUT | `/api/v1/consent-templates/{id}/versions/{versionNo}` | `templates.manage` | Lưu định nghĩa của phiên bản nháp `{ "definition": { … } }`. Không phải nháp → `409 consent_templates.not_draft`; định nghĩa sai → `400 consent_templates.invalid_definition` kèm `errors.definition` (danh sách lỗi, chỉ rõ phần/khối) |
+| POST | `/api/v1/consent-templates/{id}/versions/{versionNo}/publish` | `templates.manage` | Phát hành phiên bản nháp (kiểm tra lại định nghĩa trước khi phát hành) |
+| POST | `/api/v1/consent-templates/{id}/versions/{versionNo}/retire` | `templates.manage` | Ngừng dùng phiên bản đang phát hành (mẫu không dùng được để lập phiếu mới cho tới khi phát hành phiên bản khác). Không phải phiên bản đang phát hành → `409 consent_templates.not_published` |
+
+`hospitalSignerRoleCode` là mã vai trò người xác nhận phía bệnh viện (`DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`…; phải là vai trò đang có). `departmentId = null` → mẫu dùng toàn viện.
+
+**Định nghĩa mẫu** (`definition`) chỉ mô tả phần riêng của từng mẫu. Quốc hiệu, tên đơn vị, số phiếu, khối thông tin người bệnh và khối chữ ký do hệ thống tự thêm.
+
+```json
+{
+  "title": "Giấy cam kết\nsử dụng dịch vụ khám bệnh, chữa bệnh",
+  "subtitle": null,
+  "sections": [
+    {
+      "title": "II. Hình thức khám",
+      "blocks": [
+        { "type": "choice", "key": "examType", "label": "Hình thức khám", "required": true, "layout": "inline",
+          "options": [ { "value": "bhyt", "label": "Khám BHYT" }, { "value": "service", "label": "Khám dịch vụ" } ] },
+        { "type": "text", "key": "insuranceNumber", "label": "Số thẻ BHYT", "required": true,
+          "prefill": "patient.healthInsuranceNumber", "visibleWhen": { "field": "examType", "in": ["bhyt"] } },
+        { "type": "paragraph", "text": "Tôi cam kết thanh toán chi phí ngoài phạm vi BHYT…" },
+        { "type": "confirm", "key": "acknowledged", "label": "Tôi đã đọc và hiểu nội dung cam kết.", "required": true }
+      ]
+    }
+  ],
+  "signatures": { "patient": "Người bệnh", "representative": "Người đại diện", "hospital": "Nhân viên tiếp đón" }
+}
+```
+
+| Kiểu khối (`type`) | Ý nghĩa | Thuộc tính riêng |
+|---|---|---|
+| `paragraph`, `list` | Đoạn văn, danh sách cố định (không nhập liệu) | `text`; `items`, `layout: "ordered"` |
+| `text` | Ô chữ | `maxLength` (1–4.000), `pattern` + `patternMessage`, `prefill` |
+| `date`, `datetime` | Ngày (`yyyy-MM-dd`), ngày giờ (`yyyy-MM-ddTHH:mm`, giờ Việt Nam) | |
+| `choice` | Chọn một | `options` (`value`, `label`, `score` nếu là câu hỏi tính điểm), `layout: "inline"` |
+| `multiChoice` | Chọn nhiều | `options`, `minItems`, `maxItems`, `requireAll` (phải chọn đủ mọi mục) |
+| `confirm` | Ô xác nhận (phải đánh dấu nếu `required`) | |
+| `repeater` | Bảng nhiều dòng | `columns` (`key`, `label`, `required`, `maxLength`, `pattern`), `minItems`, `maxItems` |
+| `score` | Tổng điểm tự tính (không nhập) | `sumOf` (câu hỏi tính điểm đứng trước), `levels` (`code`, `label`, `min` tăng dần) |
+
+- Mọi khối nhập liệu có `key` (bắt đầu bằng chữ cái; chữ không dấu, số, `_`; không trùng).
+- `visibleWhen`: `{ "field", "in": [...] }` (giá trị của một trường đứng trước thuộc danh sách; chọn nhiều thì chỉ cần một), hoặc `{ "field", "minLevel" }` (trường điểm đạt tối thiểu mức). Trường bị ẩn thì không bắt buộc, và giá trị của nó không được in hay giữ lại khi trình ký.
+- `prefill`: tự điền khi lập phiếu từ `patient.healthInsuranceNumber`, `patient.phoneNumber`, `patient.patientCode`.
+- 3 mẫu giai đoạn 1 (CK-01, TT-01, TN-01) nằm trong mã nguồn (`Consent.Application/ConsentTemplates/Defaults/*.json`), nội dung theo [mẫu phiếu đề xuất](mau-phieu-de-xuat.md). Khi khởi động với `Seed:Enabled`, mẫu nào chưa có (theo mã) thì được tạo: ở trạng thái **nháp** để quản trị viên duyệt rồi phát hành, hoặc **phát hành sẵn** khi bật `Seed:DemoData`. Mẫu đã có không bị ghi đè.
+
+## 6c. Phiếu đồng thuận (`/api/v1/consent-forms`)
+
+**Phạm vi khoa:** người dùng chỉ thấy phiếu **của khoa mình** hoặc **do mình lập**, trừ khi có quyền `scope.all_departments`. Phiếu ngoài phạm vi trả `404` (không tiết lộ phiếu có tồn tại).
+
+**Vòng đời (Sprint 3):** `Draft` (nháp) → `PendingSignature` (chờ ký) → `Completed` (hoàn tất, Sprint 4) → `Revoked` (thu hồi, Sprint 4). `Draft`/`PendingSignature` → `Cancelled` (hủy, bắt buộc lý do). Chuyển trạng thái sai quy tắc → `409 consent_forms.invalid_status` kèm thông báo tiếng Việt (ví dụ "Chỉ trình ký được phiếu nháp.").
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/consent-forms?status=&templateId=&patientId=&departmentId=&from=&to=&keyword=&page=1&pageSize=20` | `consents.read` | Tìm kiếm, phân trang ở máy chủ, mới nhất trước. `from`/`to` là ngày lập (`yyyy-MM-dd`, giờ Việt Nam, gồm cả ngày `to`). `keyword`: số phiếu, họ tên người bệnh (không phân biệt dấu) hoặc mã người bệnh |
+| GET | `/api/v1/consent-forms/{id}` | `consents.read` | Chi tiết phiếu, kèm định nghĩa của **đúng phiên bản mẫu** đã dùng, dữ liệu, điểm, các mục còn thiếu (`issues`) và thao tác được phép (`actions`); ghi nhật ký `ConsentForms.Viewed` |
+| GET | `/api/v1/consent-forms/{id}/pdf` | `consents.read` | File PDF khổ A4 (`application/pdf`, tên `PDT-2026-000001.pdf`). Phiếu chưa hoàn tất có dòng **"BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ"**; ghi nhật ký `ConsentForms.PdfViewed` |
+| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. `departmentId` mặc định là khoa của người dùng; lập cho khoa khác cần quyền toàn viện (`403 consent_forms.department_forbidden`) |
+| PUT | `/api/v1/consent-forms/{id}` | `consents.create` | Lưu nháp `{ data, signerKind, representativeId }`. Chưa bắt buộc đầy đủ; các mục còn thiếu trả về trong `issues`. Chỉ phiếu nháp |
+| POST | `/api/v1/consent-forms/{id}/submit` | `consents.create` | Trình ký: kiểm tra đầy đủ theo định nghĩa mẫu (thiếu → `400 consent_forms.incomplete` kèm `errors` theo từng trường), bỏ giá trị của trường đang ẩn, **đóng băng** thông tin người bệnh và người ký (sửa hồ sơ sau đó không làm đổi phiếu) |
+| POST | `/api/v1/consent-forms/{id}/return-to-draft` | `consents.create` | Trả phiếu đang chờ ký về nháp để sửa (bỏ thông tin đã đóng băng) |
+| POST | `/api/v1/consent-forms/{id}/cancel` | `consents.create` | Hủy phiếu nháp hoặc chờ ký `{ "reason": "…" }` (5–500 ký tự) |
+
+- `signerKind`: `Patient` (người bệnh tự ký) hoặc `Representative` (người đại diện ký thay; `representativeId` phải thuộc hồ sơ người bệnh).
+- `data`: đối tượng `{ "tênTrường": giá trị }`. Giá trị là chuỗi (`text`, `date`, `datetime`, `choice`), mảng chuỗi (`multiChoice`), `true` (`confirm`) hoặc mảng dòng `[{ "cột": "…" }]` (`repeater`). Trường không có trong định nghĩa bị bỏ qua; nội dung tối đa 100.000 ký tự.
+- `scores`: `{ "tênTrườngĐiểm": { "total": 45, "levelCode": "high", "levelLabel": "Nguy cơ cao" } }` (`total = null` khi chưa trả lời đủ câu).
+- Số phiếu `PDT-<năm>-<6 chữ số>` lấy từ sequence của SQL Server, không trùng kể cả khi nhiều người lập cùng lúc.
+- Nội dung phiếu (`data`) và thông tin đóng băng có dữ liệu cá nhân nên được **mã hóa AES-256-GCM** trong CSDL; nhật ký audit che các giá trị này (`***`).
+- Tên đơn vị in trên PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (**đang để giá trị mẫu, chờ bệnh viện cung cấp**).
+
+---
+
 ## 7. Nhật ký audit (`/api/v1/audit-logs`)
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
@@ -278,10 +362,11 @@ Hành động (`action`) được ghi:
 
 | Hành động | Nguồn |
 |---|---|
-| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT) luôn hiển thị `***` |
+| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
 | `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`) |
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
 | `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |
+| `ConsentForms.Viewed`, `ConsentForms.PdfViewed` | Xem chi tiết phiếu; tải/xem PDF phiếu |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
 
