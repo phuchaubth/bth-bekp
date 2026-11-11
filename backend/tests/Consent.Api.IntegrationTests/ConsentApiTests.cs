@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Consent.Api.IntegrationTests.Infrastructure;
 using Microsoft.Data.SqlClient;
 
@@ -37,6 +38,14 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         return patients.GetProperty("items")[0].GetProperty("id").GetString()!;
     }
 
+    /// <summary>Mọi giá trị lồng bên trong một phần tử JSON.</summary>
+    private static IEnumerable<JsonElement> Descendants(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => element.EnumerateObject().SelectMany(p => Descendants(p.Value).Prepend(p.Value)),
+        JsonValueKind.Array => element.EnumerateArray().SelectMany(i => Descendants(i).Prepend(i)),
+        _ => [],
+    };
+
     private static string TemplateId(JsonElement list, string code) =>
         list.EnumerateArray().Single(t => t.GetProperty("templateCode").GetString() == code).GetProperty("templateId").GetString()!;
 
@@ -63,14 +72,27 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         var (_, list) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates", manager);
         var ck01 = list.EnumerateArray().Single(t => t.GetProperty("code").GetString() == "CK-01");
         var id = ck01.GetProperty("id").GetString();
+        var patientId = await DemoPatientIdAsync(nurse);
+        var (_, formV1) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/consent-forms", nurse, new { patientId, templateId = id });
+
         var (draftStatus, draft) = await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/consent-templates/{id}/versions", manager);
         var (invalidStatus, invalid) = await _client.SendJsonAsync(
             HttpMethod.Put, $"/api/v1/consent-templates/{id}/versions/2", manager, new { definition = new { title = "", sections = Array.Empty<object>() } });
+        var definitionV2 = JsonNode.Parse(draft.GetProperty("definition").GetRawText())!.AsObject();
+        definitionV2["title"] = "Giấy cam kết (phiên bản 2)";
         var (validStatus, _) = await _client.SendJsonAsync(
-            HttpMethod.Put, $"/api/v1/consent-templates/{id}/versions/2", manager, new { definition = draft.GetProperty("definition") });
+            HttpMethod.Put, $"/api/v1/consent-templates/{id}/versions/2", manager, new { definition = definitionV2 });
         var (_, published) = await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/consent-templates/{id}/versions/2/publish", manager);
         var (forbidden, _) = await _client.SendJsonAsync(
             HttpMethod.Post, "/api/v1/consent-templates", nurse, new { code = "X-01", name = "X", hospitalSignerRoleCode = "NURSE" });
+
+        // Phiếu lập trước khi phát hành phiên bản 2 vẫn theo phiên bản 1; phiếu lập sau dùng phiên bản 2.
+        var (_, formV1Reopened) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formV1.GetProperty("id").GetString()}", nurse);
+        var (_, formV2) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/consent-forms", nurse, new { patientId, templateId = id });
+        Assert.Equal(1, formV1Reopened.GetProperty("templateVersionNo").GetInt32());
+        Assert.NotEqual("Giấy cam kết (phiên bản 2)", formV1Reopened.GetProperty("definition").GetProperty("title").GetString());
+        Assert.Equal(2, formV2.GetProperty("templateVersionNo").GetInt32());
+        Assert.Equal("Giấy cam kết (phiên bản 2)", formV2.GetProperty("definition").GetProperty("title").GetString());
 
         Assert.Equal(["CK-01", "TN-01", "TT-01"], list.EnumerateArray().Select(t => t.GetProperty("code").GetString()));
         Assert.All(list.EnumerateArray(), t => Assert.Equal(1, t.GetProperty("publishedVersionNo").GetInt32()));
@@ -104,6 +126,11 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Created, createdStatus);
         Assert.Matches("^PDT-\\d{4}-\\d{6}$", created.GetProperty("formNo").GetString()!);
+        // Định nghĩa mẫu trả về không có thuộc tính trống (null/false), nhưng vẫn giữ điểm 0 của lựa chọn.
+        var definition = created.GetProperty("definition");
+        Assert.DoesNotContain(Descendants(definition), v => v.ValueKind is JsonValueKind.Null or JsonValueKind.False);
+        Assert.Contains(Descendants(definition), v => v.ValueKind == JsonValueKind.Object
+            && v.TryGetProperty("score", out var score) && score.GetInt32() == 0);
         Assert.Equal(40, draft.GetProperty("scores").GetProperty("morseTotal").GetProperty("total").GetInt32());
         Assert.Equal("medium", draft.GetProperty("scores").GetProperty("morseTotal").GetProperty("levelCode").GetString());
         Assert.True(draft.GetProperty("issues").TryGetProperty("measuresMedium", out _));

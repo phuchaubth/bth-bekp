@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Consent.Application.ConsentTemplates;
 
@@ -123,6 +124,12 @@ public static class PrefillSources
 /// <summary>Đọc/ghi định nghĩa mẫu và dữ liệu phiếu dạng JSON (camelCase).</summary>
 public static class TemplateJson
 {
+    private static readonly HashSet<Type> DefinitionTypes =
+    [
+        typeof(TemplateDefinition), typeof(TemplateSection), typeof(TemplateBlock), typeof(TemplateOption),
+        typeof(TemplateColumn), typeof(TemplateCondition), typeof(ScoreLevel), typeof(TemplateSignatures),
+    ];
+
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
@@ -130,6 +137,25 @@ public static class TemplateJson
     };
 
     public static string Serialize(TemplateDefinition definition) => JsonSerializer.Serialize(definition, Options);
+
+    /// <summary>
+    /// Bộ điều chỉnh cho JSON của API: định nghĩa mẫu trả về bỏ thuộc tính trống (<c>null</c>, <c>false</c>), gọn như
+    /// bản đang lưu, để màn hình soạn JSON hiển thị đúng định nghĩa và client chỉ cần xử lý "không có thuộc tính".
+    /// Giá trị số luôn được giữ (ví dụ điểm 0 của một lựa chọn, mức điểm tối thiểu 0).
+    /// </summary>
+    public static void OmitEmptyDefinitionMembers(JsonTypeInfo typeInfo)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfo);
+        if (typeInfo.Kind != JsonTypeInfoKind.Object || !DefinitionTypes.Contains(typeInfo.Type))
+        {
+            return;
+        }
+
+        foreach (var property in typeInfo.Properties)
+        {
+            property.ShouldSerialize = static (_, value) => value is not (null or false);
+        }
+    }
 
     /// <summary>Đọc định nghĩa; JSON sai cú pháp hoặc sai kiểu dữ liệu trả về <c>null</c> kèm thông báo.</summary>
     public static TemplateDefinition? TryDeserialize(string json, out string? error)

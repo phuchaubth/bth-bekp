@@ -80,6 +80,23 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return (text ? JSON.parse(text) : undefined) as T
 }
 
+/** Tải file nhị phân có xác thực (ví dụ PDF phiếu); tự làm mới phiên một lần khi access token hết hạn. */
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  let response = await send(path, { signal }, true)
+  if (response.status === 401 && refreshHandler) {
+    const newToken = await refreshHandler()
+    if (newToken) {
+      response = await send(path, { signal }, true)
+    }
+  }
+
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+
+  return response.blob()
+}
+
 /** GET không cần đăng nhập (ví dụ health check). */
 export function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return apiRequest<T>(path, { signal, auth: false })

@@ -101,6 +101,32 @@ public sealed class ConsentFormServiceTests
     }
 
     [Fact]
+    public async Task Form_KeepsItsTemplateVersion_WhenANewVersionIsPublished()
+    {
+        var s = Setup();
+        s.LogIn(s.Kkb);
+        var version1 = s.Ck01.PublishedVersion!;
+        var before = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None);
+
+        // Phiên bản 2 đổi tiêu đề rồi được phát hành (phiên bản 1 chuyển sang ngừng dùng).
+        var definition = JsonNode.Parse(version1.ContentJson)!.AsObject();
+        definition["title"] = "Giấy cam kết (phiên bản 2)";
+        var draft = s.Ck01.CreateDraftFromLatest(s.Ctx.Clock.UtcNow);
+        s.Ck01.UpdateDraft(draft.VersionNo, definition.ToJsonString(), s.Ctx.Clock.UtcNow);
+        s.Ck01.Publish(draft.VersionNo, s.Ctx.Clock.UtcNow);
+
+        var reopened = await s.Service.GetAsync(before.Value.Id, CancellationToken.None);
+        var after = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None);
+
+        Assert.Equal(TemplateVersionStatus.Retired, version1.Status);
+        Assert.Equal(version1.Id, reopened.Value.TemplateVersionId);
+        Assert.Equal(1, reopened.Value.TemplateVersionNo);
+        Assert.NotEqual("Giấy cam kết (phiên bản 2)", reopened.Value.Definition.Title);
+        Assert.Equal(2, after.Value.TemplateVersionNo);
+        Assert.Equal("Giấy cam kết (phiên bản 2)", after.Value.Definition.Title);
+    }
+
+    [Fact]
     public async Task Create_ForAnotherDepartment_IsForbidden_UnlessHospitalWideScope()
     {
         var s = Setup();

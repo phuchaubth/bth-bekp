@@ -143,6 +143,10 @@ export function usePatients(query: PatientQuery) {
   })
 }
 
-export function usePatient(id: string) {
-  return useQuery({ queryKey: patientKeys.detail(id), queryFn: ({ signal }) => patientsApi.get(id, signal) })
+export function usePatient(id: string, enabled = true) {
+  return useQuery({
+    queryKey: patientKeys.detail(id),
+    queryFn: ({ signal }) => patientsApi.get(id, signal),
+    enabled: enabled && id !== '',
+  })
 }

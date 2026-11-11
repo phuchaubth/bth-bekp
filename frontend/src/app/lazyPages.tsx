@@ -14,6 +14,21 @@ export const PatientIntakePage = lazy(() =>
 export const PatientProfilePage = lazy(() =>
   import('../features/patients/PatientProfilePage').then((m) => ({ default: m.PatientProfilePage })),
 )
+export const ConsentFormsPage = lazy(() =>
+  import('../features/consents/ConsentFormsPage').then((m) => ({ default: m.ConsentFormsPage })),
+)
+export const ConsentFormCreatePage = lazy(() =>
+  import('../features/consents/ConsentFormCreatePage').then((m) => ({ default: m.ConsentFormCreatePage })),
+)
+export const ConsentFormDetailPage = lazy(() =>
+  import('../features/consents/ConsentFormDetailPage').then((m) => ({ default: m.ConsentFormDetailPage })),
+)
+export const ConsentTemplatesPage = lazy(() =>
+  import('../features/templates/ConsentTemplatesPage').then((m) => ({ default: m.ConsentTemplatesPage })),
+)
+export const ConsentTemplateDetailPage = lazy(() =>
+  import('../features/templates/ConsentTemplateDetailPage').then((m) => ({ default: m.ConsentTemplateDetailPage })),
+)
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))
 
 export function Lazy({ children }: { children: ReactNode }) {

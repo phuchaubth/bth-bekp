@@ -326,6 +326,58 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
     expect(screen.getByText('036188000125')).toBeInTheDocument()
   })
 
+  it('hồ sơ: các phiếu của người bệnh và nút lập phiếu mới cho người bệnh này', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(session({ permissions: [Permissions.PatientsRead, Permissions.ConsentsRead, Permissions.ConsentsCreate] })),
+      'GET /api/v1/patients/p-1': detail(),
+      'GET /api/v1/consent-forms': {
+        items: [
+          {
+            id: 'f-1',
+            formNo: 'PDT-2026-000001',
+            status: 'PendingSignature',
+            templateId: 't-ck',
+            templateCode: 'CK-01',
+            templateName: 'Giấy cam kết sử dụng dịch vụ',
+            templateVersionNo: 1,
+            patientId: 'p-1',
+            patientName: 'Phạm Thị Dung',
+            patientCode: 'BN88000125',
+            departmentId: 'd-noi',
+            departmentName: 'Khoa Nội tổng hợp',
+            createdByName: 'Điều dưỡng Demo',
+            createdAtUtc: '2026-11-11T02:00:00Z',
+            updatedAtUtc: '2026-11-11T02:00:00Z',
+          },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1,
+        totalPages: 1,
+      },
+    })
+    const { router } = renderApp('/nguoi-benh/p-1')
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('link', { name: 'PDT-2026-000001' })).toHaveAttribute('href', '/phieu-dong-thuan/f-1')
+    expect(screen.getByText('Chờ ký')).toBeInTheDocument()
+    expect(calls.find((c) => c.path === '/api/v1/consent-forms')!.search).toContain('patientId=p-1')
+
+    await user.click(screen.getByRole('button', { name: /Lập phiếu/ }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/tao-moi'))
+    expect(router.state.location.search).toBe('?patientId=p-1')
+  })
+
+  it('hồ sơ: không có quyền với phiếu thì không thấy nút lập phiếu và không tải danh sách phiếu', async () => {
+    const { calls } = mockApi({ ...baseRoutes(session({ permissions: [Permissions.PatientsRead] })), 'GET /api/v1/patients/p-1': detail() })
+    renderApp('/nguoi-benh/p-1')
+
+    expect(await screen.findByText('Bạn không có quyền xem phiếu.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lập phiếu/ })).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/api/v1/consent-forms')).toBe(false)
+  })
+
   it('thêm người đại diện bằng cách quét CCCD của người đó', async () => {
     const { calls } = mockApi({
       ...baseRoutes(nurse()),

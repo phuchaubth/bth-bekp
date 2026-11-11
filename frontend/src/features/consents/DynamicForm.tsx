@@ -1,0 +1,225 @@
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
+import { Button, Checkbox, DatePicker, Flex, Form, Input, Radio, Tag, Typography, type FormInstance } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
+import { useMemo } from 'react'
+import type { FormData, ScoreResult } from '../../api/consentForms'
+import type { TemplateBlock, TemplateDefinition, TemplateOption } from '../../api/consentTemplates'
+import { evaluate, levelIndex } from './templateLogic'
+
+interface Props {
+  definition: TemplateDefinition
+  form: FormInstance<FormData>
+  initialValues: FormData
+  disabled?: boolean
+  /** Lỗi theo từng trường do máy chủ trả về khi trình ký. */
+  errors?: Record<string, string[]>
+  /** Gọi khi người dùng sửa trường (ví dụ để bỏ lỗi máy chủ của trường vừa sửa). */
+  onValuesChange?: (changed: FormData) => void
+}
+
+const DATE = 'YYYY-MM-DD'
+const DATE_TIME = 'YYYY-MM-DDTHH:mm'
+const levelColors = ['green', 'gold', 'red']
+
+/** Hiển thị và nhập liệu một phiếu theo định nghĩa mẫu (dùng chung cho soạn phiếu, xem phiếu và xem trước mẫu). */
+export function DynamicForm({ definition, form, initialValues, disabled = false, errors, onValuesChange }: Props) {
+  // preserve: tính cả giá trị của trường đang ẩn (giữ lại khi lưu nháp, giống máy chủ).
+  const watched = Form.useWatch((values: FormData) => values, { form, preserve: true })
+  const values = watched ?? initialValues
+  const { visible, scores } = useMemo(() => evaluate(definition, values ?? {}), [definition, values])
+
+  return (
+    <Form<FormData>
+      form={form}
+      layout="vertical"
+      initialValues={initialValues}
+      disabled={disabled}
+      requiredMark="optional"
+      onValuesChange={onValuesChange ? (changed: FormData) => onValuesChange(changed) : undefined}
+    >
+      {definition.sections.map((section, s) => (
+        <section key={section.title ?? s} style={{ marginBottom: 8 }}>
+          {section.title && (
+            <Typography.Title level={5} style={{ marginTop: 8 }}>
+              {section.title}
+            </Typography.Title>
+          )}
+          {section.blocks.map((block, b) => {
+            const key = block.key ?? `${s}-${b}`
+            if (block.type === 'paragraph') {
+              return (
+                <Typography.Paragraph key={key} style={{ textAlign: 'justify' }}>
+                  {block.text}
+                </Typography.Paragraph>
+              )
+            }
+            if (block.type === 'list') {
+              const ListTag = block.layout === 'ordered' ? 'ol' : 'ul'
+              return (
+                <ListTag key={key} style={{ paddingLeft: 22, marginTop: 0 }}>
+                  {block.items?.map((item) => (
+                    <li key={item} style={{ marginBottom: 4 }}>
+                      {item}
+                    </li>
+                  ))}
+                </ListTag>
+              )
+            }
+            if (block.type === 'score') {
+              return <ScoreLine key={key} block={block} score={scores[block.key!]} />
+            }
+            if (!visible.has(block.key!)) {
+              return null
+            }
+            return <Field key={key} block={block} error={errors?.[block.key!]} />
+          })}
+        </section>
+      ))}
+    </Form>
+  )
+}
+
+function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
+  const common = {
+    name: block.key!,
+    label: block.type === 'confirm' ? undefined : block.label,
+    required: block.required,
+    validateStatus: error ? ('error' as const) : undefined,
+    help: error?.join(' '),
+  }
+
+  switch (block.type) {
+    case 'text':
+      return (
+        <Form.Item {...common}>
+          <Input maxLength={block.maxLength} autoComplete="off" />
+        </Form.Item>
+      )
+    case 'date':
+      return (
+        <Form.Item
+          {...common}
+          getValueProps={(value?: string) => ({ value: value ? dayjs(value, DATE) : undefined })}
+          normalize={(value?: Dayjs | null) => (value ? value.format(DATE) : undefined)}
+        >
+          <DatePicker format="DD/MM/YYYY" placeholder="dd/mm/yyyy" style={{ width: 200 }} />
+        </Form.Item>
+      )
+    case 'datetime':
+      return (
+        <Form.Item
+          {...common}
+          getValueProps={(value?: string) => ({ value: value ? dayjs(value, DATE_TIME) : undefined })}
+          normalize={(value?: Dayjs | null) => (value ? value.format(DATE_TIME) : undefined)}
+        >
+          <DatePicker showTime={{ format: 'HH:mm' }} format="HH:mm DD/MM/YYYY" placeholder="giờ:phút ngày" style={{ width: 220 }} />
+        </Form.Item>
+      )
+    case 'choice':
+      return (
+        <Form.Item {...common}>
+          <Radio.Group>
+            <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
+              {block.options?.map((option) => (
+                <Radio key={option.value} value={option.value}>
+                  {optionLabel(option)}
+                </Radio>
+              ))}
+            </Flex>
+          </Radio.Group>
+        </Form.Item>
+      )
+    case 'multiChoice':
+      return (
+        <Form.Item {...common}>
+          <Checkbox.Group>
+            <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
+              {block.options?.map((option) => (
+                <Checkbox key={option.value} value={option.value}>
+                  {option.label}
+                </Checkbox>
+              ))}
+            </Flex>
+          </Checkbox.Group>
+        </Form.Item>
+      )
+    case 'confirm':
+      return (
+        <Form.Item {...common} valuePropName="checked" normalize={(checked: boolean) => (checked ? true : undefined)}>
+          <Checkbox>{block.label}</Checkbox>
+        </Form.Item>
+      )
+    case 'repeater':
+      return <Rows block={block} error={error} />
+    default:
+      return null
+  }
+}
+
+function optionLabel(option: TemplateOption) {
+  // == null: thuộc tính trống có thể vắng mặt hoặc là null.
+  return option.score == null ? (
+    option.label
+  ) : (
+    <>
+      {option.label}{' '}
+      <Typography.Text type="secondary" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        ({option.score} điểm)
+      </Typography.Text>
+    </>
+  )
+}
+
+function Rows({ block, error }: { block: TemplateBlock; error?: string[] }) {
+  const columns = block.columns ?? []
+  return (
+    <Form.Item label={block.label} required={block.required} validateStatus={error ? 'error' : undefined} help={error?.join(' ')}>
+      <Form.List name={block.key!}>
+        {(rows, { add, remove }) => (
+          <Flex vertical gap={8}>
+            {rows.map((row, index) => (
+              <Flex key={row.key} gap={8} wrap align="start">
+                <Typography.Text type="secondary" style={{ width: 20, paddingTop: 5 }}>
+                  {index + 1}.
+                </Typography.Text>
+                {columns.map((column) => (
+                  <Form.Item key={column.key} name={[row.name, column.key]} noStyle>
+                    <Input placeholder={column.label} aria-label={`${column.label} (dòng ${index + 1})`} maxLength={column.maxLength} style={{ flex: '1 1 160px', minWidth: 0 }} />
+                  </Form.Item>
+                ))}
+                <Button type="text" icon={<DeleteOutlined />} aria-label={`Xóa dòng ${index + 1}`} onClick={() => remove(row.name)} />
+              </Flex>
+            ))}
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => add({})}
+              disabled={block.maxItems != null && rows.length >= block.maxItems}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              Thêm dòng
+            </Button>
+          </Flex>
+        )}
+      </Form.List>
+    </Form.Item>
+  )
+}
+
+function ScoreLine({ block, score }: { block: TemplateBlock; score?: ScoreResult }) {
+  const index = levelIndex(block, score?.levelCode ?? null)
+  return (
+    <Flex align="center" gap={8} wrap style={{ margin: '4px 0 16px' }} role="status" aria-label={block.label}>
+      <Typography.Text strong>{block.label}:</Typography.Text>
+      {score?.total == null ? (
+        <Typography.Text type="secondary">trả lời đủ các câu để tính điểm</Typography.Text>
+      ) : (
+        <>
+          <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
+            {score.total} điểm
+          </Typography.Text>
+          <Tag color={levelColors[Math.min(index, levelColors.length - 1)] ?? 'default'}>{score.levelLabel}</Tag>
+        </>
+      )}
+    </Flex>
+  )
+}

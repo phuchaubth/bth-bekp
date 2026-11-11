@@ -6,7 +6,6 @@ import {
   Button,
   Card,
   Descriptions,
-  Empty,
   Flex,
   Form,
   Popconfirm,
@@ -29,6 +28,7 @@ import { maskCitizenId, maskInsurance, maskPhone } from './cccd'
 import { ageFrom, genderLabels, relationshipLabels } from './labels'
 import { PatientForm } from './PatientForm'
 import { formValuesToInput, patientToFormValues, type PatientFormValues } from './patientFormValues'
+import { PatientConsentForms } from './PatientConsentForms'
 import { HisTag } from './PatientsPage'
 import { RepresentativeFormModal } from './RepresentativeFormModal'
 
@@ -247,9 +247,7 @@ export function PatientProfilePage() {
           </Card>
         )}
         <RepresentativesCard patient={patient} canManage={canManage} />
-        <Card title="Phiếu đồng thuận">
-          <Empty description="Các phiếu của người bệnh sẽ hiển thị ở đây (Sprint 3)." />
-        </Card>
+        <PatientConsentForms patientId={patient.id} />
       </Flex>
     </>
   )

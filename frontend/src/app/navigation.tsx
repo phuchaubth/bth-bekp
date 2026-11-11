@@ -25,9 +25,9 @@ export interface NavItem {
 /** Menu chính. Dùng chung cho thanh điều hướng và định nghĩa route. */
 export const navItems: NavItem[] = [
   { path: '/', label: 'Tổng quan', icon: <DashboardOutlined /> },
-  { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, sprint: 3, permission: Permissions.ConsentsRead },
+  { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, permission: Permissions.ConsentsRead },
   { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, permission: Permissions.PatientsRead },
-  { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, sprint: 3, permission: Permissions.TemplatesRead },
+  { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, permission: Permissions.TemplatesRead },
   { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, sprint: 5, permission: Permissions.ExportsRun },
   { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, sprint: 5, permission: Permissions.ReportsRead },
   { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, sprint: 5, permission: Permissions.AuditRead },

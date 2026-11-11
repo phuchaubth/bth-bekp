@@ -13,6 +13,11 @@ import { flattenNavItems } from './navigation'
 import { Permissions } from '../auth/permissions'
 import {
   AccountPage,
+  ConsentFormCreatePage,
+  ConsentFormDetailPage,
+  ConsentFormsPage,
+  ConsentTemplateDetailPage,
+  ConsentTemplatesPage,
   DepartmentsPage,
   Lazy,
   PatientIntakePage,
@@ -24,6 +29,8 @@ import {
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
+  '/phieu-dong-thuan': <ConsentFormsPage />,
+  '/mau-phieu': <ConsentTemplatesPage />,
   '/nguoi-benh': <PatientsPage />,
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
@@ -75,6 +82,36 @@ export const appRoutes: RouteObject[] = [
         ),
       },
       ...featureRoutes,
+      {
+        path: 'phieu-dong-thuan/tao-moi',
+        element: (
+          <RequirePermission permission={Permissions.ConsentsCreate}>
+            <Lazy>
+              <ConsentFormCreatePage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'phieu-dong-thuan/:id',
+        element: (
+          <RequirePermission permission={Permissions.ConsentsRead}>
+            <Lazy>
+              <ConsentFormDetailPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'mau-phieu/:id',
+        element: (
+          <RequirePermission permission={Permissions.TemplatesRead}>
+            <Lazy>
+              <ConsentTemplateDetailPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
       {
         path: 'nguoi-benh/tiep-nhan',
         element: (

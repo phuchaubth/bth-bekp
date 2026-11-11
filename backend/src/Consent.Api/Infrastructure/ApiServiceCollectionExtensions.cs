@@ -1,8 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Consent.Api.Authorization;
 using Consent.Application.Abstractions;
 using Consent.Application.Auth;
+using Consent.Application.ConsentTemplates;
 using Consent.Application.Patients;
 using Consent.Infrastructure.Security;
 using Consent.Persistence;
@@ -47,8 +49,15 @@ internal static class ApiServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddControllers()
-            // Enum dạng chuỗi ("Male", "Found"…) để API dễ đọc và ổn định khi thêm giá trị mới.
-            .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()))
+            .AddJsonOptions(options =>
+            {
+                // Enum dạng chuỗi ("Male", "Found"…) để API dễ đọc và ổn định khi thêm giá trị mới.
+                options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+                // Định nghĩa mẫu phiếu trả về gọn như bản đang lưu (không có thuộc tính null/false).
+                options.JsonSerializerOptions.TypeInfoResolver =
+                    (options.JsonSerializerOptions.TypeInfoResolver ?? new DefaultJsonTypeInfoResolver())
+                    .WithAddedModifier(TemplateJson.OmitEmptyDefinitionMembers);
+            })
             .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
             {
                 var details = new ValidationProblemDetails(context.ModelState)
