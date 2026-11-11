@@ -64,9 +64,9 @@ Quyền sẽ được thiết kế dạng **permission** (ví dụ `consent.crea
 | Trạng thái | Ý nghĩa | Chuyển tiếp hợp lệ |
 |---|---|---|
 | `Draft` – Nháp | Đang soạn | → `PendingPatientSignature`, → `Cancelled` |
-| `PendingPatientSignature` – Chờ người bệnh ký số | Đã giải thích và ghi nhận Đồng ý/Từ chối, chờ người bệnh (hoặc người đại diện) ký SmartCA | → `PatientSigning`, → `Draft` |
+| `PendingPatientSignature` – Chờ người bệnh ký số | Đã giải thích và ghi nhận Đồng ý/Từ chối, chờ người bệnh (hoặc người đại diện) ký | → `PatientSigning` (SmartCA), → `PendingDoctorSignature` (ký tay – phương án 2), → `Draft` |
 | `PatientSigning` – Người bệnh đang ký | Đã gửi yêu cầu tới SmartCA của người bệnh | → `PendingDoctorSignature`, → `PendingPatientSignature` (hết hạn/từ chối/lỗi) |
-| `PendingDoctorSignature` – Chờ bác sĩ ký số | PDF đã có chữ ký số của người bệnh | → `DoctorSigning` |
+| `PendingDoctorSignature` – Chờ bác sĩ ký số | PDF đã có chữ ký của người bệnh (số hoặc tay) | → `DoctorSigning` |
 | `DoctorSigning` – Bác sĩ đang ký | Đã gửi yêu cầu tới SmartCA của bác sĩ | → `Completed`, → `PendingDoctorSignature` (hết hạn/từ chối/lỗi) |
 | `Completed` – Hoàn tất | PDF có đủ 2 chữ ký số, **không được sửa**. Phiếu ghi nhận cả quyết định Đồng ý hoặc Từ chối (phiếu từ chối vẫn có giá trị pháp lý) | → `Revoked` (thu hồi, bắt buộc ghi lý do) |
 | `Cancelled` / `Revoked` | Hủy nháp / thu hồi phiếu đã ký | Trạng thái cuối |
