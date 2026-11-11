@@ -41,4 +41,16 @@ public sealed class Result<T> : Result
         ArgumentNullException.ThrowIfNull(error);
         return new Result<T>(default, error);
     }
+
+    /// <summary>Cho phép <c>return dto;</c> trong phương thức trả về <see cref="Result{T}"/>.</summary>
+    public static implicit operator Result<T>(T value) => Success(value);
+
+    /// <summary>Cho phép <c>return error;</c> trong phương thức trả về <see cref="Result{T}"/>.</summary>
+    public static implicit operator Result<T>(Error error) => Failure(error);
+
+    /// <summary>Tên thay thế cho toán tử chuyển đổi (CA2225).</summary>
+    public static Result<T> FromValue(T value) => Success(value);
+
+    /// <summary>Tên thay thế cho toán tử chuyển đổi (CA2225).</summary>
+    public static Result<T> FromError(Error error) => Failure(error);
 }

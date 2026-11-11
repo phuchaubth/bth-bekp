@@ -16,4 +16,7 @@
   <ItemGroup>
     <Using Include="Xunit" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
 </Project>

@@ -7,7 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services
     .AddApplication()
-    .AddInfrastructure()
+    .AddInfrastructure(builder.Configuration)
     .AddPersistence(builder.Configuration);
 
 builder.Services.AddApiServices(builder.Configuration);
@@ -19,6 +19,11 @@ app.UseApiPipeline();
 if (app.Configuration.GetValue<bool>("Database:ApplyMigrationsOnStartup"))
 {
     await app.Services.ApplyMigrationsAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
+}
+
+if (app.Configuration.GetValue<bool>("Seed:Enabled"))
+{
+    await app.Services.SeedDatabaseAsync(app.Lifetime.ApplicationStopping).ConfigureAwait(false);
 }
 
 await app.RunAsync().ConfigureAwait(false);

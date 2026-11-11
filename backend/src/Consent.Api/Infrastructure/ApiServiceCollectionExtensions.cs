@@ -1,8 +1,17 @@
 using System.Text.Json;
+using Consent.Api.Authorization;
+using Consent.Application.Abstractions;
+using Consent.Application.Auth;
+using Consent.Infrastructure.Security;
 using Consent.Persistence;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Consent.Api.Infrastructure;
 
@@ -13,12 +22,40 @@ internal static class ApiServiceCollectionExtensions
 
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddProblemDetails(options =>
-            options.CustomizeProblemDetails = context =>
-                context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, HttpCurrentUser>();
+        services.AddScoped<IRequestContext, HttpRequestContext>();
+
+        services.AddOptions<AuthOptions>()
+            .Bind(configuration.GetSection(AuthOptions.SectionName))
+            .Validate(o => o.MaxFailedAttempts > 0 && o.LockoutMinutes > 0 && o.RefreshTokenLifetimeHours > 0,
+                "Cấu hình Auth không hợp lệ: các giá trị số lần sai, thời gian khóa và thời hạn phiên phải lớn hơn 0.")
+            .ValidateOnStart();
+
+        services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
+        {
+            context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+            ProblemDetailsMapping.Localize(context.ProblemDetails);
+        });
         services.AddExceptionHandler<GlobalExceptionHandler>();
 
+        services.AddControllers()
+            .ConfigureApiBehaviorOptions(options => options.InvalidModelStateResponseFactory = context =>
+            {
+                var details = new ValidationProblemDetails(context.ModelState)
+                {
+                    Status = StatusCodes.Status400BadRequest,
+                    Title = "Dữ liệu gửi lên không hợp lệ.",
+                };
+                details.Extensions["code"] = "validation";
+                details.Extensions["traceId"] = context.HttpContext.TraceIdentifier;
+                return new BadRequestObjectResult(details) { ContentTypes = { ProblemDetailsMapping.ProblemJson } };
+            });
         services.AddOpenApi("v1");
+
+        AddAuthentication(services);
+        AddAuthorization(services);
+        services.AddApiRateLimiting(configuration);
 
         services.AddHealthChecks()
             .AddDbContextCheck<ConsentDbContext>("database", tags: [ReadyTag]);
@@ -33,9 +70,18 @@ internal static class ApiServiceCollectionExtensions
             }
         }));
 
-        // API chạy sau reverse proxy (nginx/IIS) chịu trách nhiệm TLS.
+        // API chạy sau reverse proxy (nginx/IIS) chịu trách nhiệm TLS. Chỉ tin X-Forwarded-* khi được cấu hình,
+        // ví dụ API không mở cổng ra ngoài và chỉ nhận yêu cầu từ reverse proxy.
+        var trustAllProxies = configuration.GetValue<bool>("ReverseProxy:TrustAllProxies");
         services.Configure<ForwardedHeadersOptions>(options =>
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto);
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            if (trustAllProxies)
+            {
+                options.KnownIPNetworks.Clear();
+                options.KnownProxies.Clear();
+            }
+        });
 
         return services;
     }
@@ -43,6 +89,7 @@ internal static class ApiServiceCollectionExtensions
     public static WebApplication UseApiPipeline(this WebApplication app)
     {
         app.UseForwardedHeaders();
+        app.UseMiddleware<CorrelationIdMiddleware>();
         app.UseExceptionHandler();
         app.UseStatusCodePages();
         app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -52,28 +99,72 @@ internal static class ApiServiceCollectionExtensions
             app.UseHsts();
         }
 
+        app.UseRouting();
         app.UseCors(CorsPolicyName);
+        app.UseAuthentication();
+        app.UseAuthorization();
+        app.UseRateLimiter();
 
         if (app.Environment.IsDevelopment())
         {
-            app.MapOpenApi("/openapi/{documentName}.json");
+            app.MapOpenApi("/openapi/{documentName}.json").AllowAnonymous();
         }
+
+        app.MapControllers();
 
         // Liveness: tiến trình còn chạy (không kiểm tra phụ thuộc).
         app.MapHealthChecks("/health", new HealthCheckOptions
         {
             Predicate = _ => false,
             ResponseWriter = WriteHealthResponseAsync,
-        });
+        }).AllowAnonymous();
 
         // Readiness: kiểm tra kết nối SQL Server.
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains(ReadyTag),
             ResponseWriter = WriteHealthResponseAsync,
-        });
+        }).AllowAnonymous();
 
         return app;
+    }
+
+    private static void AddAuthentication(IServiceCollection services)
+    {
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((bearer, jwtOptions) =>
+            {
+                var jwt = jwtOptions.Value;
+                bearer.MapInboundClaims = false;
+                bearer.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidIssuer = jwt.Issuer,
+                    ValidateAudience = true,
+                    ValidAudience = jwt.Audience,
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = jwt.HasValidSigningKey ? jwt.CreateSigningKey() : null,
+                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+                    ValidateLifetime = true,
+                    RequireExpirationTime = true,
+                    ClockSkew = TimeSpan.FromSeconds(30),
+                    NameClaimType = AppClaimTypes.UserName,
+                    RoleClaimType = AppClaimTypes.Role,
+                };
+            });
+    }
+
+    private static void AddAuthorization(IServiceCollection services)
+    {
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+        services.AddAuthorization(options =>
+        {
+            // Mặc định an toàn: mọi endpoint đều yêu cầu đăng nhập, trừ khi đánh dấu [AllowAnonymous].
+            options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .Build();
+        });
     }
 
     private static Task WriteHealthResponseAsync(HttpContext context, HealthReport report)
