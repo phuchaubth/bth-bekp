@@ -129,6 +129,16 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         }
 
         await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formId}", nurse);
+        using (var pdfRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/consent-forms/{formId}/pdf"))
+        {
+            pdfRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", nurse);
+            using var pdf = await _client.SendAsync(pdfRequest);
+            Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+            Assert.Equal("application/pdf", pdf.Content.Headers.ContentType!.MediaType);
+            var bytes = await pdf.Content.ReadAsByteArrayAsync();
+            Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+        }
+
         await using var audit = new SqlCommand(
             "SELECT COUNT(*) FROM AuditLogs WHERE Action = 'ConsentForms.Viewed' AND EntityId = @id", connection);
         audit.Parameters.AddWithValue("@id", formId);

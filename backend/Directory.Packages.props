@@ -12,6 +12,10 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.15" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.15" />
     <PackageVersion Include="FluentValidation" Version="12.2.0" />
+    <!-- Sinh PDF. GIỮ Ở 6.2.4 (giấy phép MIT): từ 6.5.0 thư viện đổi sang AGPL-3.0, không phù hợp để triển khai tại bệnh viện. -->
+    <PackageVersion Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <!-- PDFsharp 6.2.4 kéo theo System.Security.Cryptography.Pkcs 8.0.1 (lỗ hổng GHSA-846f-f764-76mx): nâng lên bản đã vá. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
     <!-- Testing -->
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.15" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

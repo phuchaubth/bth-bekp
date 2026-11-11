@@ -1,5 +1,7 @@
 using Consent.Application.Abstractions;
+using Consent.Application.ConsentForms;
 using Consent.Infrastructure.His;
+using Consent.Infrastructure.Pdf;
 using Consent.Infrastructure.Security;
 using Consent.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
@@ -23,6 +25,8 @@ public static class DependencyInjection
         services.AddSingleton<ITokenService, JwtTokenService>();
         services.AddSingleton<IFieldEncryptor, AesGcmFieldEncryptor>();
         services.AddSingleton<IBlindIndexer, HmacBlindIndexer>();
+        services.AddSingleton<IConsentPdfRenderer, MigraDocConsentPdfRenderer>();
+        services.AddOptions<HospitalOptions>().Bind(configuration.GetSection(HospitalOptions.SectionName));
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))

@@ -159,7 +159,11 @@ internal sealed class AppTestContext
         new FakeRequestContext(),
         new CreateConsentFormRequestValidator(),
         new UpdateConsentFormRequestValidator(),
-        new CancelConsentFormRequestValidator());
+        new CancelConsentFormRequestValidator(),
+        Pdf,
+        Microsoft.Extensions.Options.Options.Create(new HospitalOptions()));
 
     public SequentialFormNumbers FormNumbers { get; } = new();
+
+    public RecordingPdfRenderer Pdf { get; } = new();
 }

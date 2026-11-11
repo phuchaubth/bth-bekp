@@ -11,8 +11,14 @@
     <PackageReference Include="Microsoft.Extensions.Identity.Core" />
     <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="PDFsharp-MigraDoc" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Consent.Infrastructure.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Phông Tinos (SIL OFL 1.1, cùng kích thước chữ với Times New Roman, đủ dấu tiếng Việt) nhúng vào PDF. -->
+    <EmbeddedResource Include="Pdf\Fonts\*.ttf" LogicalName="Pdf.Fonts.%(Filename)%(Extension)" />
   </ItemGroup>
 </Project>

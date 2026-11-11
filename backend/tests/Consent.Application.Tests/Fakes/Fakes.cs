@@ -302,3 +302,15 @@ internal sealed class SequentialFormNumbers : IConsentFormNumberGenerator
     public Task<string> NextAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken) =>
         Task.FromResult($"PDT-{nowUtc.Year}-{Interlocked.Increment(ref _next):000000}");
 }
+
+/// <summary>Ghi lại nội dung được yêu cầu in, trả về PDF giả.</summary>
+internal sealed class RecordingPdfRenderer : IConsentPdfRenderer
+{
+    public ConsentPdfDocument? Last { get; private set; }
+
+    public byte[] Render(ConsentPdfDocument document)
+    {
+        Last = document;
+        return "%PDF-giả"u8.ToArray();
+    }
+}

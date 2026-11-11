@@ -270,4 +270,25 @@ public sealed class ConsentFormServiceTests
         Assert.Null(submitted.Value.Data["insuranceNumber"]);
         Assert.Equal("service", submitted.Value.Data["examType"]!.GetValue<string>());
     }
+
+    [Fact]
+    public async Task Pdf_IsPreviewUntilCompleted_PrintsOnlyVisibleFields_AndIsAudited()
+    {
+        var s = Setup();
+        s.LogIn(s.Kkb);
+        var service = s.Service;
+        var form = (await service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+        var data = new JsonObject { ["examType"] = "service", ["insuranceNumber"] = "GD4790000000125", ["acknowledged"] = true };
+        await service.UpdateAsync(form.Id, new(data, ConsentSignerKind.Patient, null), CancellationToken.None);
+
+        var pdf = await service.GetPdfAsync(form.Id, CancellationToken.None);
+
+        Assert.Equal($"{form.FormNo}.pdf", pdf.Value.FileName);
+        var printed = s.Ctx.Pdf.Last!;
+        Assert.False(printed.IsFinal);
+        Assert.Null(printed.Data["insuranceNumber"]);
+        Assert.Equal("CK-01", printed.TemplateCode);
+        Assert.Equal("Khoa Khám bệnh", printed.DepartmentName);
+        Assert.Contains(s.Ctx.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormPdfViewed);
+    }
 }

@@ -10,6 +10,7 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Patients;
 using Consent.Shared;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 
 namespace Consent.Application.ConsentForms;
 
@@ -32,7 +33,9 @@ public sealed class ConsentFormService(
     IRequestContext requestContext,
     IValidator<CreateConsentFormRequest> createValidator,
     IValidator<UpdateConsentFormRequest> updateValidator,
-    IValidator<CancelConsentFormRequest> cancelValidator)
+    IValidator<CancelConsentFormRequest> cancelValidator,
+    IConsentPdfRenderer pdfRenderer,
+    IOptions<HospitalOptions> hospital)
 {
     /// <summary>Bệnh viện ở Việt Nam (UTC+7, không đổi giờ theo mùa): lọc theo ngày dùng giờ địa phương.</summary>
     public static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
@@ -238,6 +241,41 @@ public sealed class ConsentFormService(
         form.Cancel(request.Reason!, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>PDF khổ A4 của phiếu; chưa hoàn tất thì ghi rõ "bản xem trước". Mỗi lần tải được ghi nhật ký.</summary>
+    public async Task<Result<ConsentPdfFile>> GetPdfAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var form = await LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);
+        if (form is null)
+        {
+            return NotFound;
+        }
+
+        var (template, version) = await LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var definition = ConsentTemplateService.ReadDefinition(version);
+        // Chỉ in trường đang hiển thị (giá trị của trường ẩn trong bản nháp không được in).
+        var evaluation = FormDataEvaluator.Evaluate(definition, FormDataEvaluator.ParseData(form.DataJson));
+        var (patient, representative) = await ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
+        var department = await departments.GetByIdAsync(form.DepartmentId, cancellationToken).ConfigureAwait(false);
+        var documentDate = DateOnly.FromDateTime((form.SubmittedAtUtc ?? form.CreatedAtUtc).ToOffset(VietnamOffset).DateTime);
+
+        var content = pdfRenderer.Render(new ConsentPdfDocument(
+            hospital.Value,
+            department?.Name ?? string.Empty,
+            template.Code,
+            version.VersionNo,
+            form.FormNo,
+            definition,
+            evaluation.Data,
+            evaluation.Scores,
+            patient,
+            representative,
+            documentDate,
+            IsFinal: form.Status == ConsentFormStatus.Completed));
+        AddAudit(AuditActions.ConsentFormPdfViewed, form.Id);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new ConsentPdfFile(content, $"{form.FormNo}.pdf");
     }
 
     /// <summary>Phiếu trong phạm vi người dùng (khoa của mình, phiếu mình lập, hoặc toàn viện).</summary>

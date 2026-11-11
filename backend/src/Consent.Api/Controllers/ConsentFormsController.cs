@@ -24,6 +24,15 @@ public sealed class ConsentFormsController(ConsentFormService forms) : Controlle
     public async Task<IActionResult> Get(Guid id, CancellationToken cancellationToken) =>
         this.ToActionResult(await forms.GetAsync(id, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>PDF khổ A4 (ghi "bản xem trước" khi chưa ký). Mỗi lần tải được ghi nhật ký.</summary>
+    [HttpGet("{id:guid}/pdf")]
+    [HasPermission(Permissions.ConsentsRead)]
+    public async Task<IActionResult> Pdf(Guid id, CancellationToken cancellationToken)
+    {
+        var result = await forms.GetPdfAsync(id, cancellationToken).ConfigureAwait(false);
+        return this.ToActionResult(result, file => File(file.Content, "application/pdf", file.FileName));
+    }
+
     /// <summary>Lập phiếu nháp theo phiên bản đang phát hành của mẫu; điền sẵn thông tin từ hồ sơ người bệnh.</summary>
     [HttpPost]
     [HasPermission(Permissions.ConsentsCreate)]
