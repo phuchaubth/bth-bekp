@@ -50,7 +50,8 @@ Quyền sẽ được thiết kế dạng **permission** (ví dụ `consent.crea
 [Bác sĩ giải thích] ──► ghi nhận nội dung giải thích, rủi ro, phương án thay thế
       ▼
 [Người bệnh / người đại diện đồng ý hoặc từ chối]
-      │  Ký số VNPT SmartCA (chữ ký thứ 1) ──► xác nhận trên app SmartCA cá nhân
+      │  Phương án 1: Ký số VNPT SmartCA ──► xác nhận trên app SmartCA cá nhân
+      │  Phương án 2 (dự phòng): Ký tay trên máy tính bảng ──► bắt buộc chọn lý do
       ▼     ──► nhúng chữ ký vào PDF
 [Bác sĩ ký số VNPT SmartCA] (chữ ký thứ 2) ──► xác nhận trên app SmartCA
       │     ──► nhúng chữ ký vào PDF, giữ nguyên chữ ký của người bệnh
@@ -88,7 +89,16 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 - SmartCA là dịch vụ **ký số từ xa**: hệ thống tính băm (hash) của PDF → gửi yêu cầu ký → người ký xác nhận trên app VNPT SmartCA → hệ thống nhận chữ ký → nhúng vào PDF (chuẩn PAdES).
 - **Cả người bệnh (hoặc người đại diện hợp pháp) và bác sĩ đều ký số bằng VNPT SmartCA** trên cùng một file PDF, theo thứ tự: người bệnh ký trước, bác sĩ ký sau. Mỗi chữ ký được thêm theo kiểu *incremental update*, nên chữ ký trước vẫn hợp lệ sau khi có chữ ký sau.
 - **Định danh SmartCA của người bệnh**: lấy từ số CCCD vừa quét QR (đề xuất; cần đối chiếu với tài liệu VNPT). Định danh của bác sĩ lưu trong hồ sơ người dùng.
-- Trước khi ký, hệ thống tra cứu chứng thư số của người ký. Nếu người bệnh **chưa có SmartCA hoặc chứng thư đã hết hạn**, màn hình hiển thị thông báo rõ ràng và hướng xử lý (xem câu hỏi mục 10).
+- Trước khi ký, hệ thống tra cứu chứng thư số của người ký. Nếu người bệnh **chưa có SmartCA hoặc chứng thư đã hết hạn**, màn hình hiển thị thông báo rõ ràng và gợi ý chuyển sang phương án 2.
+
+#### Phương án 2 cho người bệnh: ký tay trên thiết bị
+
+- Chỉ áp dụng cho **người bệnh/người đại diện**. Bác sĩ **luôn ký số SmartCA**, không có phương án ký tay.
+- Nhân viên chọn phương án 2 khi người bệnh không ký SmartCA được, và **bắt buộc chọn lý do**: chưa có tài khoản SmartCA, chứng thư hết hạn/bị thu hồi, không có điện thoại, không thao tác được (cao tuổi, sức khỏe…), SmartCA lỗi/quá thời gian chờ, lý do khác (phải nhập mô tả).
+- Người bệnh ký trên màn hình cảm ứng (máy tính bảng). Hệ thống lưu ảnh chữ ký (PNG), chèn vào PDF tại ô chữ ký người bệnh, kèm dòng ghi chú "Ký tay – thời điểm – nhân viên chứng kiến".
+- Sau đó **bác sĩ ký số SmartCA lên toàn bộ PDF**, nên chữ ký tay cũng được chữ ký số của bác sĩ bảo vệ toàn vẹn: không ai sửa được ảnh chữ ký mà không làm chữ ký số mất hiệu lực.
+- Ghi audit việc chuyển sang phương án 2 (ai chọn, lý do, thời điểm). Báo cáo thống kê có tỉ lệ ký tay theo khoa để theo dõi.
+- Có thể cấu hình **tắt phương án 2** theo khoa hoặc loại phiếu nếu bệnh viện muốn bắt buộc ký số.
 - Người bệnh xác nhận trên điện thoại cá nhân có cài app SmartCA. Màn hình ký hiển thị trạng thái chờ và đếm ngược.
 - Khi người đại diện ký thay, hệ thống dùng SmartCA của người đại diện và ghi rõ quan hệ với người bệnh trên phiếu.
 - Thiết kế qua interface `IDigitalSignatureService` gồm các thao tác: lấy chứng thư số, tạo yêu cầu ký, kiểm tra trạng thái giao dịch, nhúng chữ ký. Có hai cài đặt:
@@ -160,6 +170,7 @@ Nguyên tắc: phiếu đã ký **bất biến**. Muốn chỉnh sửa thì thu 
 | PDF | PDFsharp (MIT) để tạo PDF và nhúng chữ ký; QuestPDF chỉ dùng nếu bệnh viện đáp ứng điều kiện license | Xem PDF bằng trình xem có sẵn của trình duyệt |
 | Excel | ClosedXML (MIT) | — |
 | QR | — | `@zxing/browser` (đọc QR bằng camera) |
+| Chữ ký tay (phương án 2) | — | `signature_pad` (vẽ chữ ký trên màn hình cảm ứng) |
 | Test | xUnit, FluentAssertions/Shouldly, NSubstitute, Testcontainers (SQL Server) | Vitest, Testing Library, MSW; Playwright cho E2E (tùy chọn) |
 
 > Tránh MediatR và AutoMapper vì các thư viện này đã chuyển sang giấy phép thương mại từ năm 2025. Handler và mapping sẽ được viết tay.
@@ -181,7 +192,7 @@ Quy ước: khóa chính `UNIQUEIDENTIFIER` (UUID), mã nghiệp vụ là cột 
 | `ConsentTemplates` | Loại mẫu phiếu | Id, Code, Name, Category (Phẫu thuật/Thủ thuật/Gây mê/Truyền máu…), DepartmentId (null = toàn viện) |
 | `ConsentTemplateVersions` | Phiên bản mẫu | Id, TemplateId, VersionNo, ContentSchemaJson (định nghĩa trường), LayoutHtml/Body, Status (Draft/Published/Retired), PublishedAt |
 | `ConsentForms` | Phiếu đồng thuận | Id, FormNo, PatientId, RepresentativeId?, TemplateVersionId, DepartmentId, EncounterCode (mã đợt KCB/HSBA), ProcedureName, PlannedDate, DoctorId, Status, Decision (Đồng ý/Từ chối), DataJson (nội dung điền theo schema), CreatedBy, CreatedAt, CompletedAt, RevokedReason, ReplacesFormId? |
-| `ConsentSignatures` | Chữ ký trên phiếu | Id, FormId, SignerType (Patient/Representative/Doctor/Witness), SignerName, Method (SmartCA), SignOrder, SignedAt, CertificateSerial, CertificateSubject, CertificateValidTo, SignatureTransactionId |
+| `ConsentSignatures` | Chữ ký trên phiếu | Id, FormId, SignerType (Patient/Representative/Doctor/Witness), SignerName, Method (SmartCA/Handwritten), FallbackReason (khi ký tay), WitnessUserId (khi ký tay), SignatureImagePath (khi ký tay), SignOrder, SignedAt, CertificateSerial, CertificateSubject, CertificateValidTo, SignatureTransactionId |
 | `SignatureTransactions` | Giao dịch SmartCA | Id, FormId, SignerType, SignerSmartCaId (đã mã hóa), ProviderTransactionId, Status, RequestedAt, ExpiresAt, CompletedAt, ErrorCode |
 | `StoredDocuments` | File PDF | Id, FormId, Kind (Unsigned/Signed), StoragePath, Sha256, SizeBytes, CreatedAt |
 | `ExportJobs` | Lịch sử xuất dữ liệu | Id, RequestedBy, FilterJson, Format, RowCount, CreatedAt |
@@ -204,7 +215,7 @@ Xuất dữ liệu: dùng view `vw_ConsentFormExport` (đã làm phẳng) cho Ex
 | Patients | `GET /patients?keyword=`, `POST /patients`, `GET/PUT /patients/{id}`, `POST /patients/parse-cccd-qr` (kiểm tra + tìm hồ sơ trùng), `GET /patients/{id}/consents` |
 | Templates | `GET/POST /consent-templates`, `POST /consent-templates/{id}/versions`, `POST /consent-templates/{id}/versions/{v}/publish`, `.../retire` |
 | Consent Forms | `GET /consent-forms?status=&department=&from=&to=&page=`, `POST /consent-forms`, `GET/PUT /consent-forms/{id}`, `POST /{id}/submit`, `POST /{id}/decision` (Đồng ý/Từ chối), `POST /{id}/revoke`, `GET /{id}/pdf`, `GET /{id}/history` |
-| Signing | `GET /consent-forms/{id}/signer-certificate?signer=patient\|doctor` (tra cứu chứng thư), `POST /consent-forms/{id}/sign/patient`, `POST /consent-forms/{id}/sign/doctor` (tạo yêu cầu SmartCA), `GET /signing-transactions/{txId}` (trạng thái), `POST /signing-transactions/{txId}/cancel` |
+| Signing | `GET /consent-forms/{id}/signer-certificate?signer=patient\|doctor` (tra cứu chứng thư), `POST /consent-forms/{id}/sign/patient`, `POST /consent-forms/{id}/sign/doctor` (tạo yêu cầu SmartCA), `POST /consent-forms/{id}/sign/patient-handwritten` (phương án 2: ảnh chữ ký + lý do), `GET /signing-transactions/{txId}` (trạng thái), `POST /signing-transactions/{txId}/cancel` |
 | Export & Reports | `POST /exports/consent-forms` (Excel/CSV), `GET /reports/summary?from=&to=` |
 | Audit | `GET /audit-logs?user=&action=&entity=&from=&to=` |
 | Hệ thống | `GET /health`, `GET /openapi/v1.json` |
@@ -240,7 +251,7 @@ bth-bekp/
 │       ├── app/                 # providers, router, theme Ant Design, ConfigProvider vi_VN
 │       ├── api/                 # http client, kiểu dữ liệu, hooks TanStack Query
 │       ├── auth/                # đăng nhập, guard theo quyền, usePermission
-│       ├── components/          # layout, PageHeader, StatusTag, MaskedText, QrScanner, SmartCaSignDialog
+│       ├── components/          # layout, PageHeader, StatusTag, MaskedText, QrScanner, SmartCaSignDialog, HandwrittenSignaturePad
 │       ├── features/
 │       │   ├── dashboard/
 │       │   ├── patients/        # gồm cccdQrParser.ts + test
@@ -282,7 +293,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 | 3 | Danh sách phiếu đồng thuận | `/phieu-dong-thuan` | Bác sĩ, ĐD, TK | Bảng có lọc (trạng thái, khoa, loại phiếu, ngày, từ khóa), thẻ trạng thái màu, thao tác nhanh |
 | 4 | Lập phiếu mới – Bước 1: Người bệnh | `/phieu-dong-thuan/tao-moi` | Bác sĩ, ĐD | **Nút "Quét QR CCCD"** (camera hoặc máy quét), tự điền, cảnh báo nếu đã có hồ sơ trùng, bổ sung thông tin thiếu, người đại diện |
 | 5 | Lập phiếu – Bước 2: Chọn mẫu và nội dung | (wizard) | Bác sĩ | Chọn mẫu theo khoa/loại; form động theo schema của mẫu: chẩn đoán, phương pháp, rủi ro, phương án thay thế |
-| 6 | Lập phiếu – Bước 3: Xem trước và người bệnh ký số | (wizard) | Bác sĩ, ĐD | Xem trước PDF, chọn Đồng ý/Từ chối, chọn người ký (người bệnh/người đại diện), kiểm tra chứng thư SmartCA, gửi yêu cầu ký |
+| 6 | Lập phiếu – Bước 3: Xem trước và người bệnh ký số | (wizard) | Bác sĩ, ĐD | Xem trước PDF, chọn Đồng ý/Từ chối, chọn người ký (người bệnh/người đại diện), kiểm tra chứng thư SmartCA, gửi yêu cầu ký; nút **"Ký tay (phương án 2)"** mở khung ký toàn màn hình kèm chọn lý do |
 | 7 | Ký số SmartCA | hộp thoại | Người bệnh, Bác sĩ | Dùng chung cho cả 2 lượt ký: hiển thị chứng thư, gửi yêu cầu, đếm ngược "Vui lòng xác nhận trên ứng dụng VNPT SmartCA", kết quả thành công/thất bại |
 | 8 | Chi tiết phiếu | `/phieu-dong-thuan/:id` | Theo quyền | Thông tin, PDF đã ký, danh sách chữ ký, lịch sử trạng thái, nút In/Tải/Thu hồi |
 | 9 | Danh sách người bệnh | `/nguoi-benh` | Bác sĩ, ĐD | Tìm theo tên, mã người bệnh, CCCD (đã che) |
@@ -290,7 +301,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 | 11 | Quản lý mẫu phiếu | `/mau-phieu` | QL mẫu | Danh sách mẫu, phiên bản, trạng thái phát hành |
 | 12 | Soạn mẫu phiếu | `/mau-phieu/:id/phien-ban/:v` | QL mẫu | Định nghĩa trường (text, ngày, chọn, checkbox), nội dung cam kết, xem trước |
 | 13 | Xuất dữ liệu | `/xuat-du-lieu` | Reporter, TK | Bộ lọc, chọn cột, định dạng Excel/CSV, lịch sử xuất |
-| 14 | Báo cáo thống kê | `/bao-cao` | Reporter, TK | Theo khoa, loại phiếu, tỉ lệ từ chối, thời gian hoàn tất |
+| 14 | Báo cáo thống kê | `/bao-cao` | Reporter, TK | Theo khoa, loại phiếu, tỉ lệ từ chối, tỉ lệ ký tay (phương án 2), thời gian hoàn tất |
 | 15 | Nhật ký hệ thống (Audit) | `/nhat-ky` | Admin, Auditor | Lọc theo người dùng, hành động, đối tượng, thời gian; xem chi tiết thay đổi |
 | 16 | Người dùng | `/quan-tri/nguoi-dung` | Admin | Tạo/sửa/khóa, gán vai trò, khoa, mã SmartCA |
 | 17 | Vai trò và quyền | `/quan-tri/vai-tro` | Admin | Ma trận quyền theo vai trò |
@@ -351,6 +362,7 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 
 ### Sprint 4 – Ký số VNPT SmartCA cho người bệnh và bác sĩ
 - Ghi nhận Đồng ý/Từ chối, chọn người ký (người bệnh/người đại diện) (màn hình 6).
+- Phương án 2: ký tay trên thiết bị cảm ứng cho người bệnh, bắt buộc lý do, có cấu hình bật/tắt.
 - `IDigitalSignatureService` gồm `FakeSignatureService` và `VnptSmartCaSignatureService` (cấu hình qua biến môi trường); tra cứu chứng thư, luồng ký bất đồng bộ + kiểm tra trạng thái giao dịch (màn hình 7).
 - Ký 2 lượt trên cùng PDF: người bệnh trước, bác sĩ sau (PAdES, incremental update). Lưu PDF sau mỗi lượt ký và SHA-256, khóa phiếu khi đủ chữ ký.
 - Tài liệu `docs/tich-hop-smartca.md`.
@@ -358,6 +370,8 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 **Tiêu chí nghiệm thu**
 - Với Fake provider: luồng ký thành công, hết hạn, bị từ chối, người bệnh chưa có SmartCA đều có test tự động và hiển thị đúng trên UI, cho cả lượt ký của người bệnh và bác sĩ.
 - Bác sĩ không thể ký trước khi người bệnh ký xong (test state machine và API).
+- Ký tay không có lý do → 422; bác sĩ không thể dùng phương án ký tay (test API); khi phương án 2 bị tắt cho khoa/loại phiếu → nút bị ẩn và API trả 403/422.
+- PDF ký tay + chữ ký số bác sĩ: ảnh chữ ký hiển thị đúng vị trí, chữ ký số của bác sĩ hợp lệ trên toàn file.
 - PDF hoàn tất mở bằng Adobe Reader hiển thị **2 chữ ký hợp lệ**, chữ ký của người bệnh không bị vô hiệu sau khi bác sĩ ký (khi dùng SmartCA sandbox; cần VNPT cấp tài khoản thử).
 - Phiếu `Completed` không sửa được (test API); thu hồi bắt buộc nhập lý do và có audit.
 - Không có client secret nào trong mã nguồn hoặc log.
@@ -403,6 +417,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 **Giả định (sẽ áp dụng nếu không có ý kiến khác)**
 1. **Đã xác nhận:** cả **người bệnh (hoặc người đại diện) và bác sĩ đều ký số bằng VNPT SmartCA**. Người bệnh ký trước, bác sĩ ký sau, trên cùng một file PDF.
+   **Phương án 2 (dự phòng) cho người bệnh:** ký tay trên máy tính bảng, bắt buộc ghi lý do; bác sĩ vẫn luôn ký số SmartCA.
 2. Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO hay HIS.
 3. Mã người bệnh / mã HSBA được **nhập tay** (chưa đồng bộ từ HIS).
 4. PDF đã ký được lưu trên **volume/thư mục mạng**; metadata và hash lưu trong SQL Server.
@@ -410,7 +425,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 **Câu hỏi**
 1. Bệnh viện đã có hợp đồng và **tài liệu API VNPT SmartCA** (môi trường sandbox) chưa? Hợp đồng có hỗ trợ người bệnh ký bằng SmartCA cá nhân của họ không?
-1a. Nếu người bệnh **chưa có SmartCA** (hoặc không có điện thoại, cấp cứu, người cao tuổi…) thì xử lý thế nào? Đề xuất: hướng dẫn đăng ký SmartCA tại chỗ, hoặc để người đại diện có SmartCA ký thay; trường hợp cấp cứu theo quy định riêng của bệnh viện.
+1a. **Đã xác nhận:** người bệnh không ký SmartCA được thì dùng phương án 2 là ký tay. Còn cần xác nhận: danh sách lý do được phép ký tay ở mục 2.5 đã đủ chưa, và có cần **nhân viên chứng kiến** ký xác nhận (bằng SmartCA) khi người bệnh ký tay không?
 2. Danh sách **loại phiếu đồng thuận** cần làm trước là gì? Có mẫu giấy hiện hành (đã bỏ thông tin thật) để số hóa không?
 3. Có cần **tích hợp HIS** (lấy mã người bệnh, đợt điều trị) ngay giai đoạn 1 không? HIS hiện dùng là gì?
 4. Quy mô dự kiến: số người dùng đồng thời và số phiếu/ngày?
