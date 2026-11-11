@@ -1,4 +1,6 @@
 using Consent.Application.Abstractions;
+using Consent.Application.ConsentTemplates;
+using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
@@ -57,6 +59,7 @@ internal sealed partial class DatabaseSeeder(
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         await SeedAdministratorAsync(roles, cancellationToken).ConfigureAwait(false);
+        await SeedConsentTemplatesAsync(cancellationToken).ConfigureAwait(false);
         if (_options.DemoData)
         {
             await SeedDemoDataAsync(roles, cancellationToken).ConfigureAwait(false);
@@ -127,6 +130,27 @@ internal sealed partial class DatabaseSeeder(
         LogAdministratorCreated(logger, admin.UserName);
     }
 
+    /// <summary>
+    /// Ba mẫu phiếu đề xuất (chờ bệnh viện duyệt). Môi trường thật: tạo ở dạng nháp để Phòng KHTH duyệt rồi mới phát hành;
+    /// môi trường demo: phát hành luôn để thử lập phiếu.
+    /// </summary>
+    private async Task SeedConsentTemplatesAsync(CancellationToken cancellationToken)
+    {
+        var existing = await db.ConsentTemplates.Select(t => t.Code).ToListAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var definition in DefaultConsentTemplates.All.Where(t => !existing.Contains(t.Code)))
+        {
+            var template = ConsentTemplate.Create(
+                definition.Code, definition.Name, definition.HospitalSignerRoleCode, null, definition.ContentJson, clock.UtcNow);
+            if (_options.DemoData)
+            {
+                template.Publish(1, clock.UtcNow);
+            }
+
+            db.ConsentTemplates.Add(template);
+            LogConsentTemplateCreated(logger, definition.Code, _options.DemoData);
+        }
+    }
+
     private async Task SeedDemoDataAsync(Dictionary<string, Role> roles, CancellationToken cancellationToken)
     {
         var departments = await db.Departments.ToDictionaryAsync(d => d.Code, cancellationToken).ConfigureAwait(false);
@@ -180,4 +204,7 @@ internal sealed partial class DatabaseSeeder(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Chưa cấu hình Seed:DemoPassword: bỏ qua tạo tài khoản demo.")]
     private static partial void LogNoDemoPassword(ILogger logger);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "Đã tạo mẫu phiếu đề xuất {Code} (phát hành ngay: {Published}).")]
+    private static partial void LogConsentTemplateCreated(ILogger logger, string code, bool published);
 }

@@ -9,6 +9,9 @@ using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
 using Consent.Shared;
+using Consent.Application.ConsentForms;
+using Consent.Domain.ConsentForms;
+using Consent.Domain.ConsentTemplates;
 
 namespace Consent.Application.Tests.Fakes;
 
@@ -86,6 +89,10 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<AuditLog> AuditLogs { get; } = [];
 
     public List<Patient> Patients { get; } = [];
+
+    public List<ConsentTemplate> ConsentTemplates { get; } = [];
+
+    public List<ConsentForm> ConsentForms { get; } = [];
 
     public int SaveCount { get; private set; }
 
@@ -231,4 +238,67 @@ internal sealed class StubHisGateway : IHisGateway
     public static HisLookupResult Found(string patientCode) => new(
         HisLookupStatus.Found,
         new HisPatient(patientCode, null, null, "BHYT", "DN4790000000002", null, new HisEncounter("TN001", null, "Khoa Khám bệnh", "Phòng khám 1")));
+}
+
+internal sealed class InMemoryConsentTemplateRepository(InMemoryStore store) : IConsentTemplateRepository
+{
+    public Task<IReadOnlyList<ConsentTemplate>> ListAsync(bool includeInactive, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ConsentTemplate>>(store.ConsentTemplates.Where(t => includeInactive || t.IsActive).ToList());
+
+    public Task<ConsentTemplate?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentTemplates.FirstOrDefault(t => t.Id == id));
+
+    public Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentTemplates.Any(t => t.Code == code));
+
+    public Task<ConsentTemplateVersion?> GetVersionAsync(Guid versionId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentTemplates.SelectMany(t => t.Versions).FirstOrDefault(v => v.Id == versionId));
+
+    public void Add(ConsentTemplate template) => store.ConsentTemplates.Add(template);
+}
+
+internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : IConsentFormRepository
+{
+    public Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentForms.FirstOrDefault(f => f.Id == id));
+
+    public Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken)
+    {
+        var rows = store.ConsentForms
+            .Where(f => query.ScopeAll || f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId)
+            .Where(f => query.Status is null || f.Status == query.Status)
+            .Where(f => query.PatientId is null || f.PatientId == query.PatientId)
+            .Where(f => query.TemplateId is null || f.TemplateId == query.TemplateId)
+            .Where(f => query.FromUtc is null || f.CreatedAtUtc >= query.FromUtc)
+            .Where(f => query.ToUtc is null || f.CreatedAtUtc < query.ToUtc)
+            .OrderByDescending(f => f.CreatedAtUtc)
+            .ToList();
+        var items = rows
+            .Skip((query.Page - 1) * query.PageSize)
+            .Take(query.PageSize)
+            .Select(f =>
+            {
+                var template = store.ConsentTemplates.Single(t => t.Id == f.TemplateId);
+                var patient = store.Patients.Single(p => p.Id == f.PatientId);
+                return new ConsentFormListItemDto(
+                    f.Id, f.FormNo, f.Status, template.Id, template.Code, template.Name,
+                    template.Versions.Single(v => v.Id == f.TemplateVersionId).VersionNo,
+                    patient.Id, patient.FullName, patient.PatientCode, f.DepartmentId,
+                    store.Departments.FirstOrDefault(d => d.Id == f.DepartmentId)?.Name ?? string.Empty,
+                    store.Users.FirstOrDefault(u => u.Id == f.CreatedByUserId)?.FullName ?? string.Empty,
+                    f.CreatedAtUtc, f.UpdatedAtUtc);
+            })
+            .ToList();
+        return Task.FromResult(new PagedResult<ConsentFormListItemDto>(items, query.Page, query.PageSize, rows.Count));
+    }
+
+    public void Add(ConsentForm form) => store.ConsentForms.Add(form);
+}
+
+internal sealed class SequentialFormNumbers : IConsentFormNumberGenerator
+{
+    private long _next;
+
+    public Task<string> NextAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken) =>
+        Task.FromResult($"PDT-{nowUtc.Year}-{Interlocked.Increment(ref _next):000000}");
 }

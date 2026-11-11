@@ -1,9 +1,12 @@
 using Consent.Application.Abstractions;
 using Consent.Domain.Auditing;
+using Consent.Domain.ConsentForms;
+using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
 using Consent.Persistence.Configurations;
+using Consent.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace Consent.Persistence;
@@ -26,6 +29,10 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<Patient> Patients => Set<Patient>();
 
+    public DbSet<ConsentTemplate> ConsentTemplates => Set<ConsentTemplate>();
+
+    public DbSet<ConsentForm> ConsentForms => Set<ConsentForm>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardAuditLogIsAppendOnly();
@@ -44,6 +51,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(ConsentDbContext).Assembly);
         var encrypted = new EncryptedStringConverter(fieldEncryptor);
         PatientConfiguration.ConfigureEncryption(modelBuilder, encrypted);
+        ConsentFormConfiguration.ConfigureEncryption(modelBuilder, encrypted);
+        modelBuilder.HasSequence<long>(ConsentFormNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
         base.OnModelCreating(modelBuilder);
     }
 

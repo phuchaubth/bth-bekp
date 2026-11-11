@@ -7,6 +7,10 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Ba mẫu phiếu đề xuất giai đoạn 1 (docs/mau-phieu-de-xuat.md), dùng để khởi tạo dữ liệu. -->
+    <EmbeddedResource Include="ConsentTemplates\Defaults\*.json" LogicalName="ConsentTemplates.Defaults.%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="FluentValidation" />
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>

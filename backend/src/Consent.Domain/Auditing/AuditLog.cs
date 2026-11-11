@@ -93,4 +93,6 @@ public static class AuditActions
     public const string PasswordChanged = "Auth.PasswordChanged";
     public const string PatientViewed = "Patients.Viewed";
     public const string PatientLookedUp = "Patients.LookedUp";
+    public const string ConsentFormViewed = "ConsentForms.Viewed";
+    public const string ConsentFormPdfViewed = "ConsentForms.PdfViewed";
 }

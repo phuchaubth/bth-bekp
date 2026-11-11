@@ -1,4 +1,6 @@
 using Consent.Application.Auth;
+using Consent.Application.ConsentForms;
+using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Patients;
 using Consent.Application.Roles;
@@ -133,4 +135,31 @@ internal sealed class AppTestContext
         new PatientRequestValidator(Clock),
         new RepresentativeRequestValidator(Clock),
         new PatientLookupRequestValidator());
+
+    public ConsentTemplateService CreateConsentTemplateService() => new(
+        new InMemoryConsentTemplateRepository(Store),
+        new InMemoryRoleRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        Store,
+        Clock,
+        new CreateConsentTemplateRequestValidator(),
+        new UpdateConsentTemplateRequestValidator());
+
+    public ConsentFormService CreateConsentFormService() => new(
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        new InMemoryPatientRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        FormNumbers,
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        new CreateConsentFormRequestValidator(),
+        new UpdateConsentFormRequestValidator(),
+        new CancelConsentFormRequestValidator());
+
+    public SequentialFormNumbers FormNumbers { get; } = new();
 }

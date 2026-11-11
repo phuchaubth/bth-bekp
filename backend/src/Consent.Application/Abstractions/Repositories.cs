@@ -1,7 +1,10 @@
 using Consent.Application.Auditing;
+using Consent.Application.ConsentForms;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
+using Consent.Domain.ConsentForms;
+using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
@@ -81,4 +84,35 @@ public interface IPatientRepository
     Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken);
 
     void Add(Patient patient);
+}
+
+public interface IConsentTemplateRepository
+{
+    /// <summary>Danh sách mẫu kèm các phiên bản.</summary>
+    Task<IReadOnlyList<ConsentTemplate>> ListAsync(bool includeInactive, CancellationToken cancellationToken);
+
+    Task<ConsentTemplate?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<bool> CodeExistsAsync(string code, CancellationToken cancellationToken);
+
+    /// <summary>Phiên bản theo Id (để dựng phiếu đã lập theo đúng phiên bản của nó).</summary>
+    Task<ConsentTemplateVersion?> GetVersionAsync(Guid versionId, CancellationToken cancellationToken);
+
+    void Add(ConsentTemplate template);
+}
+
+public interface IConsentFormRepository
+{
+    Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tìm kiếm có phân trang; phạm vi khoa đã được áp dụng sẵn trong <paramref name="query"/>.</summary>
+    Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken);
+
+    void Add(ConsentForm form);
+}
+
+/// <summary>Cấp số phiếu tăng dần, không trùng (dùng sequence của CSDL).</summary>
+public interface IConsentFormNumberGenerator
+{
+    Task<string> NextAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken);
 }

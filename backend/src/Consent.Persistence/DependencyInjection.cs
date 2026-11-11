@@ -45,6 +45,9 @@ public static class DependencyInjection
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IPatientRepository, PatientRepository>();
+        services.AddScoped<IConsentTemplateRepository, ConsentTemplateRepository>();
+        services.AddScoped<IConsentFormRepository, ConsentFormRepository>();
+        services.AddScoped<IConsentFormNumberGenerator, ConsentFormNumberGenerator>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

@@ -1,5 +1,7 @@
 using Consent.Application.Auditing;
 using Consent.Application.Auth;
+using Consent.Application.ConsentForms;
+using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Patients;
 using Consent.Application.Roles;
@@ -22,6 +24,8 @@ public static class DependencyInjection
         services.AddScoped<RoleService>();
         services.AddScoped<AuditLogService>();
         services.AddScoped<PatientService>();
+        services.AddScoped<ConsentTemplateService>();
+        services.AddScoped<ConsentFormService>();
 
         RegisterValidators(services);
         return services;
