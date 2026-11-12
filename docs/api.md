@@ -1,6 +1,6 @@
 # Tài liệu API — Quản lý Phiếu đồng thuận
 
-> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 5 — thêm xuất Excel/CSV, báo cáo thống kê, trang tổng quan; Sprint 4: ký tay trên máy tính bảng, PDF đã ký, thu hồi).
+> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 6 — thêm cấu hình hệ thống; Sprint 5: xuất Excel/CSV, báo cáo, tổng quan; Sprint 4: ký tay trên máy tính bảng, PDF đã ký, thu hồi).
 > Ở môi trường Development, đặc tả OpenAPI tự sinh có tại `GET /openapi/v1.json`.
 >
 > Mọi ví dụ dưới đây dùng **dữ liệu giả lập**.
@@ -418,6 +418,17 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 
 ---
 
+## 6f. Cấu hình hệ thống (`/api/v1/settings`)
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/settings` | `settings.manage` | `hospital` (cơ quan chủ quản, tên bệnh viện, địa danh, `updatedAtUtc`), `hisEnabled`, `smartCaEnabled`, `exportMaxRows`, `retentionPolicy`. Không có bí mật nào |
+| PUT | `/api/v1/settings/hospital` | `settings.manage` | `{ parentAgency, name, place }` (bắt buộc, ≤ 500 ký tự). Lưu trong bảng `SystemSettings`, ghi audit; phiếu in sau đó dùng tên mới, PDF đã ký giữ nguyên. Chưa đặt thì dùng cấu hình `Hospital:*` |
+
+Mọi phản hồi của API có `Cache-Control: no-store`; thân yêu cầu lớn hơn 2 MB bị từ chối.
+
+---
+
 ## 7. Nhật ký audit (`/api/v1/audit-logs`)
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
@@ -430,7 +441,7 @@ Hành động (`action`) được ghi:
 
 | Hành động | Nguồn |
 |---|---|
-| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận, chữ ký. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
+| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận, chữ ký, cấu hình hệ thống. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
 | `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`) |
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
 | `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |

@@ -1,6 +1,6 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
-> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0–5 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
+> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Toàn bộ 7 sprint (0–6) đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
 > **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10); người bệnh **ký tay trên máy tính bảng** (quyết định số 10, mục 2.5a). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
@@ -552,10 +552,18 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - E2E Playwright cho luồng chính: đăng nhập → quét QR → lập phiếu → ký → xuất.
 - Kiểm thử giao diện responsive (điện thoại, máy tính bảng, máy tính bàn).
 
-**Tiêu chí nghiệm thu**
-- Toàn bộ test đạt; độ bao phủ Domain + Application ≥ 80%.
-- Triển khai mới hoàn toàn theo `docs/trien-khai.md` thành công trên máy sạch.
-- Không còn lỗ hổng mức High/Critical trong `dotnet list package --vulnerable` và `npm audit`.
+**Điều chỉnh khi triển khai (ADR-029, ADR-030 trong [kiến trúc](kien-truc.md))**
+- **Màn hình 19 – Cấu hình hệ thống** (chưa có ở các sprint trước): quản trị nhập **tên đơn vị in trên PDF** (cơ quan chủ quản, tên bệnh viện, địa danh) trên giao diện, lưu bảng `SystemSettings`, có audit; không cần sửa file cấu hình. Phần chỉ đọc: HIS/SmartCA, giới hạn xuất, chính sách lưu trữ. Các mục cấu hình SmartCA/lý do ký tay trong kế hoạch ban đầu để lại cho giai đoạn SmartCA.
+- **Siết bảo mật** sau rà soát: thân yêu cầu ≤ 2 MB; `Seed:DemoData` bị từ chối ở Production (như HIS giả lập); `Cache-Control: no-store` và `Permissions-Policy` trên API; hướng dẫn `AllowedHosts`; web.config mẫu cho IIS có CSP và giới hạn kích thước tương đương nginx.
+- **Tài liệu triển khai** cho cả hai hình thức (chờ bệnh viện chọn): IIS + SQL Server có sẵn và Docker + SQL Server có sẵn (`deploy/`: compose Production, web.config, script SQL tạo tài khoản quyền tối thiểu, sao lưu, khôi phục). Migration chạy bằng gói `efbundle` với tài khoản riêng, không tự động khi khởi động.
+- **Xoay vòng khóa mã hóa** (`FieldEncryptionKey`, `BlindIndexKey`): chưa có công cụ mã hóa lại; tài liệu ghi rõ là hạn chế đã biết và cách bảo vệ khóa thay cho xoay vòng định kỳ. Khóa JWT và mật khẩu SQL xoay vòng được ngay.
+- Sửa cảnh báo EF Core (so sánh ảnh chữ ký theo nội dung).
+
+**Tiêu chí nghiệm thu** (✅ đã đạt)
+- ✅ Toàn bộ test đạt: backend 392 (Domain 122, Application 157, Infrastructure 43, Architecture 7, API với SQL Server thật 63), frontend 105. Độ bao phủ dòng lệnh (`scripts/coverage.sh`): **Domain 86,7%, Application 81,2%** (≥ 80%).
+- ✅ **Triển khai mới hoàn toàn theo `docs/trien-khai.md`** đã diễn tập trên môi trường sạch (hình thức Docker + SQL Server riêng): tạo CSDL và tài khoản `consent_app`/`consent_migrator` bằng script, chạy gói migration, khởi động `deploy/docker-compose.prod.yml` ở Production (không demo), đăng nhập `admin` lần đầu và đổi mật khẩu, nhập tên đơn vị, phát hành mẫu, tạo khoa/tài khoản, lập phiếu (sequence số phiếu chạy với quyền tối thiểu), ký, hoàn tất, tải PDF khớp SHA-256, xuất CSV, báo cáo, audit. Hình thức IIS: file cấu hình mẫu đã soạn, **cần diễn tập trên Windows Server của bệnh viện** (môi trường phát triển không có IIS).
+- ✅ `dotnet list package --vulnerable --include-transitive` và `npm audit`: 0 lỗ hổng.
+- ✅ E2E luồng chính trên máy tính bảng giả lập (iPad Pro 11, chạm): đăng nhập → quét QR CCCD (máy quét) → tạo hồ sơ → lập phiếu CK-01 → trình ký → ký → xác nhận → hoàn tất; quản trị cấu hình tên đơn vị; xuất Excel; điện thoại (iPhone 13) và máy tính bàn hiển thị đúng, không tràn ngang; 7/7 bước, không lỗi console.
 
 ---
 
@@ -599,7 +607,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 **Còn chờ bệnh viện cung cấp / trả lời**
 1. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật). Cách hiểu phiếu TT-01 đã được xác nhận. Khi có góp ý, chỉ cần sửa mẫu trên màn hình 12 (tạo phiên bản mới), không sửa code.
-2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh (cấu hình `Hospital:*`, đang để giá trị mẫu).
+2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh — quản trị tự nhập tại màn hình Cấu hình hệ thống sau khi triển khai (không cần gửi trước).
 3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
 4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
 
@@ -611,4 +619,4 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 Sprint 0–5 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF, ký tay trên máy tính bảng, xuất dữ liệu, báo cáo và nhật ký. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
 
-Tiếp theo là **Sprint 6: hoàn thiện, rà soát bảo mật, hướng dẫn triển khai**. Gồm: rà soát bảo mật (OWASP ASVS cơ bản), kiểm tra phụ thuộc; `docs/trien-khai.md` (IIS hoặc Docker trên Windows Server, HTTPS, sao lưu/khôi phục SQL Server và thư mục PDF, xoay vòng khóa mã hóa); màn hình cấu hình hệ thống; E2E luồng chính; kiểm thử giao diện trên điện thoại, máy tính bảng, máy tính bàn.
+Sprint 6 (cuối) đã xong: rà soát bảo mật, màn hình cấu hình hệ thống, [hướng dẫn triển khai](trien-khai.md), E2E luồng chính và responsive. Giai đoạn 1 **sẵn sàng triển khai thử nghiệm** tại bệnh viện khi có các mục còn chờ ở mục 10 (duyệt mẫu phiếu, chọn IIS hay Docker, máy tính bảng, HTTPS). Việc còn lại thuộc giai đoạn sau: tích hợp HIS FPT eHospital và ký số SmartCA (khi bệnh viện quyết định), công cụ xoay vòng khóa mã hóa, phiếu đồng thuận chuyên môn.

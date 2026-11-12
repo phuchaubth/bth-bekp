@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 5 hoàn thành: **xuất Excel/CSV** theo bộ lọc (che dữ liệu nhạy cảm mặc định, có lịch sử xuất), **báo cáo thống kê** (tỉ lệ từ chối, thời gian hoàn tất, theo khoa/mẫu/ngày), **trang tổng quan** có số liệu thật và **màn hình nhật ký hệ thống**. Trước đó: ký tay trên máy tính bảng, PDF đã ký, thu hồi (Sprint 4); mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 6 (cuối) hoàn thành: rà soát bảo mật, **màn hình Cấu hình hệ thống** (tên đơn vị in trên PDF), **[hướng dẫn triển khai](docs/trien-khai.md)** cho IIS và Docker trên Windows Server (sao lưu, khôi phục, khóa), độ bao phủ test Domain/Application > 80%. Sprint 5: **xuất Excel/CSV** theo bộ lọc (che dữ liệu nhạy cảm mặc định, có lịch sử xuất), **báo cáo thống kê** (tỉ lệ từ chối, thời gian hoàn tất, theo khoa/mẫu/ngày), **trang tổng quan** có số liệu thật và **màn hình nhật ký hệ thống**. Trước đó: ký tay trên máy tính bảng, PDF đã ký, thu hồi (Sprint 4); mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -69,7 +69,7 @@ Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") ch
 3. Nhân viên đăng nhập lại ngay trên màn hình ký để thoát chế độ ký.
 4. Người có vai trò xác nhận của mẫu bấm **Xác nhận và hoàn tất**: Tiếp đón (`tiepdon.demo`) cho CK-01, Điều dưỡng cho TT-01/TN-01. Xem **PDF đã ký**.
 5. Muốn thu hồi thì dùng `truongkhoa.demo`.
- Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (đang để giá trị mẫu trong `appsettings.json`, chờ bệnh viện cung cấp).
+ Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF do quản trị nhập tại *Quản trị → Cấu hình hệ thống* (chưa nhập thì dùng giá trị mẫu `Hospital:*` trong `appsettings.json`).
 
 > **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT, nội dung phiếu, ảnh chữ ký và file PDF đã ký được mã hóa bằng (khóa dẫn xuất từ) `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
@@ -154,7 +154,10 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 - Xuất dữ liệu: số CCCD, số điện thoại, số thẻ BHYT che mặc định; xuất đầy đủ cần quyền riêng (`exports.sensitive`) và được ghi rõ trong lịch sử xuất và nhật ký. File không lưu trên máy chủ; lịch sử xuất lưu SHA-256 của file. CSV chống chèn công thức. Giới hạn 100.000 phiếu/lần và 10 lần/phút/người dùng.
 - Nhật ký audit ghi mọi thao tác thêm/sửa/xóa, sự kiện đăng nhập và mỗi lần xuất dữ liệu; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
 - API trả lỗi dạng ProblemDetails tiếng Việt, không lộ chi tiết nội bộ; có security headers; OpenAPI chỉ bật ở Development.
-- Cấu hình Docker Compose dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức dùng tài khoản SQL riêng với quyền tối thiểu (hướng dẫn trong `docs/trien-khai.md`, Sprint 6).
+- Cấu hình Docker Compose ở thư mục gốc dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức: xem [docs/trien-khai.md](docs/trien-khai.md) (IIS hoặc `deploy/docker-compose.prod.yml`, tài khoản SQL quyền tối thiểu, HTTPS, sao lưu/khôi phục, không dữ liệu demo — API từ chối khởi động nếu bật ở Production).
+- Thân yêu cầu API tối đa 2 MB; phản hồi API không được lưu đệm (`Cache-Control: no-store`). Không có lỗ hổng đã biết trong thư viện (`dotnet list package --vulnerable`, `npm audit`, kiểm tra ở mỗi lần phát hành).
+
+Độ bao phủ test tầng Domain và Application (tiêu chí ≥ 80%): `scripts/coverage.sh` (hiện 86,7% / 81,2%).
 
 ## Tài liệu
 
@@ -165,6 +168,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | [docs/kien-truc.md](docs/kien-truc.md) | Kiến trúc, mô hình dữ liệu, xác thực/phân quyền/audit, ADR |
 | [docs/api.md](docs/api.md) | Tài liệu API (endpoint, quyền, mã lỗi, ví dụ; đặc tả định nghĩa mẫu phiếu) |
 | [docs/mau-phieu-de-xuat.md](docs/mau-phieu-de-xuat.md) | Ba mẫu phiếu giai đoạn 1 đề xuất (chờ bệnh viện duyệt) |
+| [docs/trien-khai.md](docs/trien-khai.md) | Hướng dẫn triển khai Windows Server (IIS hoặc Docker), HTTPS, sao lưu/khôi phục, khóa, vận hành; file mẫu trong `deploy/` |
 | [docs/tich-hop-smartca.md](docs/tich-hop-smartca.md) | Thiết kế tích hợp VNPT SmartCA |
 
 ## Lộ trình
@@ -178,4 +182,4 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | 4 | Ký tay trên máy tính bảng, xác nhận phía bệnh viện, PDF đã ký, thu hồi | ✅ Hoàn thành |
 | — | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn |
 | 5 | Xuất dữ liệu Excel/CSV, báo cáo thống kê, tổng quan, nhật ký hệ thống | ✅ Hoàn thành |
-| 6 | Hoàn thiện, rà soát bảo mật, hướng dẫn triển khai | Chưa bắt đầu |
+| 6 | Rà soát bảo mật, cấu hình hệ thống, hướng dẫn triển khai, E2E luồng chính, responsive | ✅ Hoàn thành |

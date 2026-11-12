@@ -1,0 +1,55 @@
+# Môi trường chính thức bằng Docker trên Windows Server (Docker Desktop/Engine với container Linux) hoặc máy chủ Linux.
+# Khác bản phát triển: KHÔNG có container SQL Server (dùng SQL Server có sẵn của bệnh viện), môi trường Production,
+# không tự migrate, không dữ liệu demo, API không mở cổng ra ngoài. HTTPS do reverse proxy phía trước (IIS/nginx) đảm nhiệm.
+#
+# Dùng: docker compose -f deploy/docker-compose.prod.yml --env-file /duong-dan/an-toan/consent.env up -d
+# Xem hướng dẫn đầy đủ trong docs/trien-khai.md.
+name: consent-management
+
+services:
+  api:
+    build:
+      context: ../backend
+    image: consent-management-api:${APP_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Chạy migration bằng gói migration có kiểm soát (mục 5 của docs/trien-khai.md), không tự động khi khởi động.
+      Database__ApplyMigrationsOnStartup: "false"
+      # Tài khoản SQL riêng, quyền tối thiểu (deploy/sql/01-create-login.sql). Không dùng sa.
+      ConnectionStrings__Default: ${CONNECTION_STRING:?Đặt CONNECTION_STRING}
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Đặt JWT_SIGNING_KEY}
+      DataProtection__FieldEncryptionKey: ${FIELD_ENCRYPTION_KEY:?Đặt FIELD_ENCRYPTION_KEY}
+      DataProtection__BlindIndexKey: ${BLIND_INDEX_KEY:?Đặt BLIND_INDEX_KEY}
+      # Tạo tài khoản quản trị đầu tiên (chỉ khi CSDL chưa có người dùng); đổi mật khẩu ở lần đăng nhập đầu rồi xóa biến này.
+      Seed__Enabled: "true"
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-}
+      Seed__DemoData: "false"
+      His__Provider: None
+      # Chỉ tin X-Forwarded-* vì API chỉ nhận yêu cầu từ container web (mạng nội bộ Docker).
+      ReverseProxy__TrustAllProxies: "true"
+      # Tên máy chủ người dùng truy cập (chống Host header injection), ví dụ: phieudongthuan.benhvien.local
+      AllowedHosts: ${ALLOWED_HOSTS:-*}
+      Storage__DocumentsPath: /app/storage/documents
+    volumes:
+      # Thư mục PDF đã ký: SAO LƯU CÙNG CSDL. Có thể trỏ tới thư mục trên ổ đĩa/thư mục mạng của máy chủ.
+      - ${DOCUMENTS_PATH:-consent-documents}:/app/storage
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  web:
+    build:
+      context: ../frontend
+    image: consent-management-web:${APP_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      # Chỉ mở trên localhost; reverse proxy HTTPS (IIS/nginx) trỏ tới cổng này.
+      - "127.0.0.1:${WEB_PORT:-8080}:8080"
+    depends_on:
+      - api
+
+volumes:
+  consent-documents:

@@ -1,6 +1,6 @@
 # Kiến trúc — Quản lý Phiếu đồng thuận
 
-> Cập nhật đến Sprint 5. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
+> Cập nhật đến Sprint 6. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
 > Tài liệu liên quan: [Yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) · [Kế hoạch](KE_HOACH_TRIEN_KHAI.md) · [Tích hợp SmartCA](tich-hop-smartca.md)
 
 ---
@@ -152,7 +152,7 @@ docker-compose.yml, .env.example
 
 Bảng được thêm dần theo sprint.
 
-**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`. Sprint 4 (migration `AddConsentSignatures`): `ConsentSignatures`; `ConsentForms` thêm quyết định, phiên ký, phiếu bị thay thế và thông tin PDF đã ký. Sprint 5 (migration `AddExportJobsAndReportIndexes`): `ExportJobs` (lịch sử xuất) và các chỉ mục phục vụ báo cáo/xuất dữ liệu trên `ConsentForms` (`CreatedAtUtc` kèm cột đếm, `CompletedAtUtc`, `RevokedAtUtc`, `CreatedByUserId + Status`).
+**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`. Sprint 4 (migration `AddConsentSignatures`): `ConsentSignatures`; `ConsentForms` thêm quyết định, phiên ký, phiếu bị thay thế và thông tin PDF đã ký. Sprint 5 (migration `AddExportJobsAndReportIndexes`): `ExportJobs` (lịch sử xuất) và các chỉ mục phục vụ báo cáo/xuất dữ liệu trên `ConsentForms` (`CreatedAtUtc` kèm cột đếm, `CompletedAtUtc`, `RevokedAtUtc`, `CreatedByUserId + Status`). Sprint 6 (migration `AddSystemSettings`): `SystemSettings` (khóa/giá trị cấu hình do quản trị sửa: tên đơn vị in trên PDF; không chứa bí mật).
 
 ```mermaid
 erDiagram
@@ -478,7 +478,14 @@ sequenceDiagram
   - `EncryptedFileDocumentStore` mã hóa AES-256-GCM bằng khóa dẫn xuất (HKDF) từ khóa mã hóa cột, đưa khóa lưu trữ vào AAD nên tráo file giữa các phiếu cũng bị phát hiện. File được ghi ra file tạm rồi mới đổi tên.
   - Mỗi lần tải PDF đã ký, máy chủ đọc đúng file đã lưu và kiểm tra lại SHA-256. Ghi file trước, lưu CSDL sau: lỗi giữa chừng chỉ để lại một file thừa.
 
-### 8.8. Xuất dữ liệu, báo cáo và tổng quan
+### 8.8. Cấu hình hệ thống và siết bảo mật (Sprint 6)
+
+- Rà soát theo OWASP ASVS cơ bản: không có lỗ hổng đã biết trong thư viện (`dotnet list package --vulnerable`, `npm audit`); xác thực và phiên (mục 8.1), phân quyền mặc định an toàn (8.2), audit (8.3), mã hóa dữ liệu (8.4), header bảo mật và CSP (API và nginx/IIS), CORS chỉ origin cấu hình, lỗi không lộ chi tiết, log không chứa dữ liệu cá nhân, giới hạn tần suất, thuật toán JWT ghim HS256, container không chạy root.
+- Bổ sung ở Sprint 6 (ADR-030): giới hạn thân yêu cầu 2 MB ở Kestrel (IIS: `maxAllowedContentLength`), từ chối `Seed:DemoData` ở Production, `Cache-Control: no-store` và `Permissions-Policy` cho mọi phản hồi API, hướng dẫn đặt `AllowedHosts`.
+- Màn hình 19 (ADR-029): `SettingsService` đọc/ghi bảng `SystemSettings`; `ConsentFormService` lấy tên đơn vị từ đây khi dựng PDF (mặc định từ `Hospital:*`). Phần chỉ đọc hiển thị trạng thái HIS/SmartCA, giới hạn xuất, chính sách lưu trữ.
+- Độ bao phủ test (`scripts/coverage.sh`): Domain 86,7%, Application 81,2% dòng lệnh (tiêu chí ≥ 80%).
+
+### 8.9. Xuất dữ liệu, báo cáo và tổng quan
 
 - **Xuất dữ liệu (ADR-026):** `ConsentFormExportService` (Application) lọc trong phạm vi khoa, chọn cột từ danh mục `ConsentFormExportColumns` (tiêu đề tiếng Việt, cờ `Sensitive`), đọc phiếu lần lượt qua `IConsentFormRepository.StreamForExportAsync` (không nạp hết vào bộ nhớ) và ghi file qua `ITabularFileWriter`. Hai bản cài đặt ở Infrastructure: `XlsxTabularFileWriter` (Office Open XML viết bằng `System.IO.Compression` + `XmlWriter`, không thêm thư viện; chuỗi ghi dạng inline string nên không bao giờ thành công thức; ngày/giờ là ô ngày của Excel; dòng tiêu đề cố định, có bộ lọc; trang "Thông tin xuất") và `CsvTabularFileWriter` (UTF-8 BOM, RFC 4180, chống chèn công thức). Cột nhạy cảm che bằng `SensitiveMask` trừ khi có `exports.sensitive` và người dùng chọn xuất đầy đủ. Nội dung theo mẫu (`TemplateContentColumns`) đọc từng phiếu theo đúng phiên bản mẫu của nó và chỉ lấy trường đang hiển thị (cùng quy tắc với PDF). Giới hạn 100.000 phiếu/lần và 10 lần/phút/người dùng. Mỗi lần xuất ghi `ExportJob` (SHA-256 của file) và audit `Exports.ConsentForms`; file trả thẳng cho người dùng, không lưu trên máy chủ. Thông tin người bệnh của phiếu đã trình ký lấy từ bản đóng băng (đúng như trên phiếu đem ký).
 - **Báo cáo (ADR-027):** `ReportService` dùng `IConsentStatisticsRepository`, trong đó mọi phép đếm/nhóm chạy trong SQL Server trên các cột không mã hóa (khoa, mẫu, trạng thái, quyết định, người ký, thời điểm); ngày tính theo giờ Việt Nam bằng số giờ kể từ mốc 00:00 chia 24. Thời gian hoàn tất lấy danh sách số giây rồi tính trung bình, trung vị, phân vị 90 trong ứng dụng. `DashboardService` dùng cùng repository cho trang tổng quan (việc chờ tôi xác nhận = phiếu người bệnh đã ký thuộc mẫu mà người dùng có vai trò xác nhận).
@@ -506,7 +513,8 @@ sequenceDiagram
 | `DataProtection:BlindIndexKey` | `DataProtection__BlindIndexKey` | **Bí mật**, Base64 của 32 byte, khác khóa mã hóa; khóa chỉ mục mù |
 | `His:Provider` | `His__Provider` | `None` (mặc định: chưa kết nối HIS) hoặc `Fake` (HIS giả lập, chỉ dev/test; bị từ chối ở Production). Giá trị khác → API không khởi động |
 | `His:TimeoutSeconds` | `His__TimeoutSeconds` | Mặc định 5 (1–60) |
-| `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` | `Hospital__…` | Cơ quan chủ quản, tên bệnh viện, địa danh in ở đầu PDF. **Đang để giá trị mẫu, chờ bệnh viện cung cấp** |
+| `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` | `Hospital__…` | Giá trị mặc định của tên đơn vị in ở đầu PDF; **từ Sprint 6 quản trị nhập tại màn hình Cấu hình hệ thống** (bảng `SystemSettings`), cấu hình này chỉ dùng khi chưa nhập |
+| `AllowedHosts` | `AllowedHosts` | Tên máy chủ người dùng truy cập (chống giả mạo Host). Mặc định `*`; đặt tên thật ở môi trường chính thức |
 | `Storage:DocumentsPath` | `Storage__DocumentsPath` | Thư mục lưu PDF đã ký (ổ đĩa hoặc thư mục mạng). Bắt buộc; mặc định `App_Data/documents`, Docker dùng volume `documents`. **Phải sao lưu cùng CSDL**; file được mã hóa bằng khóa dẫn xuất từ `FIELD_ENCRYPTION_KEY` nên mất khóa là mất cả PDF |
 | `SmartCa:*` | `SmartCa__SpPassword`… | **Tạm hoãn** (chưa tích hợp SmartCA); thiết kế giữ trong [tich-hop-smartca.md](tich-hop-smartca.md) |
 
@@ -518,7 +526,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 
 **Phát triển/kiểm thử (Docker Compose):** `sqlserver` (SQL Server 2022 Developer, có health check) → `api` (cổng nội bộ 8080, chạy user không phải root) → `web` (nginx không đặc quyền, cổng 8080, phục vụ SPA và chuyển tiếp `/api`, `/health` tới `api`).
 
-**Chính thức (Windows Server tại bệnh viện):** hình thức chạy (IIS + SQL Server có sẵn, hay Docker) chờ bệnh viện xác nhận. Hướng dẫn chi tiết, gồm HTTPS, tài khoản SQL riêng (không dùng `sa`), sao lưu và dung lượng lưu trữ, sẽ có trong `docs/trien-khai.md` (Sprint 6).
+**Chính thức (Windows Server tại bệnh viện):** hướng dẫn đầy đủ trong [trien-khai.md](trien-khai.md) cho cả hai hình thức **IIS + SQL Server có sẵn** và **Docker + SQL Server có sẵn** (`deploy/docker-compose.prod.yml`): HTTPS ở reverse proxy, tài khoản SQL quyền tối thiểu (`deploy/sql/01-create-login.sql`), migration bằng gói `efbundle`, sao lưu/khôi phục CSDL và thư mục PDF (`deploy/sql/02-backup.sql`, `03-restore.sql`), xoay vòng khóa, giám sát, danh sách kiểm tra sau triển khai. Đã diễn tập triển khai sạch hình thức Docker trong CI nội bộ (SQL Server riêng, tài khoản `consent_app`, migration bằng gói, luồng ký và xuất chạy đúng).
 
 ---
 
@@ -553,4 +561,6 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-026 | Tự ghi file Excel (Office Open XML) và CSV bằng thư viện chuẩn .NET, ghi lần lượt từng dòng; không dùng ClosedXML như kế hoạch | Không thêm phụ thuộc; bộ nhớ thấp khi xuất hàng chục nghìn phiếu; kiểm soát được việc không sinh công thức. File được kiểm tra bằng OpenXML SDK (chỉ trong test) |
 | ADR-027 | Thống kê đếm/nhóm trong SQL trên cột không mã hóa, không dùng view `vw_ConsentFormExport` như kế hoạch | Dữ liệu cá nhân mã hóa ở tầng ứng dụng nên view SQL không đọc được; đếm theo khoa/mẫu/trạng thái/quyết định không cần giải mã nên nhanh và không lộ dữ liệu |
 | ADR-028 | Không lưu file đã xuất trên máy chủ; chỉ lưu lịch sử xuất kèm SHA-256 và ghi audit | Giảm nơi lưu dữ liệu cá nhân; vẫn đối chiếu được file nào do ai xuất lúc nào khi cần điều tra |
+| ADR-029 | Cấu hình nghiệp vụ không bí mật (tên đơn vị in trên PDF) lưu trong bảng `SystemSettings` và sửa trên giao diện; bí mật chỉ ở biến môi trường | Phòng CNTT không phải sửa file cấu hình và khởi động lại khi đổi tên đơn vị; mọi thay đổi có audit; tách bạch rõ cái gì là bí mật |
+| ADR-030 | Siết Sprint 6: thân yêu cầu ≤ 2 MB, từ chối dữ liệu demo ở Production, `Cache-Control: no-store` và `Permissions-Policy` trên API, `AllowedHosts` theo tên máy chủ | Giảm bề mặt tấn công theo OWASP ASVS cơ bản; không ảnh hưởng tính năng (ảnh chữ ký ≤ 512 KB) |
 | ADR-025 | PDF đã ký lưu thành file trên đĩa, mã hóa AES-256-GCM (khóa dẫn xuất HKDF, khóa lưu trữ làm AAD), kèm SHA-256 trong CSDL; trả đúng file đã lưu mỗi lần tải | Đúng giả định lưu file trên máy chủ của kế hoạch nhưng không để lộ dữ liệu cá nhân nếu thư mục bị sao chép; phát hiện được file bị sửa hoặc bị tráo; PDF đã ký không bị dựng lại khi mẫu hay phần mềm đổi |

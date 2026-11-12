@@ -5,6 +5,7 @@ using Consent.Domain.Identity;
 using Consent.Domain.Patients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Consent.Persistence.Configurations;
@@ -122,5 +123,10 @@ internal sealed class ConsentSignatureConfiguration : IEntityTypeConfiguration<C
     /// <summary>Ảnh chữ ký tay là dữ liệu cá nhân: lưu dạng bản mã (AES-256-GCM).</summary>
     public static void ConfigureEncryption(ModelBuilder modelBuilder, EncryptedBytesConverter encrypted) =>
         modelBuilder.Entity<ConsentSignature>().Property(s => s.ImagePng).HasColumnName("ImagePngEncrypted").IsUnicode(false)
-            .HasConversion((ValueConverter)encrypted);
+            .HasConversion((ValueConverter)encrypted)
+            // Ảnh được ghi một lần, không sửa: so sánh theo nội dung để EF không coi mỗi lần nạp là thay đổi.
+            .Metadata.SetValueComparer(new ValueComparer<byte[]?>(
+                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+                v => v == null ? 0 : v.Length,
+                v => v == null ? null : v.ToArray()));
 }
