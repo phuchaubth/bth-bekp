@@ -1,6 +1,6 @@
 # Kiến trúc — Quản lý Phiếu đồng thuận
 
-> Cập nhật đến Sprint 4. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
+> Cập nhật đến Sprint 5. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
 > Tài liệu liên quan: [Yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) · [Kế hoạch](KE_HOACH_TRIEN_KHAI.md) · [Tích hợp SmartCA](tich-hop-smartca.md)
 
 ---
@@ -152,7 +152,7 @@ docker-compose.yml, .env.example
 
 Bảng được thêm dần theo sprint.
 
-**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`. Sprint 4 (migration `AddConsentSignatures`): `ConsentSignatures`; `ConsentForms` thêm quyết định, phiên ký, phiếu bị thay thế và thông tin PDF đã ký.
+**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`. Sprint 4 (migration `AddConsentSignatures`): `ConsentSignatures`; `ConsentForms` thêm quyết định, phiên ký, phiếu bị thay thế và thông tin PDF đã ký. Sprint 5 (migration `AddExportJobsAndReportIndexes`): `ExportJobs` (lịch sử xuất) và các chỉ mục phục vụ báo cáo/xuất dữ liệu trên `ConsentForms` (`CreatedAtUtc` kèm cột đếm, `CompletedAtUtc`, `RevokedAtUtc`, `CreatedByUserId + Status`).
 
 ```mermaid
 erDiagram
@@ -310,7 +310,7 @@ Khóa ngoại của `ConsentForms` không xóa dây chuyền (phiếu là hồ s
 
 **Dự kiến (khi bật lại SmartCA, quyết định 9):** `ConsentSignatures` có thêm phương thức `SmartCA`/`ProxySmartCA`, người chứng kiến, lý do (danh mục `SigningReasons`) và số sê-ri chứng thư; bảng `SignatureTransactions` theo dõi giao dịch ký SmartCA; mỗi lượt ký có thể lưu một bản PDF. Khi kết nối HIS, `ConsentForms` có thêm mã đợt khám và trạng thái đối chiếu HIS.
 
-Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog`) và gán cho vai trò qua bảng `RolePermissions` (thay cho bảng `Permissions` dự kiến trong kế hoạch). Bảng `ExportJobs` được mô tả ở mục 4 của [kế hoạch](KE_HOACH_TRIEN_KHAI.md).
+Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog`) và gán cho vai trò qua bảng `RolePermissions` (thay cho bảng `Permissions` dự kiến trong kế hoạch). Bảng `ExportJobs` (Sprint 5): `Id`, `Kind`, `RequestedByUserId`, `RequestedAtUtc`, `Format`, `FiltersJson`, `Columns`, `IncludesContent`, `IncludesSensitiveData`, `RowCount`, `FileName`, `FileSizeBytes`, `FileSha256`, `DurationMs`. Không lưu file đã xuất.
 
 ---
 
@@ -478,6 +478,13 @@ sequenceDiagram
   - `EncryptedFileDocumentStore` mã hóa AES-256-GCM bằng khóa dẫn xuất (HKDF) từ khóa mã hóa cột, đưa khóa lưu trữ vào AAD nên tráo file giữa các phiếu cũng bị phát hiện. File được ghi ra file tạm rồi mới đổi tên.
   - Mỗi lần tải PDF đã ký, máy chủ đọc đúng file đã lưu và kiểm tra lại SHA-256. Ghi file trước, lưu CSDL sau: lỗi giữa chừng chỉ để lại một file thừa.
 
+### 8.8. Xuất dữ liệu, báo cáo và tổng quan
+
+- **Xuất dữ liệu (ADR-026):** `ConsentFormExportService` (Application) lọc trong phạm vi khoa, chọn cột từ danh mục `ConsentFormExportColumns` (tiêu đề tiếng Việt, cờ `Sensitive`), đọc phiếu lần lượt qua `IConsentFormRepository.StreamForExportAsync` (không nạp hết vào bộ nhớ) và ghi file qua `ITabularFileWriter`. Hai bản cài đặt ở Infrastructure: `XlsxTabularFileWriter` (Office Open XML viết bằng `System.IO.Compression` + `XmlWriter`, không thêm thư viện; chuỗi ghi dạng inline string nên không bao giờ thành công thức; ngày/giờ là ô ngày của Excel; dòng tiêu đề cố định, có bộ lọc; trang "Thông tin xuất") và `CsvTabularFileWriter` (UTF-8 BOM, RFC 4180, chống chèn công thức). Cột nhạy cảm che bằng `SensitiveMask` trừ khi có `exports.sensitive` và người dùng chọn xuất đầy đủ. Nội dung theo mẫu (`TemplateContentColumns`) đọc từng phiếu theo đúng phiên bản mẫu của nó và chỉ lấy trường đang hiển thị (cùng quy tắc với PDF). Giới hạn 100.000 phiếu/lần và 10 lần/phút/người dùng. Mỗi lần xuất ghi `ExportJob` (SHA-256 của file) và audit `Exports.ConsentForms`; file trả thẳng cho người dùng, không lưu trên máy chủ. Thông tin người bệnh của phiếu đã trình ký lấy từ bản đóng băng (đúng như trên phiếu đem ký).
+- **Báo cáo (ADR-027):** `ReportService` dùng `IConsentStatisticsRepository`, trong đó mọi phép đếm/nhóm chạy trong SQL Server trên các cột không mã hóa (khoa, mẫu, trạng thái, quyết định, người ký, thời điểm); ngày tính theo giờ Việt Nam bằng số giờ kể từ mốc 00:00 chia 24. Thời gian hoàn tất lấy danh sách số giây rồi tính trung bình, trung vị, phân vị 90 trong ứng dụng. `DashboardService` dùng cùng repository cho trang tổng quan (việc chờ tôi xác nhận = phiếu người bệnh đã ký thuộc mẫu mà người dùng có vai trò xác nhận).
+- **Nhật ký (màn hình 15):** dùng `GET /audit-logs` có từ Sprint 1; giao diện dịch tên hành động và loại đối tượng sang tiếng Việt, xem chi tiết JSON đã che dữ liệu nhạy cảm.
+- **Biểu đồ:** vẽ bằng SVG trong ứng dụng (`BarChart`), không thêm thư viện biểu đồ; có bảng ẩn cho trình đọc màn hình.
+
 ## 9. Cấu hình và bí mật
 
 | Khóa cấu hình | Biến môi trường | Ghi chú |
@@ -490,7 +497,7 @@ sequenceDiagram
 | `Jwt:SigningTokenMinutes` | `Jwt__SigningTokenMinutes` | Thời hạn token phiên ký trên máy tính bảng. Mặc định 30 (5–120) |
 | `Auth:MaxFailedAttempts`, `Auth:LockoutMinutes` | `Auth__…` | Mặc định 5 lần, 15 phút |
 | `Auth:RefreshTokenLifetimeHours`, `Auth:RefreshReuseGraceSeconds` | `Auth__…` | Mặc định 12 giờ, 30 giây |
-| `RateLimiting:AuthPermitLimit`, `RefreshPermitLimit`, `WindowSeconds` | `RateLimiting__…` | Mặc định 10, 30 lần / 60 giây / IP |
+| `RateLimiting:AuthPermitLimit`, `RefreshPermitLimit`, `ExportPermitLimit`, `WindowSeconds` | `RateLimiting__…` | Mặc định 10, 30 lần / 60 giây / IP; xuất dữ liệu 10 lần / 60 giây / người dùng |
 | `ReverseProxy:TrustAllProxies` | `ReverseProxy__TrustAllProxies` | Mặc định `false`. Chỉ bật khi API không mở cổng ra ngoài và chỉ nhận yêu cầu từ reverse proxy (để lấy đúng IP người dùng) |
 | `Seed:Enabled` | `Seed__Enabled` | Tạo vai trò hệ thống và tài khoản quản trị đầu tiên khi khởi động |
 | `Seed:AdminPassword` | `Seed__AdminPassword` | **Bí mật**; chỉ dùng khi chưa có người dùng nào. Tài khoản `admin` phải đổi mật khẩu ở lần đăng nhập đầu |
@@ -543,4 +550,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-022 | Đóng băng (mã hóa) thông tin người bệnh và người ký khi trình ký; phiếu ngoài phạm vi khoa trả 404 | Nội dung đem ký không đổi dù hồ sơ được sửa sau đó; không tiết lộ sự tồn tại của phiếu khoa khác |
 | ADR-023 | Chế độ ký dùng token phiên ký riêng (đối tượng nhận riêng, gắn với một phiếu và một phiên, dùng một lần) và đóng phiên đăng nhập của nhân viên trên máy; thoát chế độ ký = đăng nhập lại | Máy chủ chặn được người bệnh cầm máy làm việc khác, không phụ thuộc vào việc giao diện bị vượt qua hay trang bị tải lại. Dùng lại cơ chế đăng nhập sẵn có (khóa tạm khi sai nhiều lần) thay vì thêm API kiểm tra mật khẩu riêng |
 | ADR-024 | Tự giải mã và chuẩn hóa ảnh chữ ký ở máy chủ (không thêm thư viện xử lý ảnh) | Phát hiện khung trống và ảnh giả mạo/quá lớn ngay ở máy chủ; ảnh lưu lại chỉ còn điểm ảnh (loại dữ liệu kèm theo); không phát sinh phụ thuộc mới |
+| ADR-026 | Tự ghi file Excel (Office Open XML) và CSV bằng thư viện chuẩn .NET, ghi lần lượt từng dòng; không dùng ClosedXML như kế hoạch | Không thêm phụ thuộc; bộ nhớ thấp khi xuất hàng chục nghìn phiếu; kiểm soát được việc không sinh công thức. File được kiểm tra bằng OpenXML SDK (chỉ trong test) |
+| ADR-027 | Thống kê đếm/nhóm trong SQL trên cột không mã hóa, không dùng view `vw_ConsentFormExport` như kế hoạch | Dữ liệu cá nhân mã hóa ở tầng ứng dụng nên view SQL không đọc được; đếm theo khoa/mẫu/trạng thái/quyết định không cần giải mã nên nhanh và không lộ dữ liệu |
+| ADR-028 | Không lưu file đã xuất trên máy chủ; chỉ lưu lịch sử xuất kèm SHA-256 và ghi audit | Giảm nơi lưu dữ liệu cá nhân; vẫn đối chiếu được file nào do ai xuất lúc nào khi cần điều tra |
 | ADR-025 | PDF đã ký lưu thành file trên đĩa, mã hóa AES-256-GCM (khóa dẫn xuất HKDF, khóa lưu trữ làm AAD), kèm SHA-256 trong CSDL; trả đúng file đã lưu mỗi lần tải | Đúng giả định lưu file trên máy chủ của kế hoạch nhưng không để lộ dữ liệu cá nhân nếu thư mục bị sao chép; phát hiện được file bị sửa hoặc bị tráo; PDF đã ký không bị dựng lại khi mẫu hay phần mềm đổi |

@@ -21,10 +21,11 @@ interface BarChartProps {
  * Biểu đồ cột đơn giản bằng SVG (không cần thư viện): các dãy đứng cạnh nhau theo từng nhóm, có chú giải và tooltip.
  * Dữ liệu cũng được xuất dạng bảng ẩn cho trình đọc màn hình.
  */
-export function BarChart({ labels, series, height = 180, title, maxLabels = 16 }: BarChartProps) {
+export function BarChart({ labels, series, height = 200, title, maxLabels = 16 }: BarChartProps) {
   const max = Math.max(1, ...series.flatMap((s) => s.values))
   const groups = labels.length
-  const width = Math.max(320, groups * 28)
+  // Tỉ lệ khoảng 5:1 để biểu đồ không bị kéo cao trên màn hình rộng (SVG co giãn theo chiều ngang).
+  const width = Math.max(height * 5, groups * 28)
   const padding = { left: 32, right: 8, top: 8, bottom: 24 }
   const plotWidth = width - padding.left - padding.right
   const plotHeight = height - padding.top - padding.bottom
@@ -44,7 +45,7 @@ export function BarChart({ labels, series, height = 180, title, maxLabels = 16 }
         ))}
       </div>
       <div style={{ overflowX: 'auto' }}>
-        <svg role="img" aria-label={title} width="100%" viewBox={`0 0 ${width} ${height}`} style={{ minWidth: 320, display: 'block' }}>
+        <svg role="img" aria-label={title} width="100%" viewBox={`0 0 ${width} ${height}`} style={{ minWidth: 320, maxHeight: height * 2, display: 'block' }}>
           {ticks.map((tick) => {
             const y = padding.top + plotHeight - (tick / max) * plotHeight
             return (

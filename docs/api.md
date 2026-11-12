@@ -1,6 +1,6 @@
 # Tài liệu API — Quản lý Phiếu đồng thuận
 
-> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 4 — thêm ký tay trên máy tính bảng, xác nhận phía bệnh viện, PDF đã ký, thu hồi).
+> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 5 — thêm xuất Excel/CSV, báo cáo thống kê, trang tổng quan; Sprint 4: ký tay trên máy tính bảng, PDF đã ký, thu hồi).
 > Ở môi trường Development, đặc tả OpenAPI tự sinh có tại `GET /openapi/v1.json`.
 >
 > Mọi ví dụ dưới đây dùng **dữ liệu giả lập**.
@@ -373,6 +373,51 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 
 ---
 
+## 6d. Xuất dữ liệu (`/api/v1/exports`)
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/exports/consent-forms/columns` | `exports.run` | Danh mục cột có thể chọn: `key`, `header` (tiếng Việt), `group`, `default`, `sensitive` |
+| POST | `/api/v1/exports/consent-forms` | `exports.run` (+ `exports.sensitive` để xuất đầy đủ) | Xuất phiếu ra file, trả file ngay (`Content-Disposition: attachment`). Giới hạn 10 lần / phút / người dùng (`429`) |
+| GET | `/api/v1/exports?page=1&pageSize=20` | `exports.run` | Lịch sử xuất của người dùng; người có `audit.read` thấy mọi lần xuất |
+
+Body của `POST /exports/consent-forms`:
+
+```json
+{
+  "format": "Xlsx",
+  "filter": { "status": "Completed", "templateId": "…", "departmentId": "…", "from": "2026-11-01", "to": "2026-11-30" },
+  "columns": ["formNo", "status", "patientName", "citizenId", "decision"],
+  "includeContent": false,
+  "includeSensitiveData": false
+}
+```
+
+- `format`: `Xlsx` (Excel, Office Open XML) hoặc `Csv` (UTF-8 có BOM, phân cách dấu phẩy, CRLF). Chuỗi bắt đầu bằng `= + - @` được thêm dấu nháy đơn (chống chèn công thức).
+- `filter`: theo **ngày lập** (giờ Việt Nam); người không có `scope.all_departments` chỉ xuất được phiếu khoa mình và phiếu mình lập (`departmentId` khác khoa mình → `403 exports.department_forbidden`).
+- `columns`: thứ tự trong file theo danh mục, không theo thứ tự gửi lên. Cột nhạy cảm (`citizenId`, `phoneNumber`, `representativeCitizenId`) **mặc định bị che** (`0790******12`); `includeSensitiveData: true` cần quyền `exports.sensitive` (không có → `403 exports.sensitive_forbidden`).
+- `includeContent: true`: thêm mỗi trường của mẫu một cột (nhãn tiếng Việt từ định nghĩa mẫu; lựa chọn in nhãn; trường điểm có cột tổng và cột mức); bắt buộc lọc theo đúng một `templateId`. Trường tự điền số thẻ BHYT/số điện thoại bị che trừ khi xuất đầy đủ; bảng nhiều dòng chỉ ghi số dòng khi che.
+- Lỗi: không có phiếu nào khớp → `422 exports.no_rows`; quá **100.000** phiếu → `422 exports.too_many_rows` (thu hẹp bộ lọc).
+- Phản hồi có header `X-Export-Job-Id`, `X-Export-Row-Count`, `Cache-Control: no-store`. File Excel có trang "Thông tin xuất" (mã lần xuất, người xuất, bộ lọc, phạm vi, mức che dữ liệu).
+- Mỗi lần xuất ghi `ExportJobs` (bộ lọc, cột, số dòng, kích thước, SHA-256 của file, thời gian) và audit `Exports.ConsentForms`. **File không được lưu trên máy chủ.**
+
+Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName`, `format`, `filter` (kèm `templateCode`, `departmentName` tại thời điểm xuất), `columns`, `includesContent`, `includesSensitiveData`, `rowCount`, `fileName`, `fileSizeBytes`, `fileSha256`, `durationMs`.
+
+---
+
+## 6e. Báo cáo thống kê và tổng quan
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/reports/summary?from=&to=&departmentId=&templateId=` | `reports.read` | Thống kê các phiếu **lập** trong khoảng ngày (mặc định: từ đầu tháng đến hôm nay, giờ Việt Nam; tối đa 366 ngày), trong phạm vi khoa |
+| GET | `/api/v1/dashboard` | `consents.read` | Số liệu trang tổng quan của người dùng hiện tại |
+
+`reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; khoa khác khoa mình (không có quyền toàn viện) → `403 reports.department_forbidden`.
+
+`dashboard` trả: `drafts`, `pendingSignature`, `completedToday`, `revokedLast30Days`, `awaitingMyConfirmation` (phiếu người bệnh đã ký thuộc mẫu mà người dùng có vai trò xác nhận; `total` + tối đa 5 `items`), `myOpenForms` (phiếu nháp/chờ ký do mình lập), `last14Days` (`date`, `created`, `completed`).
+
+---
+
 ## 7. Nhật ký audit (`/api/v1/audit-logs`)
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
@@ -385,12 +430,13 @@ Hành động (`action`) được ghi:
 
 | Hành động | Nguồn |
 |---|---|
-| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
+| `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận, chữ ký. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
 | `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`) |
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
 | `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |
 | `ConsentForms.Viewed`, `ConsentForms.PdfViewed` | Xem chi tiết phiếu; tải/xem PDF phiếu |
 | `ConsentForms.SigningStarted`, `ConsentForms.PatientSigned`, `ConsentForms.Completed`, `ConsentForms.Revoked` | Mở phiên ký; người bệnh ký (kèm quyết định, người ký; thiết bị lưu ở chữ ký); phía bệnh viện xác nhận (kèm SHA-256 của PDF); thu hồi |
+| `Exports.ConsentForms` | Xuất dữ liệu phiếu (`details`: định dạng, số dòng, cột, kèm nội dung, dữ liệu nhạy cảm, bộ lọc, SHA-256 của file; `entityId` = mã lần xuất) |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
 

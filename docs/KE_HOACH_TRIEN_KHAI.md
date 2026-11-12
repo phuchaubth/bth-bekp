@@ -1,6 +1,6 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
-> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0, 1 và 2 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
+> Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Sprint 0–5 đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
 > **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10); người bệnh **ký tay trên máy tính bảng** (quyết định số 10, mục 2.5a). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
@@ -529,10 +529,22 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - Xuất Excel/CSV theo bộ lọc, chọn cột, che dữ liệu mặc định; lịch sử xuất (màn hình 13).
 - Báo cáo thống kê và dashboard (2, 14); màn hình nhật ký audit (15).
 
-**Tiêu chí nghiệm thu**
-- File Excel mở được, tiêu đề tiếng Việt, số liệu khớp với bộ lọc (integration test).
-- Người không có quyền `consent.export` → 403; mỗi lần xuất có bản ghi `ExportJobs` và audit.
-- Xuất 10.000 phiếu giả lập dưới 30 giây trên môi trường Docker tham chiếu.
+**Điều chỉnh khi triển khai (ADR-026…028 trong [kiến trúc](kien-truc.md))**
+- **Không thêm thư viện Excel (ClosedXML):** file `.xlsx` và CSV được ghi bằng thư viện chuẩn .NET, từng dòng một (bộ nhớ thấp). OpenXML SDK chỉ dùng trong test để kiểm tra file đúng chuẩn. Đã mở thử bằng LibreOffice.
+- **Không dùng view SQL `vw_ConsentFormExport`:** dữ liệu cá nhân mã hóa ở tầng ứng dụng nên xuất và che dữ liệu ở tầng Application; thống kê đếm/nhóm trong SQL trên cột không mã hóa.
+- **Che dữ liệu:** số CCCD, số điện thoại, số thẻ BHYT che mặc định; xuất đầy đủ cần quyền `exports.sensitive` (mặc định chỉ Quản trị hệ thống) và người dùng phải chủ động chọn; có cảnh báo và ghi rõ trong lịch sử xuất, audit và trang "Thông tin xuất" của file Excel.
+- **Kèm nội dung phiếu theo mẫu** (mỗi trường một cột, lựa chọn in nhãn, điểm Morse có cột tổng và mức) khi lọc theo đúng một mẫu.
+- **Giới hạn:** 100.000 phiếu/lần (vượt thì báo thu hẹp bộ lọc); 10 lần xuất/phút/người dùng. File không lưu trên máy chủ; lịch sử xuất lưu SHA-256 của file.
+- **Báo cáo:** theo ngày lập (giờ Việt Nam), mặc định từ đầu tháng; tỉ lệ từ chối, người bệnh tự ký/người đại diện ký, thời gian lập → hoàn tất (trung bình, trung vị, phân vị 90, phân nhóm), theo khoa, mẫu, ngày. Tỉ lệ từng phương án ký SmartCA để lại cho giai đoạn SmartCA.
+- **Tổng quan:** số phiếu nháp, chờ ký, hoàn tất hôm nay, thu hồi 30 ngày; phiếu chờ tôi xác nhận; phiếu tôi lập chưa hoàn tất; biểu đồ 14 ngày. Biểu đồ vẽ bằng SVG, không thêm thư viện.
+- **Lịch sử xuất:** mỗi người xem lần xuất của mình; người có quyền xem nhật ký thấy mọi lần xuất.
+
+**Tiêu chí nghiệm thu** (✅ đã đạt, có test tự động)
+- ✅ File Excel mở được (kiểm tra bằng OpenXML SDK trong unit test; mở thử bằng LibreOffice), tiêu đề tiếng Việt, số liệu khớp bộ lọc (unit test và test với SQL Server thật: theo trạng thái, mẫu, khoa, khoảng ngày).
+- ✅ Không có quyền `exports.run` → `403`; không có `exports.sensitive` mà xin xuất đầy đủ → `403`; mỗi lần xuất có bản ghi `ExportJobs` và audit `Exports.ConsentForms` (test với SQL Server thật).
+- ✅ Xuất 10.000 phiếu giả lập: Excel kèm nội dung mẫu và CSV đầy đủ đều **dưới 30 giây** (integration test trên SQL Server trong container; cả lượt test gồm chèn dữ liệu chạy 25 giây).
+- ✅ Báo cáo: số liệu khớp dữ liệu (unit test với kịch bản 7 phiếu; test API), phạm vi khoa (trưởng khoa chỉ thấy khoa mình, xin khoa khác → `403`), khoảng ngày sai → `400`.
+- ✅ E2E trên Docker: tổng quan, báo cáo, xuất CSV (che CCCD), xuất Excel đầy đủ (quản trị), nhật ký có bản ghi xuất (5/5 bước).
 
 ### Sprint 6 – Hoàn thiện, bảo mật, tài liệu triển khai
 - Rà soát bảo mật (OWASP ASVS cơ bản), security headers, rate limiting, kiểm tra dependency.
@@ -597,6 +609,6 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 ## 11. Bước tiếp theo
 
-Sprint 0–4 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF, ký tay trên máy tính bảng và hoàn tất phiếu. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
+Sprint 0–5 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF, ký tay trên máy tính bảng, xuất dữ liệu, báo cáo và nhật ký. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
 
-Tiếp theo là **Sprint 5: xuất dữ liệu, báo cáo, nhật ký**. Gồm: xuất Excel/CSV theo bộ lọc (che dữ liệu mặc định, có lịch sử xuất); thống kê và dashboard (gồm tỉ lệ từ chối); màn hình xem nhật ký audit. Sau đó là **Sprint 6: hoàn thiện, rà soát bảo mật, hướng dẫn triển khai**.
+Tiếp theo là **Sprint 6: hoàn thiện, rà soát bảo mật, hướng dẫn triển khai**. Gồm: rà soát bảo mật (OWASP ASVS cơ bản), kiểm tra phụ thuộc; `docs/trien-khai.md` (IIS hoặc Docker trên Windows Server, HTTPS, sao lưu/khôi phục SQL Server và thư mục PDF, xoay vòng khóa mã hóa); màn hình cấu hình hệ thống; E2E luồng chính; kiểm thử giao diện trên điện thoại, máy tính bảng, máy tính bàn.

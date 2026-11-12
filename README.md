@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 4 hoàn thành: người bệnh **ký tay trên máy tính bảng**, phía bệnh viện xác nhận bằng tài khoản, PDF đã ký được lưu (mã hóa, có SHA-256), thu hồi và lập phiếu thay thế. Trước đó: mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 5 hoàn thành: **xuất Excel/CSV** theo bộ lọc (che dữ liệu nhạy cảm mặc định, có lịch sử xuất), **báo cáo thống kê** (tỉ lệ từ chối, thời gian hoàn tất, theo khoa/mẫu/ngày), **trang tổng quan** có số liệu thật và **màn hình nhật ký hệ thống**. Trước đó: ký tay trên máy tính bảng, PDF đã ký, thu hồi (Sprint 4); mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -151,7 +151,8 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
   - Chế độ ký dùng token phiên ký riêng: chỉ ký được đúng một phiếu, mọi API khác từ chối. Phiên đăng nhập của nhân viên trên máy bị đóng, muốn thoát phải đăng nhập lại.
   - Ảnh chữ ký được máy chủ kiểm tra, chuẩn hóa và lưu mã hóa.
   - PDF đã ký lưu thành file mã hóa trong `Storage__DocumentsPath` (Docker: volume `documents`, **sao lưu cùng CSDL**), kèm SHA-256 được kiểm tra lại mỗi lần tải.
-- Nhật ký audit ghi mọi thao tác thêm/sửa/xóa và sự kiện đăng nhập; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
+- Xuất dữ liệu: số CCCD, số điện thoại, số thẻ BHYT che mặc định; xuất đầy đủ cần quyền riêng (`exports.sensitive`) và được ghi rõ trong lịch sử xuất và nhật ký. File không lưu trên máy chủ; lịch sử xuất lưu SHA-256 của file. CSV chống chèn công thức. Giới hạn 100.000 phiếu/lần và 10 lần/phút/người dùng.
+- Nhật ký audit ghi mọi thao tác thêm/sửa/xóa, sự kiện đăng nhập và mỗi lần xuất dữ liệu; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
 - API trả lỗi dạng ProblemDetails tiếng Việt, không lộ chi tiết nội bộ; có security headers; OpenAPI chỉ bật ở Development.
 - Cấu hình Docker Compose dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức dùng tài khoản SQL riêng với quyền tối thiểu (hướng dẫn trong `docs/trien-khai.md`, Sprint 6).
 
@@ -176,5 +177,5 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | 3 | Mẫu phiếu có phiên bản, lập phiếu, xuất PDF (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | ✅ Hoàn thành |
 | 4 | Ký tay trên máy tính bảng, xác nhận phía bệnh viện, PDF đã ký, thu hồi | ✅ Hoàn thành |
 | — | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn |
-| 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |
+| 5 | Xuất dữ liệu Excel/CSV, báo cáo thống kê, tổng quan, nhật ký hệ thống | ✅ Hoàn thành |
 | 6 | Hoàn thiện, rà soát bảo mật, hướng dẫn triển khai | Chưa bắt đầu |
