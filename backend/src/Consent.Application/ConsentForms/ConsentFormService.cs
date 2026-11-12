@@ -47,6 +47,10 @@ public sealed class ConsentFormService(
 
     private bool ScopeAll => currentUser.HasPermission(Permissions.ScopeAllDepartments);
 
+    /// <summary>Thời điểm 00:00 (giờ Việt Nam) của ngày <paramref name="date"/>; dùng cho bộ lọc theo ngày.</summary>
+    public static DateTimeOffset? StartOfDayUtc(DateOnly? date) =>
+        date is { } value ? new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue), VietnamOffset) : null;
+
     public Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormQuery query, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
@@ -56,8 +60,8 @@ public sealed class ConsentFormService(
             query.TemplateId,
             query.PatientId,
             query.DepartmentId,
-            query.From is { } from ? new DateTimeOffset(from.ToDateTime(TimeOnly.MinValue), VietnamOffset) : null,
-            query.To is { } to ? new DateTimeOffset(to.AddDays(1).ToDateTime(TimeOnly.MinValue), VietnamOffset) : null,
+            StartOfDayUtc(query.From),
+            StartOfDayUtc(query.To?.AddDays(1)),
             string.IsNullOrWhiteSpace(query.Keyword) ? null : query.Keyword.Trim(),
             page,
             pageSize,

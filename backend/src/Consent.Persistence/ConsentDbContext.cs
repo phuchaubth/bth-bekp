@@ -3,6 +3,7 @@ using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
 using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
+using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
 using Consent.Persistence.Configurations;
@@ -32,6 +33,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
     public DbSet<ConsentTemplate> ConsentTemplates => Set<ConsentTemplate>();
 
     public DbSet<ConsentForm> ConsentForms => Set<ConsentForm>();
+
+    public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

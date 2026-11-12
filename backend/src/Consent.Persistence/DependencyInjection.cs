@@ -48,6 +48,8 @@ public static class DependencyInjection
         services.AddScoped<IConsentTemplateRepository, ConsentTemplateRepository>();
         services.AddScoped<IConsentFormRepository, ConsentFormRepository>();
         services.AddScoped<IConsentFormNumberGenerator, ConsentFormNumberGenerator>();
+        services.AddScoped<IExportJobRepository, ExportJobRepository>();
+        services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

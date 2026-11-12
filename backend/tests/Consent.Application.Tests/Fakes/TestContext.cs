@@ -2,10 +2,13 @@ using Consent.Application.Auth;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
+using Consent.Application.Exports;
 using Consent.Application.Patients;
+using Consent.Application.Reports;
 using Consent.Application.Roles;
 using Consent.Application.Users;
 using Consent.Domain.Departments;
+using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Microsoft.Extensions.Options;
 
@@ -178,6 +181,38 @@ internal sealed class AppTestContext
         new FakeRequestContext(),
         new PatientSignatureRequestValidator(),
         new RevokeConsentFormRequestValidator());
+
+    public ConsentFormExportService CreateConsentFormExportService() => new(
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryExportJobRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        [XlsxWriter, CsvWriter],
+        new ConsentFormExportRequestValidator());
+
+    public ReportService CreateReportService() => new(
+        new InMemoryConsentStatisticsRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        Clock,
+        CurrentUser);
+
+    public DashboardService CreateDashboardService() => new(
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryConsentStatisticsRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        Clock,
+        CurrentUser);
+
+    public RecordingTabularWriter XlsxWriter { get; } = new(ExportFormat.Xlsx);
+
+    public RecordingTabularWriter CsvWriter { get; } = new(ExportFormat.Csv);
 
     public SequentialFormNumbers FormNumbers { get; } = new();
 

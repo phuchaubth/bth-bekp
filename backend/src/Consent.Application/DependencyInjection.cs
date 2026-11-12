@@ -3,7 +3,9 @@ using Consent.Application.Auth;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
+using Consent.Application.Exports;
 using Consent.Application.Patients;
+using Consent.Application.Reports;
 using Consent.Application.Roles;
 using Consent.Application.Users;
 using FluentValidation;
@@ -27,6 +29,9 @@ public static class DependencyInjection
         services.AddScoped<ConsentTemplateService>();
         services.AddScoped<ConsentFormService>();
         services.AddScoped<ConsentSigningService>();
+        services.AddScoped<ConsentFormExportService>();
+        services.AddScoped<ReportService>();
+        services.AddScoped<DashboardService>();
 
         RegisterValidators(services);
         return services;

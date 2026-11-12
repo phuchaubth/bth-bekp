@@ -99,4 +99,5 @@ public static class AuditActions
     public const string ConsentFormPatientSigned = "ConsentForms.PatientSigned";
     public const string ConsentFormCompleted = "ConsentForms.Completed";
     public const string ConsentFormRevoked = "ConsentForms.Revoked";
+    public const string ConsentFormsExported = "Exports.ConsentForms";
 }

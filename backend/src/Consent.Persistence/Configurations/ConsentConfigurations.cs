@@ -76,6 +76,17 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.HasIndex(f => new { f.Status, f.DepartmentId, f.CreatedAtUtc });
         builder.HasIndex(f => f.PatientId);
         builder.HasIndex(f => f.TemplateId);
+        // Báo cáo, xuất dữ liệu (lọc theo ngày lập) và trang tổng quan: đếm/nhóm chỉ cần đọc chỉ mục, không đọc cả dòng
+        // (dòng phiếu có nội dung mã hóa khá lớn).
+        builder.HasIndex(f => f.CreatedAtUtc).IncludeProperties(f => new
+        {
+            f.DepartmentId, f.TemplateId, f.Status, f.Decision, f.SignerKind, f.CreatedByUserId, f.CompletedAtUtc,
+        });
+        builder.HasIndex(f => f.CompletedAtUtc).HasFilter("[CompletedAtUtc] IS NOT NULL")
+            .IncludeProperties(f => new { f.DepartmentId, f.CreatedByUserId });
+        builder.HasIndex(f => f.RevokedAtUtc).HasFilter("[RevokedAtUtc] IS NOT NULL")
+            .IncludeProperties(f => new { f.DepartmentId, f.CreatedByUserId });
+        builder.HasIndex(f => new { f.CreatedByUserId, f.Status });
         builder.HasRowVersion();
     }
 

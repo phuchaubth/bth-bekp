@@ -1,7 +1,11 @@
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using Consent.Application.Abstractions;
 using Consent.Application.Auditing;
+using Consent.Application.Exports;
+using Consent.Application.Reports;
+using Consent.Domain.Exports;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
@@ -109,6 +113,8 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<ConsentTemplate> ConsentTemplates { get; } = [];
 
     public List<ConsentForm> ConsentForms { get; } = [];
+
+    public List<ExportJob> ExportJobs { get; } = [];
 
     public int SaveCount { get; private set; }
 
@@ -280,15 +286,7 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
 
     public Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken)
     {
-        var rows = store.ConsentForms
-            .Where(f => query.ScopeAll || f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId)
-            .Where(f => query.Status is null || f.Status == query.Status)
-            .Where(f => query.PatientId is null || f.PatientId == query.PatientId)
-            .Where(f => query.TemplateId is null || f.TemplateId == query.TemplateId)
-            .Where(f => query.FromUtc is null || f.CreatedAtUtc >= query.FromUtc)
-            .Where(f => query.ToUtc is null || f.CreatedAtUtc < query.ToUtc)
-            .OrderByDescending(f => f.CreatedAtUtc)
-            .ToList();
+        var rows = Filter(query).OrderByDescending(f => f.CreatedAtUtc).ToList();
         var items = rows
             .Skip((query.Page - 1) * query.PageSize)
             .Take(query.PageSize)
@@ -312,7 +310,193 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
         Task.FromResult(store.ConsentForms.Where(f => f.ReplacesFormId == formId).Select(f => new ConsentFormRef(f.Id, f.FormNo))
             .FirstOrDefault());
 
+    public Task<int> CountAsync(ConsentFormSearch query, CancellationToken cancellationToken) => Task.FromResult(Filter(query).Count());
+
+    public async IAsyncEnumerable<ConsentFormExportRecord> StreamForExportAsync(
+        ConsentFormSearch query, bool includeData, [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var page = Filter(query).OrderBy(f => f.CreatedAtUtc).ThenBy(f => f.FormNo, StringComparer.Ordinal)
+            .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize).ToList();
+        foreach (var f in page)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            var template = store.ConsentTemplates.Single(t => t.Id == f.TemplateId);
+            var patient = store.Patients.Single(p => p.Id == f.PatientId);
+            var representative = patient.Representatives.FirstOrDefault(r => r.Id == f.RepresentativeId);
+            var hospital = f.Signatures.FirstOrDefault(s => s.Role == ConsentSignerRole.Hospital);
+            yield return new ConsentFormExportRecord
+            {
+                Id = f.Id,
+                FormNo = f.FormNo,
+                Status = f.Status,
+                TemplateCode = template.Code,
+                TemplateName = template.Name,
+                TemplateVersionId = f.TemplateVersionId,
+                TemplateVersionNo = template.Versions.Single(v => v.Id == f.TemplateVersionId).VersionNo,
+                DepartmentName = store.Departments.FirstOrDefault(d => d.Id == f.DepartmentId)?.Name ?? string.Empty,
+                CreatedByName = store.Users.FirstOrDefault(u => u.Id == f.CreatedByUserId)?.FullName ?? string.Empty,
+                CreatedAtUtc = f.CreatedAtUtc,
+                SubmittedAtUtc = f.SubmittedAtUtc,
+                CompletedAtUtc = f.CompletedAtUtc,
+                CancelledAtUtc = f.CancelledAtUtc,
+                CancelReason = f.CancelReason,
+                RevokedAtUtc = f.RevokedAtUtc,
+                RevokeReason = f.RevokeReason,
+                Decision = f.Decision,
+                SignerKind = f.SignerKind,
+                PatientId = patient.Id,
+                PatientName = patient.FullName,
+                PatientCode = patient.PatientCode,
+                PatientDateOfBirth = patient.DateOfBirth,
+                PatientGender = patient.Gender,
+                PatientCitizenId = patient.CitizenId,
+                PatientPhoneNumber = patient.PhoneNumber,
+                PatientAddress = patient.CurrentAddress ?? patient.PermanentAddress,
+                RepresentativeId = representative?.Id,
+                RepresentativeName = representative?.FullName,
+                RepresentativeRelationship = representative?.Relationship,
+                RepresentativeCitizenId = representative?.CitizenId,
+                RepresentativePhoneNumber = representative?.PhoneNumber,
+                SnapshotJson = f.SnapshotJson,
+                PatientSignedAtUtc = f.Signatures.FirstOrDefault(s => s.Role != ConsentSignerRole.Hospital)?.SignedAtUtc,
+                HospitalSignerName = hospital?.SignerName,
+                HospitalSignerTitle = hospital?.SignerTitle,
+                ReplacesFormNo = store.ConsentForms.FirstOrDefault(o => o.Id == f.ReplacesFormId)?.FormNo,
+                SignedPdfSha256 = f.SignedPdfSha256,
+                DataJson = includeData ? f.DataJson : null,
+            };
+        }
+    }
+
     public void Add(ConsentForm form) => store.ConsentForms.Add(form);
+
+    private IEnumerable<ConsentForm> Filter(ConsentFormSearch query) => Filter(store, query);
+
+    internal static IEnumerable<ConsentForm> Filter(InMemoryStore store, ConsentFormSearch query) => store.ConsentForms
+        .Where(f => query.ScopeAll || f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId)
+        .Where(f => query.Status is null || f.Status == query.Status)
+        .Where(f => query.PatientId is null || f.PatientId == query.PatientId)
+        .Where(f => query.TemplateId is null || f.TemplateId == query.TemplateId)
+        .Where(f => query.DepartmentId is null || f.DepartmentId == query.DepartmentId)
+        .Where(f => query.FromUtc is null || f.CreatedAtUtc >= query.FromUtc)
+        .Where(f => query.ToUtc is null || f.CreatedAtUtc < query.ToUtc);
+}
+
+/// <summary>Thống kê tính trên dữ liệu trong bộ nhớ, cùng quy ước với bản SQL (chỉ số ngày = số giờ kể từ mốc / 24).</summary>
+internal sealed class InMemoryConsentStatisticsRepository(InMemoryStore store) : IConsentStatisticsRepository
+{
+    public Task<IReadOnlyList<ConsentFormGroupCount>> CountByGroupAsync(ConsentFormSearch query, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ConsentFormGroupCount>>([.. InMemoryConsentFormRepository.Filter(store, query)
+            .GroupBy(f => (f.DepartmentId, f.TemplateId, f.Status, f.Decision, f.SignerKind))
+            .Select(g => new ConsentFormGroupCount(g.Key.DepartmentId, g.Key.TemplateId, g.Key.Status, g.Key.Decision, g.Key.SignerKind, g.Count()))]);
+
+    public Task<IReadOnlyList<DailyStatusCount>> CountByCreatedDayAsync(
+        ConsentFormSearch query, DateTimeOffset originUtc, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DailyStatusCount>>([.. InMemoryConsentFormRepository.Filter(store, query)
+            .Where(f => f.CreatedAtUtc >= originUtc)
+            .GroupBy(f => (Day: Day(originUtc, f.CreatedAtUtc), f.Status))
+            .Select(g => new DailyStatusCount(g.Key.Day, g.Key.Status, g.Count()))]);
+
+    public Task<IReadOnlyList<DailyCount>> CountCompletedByDayAsync(
+        ConsentFormSearch scope, DateTimeOffset originUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DailyCount>>([.. InMemoryConsentFormRepository.Filter(store, scope)
+            .Where(f => f.CompletedAtUtc >= originUtc && f.CompletedAtUtc < toUtc)
+            .GroupBy(f => Day(originUtc, f.CompletedAtUtc!.Value))
+            .Select(g => new DailyCount(g.Key, g.Count()))]);
+
+    public Task<IReadOnlyList<int>> CompletionSecondsAsync(ConsentFormSearch query, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<int>>([.. InMemoryConsentFormRepository.Filter(store, query)
+            .Where(f => f.Status == ConsentFormStatus.Completed && f.CompletedAtUtc is not null)
+            .Select(f => (int)(f.CompletedAtUtc!.Value - f.CreatedAtUtc).TotalSeconds)]);
+
+    public Task<int> CountClosedAsync(
+        ConsentFormSearch scope, bool revoked, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken) =>
+        Task.FromResult(InMemoryConsentFormRepository.Filter(store, scope)
+            .Count(f => revoked ? f.RevokedAtUtc >= fromUtc && f.RevokedAtUtc < toUtc : f.CompletedAtUtc >= fromUtc && f.CompletedAtUtc < toUtc));
+
+    public Task<DashboardFormList> AwaitingConfirmationAsync(
+        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateIds, int take, CancellationToken cancellationToken)
+    {
+        var forms = InMemoryConsentFormRepository.Filter(store, scope)
+            .Where(f => f.Status == ConsentFormStatus.PendingSignature && templateIds.Contains(f.TemplateId) && f.PatientSignature is not null)
+            .OrderBy(f => f.PatientSignature!.SignedAtUtc)
+            .ToList();
+        return Task.FromResult(new DashboardFormList(forms.Count, [.. forms.Take(take).Select(f => Item(f, f.PatientSignature!.SignedAtUtc))]));
+    }
+
+    public Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken)
+    {
+        var forms = store.ConsentForms
+            .Where(f => f.CreatedByUserId == userId && f.Status is ConsentFormStatus.Draft or ConsentFormStatus.PendingSignature)
+            .OrderByDescending(f => f.UpdatedAtUtc)
+            .ToList();
+        return Task.FromResult(new DashboardFormList(forms.Count, [.. forms.Take(take).Select(f => Item(f, f.UpdatedAtUtc))]));
+    }
+
+    private static int Day(DateTimeOffset origin, DateTimeOffset at) => (int)Math.Floor((at - origin).TotalHours) / 24;
+
+    private DashboardFormItem Item(ConsentForm f, DateTimeOffset at)
+    {
+        var template = store.ConsentTemplates.Single(t => t.Id == f.TemplateId);
+        return new DashboardFormItem(
+            f.Id, f.FormNo, f.Status, store.Patients.Single(p => p.Id == f.PatientId).FullName, template.Code, template.Name,
+            store.Departments.FirstOrDefault(d => d.Id == f.DepartmentId)?.Name ?? string.Empty, at);
+    }
+}
+
+internal sealed class InMemoryExportJobRepository(InMemoryStore store) : IExportJobRepository
+{
+    public void Add(ExportJob job) => store.ExportJobs.Add(job);
+
+    public Task<PagedResult<ExportJobRecord>> SearchAsync(ExportJobSearch query, CancellationToken cancellationToken)
+    {
+        var jobs = store.ExportJobs
+            .Where(j => query.RequestedByUserId is null || j.RequestedByUserId == query.RequestedByUserId)
+            .OrderByDescending(j => j.RequestedAtUtc)
+            .ToList();
+        var items = jobs.Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+            .Select(j => new ExportJobRecord(
+                j.Id, j.RequestedAtUtc, j.RequestedByUserId, store.Users.FirstOrDefault(u => u.Id == j.RequestedByUserId)?.FullName ?? string.Empty,
+                j.Format, j.FiltersJson, j.Columns, j.IncludesContent, j.IncludesSensitiveData, j.RowCount, j.FileName, j.FileSizeBytes,
+                j.FileSha256, j.DurationMs))
+            .ToList();
+        return Task.FromResult(new PagedResult<ExportJobRecord>(items, query.Page, query.PageSize, jobs.Count));
+    }
+}
+
+/// <summary>Bộ ghi bảng giả: giữ lại tiêu đề và giá trị từng ô để kiểm tra; ghi một ít byte để có mã băm.</summary>
+internal sealed class RecordingTabularWriter(ExportFormat format) : ITabularFileWriter
+{
+    public ExportFormat Format => format;
+
+    public string ContentType => "application/x-test";
+
+    public string FileExtension => format == ExportFormat.Xlsx ? "xlsx" : "csv";
+
+    public IReadOnlyList<TabularColumn> Columns { get; private set; } = [];
+
+    public List<IReadOnlyList<object?>> Rows { get; } = [];
+
+    public IReadOnlyList<KeyValuePair<string, string>> Properties { get; private set; } = [];
+
+    public IReadOnlyList<string> Headers => [.. Columns.Select(c => c.Header)];
+
+    public object? Cell(int row, string header) => Rows[row][Headers.ToList().IndexOf(header)];
+
+    public async Task<int> WriteAsync(TabularData data, Stream output, CancellationToken cancellationToken)
+    {
+        Columns = data.Columns;
+        Properties = data.Properties;
+        Rows.Clear();
+        await foreach (var row in data.Rows.WithCancellation(cancellationToken))
+        {
+            Rows.Add(row);
+        }
+
+        await output.WriteAsync(Encoding.UTF8.GetBytes($"{format}:{Rows.Count}"), cancellationToken);
+        return Rows.Count;
+    }
 }
 
 internal sealed class SequentialFormNumbers : IConsentFormNumberGenerator

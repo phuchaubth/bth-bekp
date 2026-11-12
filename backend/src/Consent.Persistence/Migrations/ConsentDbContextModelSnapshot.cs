@@ -187,7 +187,14 @@ namespace Consent.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CreatedByUserId");
+                    b.HasIndex("CompletedAtUtc")
+                        .HasFilter("[CompletedAtUtc] IS NOT NULL");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("CompletedAtUtc"), new[] { "DepartmentId", "CreatedByUserId" });
+
+                    b.HasIndex("CreatedAtUtc");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("CreatedAtUtc"), new[] { "DepartmentId", "TemplateId", "Status", "Decision", "SignerKind", "CreatedByUserId", "CompletedAtUtc" });
 
                     b.HasIndex("DepartmentId");
 
@@ -200,9 +207,16 @@ namespace Consent.Persistence.Migrations
                         .IsUnique()
                         .HasFilter("[ReplacesFormId] IS NOT NULL");
 
+                    b.HasIndex("RevokedAtUtc")
+                        .HasFilter("[RevokedAtUtc] IS NOT NULL");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("RevokedAtUtc"), new[] { "DepartmentId", "CreatedByUserId" });
+
                     b.HasIndex("TemplateId");
 
                     b.HasIndex("TemplateVersionId");
+
+                    b.HasIndex("CreatedByUserId", "Status");
 
                     b.HasIndex("Status", "DepartmentId", "CreatedAtUtc");
 
@@ -377,6 +391,75 @@ namespace Consent.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Departments", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.Exports.ExportJob", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Columns")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(2000)");
+
+                    b.Property<int>("DurationMs")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("FileSha256")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<long>("FileSizeBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("FiltersJson")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<bool>("IncludesContent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IncludesSensitiveData")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
+                    b.Property<DateTimeOffset>("RequestedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("RequestedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("RowCount")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequestedAtUtc");
+
+                    b.HasIndex("RequestedByUserId", "RequestedAtUtc");
+
+                    b.ToTable("ExportJobs", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.Identity.RefreshToken", b =>
@@ -796,6 +879,15 @@ namespace Consent.Persistence.Migrations
                         .WithMany("Versions")
                         .HasForeignKey("TemplateId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.Exports.ExportJob", b =>
+                {
+                    b.HasOne("Consent.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 

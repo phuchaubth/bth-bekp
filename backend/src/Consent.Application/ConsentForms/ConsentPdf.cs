@@ -51,10 +51,24 @@ public interface IConsentPdfRenderer
     byte[] Render(ConsentPdfDocument document);
 }
 
-/// <summary>Nhãn tiếng Việt dùng khi in phiếu.</summary>
+/// <summary>Nhãn tiếng Việt dùng khi in phiếu, xuất dữ liệu và báo cáo (khớp với nhãn trên giao diện).</summary>
 public static class VietnameseLabels
 {
     public static string Gender(Gender gender) => gender == Domain.Patients.Gender.Male ? "Nam" : "Nữ";
+
+    public static string Status(ConsentFormStatus status) => status switch
+    {
+        ConsentFormStatus.Draft => "Nháp",
+        ConsentFormStatus.PendingSignature => "Chờ ký",
+        ConsentFormStatus.Completed => "Hoàn tất",
+        ConsentFormStatus.Cancelled => "Đã hủy",
+        ConsentFormStatus.Revoked => "Đã thu hồi",
+        _ => status.ToString(),
+    };
+
+    public static string Decision(ConsentDecision decision) => decision == ConsentDecision.Agreed ? "Đồng ý" : "Từ chối";
+
+    public static string SignerKind(ConsentSignerKind kind) => kind == ConsentSignerKind.Patient ? "Người bệnh" : "Người đại diện";
 
     public static string Relationship(RepresentativeRelationship relationship) => relationship switch
     {

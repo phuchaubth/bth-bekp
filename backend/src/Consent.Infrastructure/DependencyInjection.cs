@@ -1,5 +1,6 @@
 using Consent.Application.Abstractions;
 using Consent.Application.ConsentForms;
+using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.His;
 using Consent.Infrastructure.Pdf;
 using Consent.Infrastructure.Security;
@@ -28,6 +29,8 @@ public static class DependencyInjection
         services.AddSingleton<IBlindIndexer, HmacBlindIndexer>();
         services.AddSingleton<IConsentPdfRenderer, MigraDocConsentPdfRenderer>();
         services.AddSingleton<IDocumentStore, EncryptedFileDocumentStore>();
+        services.AddSingleton<ITabularFileWriter, XlsxTabularFileWriter>();
+        services.AddSingleton<ITabularFileWriter, CsvTabularFileWriter>();
         services.AddOptions<DocumentStorageOptions>()
             .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
             .Validate(o => !string.IsNullOrWhiteSpace(o.DocumentsPath),
