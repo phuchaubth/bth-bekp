@@ -28,9 +28,9 @@ export const navItems: NavItem[] = [
   { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, permission: Permissions.ConsentsRead },
   { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, permission: Permissions.PatientsRead },
   { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, permission: Permissions.TemplatesRead },
-  { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, sprint: 5, permission: Permissions.ExportsRun },
-  { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, sprint: 5, permission: Permissions.ReportsRead },
-  { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, sprint: 5, permission: Permissions.AuditRead },
+  { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, permission: Permissions.ExportsRun },
+  { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, permission: Permissions.ReportsRead },
+  { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, permission: Permissions.AuditRead },
   {
     path: '/quan-tri',
     label: 'Quản trị',
@@ -39,7 +39,7 @@ export const navItems: NavItem[] = [
       { path: '/quan-tri/nguoi-dung', label: 'Người dùng', permission: Permissions.UsersRead },
       { path: '/quan-tri/vai-tro', label: 'Vai trò và quyền', permission: Permissions.RolesManage },
       { path: '/quan-tri/khoa-phong', label: 'Khoa/phòng', permission: Permissions.DepartmentsManage },
-      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', sprint: 4, permission: Permissions.SettingsManage },
+      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', sprint: 6, permission: Permissions.SettingsManage },
     ],
   },
 ]

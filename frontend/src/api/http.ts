@@ -99,6 +99,47 @@ export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob>
   return response.blob()
 }
 
+export interface DownloadedFile {
+  blob: Blob
+  fileName: string
+  headers: Headers
+}
+
+/** Tải file do máy chủ tạo (POST, ví dụ xuất Excel/CSV); lấy tên file từ Content-Disposition. */
+export async function apiDownload(path: string, body: unknown, signal?: AbortSignal): Promise<DownloadedFile> {
+  const options: RequestOptions = { method: 'POST', body, signal }
+  let response = await send(path, options, true)
+  if (response.status === 401 && refreshHandler) {
+    const newToken = await refreshHandler()
+    if (newToken) {
+      response = await send(path, options, true)
+    }
+  }
+
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+
+  return { blob: await response.blob(), fileName: fileNameFrom(response.headers.get('Content-Disposition')), headers: response.headers }
+}
+
+/** Tên file trong Content-Disposition (ưu tiên dạng filename*=UTF-8''…). */
+export function fileNameFrom(contentDisposition: string | null, fallback = 'tai-xuong'): string {
+  if (!contentDisposition) {
+    return fallback
+  }
+  const utf8 = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition)
+  if (utf8) {
+    try {
+      return decodeURIComponent(utf8[1])
+    } catch {
+      return fallback
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(contentDisposition)
+  return plain ? plain[1] : fallback
+}
+
 /** GET không cần đăng nhập (ví dụ health check). */
 export function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return apiRequest<T>(path, { signal, auth: false })

@@ -195,9 +195,10 @@ describe('Đăng nhập và phiên làm việc', () => {
     const user = userEvent.setup()
     const { router } = renderApp('/')
 
-    await user.click(within(await screen.findByRole('navigation')).getByText('Xuất dữ liệu'))
+    await user.click(within(await screen.findByRole('navigation')).getByText('Quản trị'))
+    await user.click(await within(screen.getByRole('navigation')).findByText('Cấu hình hệ thống'))
 
-    expect(router.state.location.pathname).toBe('/xuat-du-lieu')
-    expect(screen.getByText('Dự kiến hoàn thành trong Sprint 5.')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/quan-tri/cau-hinh')
+    expect(screen.getByText('Dự kiến hoàn thành trong Sprint 6.')).toBeInTheDocument()
   })
 })
