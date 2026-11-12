@@ -123,7 +123,10 @@ function Kiosk({ session }: { session: SigningSession }) {
         ) : (
           <>
             <Card title="Nội dung phiếu (chỉ đọc)">
-              <DynamicForm definition={form.definition} form={previewForm} initialValues={form.data} disabled />
+              {/* Nội dung khóa nhưng phải dễ đọc: chữ của ô bị khóa đậm hơn mặc định. */}
+              <ConfigProvider theme={{ token: { colorTextDisabled: 'rgba(0, 0, 0, 0.82)' } }}>
+                <DynamicForm definition={form.definition} form={previewForm} initialValues={form.data} disabled />
+              </ConfigProvider>
             </Card>
 
             <Card title={`Ý kiến và chữ ký của ${signerLabel}`}>

@@ -20,6 +20,7 @@ import { SIGNING_PATH, signingSession } from '../signing/signingSession'
  */
 export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; onClose: () => void }) {
   const { user, logout } = useAuth()
+  const { message } = App.useApp()
   const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -34,6 +35,8 @@ export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; 
       signingSession.set({ token: session.token, expiresAtUtc: session.expiresAtUtc, form, staffUserName: user?.userName ?? '' })
       // Đóng phiên nhân viên trước; trong lúc có phiên ký, mọi trang cần đăng nhập đều chuyển về màn hình ký.
       await logout()
+      // Thông báo dành cho nhân viên không hiện tiếp trên màn hình của người bệnh.
+      message.destroy()
       navigate(SIGNING_PATH, { replace: true })
     } catch (e) {
       setError(errorMessage(e))
