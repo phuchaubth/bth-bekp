@@ -1,6 +1,7 @@
 import { Flex, Spin } from 'antd'
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
+import { SIGNING_PATH, signingSession } from '../features/signing/signingSession'
 import { ForbiddenPage } from '../pages/ForbiddenPage'
 import { useAuth } from './authContext'
 import { FORCED_PASSWORD_CHANGE_PATH, LOGIN_PATH } from './paths'
@@ -24,6 +25,10 @@ export function RequireAuth({ children, allowPasswordChange = false }: { childre
   }
 
   if (status === 'anonymous' || !user) {
+    // Máy đang ở chế độ ký (phiên nhân viên đã đóng): mọi trang khác đều quay về màn hình ký.
+    if (signingSession.get()) {
+      return <Navigate to={SIGNING_PATH} replace />
+    }
     // Phiên hết hạn: quay lại đúng trang sau khi đăng nhập. Chủ động đăng xuất: về trang đăng nhập "sạch".
     const target = signedOutByUser
       ? LOGIN_PATH

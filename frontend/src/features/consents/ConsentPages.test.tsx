@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ConsentFormDetail, ConsentFormListItem } from '../../api/consentForms'
+import type { ConsentFormActions, ConsentFormDetail, ConsentFormListItem } from '../../api/consentForms'
 import type { TemplateDefinition } from '../../api/consentTemplates'
 import type { PatientDetail } from '../../api/patients'
 import { Permissions } from '../../auth/permissions'
@@ -115,6 +115,18 @@ const patient: PatientDetail = {
   updatedAtUtc: '2026-11-11T02:00:00Z',
 }
 
+const actions = (overrides: Partial<ConsentFormActions> = {}): ConsentFormActions => ({
+  canEdit: false,
+  canSubmit: false,
+  canReturnToDraft: false,
+  canCancel: false,
+  canStartSigning: false,
+  canConfirm: false,
+  canRevoke: false,
+  canReplace: false,
+  ...overrides,
+})
+
 const detail = (overrides: Partial<ConsentFormDetail> = {}): ConsentFormDetail => ({
   id: 'f-1',
   formNo: 'PDT-2026-000001',
@@ -153,7 +165,12 @@ const detail = (overrides: Partial<ConsentFormDetail> = {}): ConsentFormDetail =
   cancelReason: null,
   revokedAtUtc: null,
   revokeReason: null,
-  actions: { canEdit: true, canSubmit: true, canReturnToDraft: false, canCancel: true },
+  decision: null,
+  signatures: [],
+  signedPdfSha256: null,
+  replacesForm: null,
+  replacedBy: null,
+  actions: actions({ canEdit: true, canSubmit: true, canCancel: true }),
   ...overrides,
 })
 
@@ -353,7 +370,7 @@ describe('Phiếu chờ ký', () => {
       status: 'PendingSignature',
       data: { examType: 'service', acknowledged: true },
       submittedAtUtc: '2026-11-11T03:00:00Z',
-      actions: { canEdit: false, canSubmit: false, canReturnToDraft: true, canCancel: true },
+      actions: actions({ canReturnToDraft: true, canCancel: true, canStartSigning: true }),
     })
 
   it('chỉ xem; xem PDF; hủy phải có lý do', async () => {
@@ -366,7 +383,7 @@ describe('Phiếu chờ ký', () => {
           status: 'Cancelled',
           cancelReason: (call.body as { reason: string }).reason,
           cancelledAtUtc: '2026-11-11T04:00:00Z',
-          actions: { canEdit: false, canSubmit: false, canReturnToDraft: false, canCancel: false },
+          actions: actions(),
         })),
       'GET /api/v1/consent-forms/f-1/pdf': () => new Response('%PDF-1.7', { headers: { 'Content-Type': 'application/pdf' } }),
     })
@@ -394,7 +411,9 @@ describe('Phiếu chờ ký', () => {
 
     await waitFor(() => expect(calls.find((c) => c.path === '/api/v1/consent-forms/f-1/cancel')?.body).toEqual({ reason: 'Lập nhầm người bệnh' }))
     expect(await screen.findByText('Đã hủy')).toBeInTheDocument()
-    expect(screen.getByText(/Lập nhầm người bệnh/)).toBeInTheDocument()
+    // Lý do hủy ở phần thông tin phiếu và trong lịch sử phiếu.
+    expect(screen.getAllByText(/Lập nhầm người bệnh/)).toHaveLength(2)
+    expect(screen.getByText('Hủy phiếu: Lập nhầm người bệnh')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Hủy phiếu/ })).not.toBeInTheDocument()
   })
 
@@ -410,11 +429,139 @@ describe('Phiếu chờ ký', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /Trả về nháp/ }))
+    await user.click(await screen.findByRole('button', { name: 'Trả về nháp' }))
 
     expect(await screen.findByRole('button', { name: /Lưu nháp/ })).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/return-to-draft')).toBe(true)
     expect(screen.getByRole('radio', { name: 'Khám dịch vụ' })).toBeEnabled()
     expect(screen.getByRole('radio', { name: 'Khám dịch vụ' })).toBeChecked()
     expect(screen.queryByText('Phiếu đang chờ ký')).not.toBeInTheDocument()
+  })
+})
+
+describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
+  const patientSignature = {
+    role: 'Patient' as const,
+    method: 'Handwritten' as const,
+    signerName: 'Phạm Thị Dung',
+    signerTitle: null,
+    signedAtUtc: '2026-11-11T03:05:00Z',
+  }
+  const hospitalSignature = {
+    role: 'Hospital' as const,
+    method: 'AccountConfirmation' as const,
+    signerName: 'Tiếp đón Demo',
+    signerTitle: 'Nhân viên tiếp đón',
+    signedAtUtc: '2026-11-11T03:06:00Z',
+  }
+  const signedByPatient = (canConfirm: boolean) =>
+    detail({
+      status: 'PendingSignature',
+      data: { examType: 'service', acknowledged: true },
+      submittedAtUtc: '2026-11-11T03:00:00Z',
+      decision: 'Agreed',
+      signatures: [patientSignature],
+      actions: actions({ canReturnToDraft: true, canCancel: true, canConfirm }),
+    })
+  const completed = (overrides: Partial<ConsentFormDetail> = {}) =>
+    detail({
+      status: 'Completed',
+      data: { examType: 'service', acknowledged: true },
+      submittedAtUtc: '2026-11-11T03:00:00Z',
+      completedAtUtc: '2026-11-11T03:06:00Z',
+      decision: 'Agreed',
+      signatures: [patientSignature, hospitalSignature],
+      signedPdfSha256: 'ab'.repeat(32),
+      actions: actions({ canRevoke: true }),
+      ...overrides,
+    })
+
+  it('người bệnh đã ký: người đúng vai trò xác nhận bằng tài khoản thì phiếu hoàn tất', async () => {
+    let current = signedByPatient(true)
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/consent-forms/f-1': () => current,
+      'POST /api/v1/consent-forms/f-1/complete': () => (current = completed({ actions: actions() })),
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText(/Phạm Thị Dung đã ký lúc .* \(Đồng ý\)/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ký trên máy tính bảng/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Xác nhận và hoàn tất/ }))
+    await user.click(await screen.findByRole('button', { name: 'Xác nhận' }))
+
+    expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')).toBe(true)
+    expect(screen.getByText('Tiếp đón Demo (Nhân viên tiếp đón) xác nhận bằng tài khoản')).toBeInTheDocument()
+    expect(screen.getByText(/Phạm Thị Dung \(người bệnh\) ký tay trên máy tính bảng – Đồng ý/)).toBeInTheDocument()
+    expect(screen.getByText('ab'.repeat(32))).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Trả về nháp/ })).not.toBeInTheDocument()
+  })
+
+  it('người bệnh đã ký nhưng người xem không đúng vai trò xác nhận: chỉ báo chờ', async () => {
+    mockApi({ ...baseRoutes(nurse()), 'GET /api/v1/consent-forms/f-1': signedByPatient(false) })
+    renderApp('/phieu-dong-thuan/f-1')
+
+    expect(await screen.findByText('Chờ nhân viên có vai trò Tiếp đón xác nhận bằng tài khoản.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Xác nhận và hoàn tất/ })).not.toBeInTheDocument()
+  })
+
+  it('thu hồi phiếu đã hoàn tất phải có lý do', async () => {
+    let current = completed()
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/consent-forms/f-1': () => current,
+      'POST /api/v1/consent-forms/f-1/revoke': (call) =>
+        (current = completed({
+          status: 'Revoked',
+          revokedAtUtc: '2026-11-11T05:00:00Z',
+          revokeReason: (call.body as { reason: string }).reason,
+          actions: actions({ canReplace: true }),
+        })),
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Thu hồi/ }))
+    const dialog = await findDialogWith('Phiếu đã ký sẽ hết hiệu lực nhưng vẫn được lưu nguyên. Muốn thay đổi nội dung, sau khi thu hồi hãy lập phiếu thay thế.')
+    const confirm = within(dialog).getByRole('button', { name: 'Thu hồi' })
+    expect(confirm).toBeDisabled()
+    await user.type(within(dialog).getByLabelText('Lý do thu hồi'), 'Ghi sai hình thức khám')
+    await user.click(confirm)
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === '/api/v1/consent-forms/f-1/revoke')?.body).toEqual({ reason: 'Ghi sai hình thức khám' }),
+    )
+    expect(await screen.findByText('Thu hồi: Ghi sai hình thức khám')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Lập phiếu thay thế/ })).toBeInTheDocument()
+  })
+
+  it('lập phiếu thay thế cho phiếu đã thu hồi: cùng người bệnh, cùng mẫu, tham chiếu phiếu cũ', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/consent-forms/f-1': completed({
+        status: 'Revoked',
+        revokedAtUtc: '2026-11-11T05:00:00Z',
+        revokeReason: 'Ghi sai hình thức khám',
+        actions: actions({ canReplace: true }),
+      }),
+      'POST /api/v1/consent-forms': () =>
+        json(detail({ id: 'f-2', formNo: 'PDT-2026-000002', replacesForm: { id: 'f-1', formNo: 'PDT-2026-000001' } }), 201),
+      'GET /api/v1/consent-forms/f-2': detail({ id: 'f-2', formNo: 'PDT-2026-000002', replacesForm: { id: 'f-1', formNo: 'PDT-2026-000001' } }),
+      'GET /api/v1/patients/p-1': patient,
+    })
+    const { router } = renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Lập phiếu thay thế/ }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-2'))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toEqual({
+      patientId: 'p-1',
+      templateId: 't-ck',
+      replacesFormId: 'f-1',
+    })
+    expect(await screen.findByRole('link', { name: 'PDT-2026-000001' })).toHaveAttribute('href', '/phieu-dong-thuan/f-1')
   })
 })

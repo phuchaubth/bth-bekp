@@ -1,9 +1,26 @@
-import { FilePdfOutlined, RollbackOutlined, SaveOutlined, SendOutlined, StopOutlined } from '@ant-design/icons'
+import {
+  CheckCircleOutlined,
+  CopyOutlined,
+  EditOutlined,
+  FilePdfOutlined,
+  RollbackOutlined,
+  SaveOutlined,
+  SendOutlined,
+  StopOutlined,
+} from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Descriptions, Flex, Form, Input, Modal, Radio, Select, Space, Spin, Typography } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Flex, Form, Input, Modal, Popconfirm, Radio, Select, Space, Spin, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router'
-import { consentFormKeys, consentFormsApi, useConsentForm, type ConsentFormDetail, type FormData, type SignerKind } from '../../api/consentForms'
+import { Link, useNavigate, useParams } from 'react-router'
+import {
+  consentFormKeys,
+  consentFormsApi,
+  decisionLabels,
+  useConsentForm,
+  type ConsentFormDetail,
+  type FormData,
+  type SignerKind,
+} from '../../api/consentForms'
 import { ApiError } from '../../api/http'
 import { usePatient } from '../../api/patients'
 import { useAuth } from '../../auth/authContext'
@@ -13,17 +30,25 @@ import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { maskCitizenId } from '../patients/cccd'
 import { relationshipLabels } from '../patients/labels'
+import { signerRoleLabel } from '../templates/signerRoles'
 import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
+import { FormHistory, RevokeFormModal, StartSigningModal } from './SigningActions'
 
-/** Màn hình 8 (và bước soạn nội dung của màn hình 5): chi tiết phiếu, soạn phiếu nháp, trình ký, xem PDF. */
+/**
+ * Màn hình 8 (và bước soạn nội dung của màn hình 5): chi tiết phiếu, soạn phiếu nháp, trình ký, chuyển sang chế độ ký
+ * trên máy tính bảng, xác nhận phía bệnh viện, xem PDF, thu hồi và lập phiếu thay thế.
+ */
 export function ConsentFormDetailPage() {
   const { id = '' } = useParams()
   const { hasPermission } = useAuth()
   const { data: form, isPending, isError, error } = useConsentForm(id)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [signingOpen, setSigningOpen] = useState(false)
+  const [revokeOpen, setRevokeOpen] = useState(false)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { message } = App.useApp()
   const canManage = hasPermission(Permissions.ConsentsCreate)
 
@@ -33,6 +58,27 @@ export function ConsentFormDetailPage() {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       message.success('Đã trả phiếu về nháp.')
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  })
+
+  const complete = useMutation({
+    mutationFn: () => consentFormsApi.complete(id),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(consentFormKeys.detail(id), updated)
+      void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      message.success('Đã xác nhận và hoàn tất phiếu. PDF đã ký được lưu.')
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  })
+
+  const replace = useMutation({
+    mutationFn: (source: ConsentFormDetail) =>
+      consentFormsApi.create({ patientId: source.patient.id, templateId: source.templateId, replacesFormId: source.id }),
+    onSuccess: (created) => {
+      void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      message.success(`Đã lập phiếu thay thế ${created.formNo}; nội dung được chép từ phiếu cũ.`)
+      navigate(`/phieu-dong-thuan/${created.id}`)
     },
     onError: (e) => message.error(errorMessage(e)),
   })
@@ -51,17 +97,57 @@ export function ConsentFormDetailPage() {
         title={form.templateName}
         extra={
           <Space wrap>
+            {form.actions.canStartSigning && (
+              <Button type="primary" icon={<EditOutlined />} onClick={() => setSigningOpen(true)}>
+                Ký trên máy tính bảng
+              </Button>
+            )}
+            {form.actions.canConfirm && (
+              <Popconfirm
+                title="Xác nhận và hoàn tất phiếu?"
+                description="Bạn xác nhận bằng tài khoản đang đăng nhập. Phiếu sẽ bị khóa, PDF đã ký được lưu kèm mã băm."
+                okText="Xác nhận"
+                cancelText="Đóng"
+                onConfirm={() => complete.mutate()}
+              >
+                <Button type="primary" icon={<CheckCircleOutlined />} loading={complete.isPending}>
+                  Xác nhận và hoàn tất
+                </Button>
+              </Popconfirm>
+            )}
             <Button icon={<FilePdfOutlined />} onClick={() => setPdfOpen(true)}>
-              Xem PDF
+              {form.signedPdfSha256 ? 'Xem PDF đã ký' : 'Xem PDF'}
             </Button>
             {canManage && form.actions.canReturnToDraft && (
-              <Button icon={<RollbackOutlined />} loading={returnToDraft.isPending} onClick={() => returnToDraft.mutate()}>
-                Trả về nháp
-              </Button>
+              <Popconfirm
+                title="Trả phiếu về nháp?"
+                description={
+                  form.signatures.length > 0
+                    ? 'Chữ ký của người bệnh sẽ bị bỏ; sau khi sửa phải ký lại.'
+                    : 'Nội dung được mở khóa để sửa; sau đó trình ký lại.'
+                }
+                okText="Trả về nháp"
+                cancelText="Đóng"
+                onConfirm={() => returnToDraft.mutate()}
+              >
+                <Button icon={<RollbackOutlined />} loading={returnToDraft.isPending}>
+                  Trả về nháp
+                </Button>
+              </Popconfirm>
             )}
             {canManage && form.actions.canCancel && (
               <Button danger icon={<StopOutlined />} onClick={() => setCancelOpen(true)}>
                 Hủy phiếu
+              </Button>
+            )}
+            {form.actions.canRevoke && (
+              <Button danger icon={<StopOutlined />} onClick={() => setRevokeOpen(true)}>
+                Thu hồi
+              </Button>
+            )}
+            {form.actions.canReplace && (
+              <Button icon={<CopyOutlined />} loading={replace.isPending} onClick={() => replace.mutate(form)}>
+                Lập phiếu thay thế
               </Button>
             )}
           </Space>
@@ -70,9 +156,12 @@ export function ConsentFormDetailPage() {
       <Flex vertical gap={16}>
         <FormSummary form={form} />
         {canManage && form.actions.canEdit ? <DraftEditor form={form} /> : <ReadOnlyContent form={form} />}
+        <FormHistory form={form} />
       </Flex>
       <PdfPreviewModal form={form} open={pdfOpen} onClose={() => setPdfOpen(false)} />
       {cancelOpen && <CancelFormModal form={form} onClose={() => setCancelOpen(false)} />}
+      {signingOpen && <StartSigningModal form={form} onClose={() => setSigningOpen(false)} />}
+      {revokeOpen && <RevokeFormModal form={form} onClose={() => setRevokeOpen(false)} />}
     </>
   )
 }
@@ -105,23 +194,76 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
         <Descriptions.Item label="Người lập">{form.createdByName}</Descriptions.Item>
         <Descriptions.Item label="Lập lúc">{formatDateTime(form.createdAtUtc)}</Descriptions.Item>
         {form.submittedAtUtc && <Descriptions.Item label="Trình ký lúc">{formatDateTime(form.submittedAtUtc)}</Descriptions.Item>}
+        {form.decision && <Descriptions.Item label="Ý kiến người bệnh">{decisionLabels[form.decision]}</Descriptions.Item>}
+        {form.replacesForm && (
+          <Descriptions.Item label="Thay thế cho phiếu">
+            <Link to={`/phieu-dong-thuan/${form.replacesForm.id}`}>{form.replacesForm.formNo}</Link>
+          </Descriptions.Item>
+        )}
+        {form.replacedBy && (
+          <Descriptions.Item label="Phiếu thay thế">
+            <Link to={`/phieu-dong-thuan/${form.replacedBy.id}`}>{form.replacedBy.formNo}</Link>
+          </Descriptions.Item>
+        )}
         {form.cancelReason && (
-          <Descriptions.Item label="Lý do hủy" span={{ xs: 1, md: 3 }}>
+          <Descriptions.Item label="Lý do hủy" span="filled">
             {form.cancelReason} ({formatDateTime(form.cancelledAtUtc)})
           </Descriptions.Item>
         )}
+        {form.revokeReason && (
+          <Descriptions.Item label="Lý do thu hồi" span="filled">
+            {form.revokeReason} ({formatDateTime(form.revokedAtUtc)})
+          </Descriptions.Item>
+        )}
       </Descriptions>
-      {form.status === 'PendingSignature' && (
-        <Alert
-          type="info"
-          showIcon
-          style={{ marginTop: 12 }}
-          title="Phiếu đang chờ ký"
-          description="Nội dung và thông tin người bệnh đã được khóa. Bước ký tay trên máy tính bảng sẽ có ở Sprint 4; muốn sửa nội dung, hãy trả phiếu về nháp."
-        />
-      )}
+      <StatusNotice form={form} />
     </Card>
   )
+}
+
+/** Bước tiếp theo của phiếu đang chờ ký / trạng thái cuối. */
+function StatusNotice({ form }: { form: ConsentFormDetail }) {
+  const patientSignature = form.signatures.find((s) => s.method === 'Handwritten')
+  if (form.status === 'PendingSignature' && !patientSignature) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        style={{ marginTop: 12 }}
+        title="Phiếu đang chờ ký"
+        description="Nội dung và thông tin người bệnh đã được khóa. Bấm “Ký trên máy tính bảng” để người bệnh (hoặc người đại diện) ký; muốn sửa nội dung, hãy trả phiếu về nháp."
+      />
+    )
+  }
+  if (form.status === 'PendingSignature' && patientSignature) {
+    return (
+      <Alert
+        type="success"
+        showIcon
+        style={{ marginTop: 12 }}
+        title={`${patientSignature.signerName} đã ký lúc ${formatDateTime(patientSignature.signedAtUtc)}${
+          form.decision ? ` (${decisionLabels[form.decision]})` : ''
+        }`}
+        description={
+          form.actions.canConfirm
+            ? 'Bấm “Xác nhận và hoàn tất” để xác nhận bằng tài khoản của bạn và khóa phiếu.'
+            : `Chờ nhân viên có vai trò ${signerRoleLabel(form.hospitalSignerRoleCode)} xác nhận bằng tài khoản.`
+        }
+      />
+    )
+  }
+  if (form.status === 'Completed') {
+    return (
+      <Alert
+        type="success"
+        showIcon
+        style={{ marginTop: 12 }}
+        title="Phiếu đã hoàn tất"
+        description="Phiếu đã khóa, không sửa được. PDF đã ký được lưu kèm mã băm; muốn thay đổi thì thu hồi rồi lập phiếu thay thế."
+      />
+    )
+  }
+  return null
 }
 
 function DraftEditor({ form }: { form: ConsentFormDetail }) {

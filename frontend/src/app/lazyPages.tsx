@@ -29,6 +29,9 @@ export const ConsentTemplatesPage = lazy(() =>
 export const ConsentTemplateDetailPage = lazy(() =>
   import('../features/templates/ConsentTemplateDetailPage').then((m) => ({ default: m.ConsentTemplateDetailPage })),
 )
+export const SigningKioskPage = lazy(() =>
+  import('../features/signing/SigningKioskPage').then((m) => ({ default: m.SigningKioskPage })),
+)
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))
 
 export function Lazy({ children }: { children: ReactNode }) {

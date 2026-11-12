@@ -54,6 +54,41 @@ export interface ConsentRepresentativeInfo {
   phoneNumber: string | null
 }
 
+export type ConsentDecision = 'Agreed' | 'Refused'
+export type ConsentSignerRole = 'Patient' | 'Representative' | 'Hospital'
+export type ConsentSignatureMethod = 'Handwritten' | 'AccountConfirmation'
+
+/** Một chữ ký trên phiếu (ảnh chữ ký tay chỉ có trong PDF). */
+export interface ConsentSignature {
+  role: ConsentSignerRole
+  method: ConsentSignatureMethod
+  signerName: string
+  signerTitle: string | null
+  signedAtUtc: string
+}
+
+export interface ConsentFormRef {
+  id: string
+  formNo: string
+}
+
+/** Thao tác người dùng hiện tại được phép làm với phiếu (máy chủ vẫn kiểm tra lại). */
+export interface ConsentFormActions {
+  canEdit: boolean
+  canSubmit: boolean
+  canReturnToDraft: boolean
+  canCancel: boolean
+  canStartSigning: boolean
+  canConfirm: boolean
+  canRevoke: boolean
+  canReplace: boolean
+}
+
+export interface SigningSessionToken {
+  token: string
+  expiresAtUtc: string
+}
+
 export interface ConsentFormDetail {
   id: string
   formNo: string
@@ -84,7 +119,13 @@ export interface ConsentFormDetail {
   cancelReason: string | null
   revokedAtUtc: string | null
   revokeReason: string | null
-  actions: { canEdit: boolean; canSubmit: boolean; canReturnToDraft: boolean; canCancel: boolean }
+  decision: ConsentDecision | null
+  signatures: ConsentSignature[]
+  /** SHA-256 của PDF đã ký (phiếu đã hoàn tất). */
+  signedPdfSha256: string | null
+  replacesForm: ConsentFormRef | null
+  replacedBy: ConsentFormRef | null
+  actions: ConsentFormActions
 }
 
 export interface ConsentFormQuery {
@@ -115,7 +156,7 @@ export const consentFormsApi = {
   search: (query: ConsentFormQuery, signal?: AbortSignal) =>
     apiRequest<PagedResult<ConsentFormListItem>>(`${base}?${toSearchParams(query)}`, { signal }),
   get: (id: string, signal?: AbortSignal) => apiRequest<ConsentFormDetail>(`${base}/${id}`, { signal }),
-  create: (input: { patientId: string; templateId: string; departmentId?: string | null }) =>
+  create: (input: { patientId: string; templateId: string; departmentId?: string | null; replacesFormId?: string }) =>
     apiRequest<ConsentFormDetail>(base, { method: 'POST', body: input }),
   update: (id: string, input: { data: FormData; signerKind: SignerKind; representativeId: string | null }) =>
     apiRequest<ConsentFormDetail>(`${base}/${id}`, { method: 'PUT', body: input }),
@@ -123,6 +164,17 @@ export const consentFormsApi = {
   returnToDraft: (id: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/return-to-draft`, { method: 'POST' }),
   cancel: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/cancel`, { method: 'POST', body: { reason } }),
   pdf: (id: string) => apiBlob(`${base}/${id}/pdf`),
+  /** Mở phiên ký trên máy tính bảng: token chỉ dùng để người bệnh ký đúng phiếu này. */
+  startSigning: (id: string) => apiRequest<SigningSessionToken>(`${base}/${id}/signing-session`, { method: 'POST' }),
+  /** Gửi chữ ký của người bệnh bằng token phiên ký (không dùng phiên đăng nhập của nhân viên). */
+  signAsPatient: (id: string, signingToken: string, input: { decision: ConsentDecision; image: string }) =>
+    apiRequest<{ decision: ConsentDecision; signedAtUtc: string }>(`${base}/${id}/patient-signature`, {
+      method: 'POST',
+      body: input,
+      token: signingToken,
+    }),
+  complete: (id: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST' }),
+  revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
 }
 
 export const consentFormKeys = {
@@ -158,4 +210,20 @@ export const formStatusColors: Record<ConsentFormStatus, string> = {
   Completed: 'green',
   Cancelled: 'red',
   Revoked: 'volcano',
+}
+
+export const decisionLabels: Record<ConsentDecision, string> = {
+  Agreed: 'Đồng ý',
+  Refused: 'Từ chối',
+}
+
+export const signerRoleLabels: Record<ConsentSignerRole, string> = {
+  Patient: 'Người bệnh',
+  Representative: 'Người đại diện',
+  Hospital: 'Phía bệnh viện',
+}
+
+export const signatureMethodLabels: Record<ConsentSignatureMethod, string> = {
+  Handwritten: 'Ký tay trên máy tính bảng',
+  AccountConfirmation: 'Xác nhận bằng tài khoản',
 }

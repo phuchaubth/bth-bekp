@@ -43,6 +43,8 @@ export interface RequestOptions {
   signal?: AbortSignal
   /** Gửi kèm access token (mặc định: có). */
   auth?: boolean
+  /** Dùng token này thay cho access token đang đăng nhập (ví dụ token phiên ký); không tự làm mới phiên. */
+  token?: string
 }
 
 /** Được AuthProvider đăng ký: làm mới phiên và trả về access token mới (hoặc null nếu phải đăng nhập lại). */
@@ -61,7 +63,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   let response = await send(path, options, useAuth)
 
   // Access token hết hạn: làm mới phiên một lần rồi gửi lại yêu cầu.
-  if (response.status === 401 && useAuth && refreshHandler) {
+  if (response.status === 401 && useAuth && !options.token && refreshHandler) {
     const newToken = await refreshHandler()
     if (newToken) {
       response = await send(path, options, useAuth)
@@ -111,7 +113,7 @@ async function send(path: string, options: RequestOptions, useAuth: boolean): Pr
   if (options.body !== undefined) {
     headers['Content-Type'] = 'application/json'
   }
-  const token = useAuth ? tokenStore.get() : null
+  const token = options.token ?? (useAuth ? tokenStore.get() : null)
   if (token) {
     headers.Authorization = `Bearer ${token}`
   }

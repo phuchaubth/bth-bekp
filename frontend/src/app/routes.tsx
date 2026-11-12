@@ -24,8 +24,10 @@ import {
   PatientProfilePage,
   PatientsPage,
   RolesPage,
+  SigningKioskPage,
   UsersPage,
 } from './lazyPages'
+import { SIGNING_PATH } from '../features/signing/signingSession'
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
@@ -54,6 +56,16 @@ const featureRoutes: RouteObject[] = flattenNavItems()
 
 export const appRoutes: RouteObject[] = [
   { path: LOGIN_PATH, element: <LoginPage />, errorElement: <ErrorPage /> },
+  // Chế độ ký trên máy tính bảng: không dùng phiên đăng nhập (chỉ có token phiên ký), không có menu.
+  {
+    path: SIGNING_PATH,
+    element: (
+      <Lazy>
+        <SigningKioskPage />
+      </Lazy>
+    ),
+    errorElement: <ErrorPage />,
+  },
   {
     path: FORCED_PASSWORD_CHANGE_PATH,
     element: (
