@@ -55,6 +55,16 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.Property(f => f.SignerKind).HasConversion<string>().HasMaxLength(20);
         builder.Property(f => f.CancelReason).HasMaxLength(ConsentForm.ReasonMaxLength);
         builder.Property(f => f.RevokeReason).HasMaxLength(ConsentForm.ReasonMaxLength);
+        builder.Property(f => f.Decision).HasConversion<string>().HasMaxLength(20);
+        builder.Property(f => f.SignedPdfKey).HasMaxLength(200).IsUnicode(false);
+        builder.Property(f => f.SignedPdfSha256).HasMaxLength(64).IsFixedLength().IsUnicode(false);
+        builder.HasOne<ConsentForm>().WithMany().HasForeignKey(f => f.ReplacesFormId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(f => f.ReplacesFormId).IsUnique().HasFilter("[ReplacesFormId] IS NOT NULL");
+
+        builder.HasMany(f => f.Signatures).WithOne().HasForeignKey(s => s.FormId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(f => f.Signatures).HasField("_signatures").UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Ignore(f => f.PatientSignature);
+        builder.Ignore(f => f.HospitalSignature);
 
         // Tham chiếu chỉ để toàn vẹn dữ liệu; không xóa dây chuyền (phiếu là hồ sơ cần lưu trữ).
         builder.HasOne<Patient>().WithMany().HasForeignKey(f => f.PatientId).OnDelete(DeleteBehavior.Restrict);
@@ -80,4 +90,26 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
                 .HasConversion((ValueConverter)encrypted);
         });
     }
+}
+
+internal sealed class ConsentSignatureConfiguration : IEntityTypeConfiguration<ConsentSignature>
+{
+    public void Configure(EntityTypeBuilder<ConsentSignature> builder)
+    {
+        builder.ToTable("ConsentSignatures");
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.Property(s => s.Role).HasConversion<string>().HasMaxLength(20);
+        builder.Property(s => s.Method).HasConversion<string>().HasMaxLength(30);
+        builder.Property(s => s.SignerName).HasMaxLength(ConsentSignature.NameMaxLength).IsRequired();
+        builder.Property(s => s.SignerTitle).HasMaxLength(ConsentSignature.TitleMaxLength);
+        builder.Property(s => s.Device).HasMaxLength(ConsentSignature.DeviceMaxLength);
+        builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(s => s.FormId);
+    }
+
+    /// <summary>Ảnh chữ ký tay là dữ liệu cá nhân: lưu dạng bản mã (AES-256-GCM).</summary>
+    public static void ConfigureEncryption(ModelBuilder modelBuilder, EncryptedBytesConverter encrypted) =>
+        modelBuilder.Entity<ConsentSignature>().Property(s => s.ImagePng).HasColumnName("ImagePngEncrypted").IsUnicode(false)
+            .HasConversion((ValueConverter)encrypted);
 }

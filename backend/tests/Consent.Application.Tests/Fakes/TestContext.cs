@@ -161,9 +161,27 @@ internal sealed class AppTestContext
         new UpdateConsentFormRequestValidator(),
         new CancelConsentFormRequestValidator(),
         Pdf,
+        Documents,
         Microsoft.Extensions.Options.Options.Create(new HospitalOptions()));
 
+    public ConsentSigningService CreateConsentSigningService() => new(
+        CreateConsentFormService(),
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryRoleRepository(Store),
+        new InMemoryUserRepository(Store),
+        Tokens,
+        Documents,
+        Pdf,
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        new PatientSignatureRequestValidator(),
+        new RevokeConsentFormRequestValidator());
+
     public SequentialFormNumbers FormNumbers { get; } = new();
+
+    public InMemoryDocumentStore Documents { get; } = new();
 
     public RecordingPdfRenderer Pdf { get; } = new();
 }

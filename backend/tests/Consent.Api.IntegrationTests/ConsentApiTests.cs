@@ -196,4 +196,102 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, reporterStatus);
         Assert.Equal(HttpStatusCode.Forbidden, reporterCreate);
     }
+
+    [Fact]
+    public async Task HandwrittenSigning_OnATablet_CompletesWithAStoredHashedPdf_ThenRevokeAndReplace()
+    {
+        var nurse = await LoginDemoAsync("dieuduong.demo");
+        var head = await LoginDemoAsync("truongkhoa.demo");
+        var patientId = await DemoPatientIdAsync(nurse);
+        var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", nurse);
+        var (_, created) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", nurse, new { patientId, templateId = TemplateId(available, "TN-01") });
+        var formId = created.GetProperty("id").GetString()!;
+        var form = $"/api/v1/consent-forms/{formId}";
+        await _client.SendJsonAsync(HttpMethod.Put, form, nurse, new { data = MorseData(complete: true), signerKind = "Patient" });
+        var (submittedStatus, _) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/submit", nurse);
+        Assert.Equal(HttpStatusCode.OK, submittedStatus);
+
+        // Mở phiên ký: token phiên ký chỉ dùng để người bệnh ký đúng phiếu này.
+        var (sessionStatus, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", nurse);
+        Assert.Equal(HttpStatusCode.OK, sessionStatus);
+        var signingToken = session.GetProperty("token").GetString()!;
+        var (listWithSigningToken, _) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-forms", signingToken);
+        var (pdfWithSigningToken, _) = await _client.SendJsonAsync(HttpMethod.Get, $"{form}/pdf", signingToken);
+        var (signWithLoginToken, _) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", nurse, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.Equal(HttpStatusCode.Unauthorized, listWithSigningToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, pdfWithSigningToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, signWithLoginToken);
+
+        // Khung ký trống bị từ chối (422); ký thật thì được nhận đúng một lần.
+        var (blankStatus, blank) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Blank()) });
+        var (signedStatus, signed) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+        var (againStatus, _) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Refused", image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, blankStatus);
+        Assert.Equal("consent_forms.signature_blank", blank.GetProperty("code").GetString());
+        Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
+        Assert.Equal(HttpStatusCode.Conflict, againStatus);
+
+        // Phía bệnh viện (điều dưỡng: vai trò xác nhận của TN-01) xác nhận bằng tài khoản → hoàn tất.
+        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", nurse);
+        Assert.True(completedStatus == HttpStatusCode.OK, completed.ToString());
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+        Assert.Equal("Agreed", completed.GetProperty("decision").GetString());
+        Assert.Equal(2, completed.GetProperty("signatures").GetArrayLength());
+        var sha256 = completed.GetProperty("signedPdfSha256").GetString()!;
+
+        // PDF tải về đúng là file đã lưu (khớp SHA-256); file trên đĩa được mã hóa.
+        using (var pdfRequest = new HttpRequestMessage(HttpMethod.Get, $"{form}/pdf"))
+        {
+            pdfRequest.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", nurse);
+            using var pdf = await _client.SendAsync(pdfRequest);
+            var bytes = await pdf.Content.ReadAsByteArrayAsync();
+            Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
+            Assert.Equal(sha256, Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(bytes)));
+        }
+
+        await using var connection = new SqlConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+        await using (var command = new SqlCommand(
+            "SELECT f.SignedPdfKey, f.SignedPdfSha256, s.ImagePngEncrypted FROM ConsentForms f " +
+            "JOIN ConsentSignatures s ON s.FormId = f.Id AND s.Method = 'Handwritten' WHERE f.Id = @id", connection))
+        {
+            command.Parameters.AddWithValue("@id", Guid.Parse(formId));
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            var file = Path.Combine(_factory.DocumentsPath, reader.GetString(0).Replace('/', Path.DirectorySeparatorChar));
+            Assert.Equal(sha256, reader.GetString(1));
+            Assert.StartsWith("v1:", reader.GetString(2), StringComparison.Ordinal);
+            var onDisk = System.Text.Encoding.Latin1.GetString(await File.ReadAllBytesAsync(file));
+            Assert.StartsWith("CDOC", onDisk, StringComparison.Ordinal);
+            Assert.DoesNotContain("%PDF", onDisk, StringComparison.Ordinal);
+        }
+
+        // Phiếu hoàn tất không sửa được; điều dưỡng không có quyền thu hồi; trưởng khoa thu hồi phải có lý do.
+        var (editStatus, _) = await _client.SendJsonAsync(HttpMethod.Put, form, nurse, new { data = MorseData(complete: true), signerKind = "Patient" });
+        var (nurseRevoke, _) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/revoke", nurse, new { reason = "Ghi sai thông tin" });
+        var (noReason, _) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/revoke", head, new { reason = "" });
+        var (revokedStatus, revoked) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/revoke", head, new { reason = "Ghi sai thông tin" });
+        Assert.Equal(HttpStatusCode.Conflict, editStatus);
+        Assert.Equal(HttpStatusCode.Forbidden, nurseRevoke);
+        Assert.Equal(HttpStatusCode.BadRequest, noReason);
+        Assert.Equal("Revoked", revoked.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.OK, revokedStatus);
+
+        // Lập phiếu thay thế tham chiếu phiếu cũ.
+        var (replacementStatus, replacement) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", nurse, new { patientId, templateId = TemplateId(available, "TN-01"), replacesFormId = formId });
+        Assert.True(replacementStatus == HttpStatusCode.Created, replacement.ToString());
+        Assert.Equal(formId, replacement.GetProperty("replacesForm").GetProperty("id").GetString());
+
+        await using var audit = new SqlCommand(
+            "SELECT COUNT(DISTINCT Action) FROM AuditLogs WHERE EntityId = @id AND Action IN " +
+            "('ConsentForms.SigningStarted', 'ConsentForms.PatientSigned', 'ConsentForms.Completed', 'ConsentForms.Revoked')", connection);
+        audit.Parameters.AddWithValue("@id", formId);
+        Assert.Equal(4, (int)(await audit.ExecuteScalarAsync())!);
+    }
 }

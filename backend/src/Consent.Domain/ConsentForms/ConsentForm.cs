@@ -4,7 +4,8 @@ namespace Consent.Domain.ConsentForms;
 
 /// <summary>
 /// Vòng đời phiếu (giai đoạn chưa có SmartCA, ký tay trên máy tính bảng):
-/// Nháp → Chờ ký → Hoàn tất → (Thu hồi); Nháp/Chờ ký → Hủy. Khi tích hợp SmartCA sẽ bổ sung các bước ký số.
+/// Nháp → Chờ ký (người bệnh ký tay, rồi phía bệnh viện xác nhận) → Hoàn tất → (Thu hồi); Nháp/Chờ ký → Hủy.
+/// Khi tích hợp SmartCA sẽ bổ sung các bước ký số.
 /// </summary>
 public enum ConsentFormStatus
 {
@@ -32,6 +33,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     public const int FormNoMaxLength = 30;
     public const int ReasonMinLength = 5;
     public const int ReasonMaxLength = 500;
+
+    private readonly List<ConsentSignature> _signatures = [];
 
     private ConsentForm(
         Guid id,
@@ -103,6 +106,31 @@ public sealed class ConsentForm : Entity, IAuditableEntity
 
     public string? RevokeReason { get; private set; }
 
+    /// <summary>Quyết định của người bệnh/người đại diện ghi nhận khi ký.</summary>
+    public ConsentDecision? Decision { get; private set; }
+
+    /// <summary>Phiên ký đang mở trên máy tính bảng; chỉ phiên này được nhận chữ ký của người bệnh (dùng một lần).</summary>
+    public Guid? SigningSessionId { get; private set; }
+
+    /// <summary>Phiếu đã thu hồi mà phiếu này thay thế.</summary>
+    public Guid? ReplacesFormId { get; private set; }
+
+    /// <summary>Khóa lưu trữ của file PDF đã ký (file được mã hóa khi lưu).</summary>
+    public string? SignedPdfKey { get; private set; }
+
+    /// <summary>SHA-256 (hex) của file PDF đã ký, để phát hiện file bị sửa.</summary>
+    public string? SignedPdfSha256 { get; private set; }
+
+    public long? SignedPdfSize { get; private set; }
+
+    public IReadOnlyCollection<ConsentSignature> Signatures => _signatures;
+
+    /// <summary>Chữ ký tay của người bệnh hoặc người đại diện (nếu đã ký).</summary>
+    public ConsentSignature? PatientSignature => _signatures.FirstOrDefault(s => s.Role != ConsentSignerRole.Hospital);
+
+    /// <summary>Xác nhận của nhân viên phía bệnh viện (nếu đã hoàn tất).</summary>
+    public ConsentSignature? HospitalSignature => _signatures.FirstOrDefault(s => s.Role == ConsentSignerRole.Hospital);
+
     public bool CanEdit => Status == ConsentFormStatus.Draft;
 
     public bool CanSubmit => Status == ConsentFormStatus.Draft;
@@ -111,7 +139,11 @@ public sealed class ConsentForm : Entity, IAuditableEntity
 
     public bool CanCancel => Status is ConsentFormStatus.Draft or ConsentFormStatus.PendingSignature;
 
-    public bool CanComplete => Status == ConsentFormStatus.PendingSignature;
+    /// <summary>Mở phiên ký cho người bệnh: phiếu chờ ký và người bệnh chưa ký.</summary>
+    public bool CanStartSigning => Status == ConsentFormStatus.PendingSignature && PatientSignature is null;
+
+    /// <summary>Phía bệnh viện xác nhận để hoàn tất: người bệnh đã ký (luật BR-02: người bệnh ký trước).</summary>
+    public bool CanComplete => Status == ConsentFormStatus.PendingSignature && PatientSignature is not null;
 
     public bool CanRevoke => Status == ConsentFormStatus.Completed;
 
@@ -123,12 +155,16 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         Guid departmentId,
         string dataJson,
         Guid createdByUserId,
-        DateTimeOffset nowUtc)
+        DateTimeOffset nowUtc,
+        Guid? replacesFormId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(formNo);
         ArgumentNullException.ThrowIfNull(dataJson);
         return new ConsentForm(
-            Guid.CreateVersion7(), formNo, patientId, templateId, templateVersionId, departmentId, dataJson, createdByUserId, nowUtc);
+            Guid.CreateVersion7(), formNo, patientId, templateId, templateVersionId, departmentId, dataJson, createdByUserId, nowUtc)
+        {
+            ReplacesFormId = replacesFormId,
+        };
     }
 
     /// <summary>Lưu nội dung nháp và người ký phía người bệnh.</summary>
@@ -160,14 +196,55 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Trả phiếu chờ ký về nháp để sửa (khi người bệnh chưa ký).</summary>
+    /// <summary>
+    /// Trả phiếu chờ ký về nháp để sửa. Nếu người bệnh đã ký mà phía bệnh viện chưa xác nhận, chữ ký bị bỏ vì nội dung
+    /// sẽ thay đổi (nhật ký audit vẫn giữ dấu vết).
+    /// </summary>
     public void ReturnToDraft(DateTimeOffset nowUtc)
     {
         Ensure(CanReturnToDraft, "Chỉ trả về nháp được phiếu đang chờ ký.");
         SnapshotJson = null;
         SubmittedAtUtc = null;
+        _signatures.Clear();
+        Decision = null;
+        SigningSessionId = null;
         Status = ConsentFormStatus.Draft;
         UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>Mở phiên ký trên máy tính bảng. Mở phiên mới thì phiên cũ hết hiệu lực.</summary>
+    public void StartSigning(Guid sessionId, DateTimeOffset nowUtc)
+    {
+        Ensure(CanStartSigning, "Chỉ mở phiên ký được cho phiếu đang chờ ký mà người bệnh chưa ký.");
+        SigningSessionId = sessionId;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>Người bệnh (hoặc người đại diện đã chọn khi soạn phiếu) ký tay trong phiên ký đang mở.</summary>
+    public ConsentSignature SignByPatient(
+        Guid sessionId,
+        ConsentDecision decision,
+        string signerName,
+        byte[] imagePng,
+        string? device,
+        Guid? staffUserId,
+        DateTimeOffset nowUtc)
+    {
+        Ensure(Status == ConsentFormStatus.PendingSignature, "Phiếu không ở trạng thái chờ ký.");
+        Ensure(PatientSignature is null, "Người bệnh đã ký phiếu này.");
+        Ensure(SigningSessionId is { } current && current == sessionId, "Phiên ký đã kết thúc hoặc đã được thay bằng phiên khác.");
+        if (!Enum.IsDefined(decision))
+        {
+            throw new DomainException("Quyết định của người bệnh không hợp lệ.");
+        }
+
+        var role = SignerKind == ConsentSignerKind.Representative ? ConsentSignerRole.Representative : ConsentSignerRole.Patient;
+        var signature = ConsentSignature.Handwritten(Id, role, signerName, imagePng, device, staffUserId, nowUtc);
+        _signatures.Add(signature);
+        Decision = decision;
+        SigningSessionId = null;
+        UpdatedAtUtc = nowUtc;
+        return signature;
     }
 
     public void Cancel(string reason, DateTimeOffset nowUtc)
@@ -179,10 +256,27 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Hoàn tất sau khi đủ chữ ký (bước ký làm ở Sprint 4). Phiếu hoàn tất không sửa được.</summary>
-    public void Complete(DateTimeOffset nowUtc)
+    /// <summary>
+    /// Phía bệnh viện xác nhận bằng tài khoản và hoàn tất phiếu, kèm file PDF đã ký (khóa lưu trữ, SHA-256).
+    /// Phiếu hoàn tất không sửa được; muốn thay đổi thì thu hồi rồi lập phiếu thay thế.
+    /// </summary>
+    public void Complete(
+        Guid confirmedByUserId,
+        string confirmedByName,
+        string? confirmedByTitle,
+        string signedPdfKey,
+        string signedPdfSha256,
+        long signedPdfSize,
+        DateTimeOffset nowUtc)
     {
-        Ensure(CanComplete, "Chỉ hoàn tất được phiếu đang chờ ký.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfKey);
+        ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfSha256);
+        Ensure(Status == ConsentFormStatus.PendingSignature, "Chỉ hoàn tất được phiếu đang chờ ký.");
+        Ensure(CanComplete, "Người bệnh chưa ký; phía bệnh viện chỉ xác nhận sau khi người bệnh ký.");
+        _signatures.Add(ConsentSignature.AccountConfirmation(Id, confirmedByUserId, confirmedByName, confirmedByTitle, nowUtc));
+        SignedPdfKey = signedPdfKey;
+        SignedPdfSha256 = signedPdfSha256;
+        SignedPdfSize = signedPdfSize;
         Status = ConsentFormStatus.Completed;
         CompletedAtUtc = nowUtc;
         UpdatedAtUtc = nowUtc;

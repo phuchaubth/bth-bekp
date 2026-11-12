@@ -12,6 +12,8 @@ WORKDIR /app
 ENV ASPNETCORE_HTTP_PORTS=8080 \
     DOTNET_RUNNING_IN_CONTAINER=true
 COPY --from=build /app/publish .
+# Thư mục lưu PDF đã ký (gắn volume khi chạy); thuộc user "app" để API ghi được mà không cần quyền root.
+RUN mkdir -p /app/storage && chown app:app /app/storage
 # Image .NET chính thức có sẵn user không phải root tên "app".
 USER app
 EXPOSE 8080

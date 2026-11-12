@@ -62,6 +62,32 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options, IClock clock
         return new AccessToken(_handler.CreateToken(descriptor), expiresAt);
     }
 
+    public AccessToken CreateSigningToken(SigningTokenClaims claims)
+    {
+        ArgumentNullException.ThrowIfNull(claims);
+        var now = clock.UtcNow;
+        var expiresAt = now.AddMinutes(_options.SigningTokenMinutes);
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = _options.Issuer,
+            Audience = _options.SigningAudience,
+            IssuedAt = now.UtcDateTime,
+            NotBefore = now.UtcDateTime,
+            Expires = expiresAt.UtcDateTime,
+            Claims = new Dictionary<string, object>
+            {
+                [AppClaimTypes.Subject] = claims.StaffUserId.ToString(),
+                [AppClaimTypes.UserName] = claims.StaffUserName,
+                [AppClaimTypes.SigningForm] = claims.FormId.ToString(),
+                [AppClaimTypes.SigningSession] = claims.SessionId.ToString(),
+                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N"),
+            },
+            SigningCredentials = new SigningCredentials(_options.CreateSigningKey(), SecurityAlgorithms.HmacSha256),
+        };
+
+        return new AccessToken(_handler.CreateToken(descriptor), expiresAt);
+    }
+
     public string GenerateRefreshToken() =>
         Base64UrlEncoder.Encode(RandomNumberGenerator.GetBytes(RefreshTokenBytes));
 

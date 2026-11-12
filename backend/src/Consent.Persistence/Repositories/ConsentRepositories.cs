@@ -30,7 +30,13 @@ internal sealed class ConsentTemplateRepository(ConsentDbContext db) : IConsentT
 internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormRepository
 {
     public Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        db.ConsentForms.FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+        db.ConsentForms.Include(f => f.Signatures).FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
+
+    public Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken) =>
+        db.ConsentForms.AsNoTracking()
+            .Where(f => f.ReplacesFormId == formId)
+            .Select(f => new ConsentFormRef(f.Id, f.FormNo))
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken)
     {

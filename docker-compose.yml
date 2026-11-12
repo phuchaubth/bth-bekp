@@ -44,6 +44,10 @@ services:
       Seed__DemoPassword: ${SEED_DEMO_PASSWORD:-}
       # API không mở cổng ra ngoài, chỉ nhận yêu cầu từ nginx nên tin header X-Forwarded-*.
       ReverseProxy__TrustAllProxies: "true"
+      # PDF phiếu đã ký (mã hóa bằng khóa dẫn xuất từ FIELD_ENCRYPTION_KEY). Sao lưu volume này cùng CSDL.
+      Storage__DocumentsPath: /app/storage/documents
+    volumes:
+      - documents:/app/storage
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -58,3 +62,4 @@ services:
 
 volumes:
   sqlserver-data:
+  documents:

@@ -107,5 +107,5 @@
       ]
     }
   ],
-  "signatures": { "hospital": "Nhân viên y tế cung cấp thông tin", "hospitalHint": "(Ký, ghi rõ họ tên, chức danh)" }
+  "signatures": { "hospital": "Nhân viên y tế cung cấp thông tin" }
 }

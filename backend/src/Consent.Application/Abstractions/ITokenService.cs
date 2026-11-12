@@ -12,9 +12,18 @@ public sealed record AccessTokenClaims(
 
 public sealed record AccessToken(string Value, DateTimeOffset ExpiresAtUtc);
 
+/// <summary>
+/// Thông tin đưa vào token phiên ký: chỉ dùng để người bệnh ký đúng một phiếu trên máy tính bảng, không dùng được cho API
+/// khác (đối tượng nhận token riêng).
+/// </summary>
+public sealed record SigningTokenClaims(Guid StaffUserId, string StaffUserName, Guid FormId, Guid SessionId);
+
 public interface ITokenService
 {
     AccessToken CreateAccessToken(AccessTokenClaims claims);
+
+    /// <summary>Tạo token phiên ký (thời hạn ngắn) cho chế độ ký trên máy tính bảng.</summary>
+    AccessToken CreateSigningToken(SigningTokenClaims claims);
 
     /// <summary>Sinh refresh token ngẫu nhiên (dạng chuỗi gửi cho client).</summary>
     string GenerateRefreshToken();

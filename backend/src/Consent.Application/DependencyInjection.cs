@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<PatientService>();
         services.AddScoped<ConsentTemplateService>();
         services.AddScoped<ConsentFormService>();
+        services.AddScoped<ConsentSigningService>();
 
         RegisterValidators(services);
         return services;

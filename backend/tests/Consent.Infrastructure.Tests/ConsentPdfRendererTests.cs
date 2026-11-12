@@ -57,10 +57,16 @@ public sealed class ConsentPdfRendererTests
         },
     };
 
-    private static ConsentPdfDocument Document(string code, bool representative, bool isFinal)
+    private static ConsentPdfDocument Document(string code, bool representative, bool isFinal, string? examType = null)
     {
         var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
-        var evaluation = FormDataEvaluator.Evaluate(definition, SampleData(code));
+        var data = SampleData(code);
+        if (examType is not null)
+        {
+            data["examType"] = examType;
+        }
+
+        var evaluation = FormDataEvaluator.Evaluate(definition, data);
         Assert.True(evaluation.IsValid, string.Join("; ", evaluation.Errors.Select(e => $"{e.Key}: {string.Join(",", e.Value)}")));
         return new ConsentPdfDocument(
             new HospitalOptions(), "Khoa Khám bệnh", code, 1, "PDT-2026-000001", definition, evaluation.Data, evaluation.Scores,
@@ -88,6 +94,44 @@ public sealed class ConsentPdfRendererTests
         {
             File.WriteAllBytes(Path.Combine(output, $"{code}.pdf"), bytes);
         }
+    }
+
+    /// <summary>
+    /// <paramref name="maxPages"/>: cam kết khám BHYT thông thường (phổ biến nhất) gọn trong một trang; trường hợp nhiều
+    /// nội dung nhất có thể sang trang sau nhưng khối chữ ký luôn nằm trọn trên một trang.
+    /// </summary>
+    [Theory]
+    [InlineData("CK-01", false, "bhyt", 1)]
+    [InlineData("CK-01", true, "bhyt", 1)]
+    [InlineData("CK-01", true, null, 2)]
+    [InlineData("TN-01", true, null, 3)]
+    public void SignedForm_EmbedsTheSignatureImage_AndHospitalConfirmation(string code, bool representative, string? examType, int maxPages)
+    {
+        var signature = SignatureImage.Normalize(TestPng.Signature());
+        Assert.True(signature.IsValid, signature.Error);
+        var vietnam = TimeSpan.FromHours(7);
+        var document = Document(code, representative, isFinal: true, examType) with
+        {
+            Decision = Consent.Domain.ConsentForms.ConsentDecision.Agreed,
+            PatientSignature = new ConsentPdfSignature(signature.Png!, new DateTimeOffset(2026, 11, 11, 9, 30, 0, vietnam)),
+            HospitalConfirmation = new ConsentPdfConfirmation("Tiếp đón Demo", "Nhân viên tiếp đón", new DateTimeOffset(2026, 11, 11, 9, 32, 0, vietnam)),
+        };
+
+        var bytes = new MigraDocConsentPdfRenderer().Render(document);
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(
+                Path.Combine(output, $"{code}-signed{(representative ? "-representative" : string.Empty)}-{examType ?? "full"}.pdf"), bytes);
+        }
+
+        using (var stream = new MemoryStream(bytes))
+        using (var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import))
+        {
+            Assert.InRange(pdf.PageCount, 1, maxPages);
+        }
+
+        // Ảnh chữ ký được nhúng (PDFsharp ghi "/Subtype/Image").
+        Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(bytes));
     }
 
     [Fact]

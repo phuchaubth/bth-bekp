@@ -45,6 +45,14 @@ internal sealed class FakeTokenService(IClock clock) : ITokenService
         return new AccessToken($"access-{++_counter}", clock.UtcNow.AddMinutes(15));
     }
 
+    public SigningTokenClaims? LastSigningClaims { get; private set; }
+
+    public AccessToken CreateSigningToken(SigningTokenClaims claims)
+    {
+        LastSigningClaims = claims;
+        return new AccessToken($"signing-{claims.FormId:N}-{claims.SessionId:N}", clock.UtcNow.AddMinutes(30));
+    }
+
     public string GenerateRefreshToken() => "refresh-" + Guid.NewGuid().ToString("N");
 
     public string HashRefreshToken(string refreshToken) =>
@@ -72,7 +80,15 @@ internal sealed class FakeCurrentUser : ICurrentUser
 
     public HashSet<string> Permissions { get; } = [];
 
+    public HashSet<string> Roles { get; } = [];
+
+    public Guid? SigningFormId { get; set; }
+
+    public Guid? SigningSessionId { get; set; }
+
     public bool HasPermission(string permission) => Permissions.Contains(permission);
+
+    public bool IsInRole(string roleCode) => Roles.Contains(roleCode);
 }
 
 /// <summary>"Cơ sở dữ liệu" trong bộ nhớ dùng chung cho các repository giả.</summary>
@@ -292,6 +308,10 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
         return Task.FromResult(new PagedResult<ConsentFormListItemDto>(items, query.Page, query.PageSize, rows.Count));
     }
 
+    public Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentForms.Where(f => f.ReplacesFormId == formId).Select(f => new ConsentFormRef(f.Id, f.FormNo))
+            .FirstOrDefault());
+
     public void Add(ConsentForm form) => store.ConsentForms.Add(form);
 }
 
@@ -301,6 +321,26 @@ internal sealed class SequentialFormNumbers : IConsentFormNumberGenerator
 
     public Task<string> NextAsync(DateTimeOffset nowUtc, CancellationToken cancellationToken) =>
         Task.FromResult($"PDT-{nowUtc.Year}-{Interlocked.Increment(ref _next):000000}");
+}
+
+/// <summary>Kho tài liệu trong bộ nhớ; <see cref="Tamper"/> giả lập file bị sửa sau khi lưu.</summary>
+internal sealed class InMemoryDocumentStore : IDocumentStore
+{
+    public Dictionary<string, byte[]> Files { get; } = [];
+
+    public Task<string> SaveAsync(string fileName, byte[] content, CancellationToken cancellationToken)
+    {
+        var key = $"2026/11/{Path.GetFileNameWithoutExtension(fileName)}-{Files.Count + 1}.pdf.enc";
+        Files[key] = [.. content];
+        return Task.FromResult(key);
+    }
+
+    public Task<byte[]> ReadAsync(string key, CancellationToken cancellationToken) =>
+        Files.TryGetValue(key, out var content)
+            ? Task.FromResult<byte[]>([.. content])
+            : throw new DocumentUnavailableException("Không tìm thấy file đã lưu.");
+
+    public void Tamper(string key) => Files[key] = [.. Files[key], 0x20];
 }
 
 /// <summary>Ghi lại nội dung được yêu cầu in, trả về PDF giả.</summary>

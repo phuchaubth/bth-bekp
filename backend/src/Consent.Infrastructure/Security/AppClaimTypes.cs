@@ -10,4 +10,10 @@ public static class AppClaimTypes
     public const string Role = "role";
     public const string Permission = "perm";
     public const string MustChangePassword = "pwd_change";
+
+    /// <summary>Phiếu được ký (chỉ có trong token phiên ký).</summary>
+    public const string SigningForm = "sign_form";
+
+    /// <summary>Mã phiên ký (chỉ có trong token phiên ký).</summary>
+    public const string SigningSession = "sign_session";
 }

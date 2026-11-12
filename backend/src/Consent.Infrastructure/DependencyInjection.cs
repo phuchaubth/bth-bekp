@@ -3,6 +3,7 @@ using Consent.Application.ConsentForms;
 using Consent.Infrastructure.His;
 using Consent.Infrastructure.Pdf;
 using Consent.Infrastructure.Security;
+using Consent.Infrastructure.Storage;
 using Consent.Infrastructure.Time;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +27,12 @@ public static class DependencyInjection
         services.AddSingleton<IFieldEncryptor, AesGcmFieldEncryptor>();
         services.AddSingleton<IBlindIndexer, HmacBlindIndexer>();
         services.AddSingleton<IConsentPdfRenderer, MigraDocConsentPdfRenderer>();
+        services.AddSingleton<IDocumentStore, EncryptedFileDocumentStore>();
+        services.AddOptions<DocumentStorageOptions>()
+            .Bind(configuration.GetSection(DocumentStorageOptions.SectionName))
+            .Validate(o => !string.IsNullOrWhiteSpace(o.DocumentsPath),
+                "Thiếu Storage:DocumentsPath (thư mục lưu PDF phiếu đã ký).")
+            .ValidateOnStart();
         services.AddOptions<HospitalOptions>().Bind(configuration.GetSection(HospitalOptions.SectionName));
 
         services.AddOptions<JwtOptions>()
@@ -33,6 +40,7 @@ public static class DependencyInjection
             .Validate(o => o.HasValidSigningKey,
                 $"Thiếu hoặc khóa ký JWT quá ngắn (cần ≥ {JwtOptions.MinimumSigningKeyBytes} byte). Hãy cấu hình biến môi trường Jwt__SigningKey.")
             .Validate(o => o.AccessTokenMinutes is > 0 and <= 60, "Jwt:AccessTokenMinutes phải trong khoảng 1–60 phút.")
+            .Validate(o => o.SigningTokenMinutes is >= 5 and <= 120, "Jwt:SigningTokenMinutes phải trong khoảng 5–120 phút.")
             .ValidateOnStart();
 
         services.AddOptions<DataProtectionOptions>()

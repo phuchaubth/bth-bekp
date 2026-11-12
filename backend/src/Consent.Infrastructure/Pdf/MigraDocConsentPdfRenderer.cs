@@ -1,7 +1,9 @@
+using System.Buffers.Binary;
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Domain.ConsentForms;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
@@ -18,6 +20,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 {
     private const string Checked = "■";
     private const string Unchecked = "□";
+
+    private static string Box(bool selected) => selected ? Checked : Unchecked;
     private const string Blank = "……………………";
     private static readonly Color Muted = new(0x55, 0x5D, 0x6B);
     private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
@@ -351,19 +355,23 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     private static void AddSignatures(Section section, ConsentPdfDocument document)
     {
-        var date = section.AddParagraph();
-        date.Format.Alignment = ParagraphAlignment.Right;
-        date.Format.SpaceBefore = Unit.FromMillimeter(3);
-        date.Format.Font.Italic = true;
-        date.Format.KeepWithNext = true;
-        date.AddText(
-            $"{document.Hospital.Place}, ngày {document.DocumentDate.Day:00} tháng {document.DocumentDate.Month:00} năm {document.DocumentDate.Year}");
-
         var labels = document.Definition.Signatures;
-        var patientRole = document.Representative is null
-            ? labels?.Patient ?? "Người bệnh"
-            : labels?.Representative ?? "Người đại diện hợp pháp";
-        var signerName = document.Representative?.FullName ?? document.Patient.FullName;
+        var isRepresentative = document.Representative is not null;
+        var patientRole = isRepresentative
+            ? labels?.Representative ?? "Người đại diện hợp pháp"
+            : labels?.Patient ?? "Người bệnh";
+
+        // Quyết định ghi nhận khi ký (bản xem trước để trống cả hai ô) và ngày tháng trên cùng một dòng.
+        var decision = section.AddParagraph();
+        decision.Format.SpaceBefore = Unit.FromMillimeter(1);
+        decision.Format.KeepWithNext = true;
+        decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+        decision.AddFormattedText($"Ý kiến của {(isRepresentative ? "người đại diện" : "người bệnh")}: ", TextFormat.Bold);
+        decision.AddText($"{Box(document.Decision == ConsentDecision.Agreed)} Đồng ý    {Box(document.Decision == ConsentDecision.Refused)} Từ chối");
+        decision.AddTab();
+        decision.AddFormattedText(
+            $"{document.Hospital.Place}, ngày {document.DocumentDate.Day:00} tháng {document.DocumentDate.Month:00} năm {document.DocumentDate.Year}",
+            TextFormat.Italic);
 
         var table = section.AddTable();
         table.AddColumn(Unit.FromMillimeter(83));
@@ -371,21 +379,72 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         var roles = table.AddRow();
         roles.KeepWith = 2; // giữ dòng vai trò, khoảng ký và họ tên trên cùng một trang
         AddSignatureCell(roles.Cells[0], patientRole, "(Ký, ghi rõ họ tên)");
-        AddSignatureCell(roles.Cells[1], labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint ?? "(Ký, ghi rõ họ tên)");
+        AddSignatureCell(
+            roles.Cells[1],
+            labels?.Hospital ?? "Nhân viên y tế",
+            document.HospitalConfirmation is null ? labels?.HospitalHint ?? "(Xác nhận bằng tài khoản)" : "(Đã xác nhận bằng tài khoản)");
 
         var space = table.AddRow();
-        space.Height = Unit.FromMillimeter(20);
+        space.Height = Unit.FromMillimeter(14);
+        space.VerticalAlignment = VerticalAlignment.Center;
+        if (document.PatientSignature is { } signature)
+        {
+            AddSignatureImage(space.Cells[0], signature.ImagePng);
+        }
 
         var names = table.AddRow();
         var name = names.Cells[0].AddParagraph();
         name.Format.Alignment = ParagraphAlignment.Center;
-        name.AddFormattedText(signerName, TextFormat.Bold);
+        name.Format.SpaceAfter = 0;
+        name.AddFormattedText(document.Representative?.FullName ?? document.Patient.FullName, TextFormat.Bold);
         if (document.Representative is { } representative)
         {
-            var relation = names.Cells[0].AddParagraph($"Quan hệ với người bệnh: {VietnameseLabels.Relationship(representative.Relationship)}");
-            relation.Format.Alignment = ParagraphAlignment.Center;
-            relation.Format.Font.Size = 10;
+            // Số CCCD và quan hệ của người đại diện đã in đầy đủ ở phần thông tin người bệnh; ở đây nhắc lại quan hệ.
+            name.AddText($" ({VietnameseLabels.Relationship(representative.Relationship)})");
         }
+
+        if (document.PatientSignature is { } signed)
+        {
+            AddSmallLine(names.Cells[0], $"Ký lúc {signed.SignedAt:HH:mm}, {signed.SignedAt:dd/MM/yyyy}");
+        }
+
+        if (document.HospitalConfirmation is { } confirmation)
+        {
+            var staff = names.Cells[1].AddParagraph();
+            staff.Format.Alignment = ParagraphAlignment.Center;
+            staff.Format.SpaceAfter = 0;
+            staff.AddFormattedText(confirmation.Name, TextFormat.Bold);
+            if (confirmation.Title is { Length: > 0 } title)
+            {
+                AddSmallLine(names.Cells[1], title);
+            }
+
+            AddSmallLine(names.Cells[1], $"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
+        }
+    }
+
+    /// <summary>Ảnh chữ ký tay, thu vừa khung 70 × 12 mm, giữ đúng tỉ lệ.</summary>
+    private static void AddSignatureImage(Cell cell, byte[] png)
+    {
+        const double MaxWidthMm = 70;
+        const double MaxHeightMm = 12;
+        var width = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4));
+        var height = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4));
+        var scale = Math.Min(MaxWidthMm / width, MaxHeightMm / height);
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Center;
+        var image = paragraph.AddImage("base64:" + Convert.ToBase64String(png));
+        image.LockAspectRatio = false;
+        image.Width = Unit.FromMillimeter(width * scale);
+        image.Height = Unit.FromMillimeter(height * scale);
+    }
+
+    private static void AddSmallLine(Cell cell, string text)
+    {
+        var line = cell.AddParagraph(text);
+        line.Format.Alignment = ParagraphAlignment.Center;
+        line.Format.Font.Size = 10;
+        line.Format.SpaceAfter = 0;
     }
 
     private static void AddSignatureCell(Cell cell, string role, string hint)

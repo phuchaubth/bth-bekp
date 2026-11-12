@@ -149,28 +149,35 @@ internal static class ApiServiceCollectionExtensions
 
     private static void AddAuthentication(IServiceCollection services)
     {
-        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer();
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer()
+            .AddJwtBearer(SigningSession.AuthenticationScheme);
+        // Token đăng nhập thường và token phiên ký có đối tượng nhận khác nhau: mỗi loại chỉ dùng được ở nơi của nó.
         services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationScheme)
+            .Configure<IOptions<JwtOptions>>((bearer, jwtOptions) => ConfigureBearer(bearer, jwtOptions.Value, jwtOptions.Value.Audience));
+        services.AddOptions<JwtBearerOptions>(SigningSession.AuthenticationScheme)
             .Configure<IOptions<JwtOptions>>((bearer, jwtOptions) =>
-            {
-                var jwt = jwtOptions.Value;
-                bearer.MapInboundClaims = false;
-                bearer.TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidIssuer = jwt.Issuer,
-                    ValidateAudience = true,
-                    ValidAudience = jwt.Audience,
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = jwt.HasValidSigningKey ? jwt.CreateSigningKey() : null,
-                    ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
-                    ValidateLifetime = true,
-                    RequireExpirationTime = true,
-                    ClockSkew = TimeSpan.FromSeconds(30),
-                    NameClaimType = AppClaimTypes.UserName,
-                    RoleClaimType = AppClaimTypes.Role,
-                };
-            });
+                ConfigureBearer(bearer, jwtOptions.Value, jwtOptions.Value.SigningAudience));
+    }
+
+    private static void ConfigureBearer(JwtBearerOptions bearer, JwtOptions jwt, string audience)
+    {
+        bearer.MapInboundClaims = false;
+        bearer.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwt.Issuer,
+            ValidateAudience = true,
+            ValidAudience = audience,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = jwt.HasValidSigningKey ? jwt.CreateSigningKey() : null,
+            ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
+            ValidateLifetime = true,
+            RequireExpirationTime = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+            NameClaimType = AppClaimTypes.UserName,
+            RoleClaimType = AppClaimTypes.Role,
+        };
     }
 
     private static void AddAuthorization(IServiceCollection services)
@@ -182,6 +189,12 @@ internal static class ApiServiceCollectionExtensions
             options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .Build();
+            // Chỉ token phiên ký (chế độ ký trên máy tính bảng) mới gửi được chữ ký của người bệnh.
+            options.AddPolicy(SigningSession.PolicyName, new AuthorizationPolicyBuilder(SigningSession.AuthenticationScheme)
+                .RequireAuthenticatedUser()
+                .RequireClaim(AppClaimTypes.SigningForm)
+                .RequireClaim(AppClaimTypes.SigningSession)
+                .Build());
         });
     }
 

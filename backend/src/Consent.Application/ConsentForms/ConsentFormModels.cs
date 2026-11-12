@@ -74,8 +74,27 @@ public sealed record ConsentRepresentativeInfo(
 /// <summary>Nội dung đóng băng khi trình ký.</summary>
 public sealed record ConsentFormSnapshot(ConsentPatientInfo Patient, ConsentRepresentativeInfo? Representative);
 
-/// <summary>Thao tác người dùng hiện tại được phép làm với phiếu (giao diện chỉ hiện nút hợp lệ).</summary>
-public sealed record ConsentFormActions(bool CanEdit, bool CanSubmit, bool CanReturnToDraft, bool CanCancel);
+/// <summary>Thao tác người dùng hiện tại được phép làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại).</summary>
+public sealed record ConsentFormActions(
+    bool CanEdit,
+    bool CanSubmit,
+    bool CanReturnToDraft,
+    bool CanCancel,
+    bool CanStartSigning,
+    bool CanConfirm,
+    bool CanRevoke,
+    bool CanReplace);
+
+/// <summary>Một chữ ký trên phiếu (không kèm ảnh: ảnh chữ ký chỉ có trong PDF).</summary>
+public sealed record ConsentSignatureDto(
+    ConsentSignerRole Role,
+    ConsentSignatureMethod Method,
+    string SignerName,
+    string? SignerTitle,
+    DateTimeOffset SignedAtUtc);
+
+/// <summary>Tham chiếu tới một phiếu khác (phiếu bị thay thế / phiếu thay thế).</summary>
+public sealed record ConsentFormRef(Guid Id, string FormNo);
 
 public sealed record ConsentFormDetailDto(
     Guid Id,
@@ -106,13 +125,29 @@ public sealed record ConsentFormDetailDto(
     string? CancelReason,
     DateTimeOffset? RevokedAtUtc,
     string? RevokeReason,
+    ConsentDecision? Decision,
+    IReadOnlyList<ConsentSignatureDto> Signatures,
+    string? SignedPdfSha256,
+    ConsentFormRef? ReplacesForm,
+    ConsentFormRef? ReplacedBy,
     ConsentFormActions Actions);
 
-public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId);
+/// <summary>Lập phiếu. <paramref name="ReplacesFormId"/>: lập phiếu thay thế cho phiếu đã thu hồi (cùng người bệnh, cùng mẫu).</summary>
+public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId, Guid? ReplacesFormId = null);
 
 public sealed record UpdateConsentFormRequest(JsonObject? Data, ConsentSignerKind SignerKind, Guid? RepresentativeId);
 
 public sealed record CancelConsentFormRequest(string? Reason);
+
+public sealed record RevokeConsentFormRequest(string? Reason);
+
+/// <summary>Phiên ký vừa mở: token chỉ dùng để người bệnh ký đúng phiếu này, hết hạn sau ít phút.</summary>
+public sealed record SigningSessionDto(string Token, DateTimeOffset ExpiresAtUtc);
+
+/// <summary>Chữ ký tay của người bệnh/người đại diện: quyết định và ảnh PNG của khung ký (Base64).</summary>
+public sealed record PatientSignatureRequest(ConsentDecision? Decision, string? Image);
+
+public sealed record PatientSignatureResultDto(ConsentDecision Decision, DateTimeOffset SignedAtUtc);
 
 public sealed class CreateConsentFormRequestValidator : AbstractValidator<CreateConsentFormRequest>
 {
@@ -137,6 +172,33 @@ public sealed class UpdateConsentFormRequestValidator : AbstractValidator<Update
         RuleFor(x => x.Data)
             .Must(data => data is null || data.ToJsonString().Length <= MaxDataLength)
             .WithMessage("Nội dung phiếu quá lớn.");
+    }
+}
+
+public sealed class RevokeConsentFormRequestValidator : AbstractValidator<RevokeConsentFormRequest>
+{
+    public RevokeConsentFormRequestValidator()
+    {
+        RuleFor(x => x.Reason)
+            .NotEmpty().WithMessage("Vui lòng nhập lý do thu hồi.")
+            .Length(ConsentForm.ReasonMinLength, ConsentForm.ReasonMaxLength)
+            .WithMessage($"Lý do từ {ConsentForm.ReasonMinLength} đến {ConsentForm.ReasonMaxLength} ký tự.");
+    }
+}
+
+public sealed class PatientSignatureRequestValidator : AbstractValidator<PatientSignatureRequest>
+{
+    /// <summary>Độ dài tối đa của chuỗi Base64 (tương ứng <see cref="SignatureImage.MaxBytes"/>).</summary>
+    public const int MaxImageLength = ((SignatureImage.MaxBytes + 2) / 3 * 4) + 64;
+
+    public PatientSignatureRequestValidator()
+    {
+        RuleFor(x => x.Decision)
+            .NotNull().WithMessage("Vui lòng chọn Đồng ý hoặc Từ chối.")
+            .IsInEnum().WithMessage("Quyết định không hợp lệ.");
+        RuleFor(x => x.Image)
+            .NotEmpty().WithMessage("Chưa có chữ ký.")
+            .MaximumLength(MaxImageLength).WithMessage($"Ảnh chữ ký quá lớn (tối đa {SignatureImage.MaxBytes / 1024} KB).");
     }
 }
 

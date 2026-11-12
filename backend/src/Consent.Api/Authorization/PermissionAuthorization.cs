@@ -6,6 +6,14 @@ using Microsoft.Extensions.Options;
 
 namespace Consent.Api.Authorization;
 
+/// <summary>Token phiên ký: scheme xác thực và policy riêng cho chế độ ký trên máy tính bảng.</summary>
+public static class SigningSession
+{
+    public const string AuthenticationScheme = "SigningSession";
+
+    public const string PolicyName = "signing-session";
+}
+
 /// <summary>Yêu cầu người dùng có quyền (permission) cụ thể. Ví dụ: <c>[HasPermission(Permissions.UsersManage)]</c>.</summary>
 [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = true)]
 public sealed class HasPermissionAttribute(string permission) : AuthorizeAttribute(PermissionPolicyProvider.PolicyPrefix + permission)

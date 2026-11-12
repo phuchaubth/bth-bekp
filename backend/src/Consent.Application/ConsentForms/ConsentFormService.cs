@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Consent.Application.Abstractions;
@@ -35,6 +37,7 @@ public sealed class ConsentFormService(
     IValidator<UpdateConsentFormRequest> updateValidator,
     IValidator<CancelConsentFormRequest> cancelValidator,
     IConsentPdfRenderer pdfRenderer,
+    IDocumentStore documents,
     IOptions<HospitalOptions> hospital)
 {
     /// <summary>Bệnh viện ở Việt Nam (UTC+7, không đổi giờ theo mùa): lọc theo ngày dùng giờ địa phương.</summary>
@@ -119,10 +122,30 @@ public sealed class ConsentFormService(
         }
 
         var definition = ConsentTemplateService.ReadDefinition(version);
+        var data = Prefill(definition, patient);
+        if (request.ReplacesFormId is { } replacesId)
+        {
+            var replaced = await LoadInScopeAsync(replacesId, cancellationToken).ConfigureAwait(false);
+            if (replaced is null || replaced.Status != ConsentFormStatus.Revoked
+                || replaced.PatientId != patient.Id || replaced.TemplateId != template.Id)
+            {
+                return Error.ValidationField("replacesFormId", "Chỉ lập phiếu thay thế cho phiếu đã thu hồi của cùng người bệnh, cùng mẫu.");
+            }
+
+            if (await forms.FindReplacementAsync(replaced.Id, cancellationToken).ConfigureAwait(false) is { } existing)
+            {
+                return Error.Conflict("consent_forms.already_replaced", $"Phiếu này đã có phiếu thay thế {existing.FormNo}.");
+            }
+
+            // Lấy lại nội dung phiếu cũ (chuẩn hóa theo phiên bản mẫu hiện hành) để chỉ cần sửa chỗ sai.
+            data = FormDataEvaluator.Evaluate(definition, FormDataEvaluator.ParseData(replaced.DataJson), keepHidden: true).Data;
+        }
+
         var formNo = await numbers.NextAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
         var form = ConsentForm.Create(
-            formNo, patient.Id, template.Id, version.Id, department.Id, Prefill(definition, patient).ToJsonString(),
-            currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng."), clock.UtcNow);
+            formNo, patient.Id, template.Id, version.Id, department.Id, data.ToJsonString(),
+            currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng."), clock.UtcNow,
+            request.ReplacesFormId);
         forms.Add(form);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
@@ -243,7 +266,10 @@ public sealed class ConsentFormService(
         return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>PDF khổ A4 của phiếu; chưa hoàn tất thì ghi rõ "bản xem trước". Mỗi lần tải được ghi nhật ký.</summary>
+    /// <summary>
+    /// PDF khổ A4 của phiếu. Phiếu đã ký (hoàn tất/thu hồi): trả đúng file đã lưu lúc hoàn tất, sau khi kiểm tra mã băm.
+    /// Phiếu chưa hoàn tất: dựng bản xem trước (ghi rõ "bản xem trước"). Mỗi lần tải được ghi nhật ký.
+    /// </summary>
     public async Task<Result<ConsentPdfFile>> GetPdfAsync(Guid id, CancellationToken cancellationToken)
     {
         var form = await LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);
@@ -252,6 +278,40 @@ public sealed class ConsentFormService(
             return NotFound;
         }
 
+        byte[] content;
+        if (form.SignedPdfKey is { } key)
+        {
+            try
+            {
+                content = await documents.ReadAsync(key, cancellationToken).ConfigureAwait(false);
+            }
+            catch (DocumentUnavailableException)
+            {
+                return SignedPdfUnavailable;
+            }
+
+            if (!string.Equals(Sha256(content), form.SignedPdfSha256, StringComparison.Ordinal))
+            {
+                return SignedPdfUnavailable;
+            }
+        }
+        else
+        {
+            content = pdfRenderer.Render(await BuildPdfDocumentAsync(form, null, cancellationToken).ConfigureAwait(false));
+        }
+
+        AddAudit(AuditActions.ConsentFormPdfViewed, form.Id);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new ConsentPdfFile(content, $"{form.FormNo}.pdf");
+    }
+
+    /// <summary>
+    /// Dữ liệu dựng PDF: chỉ trường đang hiển thị, thông tin người bệnh/người ký (đã đóng băng nếu đã trình ký), chữ ký tay
+    /// (nếu có). <paramref name="confirmation"/> có giá trị khi dựng bản cuối lúc phía bệnh viện xác nhận.
+    /// </summary>
+    internal async Task<ConsentPdfDocument> BuildPdfDocumentAsync(
+        ConsentForm form, ConsentPdfConfirmation? confirmation, CancellationToken cancellationToken)
+    {
         var (template, version) = await LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
         var definition = ConsentTemplateService.ReadDefinition(version);
         // Chỉ in trường đang hiển thị (giá trị của trường ẩn trong bản nháp không được in).
@@ -259,8 +319,11 @@ public sealed class ConsentFormService(
         var (patient, representative) = await ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
         var department = await departments.GetByIdAsync(form.DepartmentId, cancellationToken).ConfigureAwait(false);
         var documentDate = DateOnly.FromDateTime((form.SubmittedAtUtc ?? form.CreatedAtUtc).ToOffset(VietnamOffset).DateTime);
+        var patientSignature = form.PatientSignature is { ImagePng: { } image } signature
+            ? new ConsentPdfSignature(image, signature.SignedAtUtc.ToOffset(VietnamOffset))
+            : null;
 
-        var content = pdfRenderer.Render(new ConsentPdfDocument(
+        return new ConsentPdfDocument(
             hospital.Value,
             department?.Name ?? string.Empty,
             template.Code,
@@ -272,11 +335,19 @@ public sealed class ConsentFormService(
             patient,
             representative,
             documentDate,
-            IsFinal: form.Status == ConsentFormStatus.Completed));
-        AddAudit(AuditActions.ConsentFormPdfViewed, form.Id);
-        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return new ConsentPdfFile(content, $"{form.FormNo}.pdf");
+            IsFinal: confirmation is not null,
+            form.Decision,
+            patientSignature,
+            confirmation);
     }
+
+    internal static string Sha256(byte[] content) =>
+        Convert.ToHexString(SHA256.HashData(content)).ToLower(CultureInfo.InvariantCulture);
+
+    private static Error SignedPdfUnavailable =>
+        Error.Conflict(
+            "consent_forms.signed_pdf_unavailable",
+            "Không đọc được PDF đã ký hoặc file không khớp mã băm (có thể đã bị sửa). Hãy báo quản trị hệ thống.");
 
     /// <summary>Phiếu trong phạm vi người dùng (khoa của mình, phiếu mình lập, hoặc toàn viện).</summary>
     internal async Task<ConsentForm?> LoadInScopeAsync(Guid id, CancellationToken cancellationToken)
@@ -300,6 +371,13 @@ public sealed class ConsentFormService(
     internal async Task<ConsentFormDetailDto> BuildDetailAsync(ConsentForm form, CancellationToken cancellationToken)
     {
         var (template, version) = await LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var replaces = form.ReplacesFormId is { } replacesId
+            && await forms.GetByIdAsync(replacesId, cancellationToken).ConfigureAwait(false) is { } replacedForm
+                ? new ConsentFormRef(replacedForm.Id, replacedForm.FormNo)
+                : null;
+        var replacedBy = form.Status == ConsentFormStatus.Revoked
+            ? await forms.FindReplacementAsync(form.Id, cancellationToken).ConfigureAwait(false)
+            : null;
         var definition = ConsentTemplateService.ReadDefinition(version);
         var evaluation = FormDataEvaluator.Evaluate(definition, FormDataEvaluator.ParseData(form.DataJson), keepHidden: form.CanEdit);
         var (patient, representative) = await ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
@@ -335,11 +413,27 @@ public sealed class ConsentFormService(
             form.CancelReason,
             form.RevokedAtUtc,
             form.RevokeReason,
-            new ConsentFormActions(form.CanEdit, form.CanSubmit, form.CanReturnToDraft, form.CanCancel));
+            form.Decision,
+            [.. form.Signatures.OrderBy(s => s.SignedAtUtc).Select(s => new ConsentSignatureDto(
+                s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc))],
+            form.SignedPdfSha256,
+            replaces,
+            replacedBy,
+            new ConsentFormActions(
+                form.CanEdit,
+                form.CanSubmit,
+                form.CanReturnToDraft,
+                form.CanCancel,
+                CanStartSigning: form.CanStartSigning && currentUser.HasPermission(Permissions.ConsentsCreate),
+                CanConfirm: form.CanComplete && currentUser.HasPermission(Permissions.ConsentsSign)
+                    && currentUser.IsInRole(template.HospitalSignerRoleCode),
+                CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
+                CanReplace: form.Status == ConsentFormStatus.Revoked && replacedBy is null
+                    && currentUser.HasPermission(Permissions.ConsentsCreate)));
     }
 
     /// <summary>Đã trình ký: dùng thông tin đóng băng. Đang nháp: lấy từ hồ sơ hiện tại.</summary>
-    private async Task<(ConsentPatientInfo Patient, ConsentRepresentativeInfo? Representative)> ResolvePeopleAsync(
+    internal async Task<(ConsentPatientInfo Patient, ConsentRepresentativeInfo? Representative)> ResolvePeopleAsync(
         ConsentForm form, CancellationToken cancellationToken)
     {
         if (form.SnapshotJson is not null
@@ -400,10 +494,10 @@ public sealed class ConsentFormService(
 
     private static Error InvalidStatus(string message) => Error.Conflict("consent_forms.invalid_status", message);
 
-    private void AddAudit(string action, Guid formId)
+    internal void AddAudit(string action, Guid formId, string? details = null)
     {
         var actor = new AuditActor(
             currentUser.UserId, currentUser.UserName, requestContext.IpAddress, requestContext.UserAgent, requestContext.CorrelationId);
-        auditLogs.Add(AuditLog.Create(clock.UtcNow, action, actor, nameof(ConsentForm), formId.ToString(), null));
+        auditLogs.Add(AuditLog.Create(clock.UtcNow, action, actor, nameof(ConsentForm), formId.ToString(), details));
     }
 }

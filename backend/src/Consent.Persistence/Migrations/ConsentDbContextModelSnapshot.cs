@@ -107,6 +107,10 @@ namespace Consent.Persistence.Migrations
                         .HasColumnType("varchar(max)")
                         .HasColumnName("DataEncrypted");
 
+                    b.Property<string>("Decision")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -117,6 +121,9 @@ namespace Consent.Persistence.Migrations
                         .HasColumnType("varchar(30)");
 
                     b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReplacesFormId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("RepresentativeId")
@@ -134,10 +141,27 @@ namespace Consent.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("SignedPdfKey")
+                        .HasMaxLength(200)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(200)");
+
+                    b.Property<string>("SignedPdfSha256")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<long?>("SignedPdfSize")
+                        .HasColumnType("bigint");
+
                     b.Property<string>("SignerKind")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid?>("SigningSessionId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("SnapshotJson")
                         .IsUnicode(false)
@@ -172,6 +196,10 @@ namespace Consent.Persistence.Migrations
 
                     b.HasIndex("PatientId");
 
+                    b.HasIndex("ReplacesFormId")
+                        .IsUnique()
+                        .HasFilter("[ReplacesFormId] IS NOT NULL");
+
                     b.HasIndex("TemplateId");
 
                     b.HasIndex("TemplateVersionId");
@@ -179,6 +207,57 @@ namespace Consent.Persistence.Migrations
                     b.HasIndex("Status", "DepartmentId", "CreatedAtUtc");
 
                     b.ToTable("ConsentForms", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentSignature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Device")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
+                    b.Property<Guid>("FormId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ImagePng")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("ImagePngEncrypted");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("SignedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("SignerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("SignerTitle")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FormId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("ConsentSignatures", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>
@@ -671,6 +750,11 @@ namespace Consent.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Consent.Domain.ConsentForms.ConsentForm", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacesFormId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Consent.Domain.ConsentTemplates.ConsentTemplate", null)
                         .WithMany()
                         .HasForeignKey("TemplateId")
@@ -682,6 +766,20 @@ namespace Consent.Persistence.Migrations
                         .HasForeignKey("TemplateVersionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentSignature", b =>
+                {
+                    b.HasOne("Consent.Domain.ConsentForms.ConsentForm", null)
+                        .WithMany("Signatures")
+                        .HasForeignKey("FormId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>
@@ -749,6 +847,11 @@ namespace Consent.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentForm", b =>
+                {
+                    b.Navigation("Signatures");
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>

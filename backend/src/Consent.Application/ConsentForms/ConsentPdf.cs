@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using Consent.Application.ConsentTemplates;
+using Consent.Domain.ConsentForms;
 using Consent.Domain.Patients;
 
 namespace Consent.Application.ConsentForms;
@@ -31,7 +32,16 @@ public sealed record ConsentPdfDocument(
     ConsentPatientInfo Patient,
     ConsentRepresentativeInfo? Representative,
     DateOnly DocumentDate,
-    bool IsFinal);
+    bool IsFinal,
+    ConsentDecision? Decision = null,
+    ConsentPdfSignature? PatientSignature = null,
+    ConsentPdfConfirmation? HospitalConfirmation = null);
+
+/// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
+public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt);
+
+/// <summary>Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam).</summary>
+public sealed record ConsentPdfConfirmation(string Name, string? Title, DateTimeOffset ConfirmedAt);
 
 public sealed record ConsentPdfFile(byte[] Content, string FileName);
 

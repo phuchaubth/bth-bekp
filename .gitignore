@@ -5,6 +5,8 @@
 # .NET
 **/bin/
 **/obj/
+# PDF phiếu đã ký khi chạy API cục bộ (Storage:DocumentsPath mặc định)
+**/App_Data/
 **/TestResults/
 *.user
 

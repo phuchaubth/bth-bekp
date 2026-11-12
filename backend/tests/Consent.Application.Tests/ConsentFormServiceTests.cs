@@ -15,72 +15,9 @@ namespace Consent.Application.Tests;
 
 public sealed class ConsentFormServiceTests
 {
-    private sealed class Scenario
-    {
-        public required AppTestContext Ctx { get; init; }
+    private static ConsentScenario Setup() => ConsentScenario.Create();
 
-        public required Department Noi { get; init; }
-
-        public required Department Kkb { get; init; }
-
-        public required Patient Patient { get; init; }
-
-        public required ConsentTemplate Ck01 { get; init; }
-
-        public required ConsentTemplate Tn01 { get; init; }
-
-        public ConsentFormService Service => Ctx.CreateConsentFormService();
-
-        /// <summary>Đăng nhập như một nhân viên của khoa <paramref name="department"/>.</summary>
-        public User LogIn(Department department, params string[] extraPermissions)
-        {
-            var user = Ctx.AddUser($"nv{Ctx.Store.Users.Count}", SystemRoles.Nurse, departmentId: department.Id);
-            Ctx.CurrentUser.UserId = user.Id;
-            Ctx.CurrentUser.UserName = user.UserName;
-            Ctx.CurrentUser.DepartmentId = department.Id;
-            Ctx.CurrentUser.Permissions.Clear();
-            Ctx.CurrentUser.Permissions.UnionWith([Permissions.ConsentsRead, Permissions.ConsentsCreate, .. extraPermissions]);
-            return user;
-        }
-    }
-
-    private static Scenario Setup()
-    {
-        var ctx = new AppTestContext();
-        var noi = ctx.AddDepartment("NOI", "Khoa Nội tổng hợp");
-        var kkb = ctx.AddDepartment("KKB", "Khoa Khám bệnh");
-        var patient = Patient.Create(
-            new PatientDetails(
-                "Phạm Thị Dung (giả lập)", new DateOnly(1988, 4, 5), Gender.Female, "036188000125", null, null,
-                "Số 9 Đường Thử Nghiệm", null, "0900000125", "Kinh", null, "Việt Nam", "GD4790000000125", "BN000125"),
-            ctx.Clock.UtcNow);
-        patient.AddRepresentative(
-            new RepresentativeDetails("Phạm Văn Chồng (giả lập)", RepresentativeRelationship.Spouse, "036085000777", null, Gender.Male, null, null),
-            ctx.Clock.UtcNow);
-        ctx.Store.Patients.Add(patient);
-
-        ConsentTemplate Seed(string code)
-        {
-            var source = DefaultConsentTemplates.All.Single(t => t.Code == code);
-            var template = ConsentTemplate.Create(code, source.Name, source.HospitalSignerRoleCode, null, source.ContentJson, ctx.Clock.UtcNow);
-            template.Publish(1, ctx.Clock.UtcNow);
-            ctx.Store.ConsentTemplates.Add(template);
-            return template;
-        }
-
-        return new Scenario { Ctx = ctx, Noi = noi, Kkb = kkb, Patient = patient, Ck01 = Seed("CK-01"), Tn01 = Seed("TN-01") };
-    }
-
-    private static JsonObject CompleteCk01() => new()
-    {
-        ["examType"] = "bhyt",
-        ["insuranceNumber"] = "GD4790000000125",
-        ["insuranceValidFrom"] = "2026-01-01",
-        ["insuranceValidTo"] = "2026-12-31",
-        ["primaryCareFacility"] = "Trạm Y tế Phường Mẫu",
-        ["referralPaper"] = "no",
-        ["acknowledged"] = true,
-    };
+    private static JsonObject CompleteCk01() => ConsentScenario.CompleteCk01();
 
     [Fact]
     public async Task Create_UsesPublishedVersion_NumbersTheForm_AndPrefillsFromPatient()
@@ -198,7 +135,9 @@ public sealed class ConsentFormServiceTests
 
         Assert.Equal(ConsentFormStatus.PendingSignature, submitted.Value.Status);
         Assert.Equal("Phạm Thị Dung (giả lập)", reloaded.Value.Patient.FullName);
-        Assert.Equal(new ConsentFormActions(false, false, true, true), reloaded.Value.Actions);
+        Assert.Equal(
+            new ConsentFormActions(false, false, true, true, CanStartSigning: true, CanConfirm: false, CanRevoke: false, CanReplace: false),
+            reloaded.Value.Actions);
         Assert.Equal("consent_forms.invalid_status", edit.Error!.Code);
 
         var back = await service.ReturnToDraftAsync(form.Id, CancellationToken.None);

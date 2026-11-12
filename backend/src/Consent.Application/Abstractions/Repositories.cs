@@ -108,6 +108,9 @@ public interface IConsentFormRepository
     /// <summary>Tìm kiếm có phân trang; phạm vi khoa đã được áp dụng sẵn trong <paramref name="query"/>.</summary>
     Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken);
 
+    /// <summary>Phiếu thay thế cho phiếu <paramref name="formId"/> (nếu đã lập).</summary>
+    Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken);
+
     void Add(ConsentForm form);
 }
 

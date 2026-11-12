@@ -11,6 +11,9 @@ public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary
 
     public string ConnectionString => sql.CreateConnectionString(DatabaseName);
 
+    /// <summary>Thư mục lưu PDF đã ký riêng cho factory này (xóa khi factory bị hủy).</summary>
+    public string DocumentsPath { get; } = Path.Combine(Path.GetTempPath(), "consent-test-docs-" + Guid.NewGuid().ToString("N"));
+
     protected override IReadOnlyDictionary<string, string?> Settings
     {
         get
@@ -18,6 +21,7 @@ public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary
             var settings = new Dictionary<string, string?>(TestSettings.RequiredSecrets())
             {
                 ["ConnectionStrings:Default"] = ConnectionString,
+                ["Storage:DocumentsPath"] = DocumentsPath,
                 ["Database:ApplyMigrationsOnStartup"] = "true",
                 ["Seed:Enabled"] = "true",
                 ["Seed:AdminPassword"] = TestSettings.AdminPassword,
@@ -35,5 +39,16 @@ public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary
 
             return settings;
         }
+    }
+
+    public override async ValueTask DisposeAsync()
+    {
+        await base.DisposeAsync();
+        if (Directory.Exists(DocumentsPath))
+        {
+            Directory.Delete(DocumentsPath, recursive: true);
+        }
+
+        GC.SuppressFinalize(this);
     }
 }

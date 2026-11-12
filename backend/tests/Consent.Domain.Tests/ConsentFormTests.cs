@@ -14,39 +14,77 @@ public sealed class ConsentFormTests
         Submit,
         ReturnToDraft,
         Cancel,
+        StartSigning,
+        PatientSign,
         Complete,
         Revoke,
     }
 
+    /// <summary>Trạng thái phiếu, tách "chờ ký" thành chờ người bệnh ký và chờ phía bệnh viện xác nhận.</summary>
+    public enum Stage
+    {
+        Draft,
+        AwaitingPatient,
+        AwaitingHospital,
+        Completed,
+        Cancelled,
+        Revoked,
+    }
+
+    private static readonly Guid Session = Guid.NewGuid();
+    private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47];
+
     private static ConsentForm NewForm() =>
         ConsentForm.Create("PDT-2026-000001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "{}", Guid.NewGuid(), Now);
 
+    private static void PatientSigns(ConsentForm form) =>
+        form.SignByPatient(Session, ConsentDecision.Agreed, "Người bệnh giả lập", Png, "Thiết bị thử", Guid.NewGuid(), Now);
+
+    private static void HospitalConfirms(ConsentForm form) =>
+        form.Complete(Guid.NewGuid(), "Nhân viên giả lập", "Điều dưỡng", "2026/11/a.pdf.enc", new string('a', 64), 1000, Now);
+
     /// <summary>Đưa phiếu mới tới trạng thái cần kiểm thử bằng các bước hợp lệ.</summary>
-    private static ConsentForm FormIn(ConsentFormStatus status)
+    private static ConsentForm FormIn(Stage stage)
     {
         var form = NewForm();
-        switch (status)
+        if (stage is Stage.AwaitingPatient or Stage.AwaitingHospital or Stage.Completed or Stage.Revoked)
         {
-            case ConsentFormStatus.PendingSignature:
-                form.Submit("{}", "{\"patient\":{}}", Now);
-                break;
-            case ConsentFormStatus.Completed:
-                form.Submit("{}", "{\"patient\":{}}", Now);
-                form.Complete(Now);
-                break;
-            case ConsentFormStatus.Cancelled:
-                form.Cancel(Reason, Now);
-                break;
-            case ConsentFormStatus.Revoked:
-                form.Submit("{}", "{\"patient\":{}}", Now);
-                form.Complete(Now);
-                form.Revoke(Reason, Now);
-                break;
+            form.Submit("{}", "{\"patient\":{}}", Now);
+            form.StartSigning(Session, Now);
         }
 
-        Assert.Equal(status, form.Status);
+        if (stage is Stage.AwaitingHospital or Stage.Completed or Stage.Revoked)
+        {
+            PatientSigns(form);
+        }
+
+        if (stage is Stage.Completed or Stage.Revoked)
+        {
+            HospitalConfirms(form);
+        }
+
+        if (stage == Stage.Revoked)
+        {
+            form.Revoke(Reason, Now);
+        }
+
+        if (stage == Stage.Cancelled)
+        {
+            form.Cancel(Reason, Now);
+        }
+
+        Assert.Equal(stage, StageOf(form));
         return form;
     }
+
+    private static Stage StageOf(ConsentForm form) => form.Status switch
+    {
+        ConsentFormStatus.Draft => Stage.Draft,
+        ConsentFormStatus.PendingSignature => form.PatientSignature is null ? Stage.AwaitingPatient : Stage.AwaitingHospital,
+        ConsentFormStatus.Completed => Stage.Completed,
+        ConsentFormStatus.Cancelled => Stage.Cancelled,
+        _ => Stage.Revoked,
+    };
 
     private static void Apply(ConsentForm form, FormAction action)
     {
@@ -64,8 +102,14 @@ public sealed class ConsentFormTests
             case FormAction.Cancel:
                 form.Cancel(Reason, Now);
                 break;
+            case FormAction.StartSigning:
+                form.StartSigning(Session, Now);
+                break;
+            case FormAction.PatientSign:
+                PatientSigns(form);
+                break;
             case FormAction.Complete:
-                form.Complete(Now);
+                HospitalConfirms(form);
                 break;
             case FormAction.Revoke:
                 form.Revoke(Reason, Now);
@@ -74,24 +118,28 @@ public sealed class ConsentFormTests
     }
 
     /// <summary>Bảng chuyển trạng thái đầy đủ: (trạng thái, thao tác) → trạng thái sau, hoặc null nếu không hợp lệ.</summary>
-    public static TheoryData<ConsentFormStatus, FormAction, ConsentFormStatus?> Transitions()
+    public static TheoryData<Stage, FormAction, Stage?> Transitions()
     {
-        var data = new TheoryData<ConsentFormStatus, FormAction, ConsentFormStatus?>();
-        var allowed = new Dictionary<(ConsentFormStatus, FormAction), ConsentFormStatus>
+        var data = new TheoryData<Stage, FormAction, Stage?>();
+        var allowed = new Dictionary<(Stage, FormAction), Stage>
         {
-            [(ConsentFormStatus.Draft, FormAction.Edit)] = ConsentFormStatus.Draft,
-            [(ConsentFormStatus.Draft, FormAction.Submit)] = ConsentFormStatus.PendingSignature,
-            [(ConsentFormStatus.Draft, FormAction.Cancel)] = ConsentFormStatus.Cancelled,
-            [(ConsentFormStatus.PendingSignature, FormAction.ReturnToDraft)] = ConsentFormStatus.Draft,
-            [(ConsentFormStatus.PendingSignature, FormAction.Cancel)] = ConsentFormStatus.Cancelled,
-            [(ConsentFormStatus.PendingSignature, FormAction.Complete)] = ConsentFormStatus.Completed,
-            [(ConsentFormStatus.Completed, FormAction.Revoke)] = ConsentFormStatus.Revoked,
+            [(Stage.Draft, FormAction.Edit)] = Stage.Draft,
+            [(Stage.Draft, FormAction.Submit)] = Stage.AwaitingPatient,
+            [(Stage.Draft, FormAction.Cancel)] = Stage.Cancelled,
+            [(Stage.AwaitingPatient, FormAction.ReturnToDraft)] = Stage.Draft,
+            [(Stage.AwaitingPatient, FormAction.Cancel)] = Stage.Cancelled,
+            [(Stage.AwaitingPatient, FormAction.StartSigning)] = Stage.AwaitingPatient,
+            [(Stage.AwaitingPatient, FormAction.PatientSign)] = Stage.AwaitingHospital,
+            [(Stage.AwaitingHospital, FormAction.ReturnToDraft)] = Stage.Draft,
+            [(Stage.AwaitingHospital, FormAction.Cancel)] = Stage.Cancelled,
+            [(Stage.AwaitingHospital, FormAction.Complete)] = Stage.Completed,
+            [(Stage.Completed, FormAction.Revoke)] = Stage.Revoked,
         };
-        foreach (var status in Enum.GetValues<ConsentFormStatus>())
+        foreach (var stage in Enum.GetValues<Stage>())
         {
             foreach (var action in Enum.GetValues<FormAction>())
             {
-                data.Add(status, action, allowed.TryGetValue((status, action), out var next) ? next : null);
+                data.Add(stage, action, allowed.TryGetValue((stage, action), out var next) ? next : null);
             }
         }
 
@@ -100,20 +148,73 @@ public sealed class ConsentFormTests
 
     [Theory]
     [MemberData(nameof(Transitions))]
-    public void StateMachine_AllowsOnlyDefinedTransitions(ConsentFormStatus from, FormAction action, ConsentFormStatus? expected)
+    public void StateMachine_AllowsOnlyDefinedTransitions(Stage from, FormAction action, Stage? expected)
     {
         var form = FormIn(from);
 
         if (expected is null)
         {
             Assert.Throws<DomainException>(() => Apply(form, action));
-            Assert.Equal(from, form.Status);
+            Assert.Equal(from, StageOf(form));
         }
         else
         {
             Apply(form, action);
-            Assert.Equal(expected, form.Status);
+            Assert.Equal(expected, StageOf(form));
         }
+    }
+
+    [Fact]
+    public void PatientSignature_NeedsTheCurrentSession_AndCanBeUsedOnce()
+    {
+        var form = FormIn(Stage.AwaitingPatient);
+        var other = Guid.NewGuid();
+
+        Assert.Throws<DomainException>(() =>
+            form.SignByPatient(other, ConsentDecision.Agreed, "Người bệnh giả lập", Png, null, null, Now));
+
+        // Mở phiên mới thì phiên cũ hết hiệu lực.
+        form.StartSigning(other, Now);
+        Assert.Throws<DomainException>(() => PatientSigns(form));
+
+        form.SignByPatient(other, ConsentDecision.Refused, "Người bệnh giả lập", Png, "Thiết bị thử", null, Now);
+        Assert.Null(form.SigningSessionId);
+        Assert.Equal(ConsentDecision.Refused, form.Decision);
+        Assert.Equal(ConsentSignerRole.Patient, form.PatientSignature!.Role);
+        Assert.Equal(ConsentSignatureMethod.Handwritten, form.PatientSignature.Method);
+        Assert.Throws<DomainException>(() =>
+            form.SignByPatient(other, ConsentDecision.Agreed, "Người bệnh giả lập", Png, null, null, Now));
+    }
+
+    [Fact]
+    public void RepresentativeSigns_AsRepresentative_AndHospitalConfirmsByAccount()
+    {
+        var form = NewForm();
+        form.UpdateDraft("{}", ConsentSignerKind.Representative, Guid.NewGuid(), Now);
+        form.Submit("{}", "{\"patient\":{}}", Now);
+        form.StartSigning(Session, Now);
+        PatientSigns(form);
+        HospitalConfirms(form);
+
+        Assert.Equal(ConsentSignerRole.Representative, form.PatientSignature!.Role);
+        var hospital = form.HospitalSignature!;
+        Assert.Equal(ConsentSignatureMethod.AccountConfirmation, hospital.Method);
+        Assert.Null(hospital.ImagePng);
+        Assert.Equal("Điều dưỡng", hospital.SignerTitle);
+        Assert.Equal(new string('a', 64), form.SignedPdfSha256);
+        Assert.Equal(Now, form.CompletedAtUtc);
+    }
+
+    [Fact]
+    public void ReturnToDraft_AfterPatientSigned_DropsTheSignature()
+    {
+        var form = FormIn(Stage.AwaitingHospital);
+
+        form.ReturnToDraft(Now);
+
+        Assert.Empty(form.Signatures);
+        Assert.Null(form.Decision);
+        Assert.Null(form.SigningSessionId);
     }
 
     [Fact]
@@ -136,7 +237,7 @@ public sealed class ConsentFormTests
     public void CancelAndRevoke_RequireAMeaningfulReason(string reason)
     {
         Assert.Throws<DomainException>(() => NewForm().Cancel(reason, Now));
-        Assert.Throws<DomainException>(() => FormIn(ConsentFormStatus.Completed).Revoke(reason, Now));
+        Assert.Throws<DomainException>(() => FormIn(Stage.Completed).Revoke(reason, Now));
     }
 
     [Fact]

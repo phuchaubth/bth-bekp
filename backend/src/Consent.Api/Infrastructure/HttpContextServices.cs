@@ -19,6 +19,12 @@ internal sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentU
     public Guid? DepartmentId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.Department), out var id) ? id : null;
 
     public bool HasPermission(string permission) => Principal?.HasClaim(AppClaimTypes.Permission, permission) == true;
+
+    public bool IsInRole(string roleCode) => Principal?.HasClaim(AppClaimTypes.Role, roleCode) == true;
+
+    public Guid? SigningFormId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningForm), out var id) ? id : null;
+
+    public Guid? SigningSessionId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningSession), out var id) ? id : null;
 }
 
 internal sealed class HttpRequestContext(IHttpContextAccessor accessor) : IRequestContext

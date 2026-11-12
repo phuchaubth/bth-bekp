@@ -3,6 +3,7 @@ using Consent.Api.Infrastructure;
 using Consent.Application.ConsentForms;
 using Consent.Domain.Authorization;
 using Consent.Shared;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Consent.Api.Controllers;
@@ -11,7 +12,7 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/consent-forms")]
 [Produces("application/json")]
-public sealed class ConsentFormsController(ConsentFormService forms) : ControllerBase
+public sealed class ConsentFormsController(ConsentFormService forms, ConsentSigningService signing) : ControllerBase
 {
     [HttpGet]
     [HasPermission(Permissions.ConsentsRead)]
@@ -63,4 +64,27 @@ public sealed class ConsentFormsController(ConsentFormService forms) : Controlle
     [HasPermission(Permissions.ConsentsCreate)]
     public async Task<IActionResult> Cancel(Guid id, CancelConsentFormRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await forms.CancelAsync(id, request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Mở phiên ký trên máy tính bảng: trả token phiên ký chỉ dùng để người bệnh ký đúng phiếu này.</summary>
+    [HttpPost("{id:guid}/signing-session")]
+    [HasPermission(Permissions.ConsentsCreate)]
+    public async Task<IActionResult> StartSigning(Guid id, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.StartSigningAsync(id, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Người bệnh/người đại diện ký tay (chỉ nhận token phiên ký, không nhận token đăng nhập).</summary>
+    [HttpPost("{id:guid}/patient-signature")]
+    [Authorize(Policy = SigningSession.PolicyName)]
+    public async Task<IActionResult> SignAsPatient(Guid id, PatientSignatureRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.SignAsPatientAsync(id, request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Phía bệnh viện xác nhận bằng tài khoản (vai trò theo cấu hình mẫu) và hoàn tất phiếu.</summary>
+    [HttpPost("{id:guid}/complete")]
+    [HasPermission(Permissions.ConsentsSign)]
+    public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.CompleteAsync(id, cancellationToken).ConfigureAwait(false));
+
+    [HttpPost("{id:guid}/revoke")]
+    [HasPermission(Permissions.ConsentsRevoke)]
+    public async Task<IActionResult> Revoke(Guid id, RevokeConsentFormRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.RevokeAsync(id, request, cancellationToken).ConfigureAwait(false));
 }
