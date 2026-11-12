@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 3 hoàn thành (mẫu phiếu có phiên bản, lập và trình ký phiếu, xuất PDF tiếng Việt). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026); người bệnh sẽ **ký tay trên máy tính bảng** (Sprint 4). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 4 hoàn thành: người bệnh **ký tay trên máy tính bảng**, phía bệnh viện xác nhận bằng tài khoản, PDF đã ký được lưu (mã hóa, có SHA-256), thu hồi và lập phiếu thay thế. Trước đó: mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -63,9 +63,15 @@ Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") ch
 
 **HIS:** mặc định **chưa kết nối** (`His__Provider=None`): sau khi quét chỉ kiểm tra hồ sơ đã có, mã người bệnh nhập tay, giao diện không hiển thị thông tin HIS. Để thử luồng HIS khi phát triển, đặt `His__Provider=Fake` (HIS giả lập; API từ chối khởi động nếu bật ở Production): số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
 
-**Thử lập phiếu:** đăng nhập `dieuduong.demo` → *Người bệnh* → mở một hồ sơ → **Lập phiếu** → chọn mẫu (CK-01, TT-01, TN-01) → điền → **Lưu nháp** / **Trình ký** → **Xem PDF**. Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (đang để giá trị mẫu trong `appsettings.json`, chờ bệnh viện cung cấp).
+**Thử lập và ký phiếu:**
+1. Đăng nhập `dieuduong.demo` → *Người bệnh* → mở một hồ sơ → **Lập phiếu** → chọn mẫu (CK-01, TT-01, TN-01) → điền → **Lưu nháp** / **Trình ký**.
+2. Bấm **Ký trên máy tính bảng**. Máy chuyển sang màn hình ký và phiên đăng nhập trên máy được đóng. Người bệnh chọn Đồng ý/Từ chối, ký vào khung (chuột cũng được), rồi bấm **Xác nhận chữ ký**.
+3. Nhân viên đăng nhập lại ngay trên màn hình ký để thoát chế độ ký.
+4. Người có vai trò xác nhận của mẫu bấm **Xác nhận và hoàn tất**: Tiếp đón (`tiepdon.demo`) cho CK-01, Điều dưỡng cho TT-01/TN-01. Xem **PDF đã ký**.
+5. Muốn thu hồi thì dùng `truongkhoa.demo`.
+ Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (đang để giá trị mẫu trong `appsettings.json`, chờ bệnh viện cung cấp).
 
-> **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT và nội dung phiếu được mã hóa bằng `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
+> **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT, nội dung phiếu, ảnh chữ ký và file PDF đã ký được mã hóa bằng (khóa dẫn xuất từ) `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
 ## Phát triển cục bộ
 
@@ -141,6 +147,10 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 - Mọi API mặc định yêu cầu đăng nhập; phân quyền theo quyền (permission) gán cho vai trò.
 - Dữ liệu người bệnh: số CCCD, CMND cũ, số điện thoại, mã BHYT được mã hóa AES-256-GCM trong CSDL; tra cứu/chặn trùng CCCD qua chỉ mục mù HMAC; danh sách chỉ hiện số đã che; mỗi lần xem hồ sơ đều được ghi nhật ký; số CCCD không bao giờ nằm trong URL.
 - Phiếu đồng thuận: nội dung phiếu và thông tin người bệnh/người ký đóng băng khi trình ký được mã hóa trong CSDL. Người dùng chỉ thấy phiếu của khoa mình hoặc do mình lập, trừ vai trò toàn viện. Mỗi lần xem phiếu và tải PDF đều được ghi nhật ký.
+- Ký tay:
+  - Chế độ ký dùng token phiên ký riêng: chỉ ký được đúng một phiếu, mọi API khác từ chối. Phiên đăng nhập của nhân viên trên máy bị đóng, muốn thoát phải đăng nhập lại.
+  - Ảnh chữ ký được máy chủ kiểm tra, chuẩn hóa và lưu mã hóa.
+  - PDF đã ký lưu thành file mã hóa trong `Storage__DocumentsPath` (Docker: volume `documents`, **sao lưu cùng CSDL**), kèm SHA-256 được kiểm tra lại mỗi lần tải.
 - Nhật ký audit ghi mọi thao tác thêm/sửa/xóa và sự kiện đăng nhập; không thể sửa/xóa (không có API, có trigger chặn trong SQL Server).
 - API trả lỗi dạng ProblemDetails tiếng Việt, không lộ chi tiết nội bộ; có security headers; OpenAPI chỉ bật ở Development.
 - Cấu hình Docker Compose dùng tài khoản `sa` **chỉ cho môi trường phát triển**. Môi trường chính thức dùng tài khoản SQL riêng với quyền tối thiểu (hướng dẫn trong `docs/trien-khai.md`, Sprint 6).
@@ -164,7 +174,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | 1 | Xác thực, phân quyền (RBAC), audit log, quản trị người dùng/vai trò/khoa | ✅ Hoàn thành |
 | 2 | Người bệnh, quét QR CCCD (HIS tạm chưa kết nối) | ✅ Hoàn thành |
 | 3 | Mẫu phiếu có phiên bản, lập phiếu, xuất PDF (theo [mẫu đề xuất](docs/mau-phieu-de-xuat.md)) | ✅ Hoàn thành |
-| 4 | Ký tay trên máy tính bảng (thay cho SmartCA trong giai đoạn hiện tại) | Chưa bắt đầu |
+| 4 | Ký tay trên máy tính bảng, xác nhận phía bệnh viện, PDF đã ký, thu hồi | ✅ Hoàn thành |
 | — | Ký số VNPT SmartCA (PA1 → PA3 → PA2) | ⏸ Tạm hoãn |
 | 5 | Xuất dữ liệu, báo cáo, nhật ký | Chưa bắt đầu |
 | 6 | Hoàn thiện, rà soát bảo mật, hướng dẫn triển khai | Chưa bắt đầu |

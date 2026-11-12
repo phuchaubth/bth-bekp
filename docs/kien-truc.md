@@ -1,6 +1,6 @@
 # Kiến trúc — Quản lý Phiếu đồng thuận
 
-> Cập nhật đến Sprint 3. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
+> Cập nhật đến Sprint 4. Các sơ đồ dùng Mermaid (GitHub hiển thị trực tiếp).
 > Tài liệu liên quan: [Yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md) · [Kế hoạch](KE_HOACH_TRIEN_KHAI.md) · [Tích hợp SmartCA](tich-hop-smartca.md)
 
 ---
@@ -112,18 +112,20 @@ backend/
     Consent.Application/       # Abstractions (repository, IClock, ICurrentUser, ITokenService…), Auth, Users,
                                #   Departments, Roles, Auditing (service + validator FluentValidation),
                                #   ConsentTemplates (định nghĩa mẫu, kiểm tra, đánh giá dữ liệu, 3 mẫu mặc định),
-                               #   ConsentForms (lập/soạn/trình ký/hủy phiếu, IConsentPdfRenderer)
+                               #   ConsentForms (lập/soạn/trình ký/hủy phiếu, ký tay và hoàn tất: ConsentSigningService,
+                               #   kiểm tra ảnh chữ ký SignatureImage, IConsentPdfRenderer), IDocumentStore
     Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),
                                #   Seeding, Migrations
     Consent.Infrastructure/    # Security (băm mật khẩu, JWT, mã hóa AES-GCM, chỉ mục mù), His (HIS giả lập), Time,
-                               #   Pdf (MigraDoc, font Tinos)
+                               #   Pdf (MigraDoc, font Tinos), Storage (lưu PDF đã ký, mã hóa)
     Consent.Api/               # Controllers, Authorization (HasPermission), Infrastructure (pipeline, lỗi,
                                #   security headers, correlation id, cookie, rate limiting)
   tests/
     Consent.Domain.Tests/
     Consent.Application.Tests/       # service với repository giả trong bộ nhớ
     Consent.Api.IntegrationTests/    # pipeline/phân quyền (không CSDL) + luồng thật với SQL Server (Testcontainers)
-    Consent.Infrastructure.Tests/    # mã hóa, chỉ mục mù, HIS giả lập, sinh PDF (file hợp lệ, nhúng font tiếng Việt)
+    Consent.Infrastructure.Tests/    # mã hóa, chỉ mục mù, HIS giả lập, sinh PDF (font tiếng Việt, ảnh chữ ký), kho lưu PDF,
+                                     #   token phiên ký
     Consent.ArchitectureTests/
 frontend/
   src/
@@ -133,7 +135,8 @@ frontend/
     components/                # layout chung, PageHeader, PagePlaceholder
     features/<module>/         # dashboard, account, admin (users, roles, departments), patients (QR CCCD, tiếp nhận,
                                #   danh sách, hồ sơ, người đại diện), consents (danh sách, lập phiếu, soạn phiếu
-                               #   theo định nghĩa mẫu, xem PDF), templates (mẫu phiếu, phiên bản, soạn JSON)
+                               #   theo định nghĩa mẫu, xem PDF, xác nhận, thu hồi), templates (mẫu phiếu, phiên bản,
+                               #   soạn JSON), signing (chế độ ký trên máy tính bảng, khung ký)
     pages/                     # đăng nhập, đổi mật khẩu bắt buộc, 403, 404, lỗi
     utils/                     # định dạng ngày, quy tắc mật khẩu, tìm kiếm không dấu, lỗi form
     test/                      # setup Vitest, giả lập API, dữ liệu mẫu
@@ -149,7 +152,7 @@ docker-compose.yml, .env.example
 
 Bảng được thêm dần theo sprint.
 
-**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`.
+**Đã có:** Sprint 1 (migration `AddUsersRolesAndAudit`): `Departments`, `Users`, `UserRoles`, `Roles`, `RolePermissions`, `RefreshTokens`, `AuditLogs`. Sprint 2 (migration `AddPatients`): `Patients`, `LegalRepresentatives`. Sprint 3 (migration `AddConsentTemplatesAndForms`): `ConsentTemplates`, `ConsentTemplateVersions`, `ConsentForms` và sequence `ConsentFormNumbers`. Sprint 4 (migration `AddConsentSignatures`): `ConsentSignatures`; `ConsentForms` thêm quyết định, phiên ký, phiếu bị thay thế và thông tin PDF đã ký.
 
 ```mermaid
 erDiagram
@@ -243,6 +246,8 @@ erDiagram
     Patients ||--o{ ConsentForms : "của"
     Departments ||--o{ ConsentForms : "lập tại"
     Users ||--o{ ConsentForms : "người lập"
+    ConsentForms ||--o{ ConsentSignatures : "có chữ ký"
+    ConsentForms ||--o| ConsentForms : "thay thế phiếu đã thu hồi"
 
     ConsentTemplates {
         uuid Id PK
@@ -278,7 +283,24 @@ erDiagram
         datetimeoffset SubmittedAtUtc
         string CancelReason
         string RevokeReason
+        string Decision "Agreed / Refused"
+        uuid SigningSessionId "phiên ký đang mở (dùng một lần)"
+        uuid ReplacesFormId FK "UK lọc NULL"
+        string SignedPdfKey "khóa lưu file PDF đã ký"
+        char64 SignedPdfSha256
         rowversion RowVersion
+    }
+    ConsentSignatures {
+        uuid Id PK
+        uuid FormId FK
+        string Role "Patient / Representative / Hospital"
+        string Method "Handwritten / AccountConfirmation"
+        string SignerName
+        string SignerTitle "chức danh (phía bệnh viện)"
+        uuid UserId FK "nhân viên"
+        string ImagePngEncrypted "ảnh chữ ký, AES-256-GCM"
+        string Device "User-Agent khi ký"
+        datetimeoffset SignedAtUtc
     }
 ```
 
@@ -286,41 +308,7 @@ Khóa ngoại của `ConsentForms` không xóa dây chuyền (phiếu là hồ s
 
 `AuditLogs` không có khóa ngoại (giữ nguyên lịch sử kể cả khi đối tượng bị xóa) và có trigger chặn UPDATE/DELETE.
 
-**Dự kiến (các sprint sau):** chữ ký và PDF đã ký (Sprint 4), giao dịch SmartCA (tạm hoãn, quyết định 9). Khi kết nối HIS, `ConsentForms` có thêm mã đợt khám và trạng thái đối chiếu HIS.
-
-```mermaid
-erDiagram
-    ConsentForms ||--o{ ConsentSignatures : "có chữ ký"
-    ConsentForms ||--o{ StoredDocuments : "PDF đã ký"
-    ConsentForms ||--o{ SignatureTransactions : "giao dịch SmartCA (tạm hoãn)"
-    LegalRepresentatives ||--o{ ConsentSignatures : "ký thay"
-    SigningReasons ||--o{ ConsentSignatures : "lý do (SmartCA)"
-    Users ||--o{ ConsentSignatures : "xác nhận / chứng kiến"
-
-    ConsentSignatures {
-        uuid Id PK
-        uuid FormId FK
-        string SignerType "Patient/Representative/Witness/Hospital"
-        string Method "Handwritten/AccountConfirmation/SmartCA/ProxySmartCA"
-        int SignOrder
-        uuid ReasonId FK
-        string CertificateSerial
-        datetime SignedAt "UTC"
-    }
-    SignatureTransactions {
-        uuid Id PK
-        uuid FormId FK
-        string ProviderTransactionId
-        string Status
-        datetime ExpiresAt
-    }
-    StoredDocuments {
-        uuid Id PK
-        uuid FormId FK
-        string StoragePath
-        string Sha256
-    }
-```
+**Dự kiến (khi bật lại SmartCA, quyết định 9):** `ConsentSignatures` có thêm phương thức `SmartCA`/`ProxySmartCA`, người chứng kiến, lý do (danh mục `SigningReasons`) và số sê-ri chứng thư; bảng `SignatureTransactions` theo dõi giao dịch ký SmartCA; mỗi lượt ký có thể lưu một bản PDF. Khi kết nối HIS, `ConsentForms` có thêm mã đợt khám và trạng thái đối chiếu HIS.
 
 Danh mục quyền được định nghĩa trong mã nguồn (`PermissionCatalog`) và gán cho vai trò qua bảng `RolePermissions` (thay cho bảng `Permissions` dự kiến trong kế hoạch). Bảng `ExportJobs` được mô tả ở mục 4 của [kế hoạch](KE_HOACH_TRIEN_KHAI.md).
 
@@ -337,14 +325,16 @@ stateDiagram-v2
     PendingSignature --> Draft: trả về nháp
     Draft --> Cancelled: hủy (bắt buộc lý do)
     PendingSignature --> Cancelled: hủy (bắt buộc lý do)
-    PendingSignature --> Completed: ký tay + xác nhận phía bệnh viện (Sprint 4)
-    Completed --> Revoked: thu hồi (bắt buộc lý do, Sprint 4)
+    PendingSignature --> PendingSignature: người bệnh ký tay (chế độ ký)
+    PendingSignature --> Completed: phía bệnh viện xác nhận bằng tài khoản
+    Completed --> Revoked: thu hồi (bắt buộc lý do)
     Cancelled --> [*]
     Revoked --> [*]
 ```
 
 - Quy tắc chuyển trạng thái nằm trong Domain (`ConsentForm.CanEdit/CanSubmit/CanReturnToDraft/CanCancel/CanComplete/CanRevoke`). Toàn bộ bảng chuyển đổi (5 trạng thái × 6 thao tác) có unit test. Chuyển sai quy tắc → API trả `409 consent_forms.invalid_status` kèm thông báo tiếng Việt.
-- Sprint 3 dùng các bước lập, sửa nháp, trình ký, trả về nháp, hủy. `Complete`/`Revoke` đã có trong Domain và được dùng ở Sprint 4.
+- Trong "Chờ ký" có hai bước con: chờ người bệnh ký tay (mở phiên ký, `SignByPatient`), rồi chờ phía bệnh viện xác nhận (`Complete`, luật BR-02: người bệnh ký trước). Bảng chuyển đổi trong unit test tách hai bước này: 6 trạng thái × 8 thao tác.
+- Trả về nháp sau khi người bệnh đã ký sẽ bỏ chữ ký (nội dung sẽ đổi); nhật ký audit vẫn giữ dấu vết. Phiếu hoàn tất chỉ có thể thu hồi, rồi lập phiếu thay thế (`ReplacesFormId`).
 - API trả kèm `actions` (thao tác người dùng được làm với phiếu) để giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại.
 
 **Khi bật lại SmartCA (tạm hoãn, quyết định 9):** bước chờ ký được tách theo từng người ký:
@@ -467,6 +457,27 @@ sequenceDiagram
 - **PDF (ADR-020):** `IConsentPdfRenderer` (Application) do `MigraDocConsentPdfRenderer` (Infrastructure) cài đặt. File A4 gồm tiêu đề hành chính (tên đơn vị lấy từ cấu hình `Hospital:*`), mã mẫu và số phiếu, tiêu đề, khối thông tin người bệnh, nội dung theo định nghĩa (chỉ trường đang hiển thị), khối chữ ký và số trang. Phiếu chưa hoàn tất in dòng "BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ". Sprint 3 sinh PDF mỗi lần xem, không lưu file. Từ Sprint 4, PDF đã ký được lưu kèm SHA-256. Mỗi lần xem chi tiết phiếu và mỗi lần tải PDF đều ghi nhật ký (`ConsentForms.Viewed`, `ConsentForms.PdfViewed`).
 - **Xem PDF trên giao diện:** trình duyệt tải PDF qua API (có xác thực) rồi hiển thị trong khung bằng địa chỉ `blob:`. Vì vậy CSP của web có thêm `frame-src blob:`. Chỉ script của chính ứng dụng tạo được địa chỉ này. Khi triển khai bằng IIS phải đặt cùng CSP như `frontend/nginx.conf`.
 
+### 8.7. Ký tay trên máy tính bảng
+
+- **Chế độ ký do máy chủ kiểm soát (ADR-023):**
+  - Nhân viên mở phiên ký, nhận *token phiên ký*: JWT cùng khóa ký nhưng đối tượng nhận riêng (`<Audience>:signing`), hạn `Jwt:SigningTokenMinutes` (mặc định 30 phút), chứa mã phiếu và mã phiên.
+  - API có scheme xác thực riêng `SigningSession`; chỉ endpoint `patient-signature` dùng scheme này. Token phiên ký bị mọi API khác từ chối, và ngược lại.
+  - Phiên lưu ở phiếu (`SigningSessionId`): mở phiên mới thì phiên cũ hết hiệu lực; ký xong thì phiên bị xóa (dùng một lần).
+- **Giao diện:**
+  - Lấy token xong, giao diện đóng phiên đăng nhập của nhân viên (thu hồi refresh token) rồi mở màn hình `/ky-phieu`: không menu, có nút toàn màn hình.
+  - Khi đang có phiên ký, mọi trang cần đăng nhập đều quay về màn hình ký (kể cả nút "Quay lại" của trình duyệt).
+  - Token phiên ký chỉ nằm trong bộ nhớ: tải lại trang là mất, và lúc đó máy không còn phiên nào. Thoát chế độ ký là đăng nhập lại (sai nhiều lần thì tài khoản bị khóa tạm như đăng nhập thường).
+  - Khóa ở mức thiết bị (Guided Access trên iPad, Ghim màn hình trên Android) được khuyến nghị thêm.
+- **Ảnh chữ ký (ADR-024):**
+  - Khung ký dùng Pointer Events (ngón tay, bút, chuột), `touch-action: none`. Nét ký chỉ nằm trong bộ nhớ trình duyệt để vẽ lại khi xoay màn hình; thứ gửi đi chỉ là ảnh PNG nền trắng.
+  - Máy chủ tự giải mã PNG bằng mã của dự án (`SignatureImage`, chỉ dùng `System.IO.Compression`). Các bước: kiểm tra CRC và kích thước trước khi giải nén (chặn "bom giải nén"); từ chối khung trống; cắt sát nét ký; mã hóa lại thành PNG xám 8 bit chỉ gồm điểm ảnh.
+  - Ảnh lưu mã hóa (`ImagePngEncrypted`), bị che trong audit, không có API trả ảnh riêng.
+- **Hoàn tất (ADR-025):**
+  - Người xác nhận phải có vai trò ghi trong mẫu (BR-10, quyết định 11).
+  - Máy chủ dựng PDF bản cuối (ảnh chữ ký, Đồng ý/Từ chối, người đại diện, họ tên, chức danh và thời điểm xác nhận phía bệnh viện), tính SHA-256, rồi lưu file qua `IDocumentStore`.
+  - `EncryptedFileDocumentStore` mã hóa AES-256-GCM bằng khóa dẫn xuất (HKDF) từ khóa mã hóa cột, đưa khóa lưu trữ vào AAD nên tráo file giữa các phiếu cũng bị phát hiện. File được ghi ra file tạm rồi mới đổi tên.
+  - Mỗi lần tải PDF đã ký, máy chủ đọc đúng file đã lưu và kiểm tra lại SHA-256. Ghi file trước, lưu CSDL sau: lỗi giữa chừng chỉ để lại một file thừa.
+
 ## 9. Cấu hình và bí mật
 
 | Khóa cấu hình | Biến môi trường | Ghi chú |
@@ -476,6 +487,7 @@ sequenceDiagram
 | `Cors:AllowedOrigins` | `Cors__AllowedOrigins__0`… | Mặc định rỗng; Development cho phép `http://localhost:5173` |
 | `Jwt:SigningKey` | `Jwt__SigningKey` | **Bí mật**, ≥ 32 ký tự ngẫu nhiên; thiếu thì API không khởi động |
 | `Jwt:AccessTokenMinutes` | `Jwt__AccessTokenMinutes` | Mặc định 15 (1–60) |
+| `Jwt:SigningTokenMinutes` | `Jwt__SigningTokenMinutes` | Thời hạn token phiên ký trên máy tính bảng. Mặc định 30 (5–120) |
 | `Auth:MaxFailedAttempts`, `Auth:LockoutMinutes` | `Auth__…` | Mặc định 5 lần, 15 phút |
 | `Auth:RefreshTokenLifetimeHours`, `Auth:RefreshReuseGraceSeconds` | `Auth__…` | Mặc định 12 giờ, 30 giây |
 | `RateLimiting:AuthPermitLimit`, `RefreshPermitLimit`, `WindowSeconds` | `RateLimiting__…` | Mặc định 10, 30 lần / 60 giây / IP |
@@ -488,6 +500,7 @@ sequenceDiagram
 | `His:Provider` | `His__Provider` | `None` (mặc định: chưa kết nối HIS) hoặc `Fake` (HIS giả lập, chỉ dev/test; bị từ chối ở Production). Giá trị khác → API không khởi động |
 | `His:TimeoutSeconds` | `His__TimeoutSeconds` | Mặc định 5 (1–60) |
 | `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` | `Hospital__…` | Cơ quan chủ quản, tên bệnh viện, địa danh in ở đầu PDF. **Đang để giá trị mẫu, chờ bệnh viện cung cấp** |
+| `Storage:DocumentsPath` | `Storage__DocumentsPath` | Thư mục lưu PDF đã ký (ổ đĩa hoặc thư mục mạng). Bắt buộc; mặc định `App_Data/documents`, Docker dùng volume `documents`. **Phải sao lưu cùng CSDL**; file được mã hóa bằng khóa dẫn xuất từ `FIELD_ENCRYPTION_KEY` nên mất khóa là mất cả PDF |
 | `SmartCa:*` | `SmartCa__SpPassword`… | **Tạm hoãn** (chưa tích hợp SmartCA); thiết kế giữ trong [tich-hop-smartca.md](tich-hop-smartca.md) |
 
 Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; chỉ commit `.env.example`.
@@ -528,3 +541,6 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-020 | Sinh PDF bằng PDFsharp-MigraDoc **6.2.4** (MIT, ghim phiên bản); font Tinos (SIL OFL 1.1) nhúng trong mã nguồn | Thư viện .NET thuần, không cần trình duyệt hay dịch vụ ngoài. Từ bản 6.5, thư viện đổi sang giấy phép AGPL nên không nâng cấp. Font nhúng sẵn nên PDF giống nhau trên Windows/Linux/Docker và đủ dấu tiếng Việt. Ô đánh dấu dùng □/■ vì font không có ☐/☒ |
 | ADR-021 | Ghim `System.Security.Cryptography.Pkcs` 10.0.15 | PDFsharp kéo theo bản 8.0.1 có lỗ hổng đã công bố (GHSA-846f-f764-76mx). Ghim bản đã vá thay vì tắt cảnh báo NU1903 |
 | ADR-022 | Đóng băng (mã hóa) thông tin người bệnh và người ký khi trình ký; phiếu ngoài phạm vi khoa trả 404 | Nội dung đem ký không đổi dù hồ sơ được sửa sau đó; không tiết lộ sự tồn tại của phiếu khoa khác |
+| ADR-023 | Chế độ ký dùng token phiên ký riêng (đối tượng nhận riêng, gắn với một phiếu và một phiên, dùng một lần) và đóng phiên đăng nhập của nhân viên trên máy; thoát chế độ ký = đăng nhập lại | Máy chủ chặn được người bệnh cầm máy làm việc khác, không phụ thuộc vào việc giao diện bị vượt qua hay trang bị tải lại. Dùng lại cơ chế đăng nhập sẵn có (khóa tạm khi sai nhiều lần) thay vì thêm API kiểm tra mật khẩu riêng |
+| ADR-024 | Tự giải mã và chuẩn hóa ảnh chữ ký ở máy chủ (không thêm thư viện xử lý ảnh) | Phát hiện khung trống và ảnh giả mạo/quá lớn ngay ở máy chủ; ảnh lưu lại chỉ còn điểm ảnh (loại dữ liệu kèm theo); không phát sinh phụ thuộc mới |
+| ADR-025 | PDF đã ký lưu thành file trên đĩa, mã hóa AES-256-GCM (khóa dẫn xuất HKDF, khóa lưu trữ làm AAD), kèm SHA-256 trong CSDL; trả đúng file đã lưu mỗi lần tải | Đúng giả định lưu file trên máy chủ của kế hoạch nhưng không để lộ dữ liệu cá nhân nếu thư mục bị sao chép; phát hiện được file bị sửa hoặc bị tráo; PDF đã ký không bị dựng lại khi mẫu hay phần mềm đổi |

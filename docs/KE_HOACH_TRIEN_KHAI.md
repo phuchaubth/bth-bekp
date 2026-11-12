@@ -474,18 +474,33 @@ Bố cục chung: Ant Design `Layout` có thanh menu bên trái (thu gọn thàn
 - **Phía bệnh viện:** xác nhận bằng tài khoản (quyết định 11).
 - **Hoàn tất:** chèn ảnh chữ ký vào PDF (Sprint 3 đã sinh PDF); lưu PDF và SHA-256; khóa phiếu; ghi nhật ký đầy đủ; thu hồi phải có lý do.
 
-**Tiêu chí nghiệm thu**
+**Điều chỉnh khi triển khai (ADR-023…025 trong [kiến trúc](kien-truc.md))**
+- **"Thoát phải nhập lại mật khẩu nhân viên" do máy chủ kiểm soát:**
+  - Khi bắt đầu ký, máy nhận token phiên ký (chỉ ký được đúng phiếu đó, 30 phút, dùng một lần), còn phiên đăng nhập của nhân viên trên máy bị đóng.
+  - Thoát chế độ ký chính là đăng nhập lại: dùng chung cơ chế khóa tạm khi sai mật khẩu nhiều lần.
+  - Tải lại trang thì máy không còn phiên nào. Nút "Quay lại" của trình duyệt vẫn giữ ở màn hình ký.
+- **Đồng ý/Từ chối ghi nhận lúc ký,** bắt buộc chọn. Chọn "Từ chối" thì người ký vẫn ký để xác nhận quyết định. Quyết định in trên PDF và có trong chi tiết phiếu (phục vụ báo cáo tỉ lệ từ chối ở Sprint 5).
+- **Ảnh chữ ký được máy chủ giải mã và chuẩn hóa** (cắt sát nét, PNG xám), không thêm thư viện. Ảnh không có API xem riêng, chỉ xem trong PDF.
+- **PDF đã ký lưu thành file mã hóa** trong `Storage:DocumentsPath` (Docker: volume `documents`), kèm SHA-256 trong CSDL; mỗi lần tải đều kiểm tra lại mã băm. Thư mục này phải được sao lưu cùng CSDL.
+- **Trả về nháp sau khi người bệnh đã ký** (phía bệnh viện chưa xác nhận) bỏ chữ ký, vì nội dung sẽ đổi; giao diện hỏi lại trước khi làm.
+- **Thu hồi:** quyền mặc định ở Quản trị hệ thống và Trưởng khoa. Phiếu đã thu hồi có nút "Lập phiếu thay thế": chép nội dung phiếu cũ, mỗi phiếu chỉ được thay thế một lần.
+- **Phía bệnh viện chỉ xác nhận bằng tài khoản** (quyết định 11). Mẫu TT-01 bỏ chú thích "(Ký, ghi rõ họ tên, chức danh)" ở ô phía bệnh viện; PDF ghi "(Đã xác nhận bằng tài khoản)".
+- **Chi tiết phiếu (màn hình 8)** có thêm lịch sử phiếu (lập, trình ký, các chữ ký, hoàn tất, hủy/thu hồi) và mã SHA-256 của PDF đã ký.
+
+**Tiêu chí nghiệm thu** (✅ đã đạt, có test tự động)
 - **Dữ liệu chữ ký:**
-  - Khung ký trống → không xác nhận được (test giao diện + API 422).
-  - Ảnh chữ ký không phải PNG hợp lệ hoặc quá lớn → API từ chối.
-  - Không lưu dữ liệu nét ký. Chỉ người có quyền xem phiếu mới xem được ảnh chữ ký.
-- **Chế độ ký:** chưa nhập đúng mật khẩu nhân viên thì không thoát được (test giao diện + API).
+  - ✅ Khung ký trống → không xác nhận được: giao diện khóa nút xác nhận, API trả `422 consent_forms.signature_blank` (test giao diện, unit test, test với SQL Server thật).
+  - ✅ Ảnh không phải PNG hợp lệ (sai mã kiểm tra, sai định dạng màu, thiếu dữ liệu) hoặc quá lớn (dung lượng, kích thước) → API từ chối (unit test).
+  - ✅ Không lưu dữ liệu nét ký, chỉ lưu ảnh PNG đã chuẩn hóa (mã hóa trong CSDL; test đọc trực tiếp cột). Không có API trả ảnh; ảnh chỉ có trong PDF, cần quyền xem phiếu.
+- **Chế độ ký:** ✅ chưa đăng nhập lại đúng mật khẩu thì không thoát được:
+  - Token phiên ký bị mọi API khác từ chối, token đăng nhập không ký thay được (test với SQL Server thật).
+  - Giao diện: sai mật khẩu vẫn ở màn hình ký, nút "Quay lại" vẫn giữ ở màn hình ký, tải lại trang thì không vào được trang nào (test giao diện + E2E).
 - **PDF:**
-  - Khi người đại diện ký: PDF ghi đúng họ tên, quan hệ, số CCCD của người đại diện (có test).
-  - PDF hoàn tất có ảnh chữ ký đúng ô ký, kèm họ tên và thời điểm ký.
-  - SHA-256 lưu trong CSDL khớp file (integration test).
-- **Sau khi ký:** phiếu không sửa được (test API); thu hồi bắt buộc lý do và có audit.
-- **Thiết bị:** ký được trên máy tính bảng (Safari iPad, Chrome Android) bằng ngón tay và bút. Kiểm bằng E2E giả lập cảm ứng, và thử trên máy thật khi bệnh viện có máy.
+  - ✅ Người đại diện ký: PDF ghi họ tên, quan hệ, số CCCD của người đại diện (unit test).
+  - ✅ PDF hoàn tất có ảnh chữ ký đúng ô ký, kèm họ tên và thời điểm ký (unit test kiểm tra ảnh được nhúng; E2E đọc lại chữ và ảnh trong file). Cam kết khám thông thường vẫn gọn trong 1 trang.
+  - ✅ SHA-256 lưu trong CSDL khớp file tải về; file sửa hoặc bị tráo đều bị phát hiện (integration test + unit test).
+- **Sau khi ký:** ✅ phiếu không sửa, không trả về nháp, không hủy được (`409`). ✅ Thu hồi bắt buộc lý do, có audit (`ConsentForms.Revoked`); điều dưỡng không có quyền thu hồi (`403`).
+- **Thiết bị:** ✅ E2E Chromium giả lập máy tính bảng, ký bằng sự kiện chạm thật. ⏳ Chưa thử trên iPad, máy Android và bút thật: chờ bệnh viện có máy.
 
 ### Giai đoạn sau – Ký số VNPT SmartCA cho người bệnh và bác sĩ (TẠM HOÃN)
 
@@ -582,6 +597,6 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 
 ## 11. Bước tiếp theo
 
-Sprint 0–3 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
+Sprint 0–4 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF, ký tay trên máy tính bảng và hoàn tất phiếu. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
 
-Tiếp theo là **Sprint 4: ký tay trên máy tính bảng** (mục 2.5a): chế độ ký toàn màn hình, khung ký, xác nhận phía bệnh viện bằng tài khoản, PDF hoàn tất có ảnh chữ ký và mã băm, thu hồi phiếu.
+Tiếp theo là **Sprint 5: xuất dữ liệu, báo cáo, nhật ký**. Gồm: xuất Excel/CSV theo bộ lọc (che dữ liệu mặc định, có lịch sử xuất); thống kê và dashboard (gồm tỉ lệ từ chối); màn hình xem nhật ký audit. Sau đó là **Sprint 6: hoàn thiện, rà soát bảo mật, hướng dẫn triển khai**.

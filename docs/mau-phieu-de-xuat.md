@@ -55,7 +55,8 @@ Nhân viên **sửa được** các trường tự điền trước khi trình k
 - **Ngưỡng tuổi tự ký** và cách xử lý khi người bệnh không ký được (không biết chữ, khuyết tật…) **chờ pháp chế xác nhận** (mục 6).
 - **Hình thức ký (đã chốt 11/11/2026): ký tay trên máy tính bảng.**
   - Ảnh chữ ký được chèn vào ô ký trên phiếu PDF, kèm họ tên và thời điểm ký.
-  - Khối chữ ký vẫn in "(Ký, ghi rõ họ tên)" như mẫu giấy.
+  - Ô ký phía người bệnh vẫn in "(Ký, ghi rõ họ tên)" như mẫu giấy. Phía trên khối chữ ký là dòng "Ý kiến của người bệnh: □ Đồng ý □ Từ chối" (đánh dấu theo lựa chọn khi ký).
+  - Ô phía bệnh viện in "(Đã xác nhận bằng tài khoản)" kèm họ tên, chức danh và thời điểm xác nhận (quyết định 11).
   - Quy trình chi tiết ở [kế hoạch, mục 2.5a](KE_HOACH_TRIEN_KHAI.md#25a-ký-tay-trên-máy-tính-bảng-đang-áp-dụng-quyết-định-10).
 
 ### 1.4. Kiểu trường dùng trong mẫu

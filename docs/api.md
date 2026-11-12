@@ -1,6 +1,6 @@
 # Tài liệu API — Quản lý Phiếu đồng thuận
 
-> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 3 — thêm mẫu phiếu có phiên bản, phiếu đồng thuận, xuất PDF).
+> Phiên bản API: `v1`. Tài liệu được cập nhật theo từng sprint (hiện tại: Sprint 4 — thêm ký tay trên máy tính bảng, xác nhận phía bệnh viện, PDF đã ký, thu hồi).
 > Ở môi trường Development, đặc tả OpenAPI tự sinh có tại `GET /openapi/v1.json`.
 >
 > Mọi ví dụ dưới đây dùng **dữ liệu giả lập**.
@@ -175,7 +175,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 | Báo cáo và xuất dữ liệu | `reports.read`, `exports.run`, `exports.sensitive` |
 | Phạm vi dữ liệu | `scope.all_departments` (xem dữ liệu mọi khoa) |
 
-**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`. Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`.
+**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`. Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
 
 ---
 
@@ -328,18 +328,22 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 
 **Phạm vi khoa:** người dùng chỉ thấy phiếu **của khoa mình** hoặc **do mình lập**, trừ khi có quyền `scope.all_departments`. Phiếu ngoài phạm vi trả `404` (không tiết lộ phiếu có tồn tại).
 
-**Vòng đời (Sprint 3):** `Draft` (nháp) → `PendingSignature` (chờ ký) → `Completed` (hoàn tất, Sprint 4) → `Revoked` (thu hồi, Sprint 4). `Draft`/`PendingSignature` → `Cancelled` (hủy, bắt buộc lý do). Chuyển trạng thái sai quy tắc → `409 consent_forms.invalid_status` kèm thông báo tiếng Việt (ví dụ "Chỉ trình ký được phiếu nháp.").
+**Vòng đời:** `Draft` (nháp) → `PendingSignature` (chờ ký: người bệnh ký tay, rồi phía bệnh viện xác nhận) → `Completed` (hoàn tất, phiếu bị khóa) → `Revoked` (thu hồi). `Draft`/`PendingSignature` → `Cancelled` (hủy, bắt buộc lý do). Chuyển trạng thái sai quy tắc → `409 consent_forms.invalid_status` kèm thông báo tiếng Việt (ví dụ "Chỉ trình ký được phiếu nháp.").
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/api/v1/consent-forms?status=&templateId=&patientId=&departmentId=&from=&to=&keyword=&page=1&pageSize=20` | `consents.read` | Tìm kiếm, phân trang ở máy chủ, mới nhất trước. `from`/`to` là ngày lập (`yyyy-MM-dd`, giờ Việt Nam, gồm cả ngày `to`). `keyword`: số phiếu, họ tên người bệnh (không phân biệt dấu) hoặc mã người bệnh |
 | GET | `/api/v1/consent-forms/{id}` | `consents.read` | Chi tiết phiếu, kèm định nghĩa của **đúng phiên bản mẫu** đã dùng, dữ liệu, điểm, các mục còn thiếu (`issues`) và thao tác được phép (`actions`); ghi nhật ký `ConsentForms.Viewed` |
-| GET | `/api/v1/consent-forms/{id}/pdf` | `consents.read` | File PDF khổ A4 (`application/pdf`, tên `PDT-2026-000001.pdf`). Phiếu chưa hoàn tất có dòng **"BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ"**; ghi nhật ký `ConsentForms.PdfViewed` |
-| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. `departmentId` mặc định là khoa của người dùng; lập cho khoa khác cần quyền toàn viện (`403 consent_forms.department_forbidden`) |
+| GET | `/api/v1/consent-forms/{id}/pdf` | `consents.read` | File PDF khổ A4 (`application/pdf`, tên `PDT-2026-000001.pdf`). Phiếu chưa hoàn tất: bản xem trước dựng lại mỗi lần, có dòng **"BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ"**. Phiếu hoàn tất/thu hồi: trả **đúng file đã lưu lúc hoàn tất**, sau khi kiểm tra SHA-256 (file mất, hỏng hoặc bị sửa → `409 consent_forms.signed_pdf_unavailable`). Ghi nhật ký `ConsentForms.PdfViewed` |
+| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId?, replacesFormId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. `departmentId` mặc định là khoa của người dùng; lập cho khoa khác cần quyền toàn viện (`403 consent_forms.department_forbidden`) |
 | PUT | `/api/v1/consent-forms/{id}` | `consents.create` | Lưu nháp `{ data, signerKind, representativeId }`. Chưa bắt buộc đầy đủ; các mục còn thiếu trả về trong `issues`. Chỉ phiếu nháp |
 | POST | `/api/v1/consent-forms/{id}/submit` | `consents.create` | Trình ký: kiểm tra đầy đủ theo định nghĩa mẫu (thiếu → `400 consent_forms.incomplete` kèm `errors` theo từng trường), bỏ giá trị của trường đang ẩn, **đóng băng** thông tin người bệnh và người ký (sửa hồ sơ sau đó không làm đổi phiếu) |
 | POST | `/api/v1/consent-forms/{id}/return-to-draft` | `consents.create` | Trả phiếu đang chờ ký về nháp để sửa (bỏ thông tin đã đóng băng) |
 | POST | `/api/v1/consent-forms/{id}/cancel` | `consents.create` | Hủy phiếu nháp hoặc chờ ký `{ "reason": "…" }` (5–500 ký tự) |
+| POST | `/api/v1/consent-forms/{id}/signing-session` | `consents.create` | Mở phiên ký trên máy tính bảng → `{ token, expiresAtUtc }` (mặc định 30 phút). Chỉ cho phiếu chờ ký mà người bệnh chưa ký; mở phiên mới thì phiên cũ hết hiệu lực. Ghi nhật ký `ConsentForms.SigningStarted` |
+| POST | `/api/v1/consent-forms/{id}/patient-signature` | **Token phiên ký** | Người bệnh/người đại diện ký: `{ "decision": "Agreed" \| "Refused", "image": "<PNG Base64>" }` → `{ decision, signedAtUtc }`. Xem mục "Ký tay" bên dưới. Ghi nhật ký `ConsentForms.PatientSigned` |
+| POST | `/api/v1/consent-forms/{id}/complete` | `consents.sign` + vai trò theo mẫu | Phía bệnh viện xác nhận bằng tài khoản → phiếu `Completed`. Người bệnh chưa ký → `409`; không có vai trò xác nhận của mẫu → `403 consent_forms.signer_role_required`. Ghi nhật ký `ConsentForms.Completed` (kèm SHA-256) |
+| POST | `/api/v1/consent-forms/{id}/revoke` | `consents.revoke` | Thu hồi phiếu đã hoàn tất `{ "reason": "…" }` (5–500 ký tự). Ghi nhật ký `ConsentForms.Revoked` |
 
 - `signerKind`: `Patient` (người bệnh tự ký) hoặc `Representative` (người đại diện ký thay; `representativeId` phải thuộc hồ sơ người bệnh).
 - `data`: đối tượng `{ "tênTrường": giá trị }`. Giá trị là chuỗi (`text`, `date`, `datetime`, `choice`), mảng chuỗi (`multiChoice`), `true` (`confirm`) hoặc mảng dòng `[{ "cột": "…" }]` (`repeater`). Trường không có trong định nghĩa bị bỏ qua; nội dung tối đa 100.000 ký tự.
@@ -347,6 +351,25 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 - Số phiếu `PDT-<năm>-<6 chữ số>` lấy từ sequence của SQL Server, không trùng kể cả khi nhiều người lập cùng lúc.
 - Nội dung phiếu (`data`) và thông tin đóng băng có dữ liệu cá nhân nên được **mã hóa AES-256-GCM** trong CSDL; nhật ký audit che các giá trị này (`***`).
 - Tên đơn vị in trên PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (**đang để giá trị mẫu, chờ bệnh viện cung cấp**).
+- Chi tiết phiếu có thêm `decision` (`Agreed`/`Refused`), `signatures` (`role`: `Patient`/`Representative`/`Hospital`; `method`: `Handwritten`/`AccountConfirmation`; `signerName`, `signerTitle`, `signedAtUtc`; **không kèm ảnh chữ ký**), `signedPdfSha256`, `replacesForm`/`replacedBy` (`{ id, formNo }`) và `actions`: `canEdit`, `canSubmit`, `canReturnToDraft`, `canCancel`, `canStartSigning`, `canConfirm`, `canRevoke`, `canReplace`.
+
+**Ký tay trên máy tính bảng (quyết định 10, 11)**
+
+1. **Mở phiên ký:** nhân viên gọi `signing-session`, nhận **token phiên ký**. Token này có đối tượng nhận (`aud`) riêng:
+   - Chỉ dùng được ở `patient-signature`, cho đúng phiếu và đúng phiên ghi trong token.
+   - Mọi API khác từ chối token này (`401`); ngược lại, `patient-signature` không nhận token đăng nhập thường (`401`).
+   - Giao diện đóng phiên đăng nhập của nhân viên trên máy ngay sau khi lấy token. Người bệnh cầm máy không làm được gì khác; muốn thoát chế độ ký phải đăng nhập lại.
+2. **Người bệnh ký** (`patient-signature`): mỗi phiên chỉ ký được một lần (ký lại → `409`). Người ký là người đã chọn khi soạn phiếu (người bệnh, hoặc người đại diện) và đã đóng băng khi trình ký.
+3. **Ảnh chữ ký:**
+   - Yêu cầu: PNG 8 bit không xen kẽ (đúng loại trình duyệt xuất ra), tối đa 512 KB và 3.000×1.500 điểm ảnh.
+   - Máy chủ tự giải mã ảnh. Sai định dạng hoặc quá lớn → `400` (trường `image`); khung trống hoặc nét quá ngắn → `422 consent_forms.signature_blank`.
+   - Ảnh được cắt sát nét ký và mã hóa lại thành PNG xám; mọi dữ liệu kèm theo trong file gốc bị bỏ.
+   - Ảnh được lưu **mã hóa** và không có API trả ảnh riêng: chỉ xem được trong PDF, tức là cần quyền xem phiếu.
+4. **Hoàn tất** (`complete`):
+   - Người xác nhận phải có **vai trò ghi trong mẫu** (`hospitalSignerRoleCode`).
+   - Máy chủ dựng PDF bản cuối: ảnh chữ ký, Đồng ý/Từ chối, người đại diện (nếu có), họ tên, chức danh và thời điểm xác nhận.
+   - File PDF được lưu (mã hóa) trong thư mục `Storage:DocumentsPath` kèm SHA-256. Phiếu bị khóa.
+5. **Thu hồi rồi lập phiếu thay thế:** `POST /consent-forms` với `replacesFormId` của phiếu đã thu hồi (cùng người bệnh, cùng mẫu; mỗi phiếu chỉ có một phiếu thay thế, lập lần hai → `409 consent_forms.already_replaced`). Nội dung phiếu cũ được chép sang (chuẩn hóa theo phiên bản mẫu đang phát hành).
 
 ---
 
@@ -367,6 +390,7 @@ Hành động (`action`) được ghi:
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
 | `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |
 | `ConsentForms.Viewed`, `ConsentForms.PdfViewed` | Xem chi tiết phiếu; tải/xem PDF phiếu |
+| `ConsentForms.SigningStarted`, `ConsentForms.PatientSigned`, `ConsentForms.Completed`, `ConsentForms.Revoked` | Mở phiên ký; người bệnh ký (kèm quyết định, người ký; thiết bị lưu ở chữ ký); phía bệnh viện xác nhận (kèm SHA-256 của PDF); thu hồi |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
 
