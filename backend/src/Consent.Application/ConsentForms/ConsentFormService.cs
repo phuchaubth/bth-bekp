@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using Consent.Application.Abstractions;
 using Consent.Application.Common;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.Settings;
 using Consent.Domain.Auditing;
 using Consent.Domain.Authorization;
 using Consent.Domain.ConsentForms;
@@ -12,7 +13,6 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Patients;
 using Consent.Shared;
 using FluentValidation;
-using Microsoft.Extensions.Options;
 
 namespace Consent.Application.ConsentForms;
 
@@ -38,7 +38,7 @@ public sealed class ConsentFormService(
     IValidator<CancelConsentFormRequest> cancelValidator,
     IConsentPdfRenderer pdfRenderer,
     IDocumentStore documents,
-    IOptions<HospitalOptions> hospital)
+    SettingsService settingsService)
 {
     /// <summary>Bệnh viện ở Việt Nam (UTC+7, không đổi giờ theo mùa): lọc theo ngày dùng giờ địa phương.</summary>
     public static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
@@ -328,7 +328,7 @@ public sealed class ConsentFormService(
             : null;
 
         return new ConsentPdfDocument(
-            hospital.Value,
+            await settingsService.ResolveHospitalAsync(cancellationToken).ConfigureAwait(false),
             department?.Name ?? string.Empty,
             template.Code,
             version.VersionNo,

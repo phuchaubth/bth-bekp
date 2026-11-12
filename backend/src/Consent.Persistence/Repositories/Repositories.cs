@@ -4,6 +4,7 @@ using Consent.Application.Users;
 using Consent.Domain.Auditing;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
+using Consent.Domain.Settings;
 using Consent.Shared;
 using Microsoft.EntityFrameworkCore;
 
@@ -208,4 +209,12 @@ internal sealed class AuditLogRepository(ConsentDbContext db) : IAuditLogReposit
             .ConfigureAwait(false);
         return new PagedResult<AuditLogDto>(items, query.Page, query.PageSize, total);
     }
+}
+
+internal sealed class SystemSettingRepository(ConsentDbContext db) : ISystemSettingRepository
+{
+    public async Task<IReadOnlyList<SystemSetting>> GetAllAsync(CancellationToken cancellationToken) =>
+        await db.SystemSettings.ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public void Add(SystemSetting setting) => db.SystemSettings.Add(setting);
 }

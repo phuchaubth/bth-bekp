@@ -6,6 +6,7 @@ using Consent.Application.Exports;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
+using Consent.Application.Settings;
 using Consent.Application.Users;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
@@ -165,7 +166,15 @@ internal sealed class AppTestContext
         new CancelConsentFormRequestValidator(),
         Pdf,
         Documents,
-        Microsoft.Extensions.Options.Options.Create(new HospitalOptions()));
+        CreateSettingsService());
+
+    public SettingsService CreateSettingsService() => new(
+        new InMemorySystemSettingRepository(Store),
+        Store,
+        Clock,
+        His,
+        Microsoft.Extensions.Options.Options.Create(new HospitalOptions()),
+        new UpdateHospitalSettingsRequestValidator());
 
     public ConsentSigningService CreateConsentSigningService() => new(
         CreateConsentFormService(),

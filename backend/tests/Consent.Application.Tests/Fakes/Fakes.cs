@@ -6,6 +6,7 @@ using Consent.Application.Auditing;
 using Consent.Application.Exports;
 using Consent.Application.Reports;
 using Consent.Domain.Exports;
+using Consent.Domain.Settings;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
@@ -115,6 +116,8 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<ConsentForm> ConsentForms { get; } = [];
 
     public List<ExportJob> ExportJobs { get; } = [];
+
+    public List<SystemSetting> SystemSettings { get; } = [];
 
     public int SaveCount { get; private set; }
 
@@ -443,6 +446,14 @@ internal sealed class InMemoryConsentStatisticsRepository(InMemoryStore store) :
             f.Id, f.FormNo, f.Status, store.Patients.Single(p => p.Id == f.PatientId).FullName, template.Code, template.Name,
             store.Departments.FirstOrDefault(d => d.Id == f.DepartmentId)?.Name ?? string.Empty, at);
     }
+}
+
+internal sealed class InMemorySystemSettingRepository(InMemoryStore store) : ISystemSettingRepository
+{
+    public Task<IReadOnlyList<SystemSetting>> GetAllAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<SystemSetting>>([.. store.SystemSettings]);
+
+    public void Add(SystemSetting setting) => store.SystemSettings.Add(setting);
 }
 
 internal sealed class InMemoryExportJobRepository(InMemoryStore store) : IExportJobRepository

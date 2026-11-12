@@ -191,14 +191,14 @@ describe('Đăng nhập và phiên làm việc', () => {
   })
 
   it('điều hướng tới trang chức năng khi chọn menu', async () => {
-    mockApi(baseRoutes(adminSession()))
+    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/departments': departments })
     const user = userEvent.setup()
     const { router } = renderApp('/')
 
     await user.click(within(await screen.findByRole('navigation')).getByText('Quản trị'))
-    await user.click(await within(screen.getByRole('navigation')).findByText('Cấu hình hệ thống'))
+    await user.click(await within(screen.getByRole('navigation')).findByText('Khoa/phòng'))
 
-    expect(router.state.location.pathname).toBe('/quan-tri/cau-hinh')
-    expect(screen.getByText('Dự kiến hoàn thành trong Sprint 6.')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/quan-tri/khoa-phong')
+    expect(await screen.findByRole('heading', { name: 'Khoa/phòng' })).toBeInTheDocument()
   })
 })

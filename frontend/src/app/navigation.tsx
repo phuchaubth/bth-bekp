@@ -39,7 +39,7 @@ export const navItems: NavItem[] = [
       { path: '/quan-tri/nguoi-dung', label: 'Người dùng', permission: Permissions.UsersRead },
       { path: '/quan-tri/vai-tro', label: 'Vai trò và quyền', permission: Permissions.RolesManage },
       { path: '/quan-tri/khoa-phong', label: 'Khoa/phòng', permission: Permissions.DepartmentsManage },
-      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', sprint: 6, permission: Permissions.SettingsManage },
+      { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', permission: Permissions.SettingsManage },
     ],
   },
 ]

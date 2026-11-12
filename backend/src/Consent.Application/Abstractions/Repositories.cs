@@ -11,6 +11,7 @@ using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
+using Consent.Domain.Settings;
 using Consent.Shared;
 
 namespace Consent.Application.Abstractions;
@@ -157,6 +158,13 @@ public interface IConsentStatisticsRepository
 
     /// <summary>Phiếu nháp/chờ ký do người dùng <paramref name="userId"/> lập.</summary>
     Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken);
+}
+
+public interface ISystemSettingRepository
+{
+    Task<IReadOnlyList<SystemSetting>> GetAllAsync(CancellationToken cancellationToken);
+
+    void Add(SystemSetting setting);
 }
 
 public interface IExportJobRepository

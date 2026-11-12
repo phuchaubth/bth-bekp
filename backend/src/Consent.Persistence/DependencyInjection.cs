@@ -50,6 +50,7 @@ public static class DependencyInjection
         services.AddScoped<IConsentFormNumberGenerator, ConsentFormNumberGenerator>();
         services.AddScoped<IExportJobRepository, ExportJobRepository>();
         services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();
+        services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

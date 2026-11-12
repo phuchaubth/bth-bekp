@@ -27,6 +27,7 @@ import {
   PatientsPage,
   ReportsPage,
   RolesPage,
+  SettingsPage,
   SigningKioskPage,
   UsersPage,
 } from './lazyPages'
@@ -43,6 +44,7 @@ const implementedPages: Record<string, ReactNode> = {
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
+  '/quan-tri/cau-hinh': <SettingsPage />,
 }
 
 const featureRoutes: RouteObject[] = flattenNavItems()

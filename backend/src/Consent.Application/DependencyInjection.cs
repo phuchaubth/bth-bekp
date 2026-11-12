@@ -7,6 +7,7 @@ using Consent.Application.Exports;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
+using Consent.Application.Settings;
 using Consent.Application.Users;
 using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ConsentFormExportService>();
         services.AddScoped<ReportService>();
         services.AddScoped<DashboardService>();
+        services.AddScoped<SettingsService>();
 
         RegisterValidators(services);
         return services;

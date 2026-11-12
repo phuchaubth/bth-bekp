@@ -6,6 +6,7 @@ using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
+using Consent.Domain.Settings;
 using Consent.Persistence.Configurations;
 using Consent.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -35,6 +36,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
     public DbSet<ConsentForm> ConsentForms => Set<ConsentForm>();
 
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
+
+    public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
