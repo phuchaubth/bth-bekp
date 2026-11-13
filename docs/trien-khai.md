@@ -16,7 +16,7 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
                                                                                           └── Thư mục PDF đã ký (Storage:DocumentsPath)
 ```
 
-- **HTTPS là bắt buộc:** camera quét QR CCCD chỉ hoạt động qua HTTPS; cookie phiên đăng nhập chỉ gửi qua HTTPS ngoài môi trường phát triển. Dùng chứng chỉ nội bộ của bệnh viện (CA nội bộ cài trên máy trạm và **từng điện thoại**, xem mục 9a) hoặc chứng chỉ công cộng.
+- **HTTPS là bắt buộc:** camera quét QR CCCD chỉ hoạt động qua HTTPS; cookie phiên đăng nhập chỉ gửi qua HTTPS ngoài môi trường phát triển. **Bệnh viện dùng chứng chỉ công cộng** (quyết định 15), xem mục 2a.
 - API chỉ nghe trên `localhost` (hoặc mạng nội bộ Docker) và nhận yêu cầu từ reverse proxy; không mở cổng API ra mạng bệnh viện.
 - Dung lượng: khoảng 200–500 KB cho mỗi PDF đã ký; với 500–3.000 phiếu/ngày cần dự trù **200–550 GB/năm** cho thư mục PDF (xem kế hoạch, mục 2.7). CSDL nhỏ hơn nhiều (nội dung phiếu dạng JSON mã hóa, không chứa PDF).
 
@@ -25,12 +25,37 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 | Thành phần | Yêu cầu |
 |---|---|
 | Hệ điều hành | Windows Server 2019 trở lên (hoặc Linux nếu dùng Docker) |
-| SQL Server | 2017 trở lên (đã kiểm thử với 2022). Express dùng được cho quy mô vừa (giới hạn 10 GB/CSDL, không có SQL Agent: lên lịch sao lưu bằng Task Scheduler). Collation CSDL: `Vietnamese_CI_AS` hoặc `Latin1_General_100_CI_AI` (ứng dụng tự đặt collation không dấu cho cột tìm kiếm) |
+| SQL Server | **Khuyến nghị SQL Server 2022 hoặc 2025, bản Standard** (mục 2b). Đã kiểm thử toàn bộ với 2022 và 2025. Collation CSDL: `Vietnamese_CI_AS` hoặc `Latin1_General_100_CI_AI` (ứng dụng tự đặt collation không dấu cho cột tìm kiếm) |
 | Hình thức A (IIS) | IIS 10 với **ASP.NET Core Hosting Bundle 10.0**, **URL Rewrite**, **Application Request Routing (ARR)**; .NET SDK 10 trên máy build |
 | Hình thức B (Docker) | Docker Engine 24+ và Docker Compose v2 (Windows: Docker Desktop hoặc Docker Engine với container Linux) |
 | Máy trạm | Chrome/Edge bản mới |
 | Điện thoại ký phiếu | iPhone iOS 16+ (Safari) hoặc Android 10+ (Chrome bản mới), màn hình từ 6 inch; kết nối Wi-Fi nội bộ tới máy chủ |
 | Phần cứng tối thiểu | 4 vCPU, 8 GB RAM cho máy chủ ứng dụng; SQL Server theo khuyến nghị của Microsoft |
+
+## 2a. Chứng chỉ HTTPS công cộng (quyết định 15)
+
+1. **Tên miền:** dùng một tên miền con của bệnh viện, ví dụ `phieudongthuan.<tên-miền-bệnh-viện>`. Trên **DNS nội bộ**, trỏ tên này về IP nội bộ của máy chủ; điện thoại và máy trạm vào bằng Wi-Fi/mạng nội bộ. Không cần mở hệ thống ra Internet.
+2. **Cấp chứng chỉ:** từ một CA công cộng (thương mại hoặc Let's Encrypt). Vì máy chủ không mở ra Internet, xác thực tên miền bằng **bản ghi DNS (DNS-01)** hoặc theo quy trình của nhà cung cấp chứng chỉ thương mại.
+3. **Gia hạn:** thời hạn tối đa của chứng chỉ công cộng đang rút ngắn theo quy định chung của các CA (200 ngày từ 15/3/2026, 100 ngày từ 15/3/2027, 47 ngày từ 15/3/2029). Nên **tự động gia hạn** (ví dụ win-acme trên Windows, hoặc certbot với plugin DNS) và đặt cảnh báo trước khi hết hạn 30 ngày.
+4. **Gắn chứng chỉ** ở reverse proxy phía trước stack Docker (mục 6, bước 4), kèm chuỗi chứng chỉ trung gian đầy đủ. Điện thoại và máy trạm **không cần cài thêm chứng chỉ**.
+5. Không dùng chứng chỉ có ký tự đại diện (`*.`) chung với các hệ thống khác nếu khóa riêng phải sao chép sang nhiều máy; ưu tiên chứng chỉ riêng cho tên miền này.
+
+## 2b. Chọn phiên bản SQL Server
+
+Đo trên CSDL thử nghiệm: mỗi phiếu hoàn tất chiếm khoảng **30 KB** trong CSDL (nội dung phiếu mã hóa, **ảnh chữ ký tay mã hóa khoảng 15 KB**, nhật ký audit, chỉ mục). File PDF đã ký nằm ở thư mục riêng, không tính vào CSDL.
+
+| Số phiếu/ngày | CSDL tăng mỗi năm (ước tính) | Sau 10 năm |
+|---|---|---|
+| 500 | khoảng 5–6 GB | khoảng 55 GB |
+| 1.500 | khoảng 16 GB | khoảng 160 GB |
+| 3.000 | khoảng 33 GB | khoảng 330 GB |
+
+- **Khuyến nghị: SQL Server 2022 Standard** (đã chạy ổn định lâu, có sẵn kinh nghiệm vận hành) hoặc **SQL Server 2025 Standard**. Ứng dụng đã chạy đủ 65 kiểm thử tích hợp trên cả hai phiên bản. Cài bản cập nhật tích lũy (CU) mới nhất.
+- **Không dùng Express cho môi trường chính thức:** giới hạn **10 GB mỗi CSDL** sẽ đầy sau khoảng 4 tháng (3.000 phiếu/ngày) đến 2 năm (500 phiếu/ngày), trong khi phiếu phải lưu theo thời hạn hồ sơ bệnh án và không xóa. Express chỉ hợp cho môi trường thử nghiệm hoặc thí điểm ngắn ở một vài khoa.
+- **Enterprise không cần thiết:** Standard đủ tài nguyên (tối đa 24 lõi, 128 GB bộ nhớ đệm) cho quy mô này.
+- **Giấy phép:** Standard theo lõi (tối thiểu 4 lõi) hoặc theo máy chủ + CAL. Phòng CNTT đối chiếu với hợp đồng bản quyền hiện có của bệnh viện. Nếu bệnh viện đã có SQL Server 2019 Standard thì vẫn dùng được (ứng dụng hỗ trợ từ 2017), nhưng 2019 đã hết hỗ trợ chính thức, nên ưu tiên nâng cấp.
+- **Cấu hình gợi ý:** 4 lõi, 16 GB RAM cho SQL Server; ổ dữ liệu và ổ nhật ký giao dịch tách riêng; chế độ khôi phục **Full** với sao lưu nhật ký định kỳ (mục 7); SQL Agent lên lịch sao lưu (Standard có sẵn).
+- SQL Server có thể đặt trên máy chủ CSDL sẵn có của bệnh viện; ứng dụng (Docker) chỉ cần kết nối tới cổng 1433.
 
 ## 3. Bí mật và cấu hình
 
@@ -215,10 +240,7 @@ Khuyến nghị: bảo vệ hai khóa `DataProtection__*` như bảo vệ CSDL (
 Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, rồi đưa máy cho người bệnh (hoặc người đại diện) đọc và ký bằng ngón tay. Ứng dụng là trang web, không cần cài ứng dụng riêng.
 
 1. **Mạng:** điện thoại vào Wi-Fi nội bộ truy cập được địa chỉ HTTPS của hệ thống. Không mở hệ thống ra Internet.
-2. **Chứng chỉ:** nếu dùng CA nội bộ, cài chứng chỉ CA lên từng máy.
-   - iPhone: mở file chứng chỉ → *Cài đặt → Đã tải về hồ sơ* → Cài đặt; rồi *Cài đặt → Cài đặt chung → Giới thiệu → Cài đặt tin cậy chứng nhận* → bật tin cậy hoàn toàn cho CA đó.
-   - Android: *Cài đặt → Bảo mật → Mã hóa và thông tin xác thực → Cài đặt chứng chỉ → Chứng chỉ CA*.
-   Không có chứng chỉ tin cậy thì trình duyệt báo lỗi, camera quét QR CCCD không chạy.
+2. **Chứng chỉ:** bệnh viện dùng chứng chỉ công cộng (mục 2a), nên điện thoại **không cần cài thêm chứng chỉ**. Chỉ cần ngày giờ trên điện thoại đúng (đặt tự động); sai ngày giờ thì trình duyệt báo lỗi chứng chỉ.
 3. **Lối tắt:** mở trang trong Safari/Chrome → *Thêm vào màn hình chính*.
 4. **Khóa ứng dụng khi đưa máy cho người bệnh:**
    - iPhone: bật *Cài đặt → Trợ năng → Truy cập được hướng dẫn* (Guided Access), khi ký thì nhấn nút sườn 3 lần.
