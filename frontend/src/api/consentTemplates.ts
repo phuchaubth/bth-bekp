@@ -88,6 +88,8 @@ export interface TemplateSignatures {
   decisionLabel?: string
   agreeLabel?: string
   refuseLabel?: string
+  /** Các bước xác nhận trung gian theo vai trò, làm lần lượt trước bước xác nhận cuối. */
+  steps?: { key: string; roleCode: string; label: string; hint?: string }[]
 }
 
 export type TemplateVersionStatus = 'Draft' | 'Published' | 'Retired'

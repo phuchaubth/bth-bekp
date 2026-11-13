@@ -97,6 +97,7 @@ public static class AuditActions
     public const string ConsentFormPdfViewed = "ConsentForms.PdfViewed";
     public const string ConsentFormSigningStarted = "ConsentForms.SigningStarted";
     public const string ConsentFormPatientSigned = "ConsentForms.PatientSigned";
+    public const string ConsentFormStepConfirmed = "ConsentForms.StepConfirmed";
     public const string ConsentFormCompleted = "ConsentForms.Completed";
     public const string ConsentFormRevoked = "ConsentForms.Revoked";
     public const string ConsentFormsExported = "Exports.ConsentForms";

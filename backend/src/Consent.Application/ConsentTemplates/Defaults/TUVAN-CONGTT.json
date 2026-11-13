@@ -53,10 +53,13 @@
   "signatures": {
     "patient": "Người bệnh (Patient)",
     "representative": "Người đại diện của người bệnh (Patient’s Representative)",
-    "hospital": "Người tư vấn (Consultant)",
+    "hospital": "Điều dưỡng khoa (Ward Nurse)",
     "decision": "required",
     "decisionLabel": "Ông/bà đã xem và đồng ý tham gia sử dụng các Cổng thông tin chính thức tại bệnh viện? (Have you reviewed and agreed to participate in using the hospital’s official information portals?)",
     "agreeLabel": "Đồng ý (Agree)",
-    "refuseLabel": "Không đồng ý (Disagree)"
+    "refuseLabel": "Không đồng ý (Disagree)",
+    "steps": [
+      { "key": "consultant", "roleCode": "RECEPTIONIST", "label": "Người tư vấn (Consultant)" }
+    ]
   }
 }

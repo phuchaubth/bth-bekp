@@ -27,6 +27,7 @@ public sealed class ConsentFormService(
     IPatientRepository patients,
     IDepartmentRepository departments,
     IUserRepository users,
+    IRoleRepository roles,
     IConsentFormNumberGenerator numbers,
     IAuditLogRepository auditLogs,
     IUnitOfWork unitOfWork,
@@ -326,6 +327,11 @@ public sealed class ConsentFormService(
         var patientSignature = form.PatientSignature is { ImagePng: { } image } signature
             ? new ConsentPdfSignature(image, signature.SignedAtUtc.ToOffset(VietnamOffset))
             : null;
+        var steps = definition.Signatures?.Steps is { Count: > 0 } stepDefinitions
+            ? stepDefinitions.Select(step => form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key) is { } done
+                ? new ConsentPdfConfirmation(done.SignerName, done.SignerTitle, done.SignedAtUtc.ToOffset(VietnamOffset))
+                : null).ToList()
+            : null;
 
         return new ConsentPdfDocument(
             await settingsService.ResolveHospitalAsync(cancellationToken).ConfigureAwait(false),
@@ -342,7 +348,8 @@ public sealed class ConsentFormService(
             IsFinal: confirmation is not null,
             form.Decision,
             patientSignature,
-            confirmation);
+            confirmation,
+            steps);
     }
 
     internal static string Sha256(byte[] content) =>
@@ -387,6 +394,10 @@ public sealed class ConsentFormService(
         var (patient, representative) = await ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
         var department = await departments.GetByIdAsync(form.DepartmentId, cancellationToken).ConfigureAwait(false);
         var creator = await users.GetByIdAsync(form.CreatedByUserId, cancellationToken).ConfigureAwait(false);
+        var steps = await BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
+        var nextStep = steps.FirstOrDefault(s => s.IsNext);
+        var canSign = currentUser.HasPermission(Permissions.ConsentsSign);
+        var alreadyConfirmedStep = form.StepSignatures.Any(s => s.UserId == currentUser.UserId);
 
         return new ConsentFormDetailDto(
             form.Id,
@@ -418,8 +429,8 @@ public sealed class ConsentFormService(
             form.RevokedAtUtc,
             form.RevokeReason,
             form.Decision,
-            [.. form.Signatures.OrderBy(s => s.SignedAtUtc).Select(s => new ConsentSignatureDto(
-                s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc))],
+            [.. form.Signatures.OrderBy(s => s.SignedAtUtc).Select(ToSignatureDto)],
+            steps,
             form.SignedPdfSha256,
             replaces,
             replacedBy,
@@ -429,11 +440,41 @@ public sealed class ConsentFormService(
                 form.CanReturnToDraft,
                 form.CanCancel,
                 CanStartSigning: form.CanStartSigning && currentUser.HasPermission(Permissions.ConsentsCreate),
-                CanConfirm: form.CanComplete && currentUser.HasPermission(Permissions.ConsentsSign)
+                CanConfirmStep: nextStep is not null && canSign && !alreadyConfirmedStep && currentUser.IsInRole(nextStep.RoleCode),
+                CanConfirm: form.CanComplete && canSign && steps.All(s => s.Confirmation is not null) && !alreadyConfirmedStep
                     && currentUser.IsInRole(template.HospitalSignerRoleCode),
                 CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
                 CanReplace: form.Status == ConsentFormStatus.Revoked && replacedBy is null
                     && currentUser.HasPermission(Permissions.ConsentsCreate)));
+    }
+
+    private static ConsentSignatureDto ToSignatureDto(ConsentSignature s) =>
+        new(s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc, s.StepKey);
+
+    /// <summary>Các bước xác nhận trung gian của mẫu, kèm xác nhận đã có và bước đang chờ.</summary>
+    internal async Task<IReadOnlyList<ConsentFormStepDto>> BuildStepsAsync(
+        ConsentForm form, TemplateDefinition definition, CancellationToken cancellationToken)
+    {
+        if (definition.Signatures?.Steps is not { Count: > 0 } stepDefinitions)
+        {
+            return [];
+        }
+
+        var allRoles = await roles.ListAsync(cancellationToken).ConfigureAwait(false);
+        var result = new List<ConsentFormStepDto>(stepDefinitions.Count);
+        var nextFound = false;
+        foreach (var step in stepDefinitions)
+        {
+            var done = form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key);
+            var isNext = done is null && !nextFound && form.CanComplete;
+            nextFound |= done is null;
+            var roleName = allRoles.FirstOrDefault(r => string.Equals(r.Code, step.RoleCode, StringComparison.OrdinalIgnoreCase))?.Name
+                ?? step.RoleCode;
+            result.Add(new ConsentFormStepDto(
+                step.Key, step.Label, step.RoleCode, roleName, isNext, done is null ? null : ToSignatureDto(done)));
+        }
+
+        return result;
     }
 
     /// <summary>Đã trình ký: dùng thông tin đóng băng. Đang nháp: lấy từ hồ sơ hiện tại.</summary>

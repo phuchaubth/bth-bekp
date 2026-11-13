@@ -66,6 +66,7 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.Navigation(f => f.Signatures).HasField("_signatures").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Ignore(f => f.PatientSignature);
         builder.Ignore(f => f.HospitalSignature);
+        builder.Ignore(f => f.StepSignatures);
 
         // Tham chiếu chỉ để toàn vẹn dữ liệu; không xóa dây chuyền (phiếu là hồ sơ cần lưu trữ).
         builder.HasOne<Patient>().WithMany().HasForeignKey(f => f.PatientId).OnDelete(DeleteBehavior.Restrict);
@@ -116,8 +117,11 @@ internal sealed class ConsentSignatureConfiguration : IEntityTypeConfiguration<C
         builder.Property(s => s.SignerName).HasMaxLength(ConsentSignature.NameMaxLength).IsRequired();
         builder.Property(s => s.SignerTitle).HasMaxLength(ConsentSignature.TitleMaxLength);
         builder.Property(s => s.Device).HasMaxLength(ConsentSignature.DeviceMaxLength);
+        builder.Property(s => s.StepKey).HasMaxLength(ConsentSignature.StepKeyMaxLength).IsUnicode(false);
         builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(s => s.FormId);
+        // Mỗi bước xác nhận chỉ một lần trên một phiếu, kể cả khi hai người bấm cùng lúc.
+        builder.HasIndex(s => new { s.FormId, s.StepKey }).IsUnique().HasFilter("[StepKey] IS NOT NULL");
     }
 
     /// <summary>Ảnh chữ ký tay là dữ liệu cá nhân: lưu dạng bản mã (AES-256-GCM).</summary>

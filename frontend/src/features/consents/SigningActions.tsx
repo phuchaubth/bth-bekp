@@ -135,7 +135,9 @@ export function FormHistory({ form }: { form: ConsentFormDetail }) {
         : {
             at: signature.signedAtUtc,
             color: 'blue',
-            text: `${signature.signerName}${signature.signerTitle ? ` (${signature.signerTitle})` : ''} xác nhận bằng tài khoản`,
+            text: `${signature.signerName}${signature.signerTitle ? ` (${signature.signerTitle})` : ''} xác nhận bằng tài khoản${
+              signature.stepKey ? `: ${form.steps.find((step) => step.key === signature.stepKey)?.label ?? signature.stepKey}` : ''
+            }`,
           },
     )
   }

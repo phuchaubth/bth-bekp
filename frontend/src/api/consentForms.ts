@@ -55,7 +55,7 @@ export interface ConsentRepresentativeInfo {
 }
 
 export type ConsentDecision = 'Agreed' | 'Refused'
-export type ConsentSignerRole = 'Patient' | 'Representative' | 'Hospital'
+export type ConsentSignerRole = 'Patient' | 'Representative' | 'Hospital' | 'Staff'
 export type ConsentSignatureMethod = 'Handwritten' | 'AccountConfirmation'
 
 /** Một chữ ký trên phiếu (ảnh chữ ký tay chỉ có trong PDF). */
@@ -65,6 +65,19 @@ export interface ConsentSignature {
   signerName: string
   signerTitle: string | null
   signedAtUtc: string
+  /** Bước xác nhận (chỉ với vai trò `Staff`). */
+  stepKey?: string | null
+}
+
+/** Một bước xác nhận trung gian theo vai trò (định nghĩa ở `signatures.steps` của mẫu). */
+export interface ConsentFormStep {
+  key: string
+  label: string
+  roleCode: string
+  roleName: string
+  /** Bước đang chờ xác nhận (các bước làm lần lượt sau khi người bệnh ký). */
+  isNext: boolean
+  confirmation: ConsentSignature | null
 }
 
 export interface ConsentFormRef {
@@ -79,6 +92,8 @@ export interface ConsentFormActions {
   canReturnToDraft: boolean
   canCancel: boolean
   canStartSigning: boolean
+  /** Người dùng hiện tại xác nhận được bước đang chờ. */
+  canConfirmStep: boolean
   canConfirm: boolean
   canRevoke: boolean
   canReplace: boolean
@@ -121,6 +136,7 @@ export interface ConsentFormDetail {
   revokeReason: string | null
   decision: ConsentDecision | null
   signatures: ConsentSignature[]
+  steps: ConsentFormStep[]
   /** SHA-256 của PDF đã ký (phiếu đã hoàn tất). */
   signedPdfSha256: string | null
   replacesForm: ConsentFormRef | null
@@ -174,6 +190,8 @@ export const consentFormsApi = {
       body: input,
       token: signingToken,
     }),
+  confirmStep: (id: string, stepKey: string) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey } }),
   complete: (id: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST' }),
   revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
 }
@@ -222,6 +240,7 @@ export const signerRoleLabels: Record<ConsentSignerRole, string> = {
   Patient: 'Người bệnh',
   Representative: 'Người đại diện',
   Hospital: 'Phía bệnh viện',
+  Staff: 'Nhân viên xác nhận',
 }
 
 export const signatureMethodLabels: Record<ConsentSignatureMethod, string> = {

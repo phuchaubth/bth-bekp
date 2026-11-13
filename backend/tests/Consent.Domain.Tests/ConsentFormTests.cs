@@ -201,6 +201,44 @@ public sealed class ConsentFormTests
     }
 
     [Fact]
+    public void ConfirmationSteps_AfterPatient_OncePerStepAndPerAccount_RequiredBeforeCompletion()
+    {
+        var nurse = Guid.NewGuid();
+        var doctor = Guid.NewGuid();
+        var beforePatient = FormIn(Stage.AwaitingPatient);
+        Assert.Throws<DomainException>(() => beforePatient.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", null, Now));
+
+        var form = FormIn(Stage.AwaitingHospital);
+        Assert.Throws<DomainException>(() =>
+            form.Complete(doctor, "Bác sĩ giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]));
+
+        var step = form.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", "Điều dưỡng", Now);
+        Assert.Throws<DomainException>(() => form.ConfirmStep("nurse", Guid.NewGuid(), "Người khác", null, Now));
+        Assert.Throws<DomainException>(() => form.ConfirmStep("screening", nurse, "Điều dưỡng giả lập", null, Now));
+        Assert.Throws<DomainException>(() =>
+            form.Complete(nurse, "Điều dưỡng giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]));
+        form.Complete(doctor, "Bác sĩ giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]);
+
+        Assert.Equal(ConsentSignerRole.Staff, step.Role);
+        Assert.Equal("nurse", step.StepKey);
+        Assert.Equal(ConsentSignerRole.Patient, form.PatientSignature!.Role);
+        Assert.Equal(doctor, form.HospitalSignature!.UserId);
+        Assert.Equal(ConsentFormStatus.Completed, form.Status);
+    }
+
+    [Fact]
+    public void ReturnToDraft_ClearsConfirmationSteps()
+    {
+        var form = FormIn(Stage.AwaitingHospital);
+        form.ConfirmStep("nurse", Guid.NewGuid(), "Điều dưỡng giả lập", null, Now);
+
+        form.ReturnToDraft(Now);
+
+        Assert.Empty(form.StepSignatures);
+        Assert.Empty(form.Signatures);
+    }
+
+    [Fact]
     public void RepresentativeSigns_AsRepresentative_AndHospitalConfirmsByAccount()
     {
         var form = NewForm();

@@ -81,6 +81,7 @@ public sealed record ConsentFormActions(
     bool CanReturnToDraft,
     bool CanCancel,
     bool CanStartSigning,
+    bool CanConfirmStep,
     bool CanConfirm,
     bool CanRevoke,
     bool CanReplace);
@@ -91,7 +92,23 @@ public sealed record ConsentSignatureDto(
     ConsentSignatureMethod Method,
     string SignerName,
     string? SignerTitle,
-    DateTimeOffset SignedAtUtc);
+    DateTimeOffset SignedAtUtc,
+    string? StepKey = null);
+
+/// <summary>
+/// Một bước xác nhận trung gian theo định nghĩa mẫu và trạng thái của nó. <paramref name="IsNext"/>: bước đang chờ
+/// (các bước làm lần lượt sau khi người bệnh ký).
+/// </summary>
+public sealed record ConsentFormStepDto(
+    string Key,
+    string Label,
+    string RoleCode,
+    string RoleName,
+    bool IsNext,
+    ConsentSignatureDto? Confirmation);
+
+/// <summary>Xác nhận bước <paramref name="StepKey"/> (phải là bước đang chờ, để tránh xác nhận nhầm bước).</summary>
+public sealed record ConfirmStepRequest(string? StepKey);
 
 /// <summary>Tham chiếu tới một phiếu khác (phiếu bị thay thế / phiếu thay thế).</summary>
 public sealed record ConsentFormRef(Guid Id, string FormNo);
@@ -127,6 +144,7 @@ public sealed record ConsentFormDetailDto(
     string? RevokeReason,
     ConsentDecision? Decision,
     IReadOnlyList<ConsentSignatureDto> Signatures,
+    IReadOnlyList<ConsentFormStepDto> Steps,
     string? SignedPdfSha256,
     ConsentFormRef? ReplacesForm,
     ConsentFormRef? ReplacedBy,

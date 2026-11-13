@@ -153,7 +153,7 @@ public sealed class ConsentFormServiceTests
         Assert.Equal(ConsentFormStatus.PendingSignature, submitted.Value.Status);
         Assert.Equal("Phạm Thị Dung (giả lập)", reloaded.Value.Patient.FullName);
         Assert.Equal(
-            new ConsentFormActions(false, false, true, true, CanStartSigning: true, CanConfirm: false, CanRevoke: false, CanReplace: false),
+            new ConsentFormActions(false, false, true, true, CanStartSigning: true, CanConfirmStep: false, CanConfirm: false, CanRevoke: false, CanReplace: false),
             reloaded.Value.Actions);
         Assert.Equal("consent_forms.invalid_status", edit.Error!.Code);
 

@@ -353,6 +353,26 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
     }
 
+    /// <summary>Một ô chữ ký: vai trò, ghi chú, ảnh chữ ký tay (nếu có), họ tên ("tên|phần thêm") và các dòng nhỏ.</summary>
+    private sealed record SignatureSlot(string Role, string Hint, byte[]? ImagePng, string? Name, IReadOnlyList<string> Lines);
+
+    private static SignatureSlot ConfirmationSlot(string role, string? hint, ConsentPdfConfirmation? confirmation)
+    {
+        if (confirmation is null)
+        {
+            return new SignatureSlot(role, hint ?? "(Xác nhận bằng tài khoản)", null, null, []);
+        }
+
+        var lines = new List<string>();
+        if (confirmation.Title is { Length: > 0 } title)
+        {
+            lines.Add(title);
+        }
+
+        lines.Add($"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
+        return new SignatureSlot(role, "(Đã xác nhận bằng tài khoản)", null, confirmation.Name, lines);
+    }
+
     private static void AddSignatures(Section section, ConsentPdfDocument document)
     {
         var labels = document.Definition.Signatures;
@@ -392,53 +412,75 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             $"{document.Hospital.Place}, ngày {document.DocumentDate.Day:00} tháng {document.DocumentDate.Month:00} năm {document.DocumentDate.Year}",
             TextFormat.Italic);
 
+        // Ô chữ ký theo thứ tự: người bệnh/người đại diện, các bước xác nhận trung gian (nếu mẫu có), xác nhận cuối của
+        // bệnh viện; xếp hai ô mỗi hàng.
+        var patientLines = new List<string>();
+        var patientName = document.Representative is { } representative
+            // Số CCCD và quan hệ của người đại diện đã in ở phần thông tin người bệnh; ở đây nhắc lại quan hệ.
+            ? $"{representative.FullName}|({VietnameseLabels.Relationship(representative.Relationship)})"
+            : document.Patient.FullName;
+        if (document.PatientSignature is { } signed)
+        {
+            patientLines.Add($"Ký lúc {signed.SignedAt:HH:mm}, {signed.SignedAt:dd/MM/yyyy}");
+        }
+
+        var slots = new List<SignatureSlot>
+        {
+            new(patientRole, "(Ký, ghi rõ họ tên)", document.PatientSignature?.ImagePng, patientName, patientLines),
+        };
+        var steps = labels?.Steps ?? [];
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var done = document.StepConfirmations is { } confirmations && i < confirmations.Count ? confirmations[i] : null;
+            slots.Add(ConfirmationSlot(steps[i].Label, steps[i].Hint, done));
+        }
+
+        slots.Add(ConfirmationSlot(labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint, document.HospitalConfirmation));
+
         var table = section.AddTable();
         table.AddColumn(Unit.FromMillimeter(83));
         table.AddColumn(Unit.FromMillimeter(84));
-        var roles = table.AddRow();
-        roles.KeepWith = 2; // giữ dòng vai trò, khoảng ký và họ tên trên cùng một trang
-        AddSignatureCell(roles.Cells[0], patientRole, "(Ký, ghi rõ họ tên)");
-        AddSignatureCell(
-            roles.Cells[1],
-            labels?.Hospital ?? "Nhân viên y tế",
-            document.HospitalConfirmation is null ? labels?.HospitalHint ?? "(Xác nhận bằng tài khoản)" : "(Đã xác nhận bằng tài khoản)");
-
-        var space = table.AddRow();
-        space.Height = Unit.FromMillimeter(14);
-        space.VerticalAlignment = VerticalAlignment.Center;
-        if (document.PatientSignature is { } signature)
+        for (var start = 0; start < slots.Count; start += 2)
         {
-            AddSignatureImage(space.Cells[0], signature.ImagePng);
-        }
-
-        var names = table.AddRow();
-        var name = names.Cells[0].AddParagraph();
-        name.Format.Alignment = ParagraphAlignment.Center;
-        name.Format.SpaceAfter = 0;
-        name.AddFormattedText(document.Representative?.FullName ?? document.Patient.FullName, TextFormat.Bold);
-        if (document.Representative is { } representative)
-        {
-            // Số CCCD và quan hệ của người đại diện đã in đầy đủ ở phần thông tin người bệnh; ở đây nhắc lại quan hệ.
-            name.AddText($" ({VietnameseLabels.Relationship(representative.Relationship)})");
-        }
-
-        if (document.PatientSignature is { } signed)
-        {
-            AddSmallLine(names.Cells[0], $"Ký lúc {signed.SignedAt:HH:mm}, {signed.SignedAt:dd/MM/yyyy}");
-        }
-
-        if (document.HospitalConfirmation is { } confirmation)
-        {
-            var staff = names.Cells[1].AddParagraph();
-            staff.Format.Alignment = ParagraphAlignment.Center;
-            staff.Format.SpaceAfter = 0;
-            staff.AddFormattedText(confirmation.Name, TextFormat.Bold);
-            if (confirmation.Title is { Length: > 0 } title)
+            var pair = slots.Skip(start).Take(2).ToList();
+            var roles = table.AddRow();
+            roles.KeepWith = 2; // giữ dòng vai trò, khoảng ký và họ tên trên cùng một trang
+            if (start > 0)
             {
-                AddSmallLine(names.Cells[1], title);
+                roles.TopPadding = Unit.FromMillimeter(4);
             }
 
-            AddSmallLine(names.Cells[1], $"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
+            var space = table.AddRow();
+            space.Height = Unit.FromMillimeter(14);
+            space.VerticalAlignment = VerticalAlignment.Center;
+            var names = table.AddRow();
+            for (var c = 0; c < pair.Count; c++)
+            {
+                var slot = pair[c];
+                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint);
+                if (slot.ImagePng is { } image)
+                {
+                    AddSignatureImage(space.Cells[c], image);
+                }
+
+                if (slot.Name is { } fullName)
+                {
+                    var name = names.Cells[c].AddParagraph();
+                    name.Format.Alignment = ParagraphAlignment.Center;
+                    name.Format.SpaceAfter = 0;
+                    var parts = fullName.Split('|', 2);
+                    name.AddFormattedText(parts[0], TextFormat.Bold);
+                    if (parts.Length > 1)
+                    {
+                        name.AddText($" {parts[1]}");
+                    }
+                }
+
+                foreach (var line in slot.Lines)
+                {
+                    AddSmallLine(names.Cells[c], line);
+                }
+            }
         }
     }
 

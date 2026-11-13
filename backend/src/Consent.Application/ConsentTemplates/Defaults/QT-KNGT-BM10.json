@@ -128,13 +128,6 @@
             { "value": "maskContinue", "label": "“CÓ” dưới 03 triệu chứng: hướng dẫn người bệnh đeo khẩu trang và tiếp tục làm thủ tục (“YES” to fewer than 3 symptoms: advise the patient to wear a mask and continue the admission process)" }
           ],
           "visibleWhen": { "field": "infectionSymptoms", "in": ["yes"] }
-        },
-        {
-          "type": "text",
-          "key": "screeningStaffName",
-          "label": "Nhân viên bộ phận hướng dẫn, ghi rõ họ tên (Screening staff, full name)",
-          "required": true,
-          "maxLength": 200
         }
       ]
     },
@@ -659,13 +652,6 @@
             { "value": "notNeeded", "label": "Không cần thiết (Not needed)" },
             { "value": "provided", "label": "Cần thiết – đã hướng dẫn người bệnh cách chăm sóc vết thương sau thủ thuật (Needed – provided patient education on wound care after procedure)" }
           ]
-        },
-        {
-          "type": "text",
-          "key": "nurseName",
-          "label": "Điều dưỡng thực hiện, ghi rõ họ tên (Nurse in charge, full name)",
-          "required": true,
-          "maxLength": 200
         }
       ]
     },
@@ -805,7 +791,10 @@
     "patient": "Người bệnh (Patient)",
     "representative": "Người đại diện của người bệnh (Patient’s Representative)",
     "hospital": "Bác sĩ thực hiện (Physician in charge)",
-    "hospitalHint": "(Phần điều dưỡng ghi họ tên điều dưỡng thực hiện ở mục nhu cầu giáo dục sức khỏe – nurse’s name is recorded in the nursing section)",
-    "decision": "none"
+    "decision": "none",
+    "steps": [
+      { "key": "screeningStaff", "roleCode": "RECEPTIONIST", "label": "Nhân viên bộ phận hướng dẫn (Screening staff)" },
+      { "key": "nurse", "roleCode": "NURSE", "label": "Điều dưỡng thực hiện (Nurse in charge)" }
+    ]
   }
 }

@@ -134,7 +134,7 @@ internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormR
                 RepresentativeCitizenId = r == null ? null : r.CitizenId,
                 RepresentativePhoneNumber = r == null ? null : r.PhoneNumber,
                 SnapshotJson = f.SnapshotJson,
-                PatientSignedAtUtc = f.Signatures.Where(s => s.Role != ConsentSignerRole.Hospital)
+                PatientSignedAtUtc = f.Signatures.Where(s => (s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative))
                     .Select(s => (DateTimeOffset?)s.SignedAtUtc).FirstOrDefault(),
                 HospitalSignerName = f.Signatures.Where(s => s.Role == ConsentSignerRole.Hospital)
                     .Select(s => s.SignerName).FirstOrDefault(),

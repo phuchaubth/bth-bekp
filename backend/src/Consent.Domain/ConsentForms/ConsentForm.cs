@@ -126,10 +126,15 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     public IReadOnlyCollection<ConsentSignature> Signatures => _signatures;
 
     /// <summary>Chữ ký tay của người bệnh hoặc người đại diện (nếu đã ký).</summary>
-    public ConsentSignature? PatientSignature => _signatures.FirstOrDefault(s => s.Role != ConsentSignerRole.Hospital);
+    public ConsentSignature? PatientSignature =>
+        _signatures.FirstOrDefault(s => s.Role is ConsentSignerRole.Patient or ConsentSignerRole.Representative);
 
     /// <summary>Xác nhận của nhân viên phía bệnh viện (nếu đã hoàn tất).</summary>
     public ConsentSignature? HospitalSignature => _signatures.FirstOrDefault(s => s.Role == ConsentSignerRole.Hospital);
+
+    /// <summary>Các bước xác nhận trung gian đã thực hiện, theo thứ tự thời gian.</summary>
+    public IEnumerable<ConsentSignature> StepSignatures =>
+        _signatures.Where(s => s.Role == ConsentSignerRole.Staff).OrderBy(s => s.SignedAtUtc);
 
     public bool CanEdit => Status == ConsentFormStatus.Draft;
 
@@ -250,6 +255,22 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         return signature;
     }
 
+    /// <summary>
+    /// Nhân viên xác nhận một bước trung gian bằng tài khoản (thứ tự bước và vai trò do tầng ứng dụng kiểm tra theo
+    /// định nghĩa mẫu). Mỗi bước một lần; một tài khoản chỉ xác nhận một bước trên một phiếu, để mỗi phần có người chịu
+    /// trách nhiệm riêng.
+    /// </summary>
+    public ConsentSignature ConfirmStep(string stepKey, Guid userId, string name, string? title, DateTimeOffset nowUtc)
+    {
+        Ensure(CanComplete, "Chỉ xác nhận được phiếu đang chờ ký sau khi người bệnh đã ký.");
+        Ensure(!StepSignatures.Any(s => s.StepKey == stepKey), "Bước này đã được xác nhận.");
+        EnsureNotConfirmedBy(userId);
+        var signature = ConsentSignature.StepConfirmation(Id, stepKey, userId, name, title, nowUtc);
+        _signatures.Add(signature);
+        UpdatedAtUtc = nowUtc;
+        return signature;
+    }
+
     public void Cancel(string reason, DateTimeOffset nowUtc)
     {
         Ensure(CanCancel, "Chỉ hủy được phiếu nháp hoặc phiếu chưa ký.");
@@ -270,12 +291,17 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         string signedPdfKey,
         string signedPdfSha256,
         long signedPdfSize,
-        DateTimeOffset nowUtc)
+        DateTimeOffset nowUtc,
+        IReadOnlyCollection<string>? requiredStepKeys = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfSha256);
         Ensure(Status == ConsentFormStatus.PendingSignature, "Chỉ hoàn tất được phiếu đang chờ ký.");
         Ensure(CanComplete, "Người bệnh chưa ký; phía bệnh viện chỉ xác nhận sau khi người bệnh ký.");
+        Ensure(
+            (requiredStepKeys ?? []).All(key => StepSignatures.Any(s => s.StepKey == key)),
+            "Còn bước xác nhận chưa thực hiện.");
+        EnsureNotConfirmedBy(confirmedByUserId);
         _signatures.Add(ConsentSignature.AccountConfirmation(Id, confirmedByUserId, confirmedByName, confirmedByTitle, nowUtc));
         SignedPdfKey = signedPdfKey;
         SignedPdfSha256 = signedPdfSha256;
@@ -294,6 +320,11 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         Status = ConsentFormStatus.Revoked;
         UpdatedAtUtc = nowUtc;
     }
+
+    private void EnsureNotConfirmedBy(Guid userId) =>
+        Ensure(
+            !StepSignatures.Any(s => s.UserId == userId),
+            "Tài khoản này đã xác nhận một bước trên phiếu; mỗi bước cần một người khác.");
 
     private static void Ensure(bool allowed, string message)
     {

@@ -160,6 +160,11 @@ public sealed class ConsentTemplateService(
             return InvalidDefinition(errors);
         }
 
+        if (await CheckStepRolesAsync(definition, cancellationToken).ConfigureAwait(false) is { } stepError)
+        {
+            return stepError;
+        }
+
         template.UpdateDraft(versionNo, TemplateJson.Serialize(definition), clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return ToVersionDto(template, version);
@@ -189,6 +194,11 @@ public sealed class ConsentTemplateService(
         if (definition is null)
         {
             return InvalidDefinition(errors);
+        }
+
+        if (await CheckStepRolesAsync(definition, cancellationToken).ConfigureAwait(false) is { } stepError)
+        {
+            return stepError;
         }
 
         template.Publish(versionNo, clock.UtcNow);
@@ -245,6 +255,22 @@ public sealed class ConsentTemplateService(
             "consent_templates.invalid_definition",
             "Định nghĩa mẫu chưa hợp lệ.",
             new Dictionary<string, string[]> { ["definition"] = [.. errors] });
+
+    /// <summary>Vai trò của các bước xác nhận phải tồn tại (không phân biệt hoa thường).</summary>
+    private async Task<Error?> CheckStepRolesAsync(TemplateDefinition definition, CancellationToken cancellationToken)
+    {
+        if (definition.Signatures?.Steps is not { Count: > 0 } steps)
+        {
+            return null;
+        }
+
+        var allRoles = await roles.ListAsync(cancellationToken).ConfigureAwait(false);
+        var missing = steps.Where(step => !allRoles.Any(r => string.Equals(r.Code, step.RoleCode, StringComparison.OrdinalIgnoreCase)))
+            .Select(step => step.RoleCode).ToList();
+        return missing.Count == 0
+            ? null
+            : InvalidDefinition([$"Khối chữ ký: vai trò {string.Join(", ", missing)} không tồn tại."]);
+    }
 
     private async Task<Error?> CheckReferencesAsync(string roleCode, Guid? departmentId, CancellationToken cancellationToken)
     {

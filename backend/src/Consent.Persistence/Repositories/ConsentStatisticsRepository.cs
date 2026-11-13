@@ -64,14 +64,14 @@ internal sealed class ConsentStatisticsRepository(ConsentDbContext db) : IConsen
         var forms = ConsentFormFilters.Apply(db, scope)
             .Where(f => f.Status == ConsentFormStatus.PendingSignature
                         && templateIds.Contains(f.TemplateId)
-                        && f.Signatures.Any(s => s.Role != ConsentSignerRole.Hospital));
+                        && f.Signatures.Any(s => (s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)));
         var total = await forms.CountAsync(cancellationToken).ConfigureAwait(false);
         var items = await (
                 from f in forms
                 join p in db.Patients on f.PatientId equals p.Id
                 join t in db.ConsentTemplates on f.TemplateId equals t.Id
                 join d in db.Departments on f.DepartmentId equals d.Id
-                let signedAt = f.Signatures.Where(s => s.Role != ConsentSignerRole.Hospital).Max(s => (DateTimeOffset?)s.SignedAtUtc)
+                let signedAt = f.Signatures.Where(s => (s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)).Max(s => (DateTimeOffset?)s.SignedAtUtc)
                     ?? f.UpdatedAtUtc
                 orderby signedAt
                 select new DashboardFormItem(f.Id, f.FormNo, f.Status, p.FullName, t.Code, t.Name, d.Name, signedAt))

@@ -24,7 +24,7 @@ public sealed class HospitalTemplateTests
                 ["QT-KNGT-BM02"] = SystemRoles.Receptionist,
                 ["TTNB-NGOAITRU"] = SystemRoles.Receptionist,
                 ["QT-KNGT-BM10"] = SystemRoles.Doctor,
-                ["TUVAN-CONGTT"] = SystemRoles.Receptionist,
+                ["TUVAN-CONGTT"] = SystemRoles.Nurse,
             },
             roles);
         Assert.All(DefaultConsentTemplates.All, t =>
@@ -253,7 +253,6 @@ public sealed class HospitalTemplateTests
         ["infectionSymptoms"] = "no",
         ["staffMobilityAid"] = "no",
         ["staffUnsteady"] = "no",
-        ["screeningStaffName"] = "Nhân Viên Hướng Dẫn",
         ["pulse"] = "80",
         ["temperature"] = "37,2",
         ["bloodPressure"] = "120/80",
@@ -280,7 +279,6 @@ public sealed class HospitalTemplateTests
         ["highFallRisk"] = "no",
         ["nurseEduFall"] = "notNeeded",
         ["nurseEduWound"] = "notNeeded",
-        ["nurseName"] = "Điều Dưỡng Thử Nghiệm",
         ["adultNutritionRisk"] = "moderate",
         ["dietCounseling"] = "notRequired",
         ["physicianEduFall"] = "notRequired",

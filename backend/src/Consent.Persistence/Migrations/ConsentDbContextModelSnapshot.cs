@@ -262,6 +262,11 @@ namespace Consent.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("StepKey")
+                        .HasMaxLength(50)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(50)");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -270,6 +275,10 @@ namespace Consent.Persistence.Migrations
                     b.HasIndex("FormId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("FormId", "StepKey")
+                        .IsUnique()
+                        .HasFilter("[StepKey] IS NOT NULL");
 
                     b.ToTable("ConsentSignatures", (string)null);
                 });

@@ -27,7 +27,7 @@ public static class DefaultConsentTemplates
         new(
             "TUVAN-CONGTT",
             "Phiếu tư vấn tham gia và sử dụng cổng thông tin chính thức của bệnh viện",
-            SystemRoles.Receptionist,
+            SystemRoles.Nurse,
             Load("TUVAN-CONGTT")),
     ];
 

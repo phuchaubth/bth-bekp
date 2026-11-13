@@ -230,6 +230,52 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PortalConsultation_ConsultantConfirmsStep_ThenOnlyAWardNurseMayComplete()
+    {
+        var receptionist = await LoginDemoAsync("tiepdon.demo");
+        var patientId = await DemoPatientIdAsync(receptionist);
+        var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", receptionist);
+        var (_, created) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId, templateId = TemplateId(available, "TUVAN-CONGTT") });
+        var formId = created.GetProperty("id").GetString()!;
+        var form = $"/api/v1/consent-forms/{formId}";
+        await _client.SendJsonAsync(HttpMethod.Post, $"{form}/submit", receptionist);
+        var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
+        var (signedStatus, signed) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
+            new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
+
+        var (completeTooEarly, early) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+        var (stepStatus, afterStep) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant" });
+        var (againStatus, _) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant" });
+        var (completeWrongRole, wrongRole) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+
+        Assert.Equal(HttpStatusCode.Conflict, completeTooEarly);
+        Assert.Contains("Người tư vấn", early.GetProperty("title").GetString()!, StringComparison.Ordinal);
+        Assert.True(stepStatus == HttpStatusCode.OK, afterStep.ToString());
+        var step = afterStep.GetProperty("steps")[0];
+        Assert.Equal("consultant", step.GetProperty("key").GetString());
+        Assert.Equal("Tiếp đón Demo", step.GetProperty("confirmation").GetProperty("signerName").GetString());
+        Assert.False(afterStep.GetProperty("actions").GetProperty("canConfirm").GetBoolean());
+        Assert.Equal(HttpStatusCode.Conflict, againStatus);
+        Assert.Equal(HttpStatusCode.Forbidden, completeWrongRole);
+        Assert.Equal("consent_forms.signer_role_required", wrongRole.GetProperty("code").GetString());
+
+        await using var connection = new SqlConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand(
+            "SELECT Role, StepKey FROM ConsentSignatures WHERE FormId = @id AND StepKey IS NOT NULL", connection);
+        command.Parameters.AddWithValue("@id", Guid.Parse(formId));
+        await using var reader = await command.ExecuteReaderAsync();
+        Assert.True(await reader.ReadAsync());
+        Assert.Equal("Staff", reader.GetString(0));
+        Assert.Equal("consultant", reader.GetString(1));
+    }
+
+    [Fact]
     public async Task HandwrittenSigning_OnATablet_CompletesWithAStoredHashedPdf_ThenRevokeAndReplace()
     {
         var nurse = await LoginDemoAsync("dieuduong.demo");

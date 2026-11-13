@@ -35,6 +35,10 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"q\",\"label\":\"Q\",\"options\":[{\"value\":\"x\",\"label\":\"X\",\"score\":1}]},{\"type\":\"score\",\"key\":\"s\",\"label\":\"S\",\"sumOf\":[\"q\"],\"levels\":[{\"code\":\"a\",\"label\":\"A\",\"min\":5},{\"code\":\"b\",\"label\":\"B\",\"min\":1}]}]}]}", "tăng dần")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\",\"prefill\":\"patient.secret\"}]}]}", "nguồn tự điền")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"decision\":\"maybe\"}}", "\"decision\" chỉ nhận")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"steps\":[{\"key\":\"a\",\"roleCode\":\"NURSE\",\"label\":\"A\"},{\"key\":\"a\",\"roleCode\":\"DOCTOR\",\"label\":\"B\"}]}}", "mã bước xác nhận bị trùng")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"steps\":[{\"key\":\"a\",\"roleCode\":\"nurse role\",\"label\":\"A\"}]}}", "mã vai trò không hợp lệ")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"steps\":[{\"key\":\"a\",\"roleCode\":\"NURSE\",\"label\":\"\"}]}}", "phải có nhãn")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"steps\":[{\"key\":\"a1\",\"roleCode\":\"A\",\"label\":\"A\"},{\"key\":\"a2\",\"roleCode\":\"A\",\"label\":\"A\"},{\"key\":\"a3\",\"roleCode\":\"A\",\"label\":\"A\"},{\"key\":\"a4\",\"roleCode\":\"A\",\"label\":\"A\"},{\"key\":\"a5\",\"roleCode\":\"A\",\"label\":\"A\"},{\"key\":\"a6\",\"roleCode\":\"A\",\"label\":\"A\"}]}}", "tối đa 5 bước")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);

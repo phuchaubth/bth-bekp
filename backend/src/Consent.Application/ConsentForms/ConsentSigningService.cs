@@ -15,6 +15,8 @@ namespace Consent.Application.ConsentForms;
 /// <item>Nhân viên mở phiên ký: nhận token phiên ký chỉ dùng được để ký đúng phiếu đó (giao diện đóng phiên đăng nhập của
 /// nhân viên trên máy, muốn thoát phải đăng nhập lại).</item>
 /// <item>Người bệnh/người đại diện chọn Đồng ý/Từ chối và ký tay; máy chủ kiểm tra và chuẩn hóa ảnh chữ ký.</item>
+/// <item>Nếu mẫu có các bước xác nhận trung gian (<c>signatures.steps</c>): nhân viên đúng vai trò của từng bước lần lượt
+/// xác nhận bằng tài khoản (mỗi bước một người khác nhau).</item>
 /// <item>Nhân viên có vai trò theo cấu hình mẫu xác nhận bằng tài khoản: phiếu hoàn tất, PDF đã ký được lưu (mã hóa) kèm
 /// SHA-256.</item>
 /// </list>
@@ -148,6 +150,68 @@ public sealed class ConsentSigningService(
     }
 
     /// <summary>
+    /// Nhân viên xác nhận bước trung gian đang chờ (<paramref name="request"/> nêu rõ bước để tránh xác nhận nhầm khi hai
+    /// người thao tác cùng lúc). Cần đúng vai trò của bước; một tài khoản chỉ xác nhận một bước trên phiếu.
+    /// </summary>
+    public async Task<Result<ConsentFormDetailDto>> ConfirmStepAsync(
+        Guid id, ConfirmStepRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.StepKey))
+        {
+            return Error.ValidationField("stepKey", "Thiếu bước cần xác nhận.");
+        }
+
+        var form = await formService.LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);
+        if (form is null)
+        {
+            return NotFound;
+        }
+
+        if (!form.CanComplete)
+        {
+            return InvalidStatus(form.Status == ConsentFormStatus.PendingSignature
+                ? "Người bệnh chưa ký; các bước xác nhận chỉ thực hiện sau khi người bệnh ký."
+                : "Chỉ xác nhận được phiếu đang chờ ký.");
+        }
+
+        var (_, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var definition = ConsentTemplateService.ReadDefinition(version);
+        var steps = await formService.BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
+        var step = steps.FirstOrDefault(s => s.Key == request.StepKey);
+        if (step is null)
+        {
+            return Error.ValidationField("stepKey", "Mẫu phiếu không có bước xác nhận này.");
+        }
+
+        if (!step.IsNext)
+        {
+            return InvalidStatus(step.Confirmation is not null
+                ? $"Bước \"{step.Label}\" đã được xác nhận."
+                : $"Chưa đến lượt bước \"{step.Label}\"; hãy xác nhận các bước trước.");
+        }
+
+        if (!currentUser.IsInRole(step.RoleCode))
+        {
+            return Error.Forbidden(
+                "consent_forms.signer_role_required", $"Bước \"{step.Label}\" cần nhân viên có vai trò {step.RoleName} xác nhận.");
+        }
+
+        var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        if (form.StepSignatures.Any(s => s.UserId == userId))
+        {
+            return SameConfirmer;
+        }
+
+        var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
+            ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
+        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, clock.UtcNow);
+        formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key }));
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Phía bệnh viện xác nhận bằng tài khoản (người có vai trò theo cấu hình mẫu) sau khi người bệnh đã ký: dựng PDF bản
     /// cuối có ảnh chữ ký, lưu file (mã hóa) kèm SHA-256 và khóa phiếu.
     /// </summary>
@@ -166,7 +230,15 @@ public sealed class ConsentSigningService(
                 : "Chỉ hoàn tất được phiếu đang chờ ký.");
         }
 
-        var (template, _) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var (template, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var steps = await formService.BuildStepsAsync(form, ConsentTemplateService.ReadDefinition(version), cancellationToken)
+            .ConfigureAwait(false);
+        var stepKeys = steps.Select(s => s.Key).ToList();
+        if (steps.FirstOrDefault(s => s.Confirmation is null) is { } waiting)
+        {
+            return InvalidStatus($"Còn bước xác nhận chưa thực hiện: {waiting.Label}.");
+        }
+
         if (!currentUser.IsInRole(template.HospitalSignerRoleCode))
         {
             var allRoles = await roles.ListAsync(cancellationToken).ConfigureAwait(false);
@@ -176,6 +248,11 @@ public sealed class ConsentSigningService(
         }
 
         var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        if (form.StepSignatures.Any(s => s.UserId == userId))
+        {
+            return SameConfirmer;
+        }
+
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
         var now = clock.UtcNow;
@@ -185,7 +262,7 @@ public sealed class ConsentSigningService(
         // Lưu file trước; nếu lưu CSDL thất bại thì chỉ còn một file thừa (không ảnh hưởng dữ liệu).
         var key = await documents.SaveAsync($"{form.FormNo}.pdf", pdf, cancellationToken).ConfigureAwait(false);
 
-        form.Complete(userId, user.FullName, user.Title, key, sha256, pdf.LongLength, now);
+        form.Complete(userId, user.FullName, user.Title, key, sha256, pdf.LongLength, now, stepKeys);
         formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256 }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
@@ -225,6 +302,11 @@ public sealed class ConsentSigningService(
         var buffer = new byte[(base64.Length * 3 / 4) + 3];
         return Convert.TryFromBase64String(base64, buffer, out var written) ? buffer[..written] : null;
     }
+
+    private static Error SameConfirmer =>
+        Error.BusinessRule(
+            "consent_forms.same_confirmer",
+            "Tài khoản của bạn đã xác nhận một bước trên phiếu này; mỗi bước cần một người khác xác nhận.");
 
     private static Error InvalidStatus(string message) => Error.Conflict("consent_forms.invalid_status", message);
 }

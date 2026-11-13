@@ -35,12 +35,16 @@ public sealed record ConsentPdfDocument(
     bool IsFinal,
     ConsentDecision? Decision = null,
     ConsentPdfSignature? PatientSignature = null,
-    ConsentPdfConfirmation? HospitalConfirmation = null);
+    ConsentPdfConfirmation? HospitalConfirmation = null,
+    IReadOnlyList<ConsentPdfConfirmation?>? StepConfirmations = null);
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
 public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt);
 
-/// <summary>Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam).</summary>
+/// <summary>
+/// Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam). Với các bước trung gian,
+/// <see cref="ConsentPdfDocument.StepConfirmations"/> theo đúng thứ tự <c>signatures.steps</c> (bước chưa làm là <c>null</c>).
+/// </summary>
 public sealed record ConsentPdfConfirmation(string Name, string? Title, DateTimeOffset ConfirmedAt);
 
 public sealed record ConsentPdfFile(byte[] Content, string FileName);

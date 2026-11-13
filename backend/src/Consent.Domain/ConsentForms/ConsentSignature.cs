@@ -14,7 +14,12 @@ public enum ConsentSignerRole
 {
     Patient,
     Representative,
+
+    /// <summary>Xác nhận cuối của phía bệnh viện (vai trò cấu hình trên mẫu); hoàn tất phiếu.</summary>
     Hospital,
+
+    /// <summary>Một bước xác nhận trung gian của nhân viên theo vai trò (ví dụ điều dưỡng trước bác sĩ), xem <see cref="ConsentSignature.StepKey"/>.</summary>
+    Staff,
 }
 
 /// <summary>Cách ký: ký tay trên máy tính bảng, hoặc xác nhận bằng tài khoản đăng nhập (phía bệnh viện).</summary>
@@ -33,6 +38,7 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
     public const int NameMaxLength = 200;
     public const int TitleMaxLength = 100;
     public const int DeviceMaxLength = 300;
+    public const int StepKeyMaxLength = 50;
 
     private ConsentSignature(
         Guid id,
@@ -44,9 +50,11 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
         Guid? userId,
         byte[]? imagePng,
         string? device,
-        DateTimeOffset signedAtUtc)
+        DateTimeOffset signedAtUtc,
+        string? stepKey = null)
         : base(id)
     {
+        StepKey = stepKey;
         FormId = formId;
         Role = role;
         Method = method;
@@ -81,6 +89,9 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
     public string? Device { get; private set; }
 
     public DateTimeOffset SignedAtUtc { get; private set; }
+
+    /// <summary>Bước xác nhận theo định nghĩa mẫu (chỉ với <see cref="ConsentSignerRole.Staff"/>).</summary>
+    public string? StepKey { get; private set; }
 
     internal static ConsentSignature Handwritten(
         Guid formId, ConsentSignerRole role, string signerName, byte[] imagePng, string? device, Guid? staffUserId, DateTimeOffset nowUtc)
@@ -120,6 +131,29 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
             null,
             null,
             nowUtc);
+
+    internal static ConsentSignature StepConfirmation(
+        Guid formId, string stepKey, Guid userId, string name, string? title, DateTimeOffset nowUtc)
+    {
+        var key = stepKey?.Trim() ?? string.Empty;
+        if (key.Length is 0 or > StepKeyMaxLength)
+        {
+            throw new DomainException("Bước xác nhận không hợp lệ.");
+        }
+
+        return new(
+            Guid.CreateVersion7(),
+            formId,
+            ConsentSignerRole.Staff,
+            ConsentSignatureMethod.AccountConfirmation,
+            RequireName(name),
+            Truncate(title, TitleMaxLength),
+            userId,
+            null,
+            null,
+            nowUtc,
+            key);
+    }
 
     private static string RequireName(string name)
     {

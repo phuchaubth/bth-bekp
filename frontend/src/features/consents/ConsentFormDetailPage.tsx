@@ -72,6 +72,16 @@ export function ConsentFormDetailPage() {
     onError: (e) => message.error(errorMessage(e)),
   })
 
+  const confirmStep = useMutation({
+    mutationFn: (stepKey: string) => consentFormsApi.confirmStep(id, stepKey),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(consentFormKeys.detail(id), updated)
+      void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      message.success('Đã xác nhận bước của bạn.')
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  })
+
   const replace = useMutation({
     mutationFn: (source: ConsentFormDetail) =>
       consentFormsApi.create({ patientId: source.patient.id, templateId: source.templateId, replacesFormId: source.id }),
@@ -91,6 +101,8 @@ export function ConsentFormDetailPage() {
     return <Alert type="error" showIcon title={errorMessage(error)} />
   }
 
+  const nextStep = form.steps.find((step) => step.isNext)
+
   return (
     <>
       <PageHeader
@@ -101,6 +113,19 @@ export function ConsentFormDetailPage() {
               <Button type="primary" icon={<EditOutlined />} onClick={() => setSigningOpen(true)}>
                 Ký trên máy tính bảng
               </Button>
+            )}
+            {form.actions.canConfirmStep && nextStep && (
+              <Popconfirm
+                title={`Xác nhận: ${nextStep.label}?`}
+                description="Bạn xác nhận phần này bằng tài khoản đang đăng nhập. Mỗi bước cần một người khác nhau."
+                okText="Xác nhận"
+                cancelText="Đóng"
+                onConfirm={() => confirmStep.mutate(nextStep.key)}
+              >
+                <Button type="primary" icon={<CheckCircleOutlined />} loading={confirmStep.isPending}>
+                  Xác nhận: {nextStep.label}
+                </Button>
+              </Popconfirm>
             )}
             {form.actions.canConfirm && (
               <Popconfirm
@@ -221,9 +246,34 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
   )
 }
 
+/** Tiến trình các bước xác nhận theo vai trò (mẫu có `signatures.steps`). */
+function StepProgress({ form }: { form: ConsentFormDetail }) {
+  return (
+    <ol aria-label="Các bước xác nhận" style={{ margin: '4px 0 8px', paddingInlineStart: 20 }}>
+      {form.steps.map((step) => (
+        <li key={step.key}>
+          {step.label}:{' '}
+          {step.confirmation ? (
+            <Typography.Text type="success">
+              {step.confirmation.signerName} đã xác nhận lúc {formatDateTime(step.confirmation.signedAtUtc)}
+            </Typography.Text>
+          ) : (
+            <Typography.Text type="secondary">{step.isNext ? 'đang chờ' : 'chưa đến lượt'} ({step.roleName})</Typography.Text>
+          )}
+        </li>
+      ))}
+      <li>
+        Xác nhận cuối ({signerRoleLabel(form.hospitalSignerRoleCode)}):{' '}
+        <Typography.Text type="secondary">{form.steps.every((s) => s.confirmation) ? 'đang chờ' : 'chưa đến lượt'}</Typography.Text>
+      </li>
+    </ol>
+  )
+}
+
 /** Bước tiếp theo của phiếu đang chờ ký / trạng thái cuối. */
 function StatusNotice({ form }: { form: ConsentFormDetail }) {
   const patientSignature = form.signatures.find((s) => s.method === 'Handwritten')
+  const pendingStep = form.steps.find((step) => step.isNext)
   if (form.status === 'PendingSignature' && !patientSignature) {
     return (
       <Alert
@@ -245,9 +295,16 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
           form.decision ? ` (${decisionLabels[form.decision]})` : ''
         }`}
         description={
-          form.actions.canConfirm
-            ? 'Bấm “Xác nhận và hoàn tất” để xác nhận bằng tài khoản của bạn và khóa phiếu.'
-            : `Chờ nhân viên có vai trò ${signerRoleLabel(form.hospitalSignerRoleCode)} xác nhận bằng tài khoản.`
+          <>
+            {form.steps.length > 0 && <StepProgress form={form} />}
+            {pendingStep
+              ? form.actions.canConfirmStep
+                ? `Bấm “Xác nhận: ${pendingStep.label}” để xác nhận phần của bạn bằng tài khoản.`
+                : `Chờ nhân viên có vai trò ${pendingStep.roleName} xác nhận bước “${pendingStep.label}”.`
+              : form.actions.canConfirm
+                ? 'Bấm “Xác nhận và hoàn tất” để xác nhận bằng tài khoản của bạn và khóa phiếu.'
+                : `Chờ nhân viên có vai trò ${signerRoleLabel(form.hospitalSignerRoleCode)} xác nhận bằng tài khoản.`}
+          </>
         }
       />
     )

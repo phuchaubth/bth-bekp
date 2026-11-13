@@ -92,6 +92,8 @@ public sealed record ScoreLevel(string Code, string Label, int Min);
 /// <see cref="Decision"/> = <c>none</c>: người bệnh chỉ ký xác nhận (phiếu khai thông tin, phiếu nhận định), không hỏi
 /// Đồng ý/Từ chối. Mặc định (<c>required</c>): bắt buộc chọn; <see cref="DecisionLabel"/>, <see cref="AgreeLabel"/>,
 /// <see cref="RefuseLabel"/> thay câu hỏi và nhãn mặc định ("Ý kiến của người bệnh", "Đồng ý", "Từ chối").
+/// <see cref="Steps"/>: các bước xác nhận trung gian theo vai trò, làm lần lượt sau khi người bệnh ký và trước bước xác
+/// nhận cuối (vai trò cấu hình trên mẫu, nhãn <see cref="Hospital"/>).
 /// </summary>
 public sealed record TemplateSignatures(
     string? Patient = null,
@@ -101,13 +103,22 @@ public sealed record TemplateSignatures(
     string? Decision = null,
     string? DecisionLabel = null,
     string? AgreeLabel = null,
-    string? RefuseLabel = null)
+    string? RefuseLabel = null,
+    IReadOnlyList<TemplateConfirmationStep>? Steps = null)
 {
+    public const int MaxSteps = 5;
+
     public const string DecisionRequired = "required";
     public const string DecisionNone = "none";
 
     public bool RequiresDecision => !string.Equals(Decision, DecisionNone, StringComparison.Ordinal);
 }
+
+/// <summary>
+/// Một bước xác nhận trung gian: nhân viên có vai trò <see cref="RoleCode"/> xác nhận bằng tài khoản. <see cref="Label"/>
+/// là nhãn ô chữ ký trên PDF, ví dụ "Điều dưỡng thực hiện (Nurse in charge)".
+/// </summary>
+public sealed record TemplateConfirmationStep(string Key, string RoleCode, string Label, string? Hint = null);
 
 public static class BlockTypes
 {
@@ -152,7 +163,7 @@ public static class TemplateJson
     private static readonly HashSet<Type> DefinitionTypes =
     [
         typeof(TemplateDefinition), typeof(TemplateSection), typeof(TemplateBlock), typeof(TemplateOption),
-        typeof(TemplateColumn), typeof(TemplateCondition), typeof(ScoreLevel), typeof(TemplateSignatures),
+        typeof(TemplateColumn), typeof(TemplateCondition), typeof(ScoreLevel), typeof(TemplateSignatures), typeof(TemplateConfirmationStep),
     ];
 
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)

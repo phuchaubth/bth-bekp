@@ -11,11 +11,11 @@
 |---|---|---|---|---|
 | `QT-KNGT-BM02` | 19. SONG NGỮ QT-KNGT-BM02 | Giấy đồng thuận về chế độ thanh toán và quyền lợi khám chữa bệnh BHYT | Tiếp đón ("Nhân viên hướng dẫn") | Không, chỉ ký xác nhận |
 | `TTNB-NGOAITRU` | 27. BV Phiếu thông tin người bệnh ngoại trú | Phiếu thông tin người bệnh ngoại trú | Tiếp đón ("Nhân viên tiếp nhận") | Không, chỉ ký xác nhận |
-| `QT-KNGT-BM10` | 30. JCI Phiếu nhận định ban đầu NB ngoại trú (02.08.2024) | Phiếu nhận định ban đầu và nhu cầu giáo dục sức khỏe người bệnh ngoại trú | Bác sĩ ("Bác sĩ thực hiện") | Không, chỉ ký xác nhận |
-| `TUVAN-CONGTT` | 24. JCI Phiếu tư vấn tham gia và sử dụng cổng thông tin | Phiếu tư vấn tham gia và sử dụng cổng thông tin chính thức của bệnh viện | Tiếp đón ("Người tư vấn") | Có: "Đồng ý (Agree)" / "Không đồng ý (Disagree)" |
+| `QT-KNGT-BM10` | 30. JCI Phiếu nhận định ban đầu NB ngoại trú (02.08.2024) | Lần lượt: nhân viên hướng dẫn (Tiếp đón) → điều dưỡng → **bác sĩ xác nhận cuối** | Không, chỉ ký xác nhận |
+| `TUVAN-CONGTT` | 24. JCI Phiếu tư vấn tham gia và sử dụng cổng thông tin | Lần lượt: người tư vấn (Tiếp đón) → **điều dưỡng khoa xác nhận cuối** | Có: "Đồng ý (Agree)" / "Không đồng ý (Disagree)" |
 
-Mã `TTNB-NGOAITRU` và `TUVAN-CONGTT` do nhóm phát triển đặt vì bản Word không ghi mã biểu mẫu. Đổi mã là thay đổi dữ liệu
-(tạo mẫu mới), nên cần bệnh viện cho mã chính thức trước khi phát hành ở môi trường thật.
+Mã `TTNB-NGOAITRU` và `TUVAN-CONGTT` do nhóm phát triển đặt vì bản Word không ghi mã biểu mẫu; bệnh viện đã đồng ý dùng
+hai mã này (13/11/2026).
 
 ## 1. Cách chuyển từ bản giấy
 
@@ -33,6 +33,10 @@ Mã `TTNB-NGOAITRU` và `TUVAN-CONGTT` do nhóm phát triển đặt vì bản W
 - `signatures.decision = "none"`: người bệnh chỉ ký xác nhận, không có câu hỏi Đồng ý/Từ chối trên máy tính bảng và PDF.
 - `signatures.decisionLabel`, `agreeLabel`, `refuseLabel`: câu hỏi và nhãn riêng, dùng cho phiếu tư vấn cổng thông tin.
 - Nguồn tự điền mới: `patient.permanentAddress`, `patient.currentAddress`, `patient.ethnicity`, `patient.occupation`.
+- `signatures.steps`: **nhiều bước xác nhận theo vai trò** (bệnh viện đồng ý 13/11/2026). Sau khi người bệnh ký, nhân viên
+  đúng vai trò của từng bước lần lượt bấm "Xác nhận: …" trên trang chi tiết phiếu; người có vai trò xác nhận cuối hoàn tất
+  phiếu khi đủ các bước. Mỗi bước một người khác nhau (một tài khoản không xác nhận hai phần trên cùng phiếu). PDF in một
+  ô chữ ký cho mỗi người, kèm họ tên, chức danh và thời điểm xác nhận.
 
 ## 2. Từng mẫu
 
@@ -58,7 +62,7 @@ Một phiếu điện tử gồm đủ các phần của bản giấy, theo th�
 1. **Người bệnh tự khai:** phòng khám; nguy cơ té ngã (2 câu); tầm soát bệnh lây nhiễm (câu 2, 3 chỉ hiện khi câu 1 là
    "Có").
 2. **Nhân viên hướng dẫn:** 2 câu té ngã, hành động can thiệp; xử trí tầm soát lây nhiễm (chỉ hiện khi người bệnh có
-   triệu chứng); họ tên nhân viên.
+   triệu chứng). Nhân viên hướng dẫn xác nhận phần này bằng tài khoản (bước 1).
 3. **Điều dưỡng:** dấu hiệu sinh tồn và chỉ số đo (mạch, nhiệt độ, huyết áp dạng `120/80`, nhịp thở, chiều cao, cân
    nặng, BMI bắt buộc; SpO₂, vòng đầu, cân nặng 3 tháng trước, % sụt cân không bắt buộc), có kiểm tra định dạng số.
    Dấu hiệu cần cấp cứu: chọn "Có" thì ghi rõ và **bỏ qua toàn bộ phần đánh giá** (đúng ghi chú "chỉ thực hiện nếu mục A
@@ -70,7 +74,8 @@ Một phiếu điện tử gồm đủ các phần của bản giấy, theo th�
    - Người lớn: điểm BMI (0/1/2), % sụt cân (0/1/2), bệnh lý cấp hoặc gần như không ăn > 5 ngày (0/2). Hệ thống tự cộng
      tổng 0–6 và xếp mức: 0 không nguy cơ, 1 trung bình, 2–4 cao, ≥ 5 rất cao.
    - Bệnh nhi < 16 tuổi (PNST): 4 câu Có/Không, tự đếm số yếu tố nguy cơ; 0–1 kết thúc đánh giá, ≥ 2 có nguy cơ.
-6. **Nhu cầu GDSK do điều dưỡng thực hiện** (phòng ngừa té ngã, chăm sóc vết thương) và họ tên điều dưỡng.
+6. **Nhu cầu GDSK do điều dưỡng thực hiện** (phòng ngừa té ngã, chăm sóc vết thương). Điều dưỡng xác nhận bằng tài
+   khoản (bước 2).
 7. **Phần bác sĩ:** mức nguy cơ suy dinh dưỡng và giải pháp (người lớn hoặc nhi), tư vấn chế độ ăn (6 lựa chọn, "Khác"
    thì ghi rõ), nhu cầu GDSK khác (té ngã, vết thương, đau, người bệnh mới, khác).
 
@@ -89,13 +94,15 @@ rất cao).
 
 | Nội dung | Bản giấy | Ứng dụng hiện nay | Đề xuất |
 |---|---|---|---|
-| Nhiều người ký trên một phiếu (BM10) | Người bệnh, nhân viên hướng dẫn, điều dưỡng, bác sĩ ký riêng từng phần | Người bệnh ký tay; **một** vai trò bệnh viện (bác sĩ) xác nhận bằng tài khoản. Nhân viên hướng dẫn và điều dưỡng ghi họ tên trong phiếu | Bổ sung "nhiều bước xác nhận" theo vai trò nếu bệnh viện cần chữ ký riêng từng phần |
-| Phiếu tư vấn cổng thông tin | Ký: người bệnh, người tư vấn, điều dưỡng khoa | Người bệnh và người tư vấn (tiếp đón) | Như trên |
+| Nhập liệu theo từng phần (BM10) | Mỗi người tự ghi phần của mình vào phiếu giấy | Nội dung điền ở bản nháp (nhân viên cùng khoa đều sửa được), khóa khi trình ký; sau khi người bệnh ký, từng người xác nhận phần của mình bằng tài khoản | Khóa riêng từng phần theo vai trò nếu bệnh viện cần |
+| Phạm vi khoa | | Người xác nhận phải thấy được phiếu: cùng khoa với phiếu, hoặc có quyền toàn viện. Nhân viên hướng dẫn, điều dưỡng, bác sĩ cần thuộc cùng khoa (ví dụ Khoa Khám bệnh) | |
 | Mã QR, logo trên phiếu | Có | Không in. Đầu trang dùng tên đơn vị cấu hình ở *Quản trị → Cấu hình hệ thống* | Bổ sung khối hình ảnh nếu cần |
 | Bố cục bảng, ô vuông | Bảng nhiều cột | Danh sách câu hỏi tuần tự; PDF dùng ô ■/□ | |
 | Số trang PDF | BM02, phiếu tư vấn: 1 trang | 2 trang, vì khối chữ ký luôn nằm trọn một trang | Thu gọn bố cục nếu bệnh viện yêu cầu 1 trang |
 
-## 4. Điểm khác so với bản Word (cần bệnh viện xác nhận)
+## 4. Điểm khác so với bản Word
+
+> Bệnh viện đã đồng ý các cách hiểu dưới đây (13/11/2026), gồm cả hai mã `TTNB-NGOAITRU`, `TUVAN-CONGTT`.
 
 1. **BM10, bảng BMI người lớn:** ô điểm 0 ghi "≥ 20%". Ứng dụng hiểu là BMI ≥ 20 (không có dấu %).
 2. **Phiếu tư vấn cổng thông tin:** email ghi "ctxh_bth@bthh.org.vn" ở một chỗ, "ctxh_bth@bth.org.vn" ở chỗ khác. Ứng

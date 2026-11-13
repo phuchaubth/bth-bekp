@@ -121,6 +121,7 @@ const actions = (overrides: Partial<ConsentFormActions> = {}): ConsentFormAction
   canReturnToDraft: false,
   canCancel: false,
   canStartSigning: false,
+  canConfirmStep: false,
   canConfirm: false,
   canRevoke: false,
   canReplace: false,
@@ -167,6 +168,7 @@ const detail = (overrides: Partial<ConsentFormDetail> = {}): ConsentFormDetail =
   revokeReason: null,
   decision: null,
   signatures: [],
+  steps: [],
   signedPdfSha256: null,
   replacesForm: null,
   replacedBy: null,
@@ -497,6 +499,53 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     expect(screen.getByText(/Phạm Thị Dung \(người bệnh\) ký tay trên máy tính bảng – Đồng ý/)).toBeInTheDocument()
     expect(screen.getByText('ab'.repeat(32))).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Trả về nháp/ })).not.toBeInTheDocument()
+  })
+
+  it('mẫu có bước xác nhận theo vai trò: người đúng vai trò xác nhận bước đang chờ, sau đó mới tới xác nhận cuối', async () => {
+    const steps = (confirmed: boolean) => [
+      {
+        key: 'nurse',
+        label: 'Điều dưỡng thực hiện (Nurse in charge)',
+        roleCode: 'NURSE',
+        roleName: 'Điều dưỡng',
+        isNext: !confirmed,
+        confirmation: confirmed
+          ? {
+              role: 'Staff' as const,
+              method: 'AccountConfirmation' as const,
+              signerName: 'Điều dưỡng Demo',
+              signerTitle: 'Điều dưỡng',
+              signedAtUtc: '2026-11-11T03:06:00Z',
+              stepKey: 'nurse',
+            }
+          : null,
+      },
+    ]
+    let current = { ...signedByPatient(false), steps: steps(false), actions: actions({ canConfirmStep: true }) }
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/consent-forms/f-1': () => current,
+      'POST /api/v1/consent-forms/f-1/confirm-step': () =>
+        (current = {
+          ...current,
+          steps: steps(true),
+          signatures: [...current.signatures, steps(true)[0].confirmation!],
+          actions: actions(),
+        }),
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    expect(await screen.findByRole('list', { name: 'Các bước xác nhận' })).toHaveTextContent('đang chờ (Điều dưỡng)')
+    expect(screen.queryByRole('button', { name: /Xác nhận và hoàn tất/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Xác nhận: Điều dưỡng thực hiện/ }))
+    await user.click(await screen.findByRole('button', { name: 'Xác nhận' }))
+
+    expect(await screen.findByText(/Điều dưỡng Demo đã xác nhận lúc/)).toBeInTheDocument()
+    expect(screen.getByText('Chờ nhân viên có vai trò Tiếp đón xác nhận bằng tài khoản.')).toBeInTheDocument()
+    expect(screen.getByText(/Điều dưỡng Demo \(Điều dưỡng\) xác nhận bằng tài khoản: Điều dưỡng thực hiện/)).toBeInTheDocument()
+    const call = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/confirm-step')!
+    expect(call.body).toEqual({ stepKey: 'nurse' })
   })
 
   it('người bệnh đã ký nhưng người xem không đúng vai trò xác nhận: chỉ báo chờ', async () => {

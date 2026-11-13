@@ -155,6 +155,7 @@ internal sealed class AppTestContext
         new InMemoryPatientRepository(Store),
         new InMemoryDepartmentRepository(Store),
         new InMemoryUserRepository(Store),
+        new InMemoryRoleRepository(Store),
         FormNumbers,
         new InMemoryAuditLogRepository(Store),
         Store,

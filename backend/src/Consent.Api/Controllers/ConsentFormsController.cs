@@ -77,6 +77,12 @@ public sealed class ConsentFormsController(ConsentFormService forms, ConsentSign
     public async Task<IActionResult> SignAsPatient(Guid id, PatientSignatureRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await signing.SignAsPatientAsync(id, request, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>Nhân viên xác nhận bước trung gian đang chờ (vai trò theo bước trong định nghĩa mẫu).</summary>
+    [HttpPost("{id:guid}/confirm-step")]
+    [HasPermission(Permissions.ConsentsSign)]
+    public async Task<IActionResult> ConfirmStep(Guid id, ConfirmStepRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.ConfirmStepAsync(id, request, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Phía bệnh viện xác nhận bằng tài khoản (vai trò theo cấu hình mẫu) và hoàn tất phiếu.</summary>
     [HttpPost("{id:guid}/complete")]
     [HasPermission(Permissions.ConsentsSign)]

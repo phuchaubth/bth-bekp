@@ -168,7 +168,6 @@ public sealed class ConsentPdfRendererTests
             ["staffUnsteady"] = "no",
             ["fallInterventions"] = new JsonArray("mobilityAid"),
             ["infectionAction"] = "maskContinue",
-            ["screeningStaffName"] = "Nhân Viên Hướng Dẫn (giả lập)",
             ["pulse"] = "82",
             ["temperature"] = "37,8",
             ["bloodPressure"] = "125/80",
@@ -204,7 +203,6 @@ public sealed class ConsentPdfRendererTests
             ["highFallRisk"] = "yes",
             ["nurseEduFall"] = "provided",
             ["nurseEduWound"] = "notNeeded",
-            ["nurseName"] = "Điều Dưỡng Thử Nghiệm (giả lập)",
             ["adultNutritionRisk"] = "high",
             ["dietCounseling"] = "required",
             ["dietRegimens"] = new JsonArray("ironDeficiency", "other"),
@@ -253,6 +251,43 @@ public sealed class ConsentPdfRendererTests
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.InRange(pdf.PageCount, 1, maxPages);
         Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(bytes));
+    }
+
+    [Fact]
+    public void Bm10_PrintsOneSignatureBoxPerConfirmationStep()
+    {
+        var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == "QT-KNGT-BM10").ContentJson).Definition!;
+        var evaluation = FormDataEvaluator.Evaluate(definition, HospitalData("QT-KNGT-BM10"));
+        var vietnam = TimeSpan.FromHours(7);
+        var at = new DateTimeOffset(2026, 11, 11, 9, 40, 0, vietnam);
+        var document = new ConsentPdfDocument(
+            new HospitalOptions(), "Khoa Khám bệnh", "QT-KNGT-BM10", 1, "PDT-2026-000002", definition, evaluation.Data, evaluation.Scores,
+            Patient, null, new DateOnly(2026, 11, 11), IsFinal: true)
+        {
+            PatientSignature = new ConsentPdfSignature(SignatureImage.Normalize(TestPng.Signature()).Png!, at),
+            StepConfirmations =
+            [
+                new ConsentPdfConfirmation("Nhân Viên Hướng Dẫn (giả lập)", "Tiếp đón", at),
+                new ConsentPdfConfirmation("Điều Dưỡng Thử Nghiệm (giả lập)", "Điều dưỡng", at),
+            ],
+            HospitalConfirmation = new ConsentPdfConfirmation("Bác Sĩ Thử Nghiệm (giả lập)", "Bác sĩ", at),
+        };
+
+        var bytes = new MigraDocConsentPdfRenderer().Render(document);
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, "QT-KNGT-BM10-steps.pdf"), bytes);
+        }
+
+        // Bản xem trước (chưa ai xác nhận) cũng in đủ bốn ô ký.
+        var preview = new MigraDocConsentPdfRenderer().Render(document with
+        {
+            IsFinal = false, PatientSignature = null, StepConfirmations = null, HospitalConfirmation = null,
+        });
+        using var stream = new MemoryStream(bytes);
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.InRange(pdf.PageCount, 1, 6);
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(preview, 0, 4));
     }
 
     [Fact]

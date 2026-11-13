@@ -105,6 +105,55 @@ public static partial class TemplateDefinitionValidator
                 return;
             }
         }
+
+        ValidateSteps(signatures.Steps, errors);
+    }
+
+    private static void ValidateSteps(IReadOnlyList<TemplateConfirmationStep>? steps, List<string> errors)
+    {
+        if (steps is null)
+        {
+            return;
+        }
+
+        if (steps.Count > TemplateSignatures.MaxSteps)
+        {
+            errors.Add($"Khối chữ ký: tối đa {TemplateSignatures.MaxSteps} bước xác nhận.");
+            return;
+        }
+
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            var where = $"Khối chữ ký, bước {i + 1}";
+            if (step is null)
+            {
+                errors.Add($"{where}: trống.");
+                continue;
+            }
+
+            if (!KeyPattern().IsMatch(step.Key ?? string.Empty))
+            {
+                errors.Add($"{where}: mã bước phải bắt đầu bằng chữ cái, chỉ gồm chữ không dấu, số, dấu gạch dưới (tối đa 50 ký tự).");
+            }
+
+            if (!RoleCodePattern().IsMatch(step.RoleCode ?? string.Empty))
+            {
+                errors.Add($"{where}: mã vai trò không hợp lệ (ví dụ NURSE).");
+            }
+
+            if (string.IsNullOrWhiteSpace(step.Label) || step.Label.Length > MaxLabelLength
+                || step.Hint is { Length: > MaxLabelLength })
+            {
+                errors.Add($"{where}: phải có nhãn, nhãn và ghi chú tối đa {MaxLabelLength} ký tự.");
+            }
+        }
+
+        if (steps.Where(s => s?.Key is not null).Select(s => s.Key).Distinct(StringComparer.Ordinal).Count()
+            != steps.Count(s => s?.Key is not null))
+        {
+            errors.Add("Khối chữ ký: mã bước xác nhận bị trùng.");
+        }
     }
 
     private static void ValidateBlock(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)
@@ -307,4 +356,7 @@ public static partial class TemplateDefinitionValidator
 
     [GeneratedRegex("^[A-Za-z][A-Za-z0-9_]{0,49}$")]
     private static partial Regex KeyPattern();
+
+    [GeneratedRegex("^[A-Z][A-Z0-9_]{0,49}$")]
+    private static partial Regex RoleCodePattern();
 }
