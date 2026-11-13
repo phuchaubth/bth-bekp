@@ -600,7 +600,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
 | 10 | Hình thức ký khi chưa có SmartCA (11/11/2026) | **Người bệnh (hoặc người đại diện) ký tay trên máy tính bảng.** Ảnh chữ ký chèn vào PDF, lưu mã băm, khóa phiếu (mục 2.5a, ADR-018) |
 | 11 | Phía bệnh viện khi ký tay (11/11/2026, đồng ý đề xuất) | Người ký theo cấu hình mẫu **chỉ xác nhận bằng tài khoản đang đăng nhập**, không ký tay thêm. PDF ghi họ tên, chức danh, thời điểm xác nhận |
-| 12 | Hình thức triển khai (13/11/2026) | **Docker** (container Linux) + SQL Server có sẵn trên Windows Server ([hướng dẫn, mục 6](trien-khai.md)) |
+| 12 | Hình thức triển khai (13/11/2026, điều chỉnh) | **IIS + SQL Server 2025 Standard** trên Windows Server ([hướng dẫn, mục 5](trien-khai.md)). Ban đầu chọn Docker, nhưng hiện chưa bố trí hạ tầng Docker; hướng dẫn Docker giữ lại để chuyển sau |
 | 13 | Thiết bị ký (13/11/2026) | **Điện thoại thông minh** (iPhone/Android) thay cho máy tính bảng. Màn hình ký tối ưu cho điện thoại cầm dọc và ngang ([hướng dẫn, mục 9a](trien-khai.md)) |
 | 14 | Pháp chế (13/11/2026) | **Đồng ý**: chữ ký tay điện tử trên điện thoại kèm xác nhận bằng tài khoản dùng được cho các phiếu giai đoạn 1; lưu trữ theo thời hạn hồ sơ bệnh án, hệ thống không tự động xóa |
 | 15 | Chứng chỉ HTTPS (13/11/2026) | **Chứng chỉ công cộng** cho **`phieudongthuan.bth.org.vn`**, DNS nội bộ trỏ về máy chủ; tự động gia hạn ([hướng dẫn, mục 2a](trien-khai.md)) |
@@ -614,7 +614,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 1. Vài điện thoại thật (iPhone và Android) để thử ký trước khi dùng chính thức.
 2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh — quản trị tự nhập tại màn hình Cấu hình hệ thống sau khi triển khai (không cần gửi trước).
 
-*Đã có câu trả lời (13/11/2026):* các điểm khác bản Word và chữ ký riêng từng phần (đã làm nhiều bước xác nhận), hình thức triển khai Docker, thiết bị ký là điện thoại, pháp chế đồng ý, SQL Server 2025 Standard, tên miền `phieudongthuan.bth.org.vn`.
+*Đã có câu trả lời (13/11/2026):* các điểm khác bản Word và chữ ký riêng từng phần (đã làm nhiều bước xác nhận), hình thức triển khai IIS (điều chỉnh từ Docker), thiết bị ký là điện thoại, pháp chế đồng ý, SQL Server 2025 Standard, tên miền `phieudongthuan.bth.org.vn`.
 
 *Không còn chờ (tạm hoãn theo quyết định 9):* thông tin SmartCA UAT và code mẫu VNPT; tài liệu API FPT eHospital; danh sách lý do/quan hệ ký thay (dùng khi có SmartCA).
 

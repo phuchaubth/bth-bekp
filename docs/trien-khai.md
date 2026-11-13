@@ -1,7 +1,7 @@
 # Hướng dẫn triển khai — Quản lý Phiếu đồng thuận
 
 > Dành cho phòng CNTT bệnh viện. Áp dụng cho máy chủ **Windows Server** tại bệnh viện (quyết định 5).
-> **Bệnh viện đã chọn hình thức B. Docker** (container Linux) + SQL Server có sẵn (quyết định 12, 13/11/2026) — làm theo **mục 6**. Hình thức A (IIS) giữ lại để tham khảo. Người bệnh **ký trên điện thoại thông minh** (quyết định 13) — chuẩn bị điện thoại theo **mục 9a**. Phần sao lưu, khôi phục, khóa và vận hành dùng chung.
+> **Bệnh viện triển khai theo hình thức A. IIS + SQL Server 2025 Standard** trên Windows Server (quyết định 12, điều chỉnh 13/11/2026: hiện chưa bố trí hạ tầng Docker) — làm theo **mục 5**. Hình thức B (Docker) giữ lại để chuyển sang sau này. Người bệnh **ký trên điện thoại thông minh** (quyết định 13) — chuẩn bị điện thoại theo **mục 9a**. Phần sao lưu, khôi phục, khóa và vận hành dùng chung.
 > Các file mẫu nằm trong thư mục [`deploy/`](../deploy). Mọi giá trị trong tài liệu này là ví dụ; **không có bí mật thật nào trong repo**.
 
 ---
@@ -9,7 +9,7 @@
 ## 1. Kiến trúc triển khai
 
 ```
-Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──► Reverse proxy (nginx trong Docker, hoặc IIS)
+Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──► IIS: site ConsentWeb (giao diện + ARR chuyển tiếp)
                                                                    ├── /            → file tĩnh của giao diện web (frontend/dist)
                                                                    └── /api, /health → API ASP.NET Core (cổng nội bộ, không mở ra ngoài)
                                                                                           ├── SQL Server (CSDL ConsentManagement)
@@ -37,7 +37,7 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 1. **Tên miền: `phieudongthuan.bth.org.vn`** (quyết định 15). Trên **DNS nội bộ**, trỏ tên này về IP nội bộ của máy chủ; điện thoại và máy trạm vào bằng Wi-Fi/mạng nội bộ. Không cần mở hệ thống ra Internet. Nếu có DNS công cộng cho `bth.org.vn`, không cần bản ghi A công cộng cho tên này (chỉ cần bản ghi TXT khi xác thực DNS-01).
 2. **Cấp chứng chỉ:** từ một CA công cộng (thương mại hoặc Let's Encrypt). Vì máy chủ không mở ra Internet, xác thực tên miền bằng **bản ghi DNS (DNS-01)** hoặc theo quy trình của nhà cung cấp chứng chỉ thương mại.
 3. **Gia hạn:** thời hạn tối đa của chứng chỉ công cộng đang rút ngắn theo quy định chung của các CA (200 ngày từ 15/3/2026, 100 ngày từ 15/3/2027, 47 ngày từ 15/3/2029). Nên **tự động gia hạn** (ví dụ win-acme trên Windows, hoặc certbot với plugin DNS) và đặt cảnh báo trước khi hết hạn 30 ngày.
-4. **Gắn chứng chỉ** ở reverse proxy phía trước stack Docker (mục 6, bước 4), kèm chuỗi chứng chỉ trung gian đầy đủ. Điện thoại và máy trạm **không cần cài thêm chứng chỉ**.
+4. **Gắn chứng chỉ** vào binding HTTPS của site `ConsentWeb` trên IIS (mục 5.3), kèm chuỗi chứng chỉ trung gian đầy đủ. Trên Windows có thể dùng **win-acme** (Let's Encrypt, xác thực DNS) để cấp, gắn binding IIS và tự gia hạn bằng Task Scheduler; hoặc nhập chứng chỉ thương mại vào kho *Local Computer → Personal* rồi chọn trong binding. Điện thoại và máy trạm **không cần cài thêm chứng chỉ**.
 5. Không dùng chứng chỉ có ký tự đại diện (`*.`) chung với các hệ thống khác nếu khóa riêng phải sao chép sang nhiều máy; ưu tiên chứng chỉ riêng cho tên miền này.
 
 ## 2b. Chọn phiên bản SQL Server
@@ -55,7 +55,7 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 - **Enterprise không cần thiết:** giới hạn lõi và bộ nhớ của Standard cao hơn nhiều so với nhu cầu của ứng dụng.
 - **Giấy phép:** Standard theo lõi (tối thiểu 4 lõi) hoặc theo máy chủ + CAL. Phòng CNTT đối chiếu với hợp đồng bản quyền hiện có của bệnh viện. Ứng dụng hỗ trợ từ 2017, nhưng chỉ kiểm thử thường xuyên với 2025 và 2022.
 - **Cấu hình gợi ý:** 4 lõi, 16 GB RAM cho SQL Server; ổ dữ liệu và ổ nhật ký giao dịch tách riêng; chế độ khôi phục **Full** với sao lưu nhật ký định kỳ (mục 7); SQL Agent lên lịch sao lưu (Standard có sẵn).
-- SQL Server có thể đặt trên máy chủ CSDL sẵn có của bệnh viện; ứng dụng (Docker) chỉ cần kết nối tới cổng 1433.
+- SQL Server có thể đặt trên máy chủ CSDL sẵn có của bệnh viện hoặc cùng máy chủ IIS; ứng dụng chỉ cần kết nối tới cổng 1433.
 
 ## 3. Bí mật và cấu hình
 
@@ -70,7 +70,7 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 | `Seed__Enabled`, `Seed__AdminPassword` | Tạo vai trò hệ thống và tài khoản `admin` lần đầu (phải đổi mật khẩu ở lần đăng nhập đầu). Sau khi đăng nhập được, **xóa `Seed__AdminPassword`** | — |
 | `Seed__DemoData` | Phải là `false` (API từ chối khởi động nếu bật ở Production) | — |
 | `Storage__DocumentsPath` | Thư mục lưu PDF đã ký. Ổ đĩa riêng hoặc thư mục mạng (tài khoản chạy ứng dụng cần quyền ghi) | ví dụ `D:\ConsentDocuments` |
-| `AllowedHosts` | Tên máy chủ người dùng truy cập (chống giả mạo Host), ví dụ `phieudongthuan.bth.org.vn` | — |
+| `AllowedHosts` | Tên máy chủ được chấp nhận (chống giả mạo Host). IIS: `phieudongthuan.bth.org.vn;localhost;127.0.0.1` (thêm `localhost` để kiểm tra sức khỏe trực tiếp trên máy chủ; API chỉ nghe trên `127.0.0.1` nên không mở rộng truy cập) | — |
 | `ReverseProxy__TrustAllProxies` | `true` khi API chỉ nhận yêu cầu từ reverse proxy trên cùng máy (để ghi đúng IP người dùng vào nhật ký) | — |
 | `Jwt__AccessTokenMinutes`, `Jwt__SigningTokenMinutes`, `Auth__*`, `RateLimiting__*` | Tùy chọn; mặc định hợp lý (xem [kiến trúc, mục 9](kien-truc.md#9-cấu-hình-và-bí-mật)) | — |
 | `His__Provider` | `None` (chưa kết nối HIS) | — |
@@ -142,7 +142,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
      'DataProtection__FieldEncryptionKey'= '…'
      'DataProtection__BlindIndexKey'     = '…'
      'Storage__DocumentsPath'            = 'D:\ConsentDocuments'
-     'AllowedHosts'                      = 'phieudongthuan.bth.org.vn'
+     'AllowedHosts'                      = 'phieudongthuan.bth.org.vn;localhost;127.0.0.1'
      'ReverseProxy__TrustAllProxies'     = 'true'
      'Seed__Enabled'                     = 'true'
      'Seed__AdminPassword'               = '…'   # xóa sau khi đăng nhập lần đầu
@@ -158,10 +158,23 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
 ### 5.3. Site Web (HTTPS, công khai trong mạng bệnh viện)
 
-1. Cài **URL Rewrite** và **ARR**; trong ARR (*Server Proxy Settings*) bật *Enable proxy*, tắt *Reverse rewrite host in response headers*.
+1. Cài **URL Rewrite** và **ARR**, rồi cấu hình ARR ở cấp máy chủ (PowerShell quản trị):
+
+   ```powershell
+   Import-Module WebAdministration
+   # Bật proxy; giữ nguyên Host gốc (phieudongthuan.bth.org.vn) khi chuyển tới API; không sửa Host trong header phản hồi.
+   Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter 'system.webServer/proxy' -name 'enabled' -value 'True'
+   Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter 'system.webServer/proxy' -name 'preserveHostHeader' -value 'True'
+   Set-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter 'system.webServer/proxy' -name 'reverseRewriteHostInResponseHeaders' -value 'False'
+   # Cho phép rule "API proxy" đặt header X-Forwarded-Proto (thiếu bước này IIS trả lỗi 500).
+   Add-WebConfigurationProperty -pspath 'MACHINE/WEBROOT/APPHOST' -filter 'system.webServer/rewrite/allowedServerVariables' -name '.' -value @{name='HTTP_X_FORWARDED_PROTO'}
+   ```
+
+   ARR tự thêm header `X-Forwarded-For` (IP thật của người dùng) để API ghi đúng vào nhật ký.
 2. Tạo site `ConsentWeb` trỏ `D:\Apps\ConsentWeb`, binding **https cổng 443**, hostname `phieudongthuan.bth.org.vn`, chọn chứng chỉ; thêm binding http 80 với rule chuyển hướng sang https (hoặc không mở 80).
 3. `web.config` của site (bản mẫu) chuyển tiếp `/api/*` và `/health*` tới `http://localhost:5080`, các đường dẫn khác trả `index.html`, và đặt security header giống `frontend/nginx.conf` (CSP có `frame-src blob:` để xem PDF trong ứng dụng). Nếu API chạy cổng khác, sửa URL trong rule *API proxy*.
-4. Mở `https://phieudongthuan.bth.org.vn`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
+4. Kiểm tra qua IIS: `https://phieudongthuan.bth.org.vn/health/ready` trả `Healthy`. Lỗi 400 thường do `AllowedHosts` hoặc `preserveHostHeader`; lỗi 500 thường do thiếu `allowedServerVariables` (bước 1).
+5. Mở `https://phieudongthuan.bth.org.vn`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
 
 ### 5.4. Nâng cấp phiên bản
 
