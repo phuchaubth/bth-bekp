@@ -64,9 +64,9 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 | Biến môi trường | Ý nghĩa | Cách tạo |
 |---|---|---|
 | `ConnectionStrings__Default` | Chuỗi kết nối SQL Server bằng tài khoản `consent_app` (quyền tối thiểu, mục 4) | `Server=SQL01;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=False` (`True` nếu SQL Server dùng chứng chỉ tự ký) |
-| `Jwt__SigningKey` | Khóa ký token đăng nhập, ≥ 32 ký tự ngẫu nhiên | `openssl rand -base64 48` hoặc PowerShell: `[Convert]::ToBase64String((1..48 \| % { Get-Random -Max 256 }))` |
-| `DataProtection__FieldEncryptionKey` | Khóa AES-256 mã hóa CCCD, SĐT, BHYT, nội dung phiếu, ảnh chữ ký và PDF đã ký. **Mất khóa = mất dữ liệu** | `openssl rand -base64 32` |
-| `DataProtection__BlindIndexKey` | Khóa HMAC cho chỉ mục mù (tra cứu CCCD). Phải khác khóa trên | `openssl rand -base64 32` |
+| `Jwt__SigningKey` | Khóa ký token đăng nhập, ≥ 32 ký tự ngẫu nhiên | `openssl rand -base64 48` hoặc PowerShell (bộ sinh số ngẫu nhiên an toàn, **không dùng `Get-Random`**): `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)` |
+| `DataProtection__FieldEncryptionKey` | Khóa AES-256 mã hóa CCCD, SĐT, BHYT, nội dung phiếu, ảnh chữ ký và PDF đã ký. **Mất khóa = mất dữ liệu** | `openssl rand -base64 32`, hoặc lệnh PowerShell ở dòng trên với `byte[] 32` |
+| `DataProtection__BlindIndexKey` | Khóa HMAC cho chỉ mục mù (tra cứu CCCD). Phải khác khóa trên | `openssl rand -base64 32`, hoặc lệnh PowerShell với `byte[] 32` |
 | `Seed__Enabled`, `Seed__AdminPassword` | Tạo vai trò hệ thống và tài khoản `admin` lần đầu (phải đổi mật khẩu ở lần đăng nhập đầu). Sau khi đăng nhập được, **xóa `Seed__AdminPassword`** | — |
 | `Seed__DemoData` | Phải là `false` (API từ chối khởi động nếu bật ở Production) | — |
 | `Storage__DocumentsPath` | Thư mục lưu PDF đã ký. Ổ đĩa riêng hoặc thư mục mạng (tài khoản chạy ứng dụng cần quyền ghi) | ví dụ `D:\ConsentDocuments` |
@@ -111,14 +111,24 @@ Gói migration áp dụng lần lượt các migration còn thiếu (idempotent;
 
 ## 5. Hình thức A — IIS + SQL Server có sẵn
 
-### 5.1. Build
+### 5.1. Lấy gói triển khai
 
-Trên máy build:
+**Cách 1 (khuyến nghị): tải gói đã đóng gói sẵn.** Mỗi lần có mã nguồn mới, GitHub Actions chạy quy trình *Gói triển khai IIS* (`.github/workflows/package-iis.yml`) và tạo file `goi-trien-khai-iis-<mã commit>.zip` (giữ 30 ngày). Vào repo trên GitHub → **Actions** → *Gói triển khai IIS* → lần chạy mới nhất có dấu ✓ → mục **Artifacts** → tải về (cần tài khoản GitHub có quyền đọc repo). Giải nén trên máy chủ:
+
+| Thư mục/file trong gói | Chép tới | Ghi chú |
+|---|---|---|
+| `ConsentApi\` | `D:\Apps\ConsentApi` | Đã gồm `web.config` mẫu (`deploy/iis/web.config`) |
+| `ConsentWeb\` | `D:\Apps\ConsentWeb` | Đã gồm `web.config` mẫu (`deploy/iis/web.frontend.config`) |
+| `efbundle.exe` | Thư mục tạm trên máy chủ | Cập nhật lược đồ CSDL (mục 4.2) |
+| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql` |
+| `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Mã commit và ngày đóng gói |
+
+**Cách 2: tự build** trên một máy có .NET SDK 10 và Node.js 24.15 trở lên (kết quả giống cách 1):
 
 ```bash
 # API
 cd backend
-dotnet publish src/Consent.Api/Consent.Api.csproj -c Release -o ../artifacts/api
+dotnet publish src/Consent.Api/Consent.Api.csproj -c Release -r win-x64 --self-contained false -o ../artifacts/api
 # Giao diện web
 cd ../frontend
 npm ci && npm run build          # kết quả trong frontend/dist
