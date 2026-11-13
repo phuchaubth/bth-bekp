@@ -6,7 +6,10 @@ namespace Consent.Api.IntegrationTests.Infrastructure;
 /// <summary>Một container SQL Server dùng chung cho mọi test cần cơ sở dữ liệu; mỗi test dùng database riêng.</summary>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
-    private readonly MsSqlContainer _container = new MsSqlBuilder(TestSettings.SqlServerImage).Build();
+    private readonly MsSqlContainer _container = new MsSqlBuilder(TestSettings.SqlServerImage)
+        // Bản Standard (như máy chủ của bệnh viện) để không vô tình dùng tính năng chỉ có ở Enterprise.
+        .WithEnvironment("MSSQL_PID", "StandardDeveloper")
+        .Build();
 
     public Task InitializeAsync() => _container.StartAsync();
 

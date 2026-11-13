@@ -603,19 +603,18 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 12 | Hình thức triển khai (13/11/2026) | **Docker** (container Linux) + SQL Server có sẵn trên Windows Server ([hướng dẫn, mục 6](trien-khai.md)) |
 | 13 | Thiết bị ký (13/11/2026) | **Điện thoại thông minh** (iPhone/Android) thay cho máy tính bảng. Màn hình ký tối ưu cho điện thoại cầm dọc và ngang ([hướng dẫn, mục 9a](trien-khai.md)) |
 | 14 | Pháp chế (13/11/2026) | **Đồng ý**: chữ ký tay điện tử trên điện thoại kèm xác nhận bằng tài khoản dùng được cho các phiếu giai đoạn 1; lưu trữ theo thời hạn hồ sơ bệnh án, hệ thống không tự động xóa |
-| 15 | Chứng chỉ HTTPS (13/11/2026) | **Chứng chỉ công cộng** cho tên miền con của bệnh viện, DNS nội bộ trỏ về máy chủ; tự động gia hạn ([hướng dẫn, mục 2a](trien-khai.md)) |
-| 16 | SQL Server (khuyến nghị 13/11/2026) | **SQL Server 2022 hoặc 2025, bản Standard**; không dùng Express cho môi trường chính thức (giới hạn 10 GB/CSDL). Đã kiểm thử với cả 2022 và 2025 ([hướng dẫn, mục 2b](trien-khai.md)) |
+| 15 | Chứng chỉ HTTPS (13/11/2026) | **Chứng chỉ công cộng** cho **`phieudongthuan.bth.org.vn`**, DNS nội bộ trỏ về máy chủ; tự động gia hạn ([hướng dẫn, mục 2a](trien-khai.md)) |
+| 16 | SQL Server (13/11/2026) | **SQL Server 2025 Standard**; không dùng Express cho môi trường chính thức. Kiểm thử tích hợp mặc định chạy trên 2025 ([hướng dẫn, mục 2b](trien-khai.md)) |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. Xác nhận mua/sử dụng SQL Server Standard (2022 hoặc 2025) theo khuyến nghị, và tên miền con dùng cho chứng chỉ HTTPS công cộng.
+1. Vài điện thoại thật (iPhone và Android) để thử ký trước khi dùng chính thức.
 2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh — quản trị tự nhập tại màn hình Cấu hình hệ thống sau khi triển khai (không cần gửi trước).
-3. Vài điện thoại thật (iPhone và Android) để thử ký trước khi dùng chính thức.
 
-*Đã có câu trả lời (13/11/2026):* các điểm khác bản Word và chữ ký riêng từng phần (đã làm nhiều bước xác nhận), hình thức triển khai Docker, thiết bị ký là điện thoại, pháp chế đồng ý.
+*Đã có câu trả lời (13/11/2026):* các điểm khác bản Word và chữ ký riêng từng phần (đã làm nhiều bước xác nhận), hình thức triển khai Docker, thiết bị ký là điện thoại, pháp chế đồng ý, SQL Server 2025 Standard, tên miền `phieudongthuan.bth.org.vn`.
 
 *Không còn chờ (tạm hoãn theo quyết định 9):* thông tin SmartCA UAT và code mẫu VNPT; tài liệu API FPT eHospital; danh sách lý do/quan hệ ký thay (dùng khi có SmartCA).
 

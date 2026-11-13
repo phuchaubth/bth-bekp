@@ -4,10 +4,11 @@ name: consent-management
 
 services:
   sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2025-latest
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_PID: Developer
+      # Bản Standard Developer: cùng tính năng với SQL Server 2025 Standard dùng ở bệnh viện.
+      MSSQL_PID: StandardDeveloper
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Đặt MSSQL_SA_PASSWORD trong file .env}
     ports:
       # Chỉ mở trên localhost để chạy API ngoài Docker khi phát triển.

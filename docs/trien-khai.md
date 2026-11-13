@@ -25,7 +25,7 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 | Thành phần | Yêu cầu |
 |---|---|
 | Hệ điều hành | Windows Server 2019 trở lên (hoặc Linux nếu dùng Docker) |
-| SQL Server | **Khuyến nghị SQL Server 2022 hoặc 2025, bản Standard** (mục 2b). Đã kiểm thử toàn bộ với 2022 và 2025. Collation CSDL: `Vietnamese_CI_AS` hoặc `Latin1_General_100_CI_AI` (ứng dụng tự đặt collation không dấu cho cột tìm kiếm) |
+| SQL Server | **SQL Server 2025 Standard** (quyết định 16, mục 2b). Đã kiểm thử toàn bộ với 2025 (mặc định của kiểm thử tích hợp) và 2022. Collation CSDL: `Vietnamese_CI_AS` hoặc `Latin1_General_100_CI_AI` (ứng dụng tự đặt collation không dấu cho cột tìm kiếm) |
 | Hình thức A (IIS) | IIS 10 với **ASP.NET Core Hosting Bundle 10.0**, **URL Rewrite**, **Application Request Routing (ARR)**; .NET SDK 10 trên máy build |
 | Hình thức B (Docker) | Docker Engine 24+ và Docker Compose v2 (Windows: Docker Desktop hoặc Docker Engine với container Linux) |
 | Máy trạm | Chrome/Edge bản mới |
@@ -34,7 +34,7 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 
 ## 2a. Chứng chỉ HTTPS công cộng (quyết định 15)
 
-1. **Tên miền:** dùng một tên miền con của bệnh viện, ví dụ `phieudongthuan.<tên-miền-bệnh-viện>`. Trên **DNS nội bộ**, trỏ tên này về IP nội bộ của máy chủ; điện thoại và máy trạm vào bằng Wi-Fi/mạng nội bộ. Không cần mở hệ thống ra Internet.
+1. **Tên miền: `phieudongthuan.bth.org.vn`** (quyết định 15). Trên **DNS nội bộ**, trỏ tên này về IP nội bộ của máy chủ; điện thoại và máy trạm vào bằng Wi-Fi/mạng nội bộ. Không cần mở hệ thống ra Internet. Nếu có DNS công cộng cho `bth.org.vn`, không cần bản ghi A công cộng cho tên này (chỉ cần bản ghi TXT khi xác thực DNS-01).
 2. **Cấp chứng chỉ:** từ một CA công cộng (thương mại hoặc Let's Encrypt). Vì máy chủ không mở ra Internet, xác thực tên miền bằng **bản ghi DNS (DNS-01)** hoặc theo quy trình của nhà cung cấp chứng chỉ thương mại.
 3. **Gia hạn:** thời hạn tối đa của chứng chỉ công cộng đang rút ngắn theo quy định chung của các CA (200 ngày từ 15/3/2026, 100 ngày từ 15/3/2027, 47 ngày từ 15/3/2029). Nên **tự động gia hạn** (ví dụ win-acme trên Windows, hoặc certbot với plugin DNS) và đặt cảnh báo trước khi hết hạn 30 ngày.
 4. **Gắn chứng chỉ** ở reverse proxy phía trước stack Docker (mục 6, bước 4), kèm chuỗi chứng chỉ trung gian đầy đủ. Điện thoại và máy trạm **không cần cài thêm chứng chỉ**.
@@ -50,10 +50,10 @@ Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──�
 | 1.500 | khoảng 16 GB | khoảng 160 GB |
 | 3.000 | khoảng 33 GB | khoảng 330 GB |
 
-- **Khuyến nghị: SQL Server 2022 Standard** (đã chạy ổn định lâu, có sẵn kinh nghiệm vận hành) hoặc **SQL Server 2025 Standard**. Ứng dụng đã chạy đủ 65 kiểm thử tích hợp trên cả hai phiên bản. Cài bản cập nhật tích lũy (CU) mới nhất.
-- **Không dùng Express cho môi trường chính thức:** giới hạn **10 GB mỗi CSDL** sẽ đầy sau khoảng 4 tháng (3.000 phiếu/ngày) đến 2 năm (500 phiếu/ngày), trong khi phiếu phải lưu theo thời hạn hồ sơ bệnh án và không xóa. Express chỉ hợp cho môi trường thử nghiệm hoặc thí điểm ngắn ở một vài khoa.
-- **Enterprise không cần thiết:** Standard đủ tài nguyên (tối đa 24 lõi, 128 GB bộ nhớ đệm) cho quy mô này.
-- **Giấy phép:** Standard theo lõi (tối thiểu 4 lõi) hoặc theo máy chủ + CAL. Phòng CNTT đối chiếu với hợp đồng bản quyền hiện có của bệnh viện. Nếu bệnh viện đã có SQL Server 2019 Standard thì vẫn dùng được (ứng dụng hỗ trợ từ 2017), nhưng 2019 đã hết hỗ trợ chính thức, nên ưu tiên nâng cấp.
+- **Bệnh viện chọn SQL Server 2025 Standard** (quyết định 16). Kiểm thử tích hợp và môi trường phát triển (`docker-compose.yml`) dùng SQL Server 2025 **bản Standard Developer** (`MSSQL_PID=StandardDeveloper`), cùng tính năng với bản Standard; ứng dụng cũng chạy được với 2022. Cài bản cập nhật tích lũy (CU) mới nhất; mức tương thích CSDL để mặc định của 2025.
+- **Không dùng Express cho môi trường chính thức:** Express giới hạn dung lượng mỗi CSDL (10 GB ở bản 2022), trong khi phiếu phải lưu theo thời hạn hồ sơ bệnh án và không xóa. Express chỉ hợp cho môi trường thử nghiệm hoặc thí điểm ngắn ở một vài khoa.
+- **Enterprise không cần thiết:** giới hạn lõi và bộ nhớ của Standard cao hơn nhiều so với nhu cầu của ứng dụng.
+- **Giấy phép:** Standard theo lõi (tối thiểu 4 lõi) hoặc theo máy chủ + CAL. Phòng CNTT đối chiếu với hợp đồng bản quyền hiện có của bệnh viện. Ứng dụng hỗ trợ từ 2017, nhưng chỉ kiểm thử thường xuyên với 2025 và 2022.
 - **Cấu hình gợi ý:** 4 lõi, 16 GB RAM cho SQL Server; ổ dữ liệu và ổ nhật ký giao dịch tách riêng; chế độ khôi phục **Full** với sao lưu nhật ký định kỳ (mục 7); SQL Agent lên lịch sao lưu (Standard có sẵn).
 - SQL Server có thể đặt trên máy chủ CSDL sẵn có của bệnh viện; ứng dụng (Docker) chỉ cần kết nối tới cổng 1433.
 
@@ -70,7 +70,7 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 | `Seed__Enabled`, `Seed__AdminPassword` | Tạo vai trò hệ thống và tài khoản `admin` lần đầu (phải đổi mật khẩu ở lần đăng nhập đầu). Sau khi đăng nhập được, **xóa `Seed__AdminPassword`** | — |
 | `Seed__DemoData` | Phải là `false` (API từ chối khởi động nếu bật ở Production) | — |
 | `Storage__DocumentsPath` | Thư mục lưu PDF đã ký. Ổ đĩa riêng hoặc thư mục mạng (tài khoản chạy ứng dụng cần quyền ghi) | ví dụ `D:\ConsentDocuments` |
-| `AllowedHosts` | Tên máy chủ người dùng truy cập (chống giả mạo Host), ví dụ `phieudongthuan.benhvien.local` | — |
+| `AllowedHosts` | Tên máy chủ người dùng truy cập (chống giả mạo Host), ví dụ `phieudongthuan.bth.org.vn` | — |
 | `ReverseProxy__TrustAllProxies` | `true` khi API chỉ nhận yêu cầu từ reverse proxy trên cùng máy (để ghi đúng IP người dùng vào nhật ký) | — |
 | `Jwt__AccessTokenMinutes`, `Jwt__SigningTokenMinutes`, `Auth__*`, `RateLimiting__*` | Tùy chọn; mặc định hợp lý (xem [kiến trúc, mục 9](kien-truc.md#9-cấu-hình-và-bí-mật)) | — |
 | `His__Provider` | `None` (chưa kết nối HIS) | — |
@@ -142,7 +142,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
      'DataProtection__FieldEncryptionKey'= '…'
      'DataProtection__BlindIndexKey'     = '…'
      'Storage__DocumentsPath'            = 'D:\ConsentDocuments'
-     'AllowedHosts'                      = 'phieudongthuan.benhvien.local'
+     'AllowedHosts'                      = 'phieudongthuan.bth.org.vn'
      'ReverseProxy__TrustAllProxies'     = 'true'
      'Seed__Enabled'                     = 'true'
      'Seed__AdminPassword'               = '…'   # xóa sau khi đăng nhập lần đầu
@@ -159,9 +159,9 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 ### 5.3. Site Web (HTTPS, công khai trong mạng bệnh viện)
 
 1. Cài **URL Rewrite** và **ARR**; trong ARR (*Server Proxy Settings*) bật *Enable proxy*, tắt *Reverse rewrite host in response headers*.
-2. Tạo site `ConsentWeb` trỏ `D:\Apps\ConsentWeb`, binding **https cổng 443**, hostname `phieudongthuan.benhvien.local`, chọn chứng chỉ; thêm binding http 80 với rule chuyển hướng sang https (hoặc không mở 80).
+2. Tạo site `ConsentWeb` trỏ `D:\Apps\ConsentWeb`, binding **https cổng 443**, hostname `phieudongthuan.bth.org.vn`, chọn chứng chỉ; thêm binding http 80 với rule chuyển hướng sang https (hoặc không mở 80).
 3. `web.config` của site (bản mẫu) chuyển tiếp `/api/*` và `/health*` tới `http://localhost:5080`, các đường dẫn khác trả `index.html`, và đặt security header giống `frontend/nginx.conf` (CSP có `frame-src blob:` để xem PDF trong ứng dụng). Nếu API chạy cổng khác, sửa URL trong rule *API proxy*.
-4. Mở `https://phieudongthuan.benhvien.local`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
+4. Mở `https://phieudongthuan.bth.org.vn`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
 
 ### 5.4. Nâng cấp phiên bản
 
@@ -178,7 +178,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
    FIELD_ENCRYPTION_KEY=…
    BLIND_INDEX_KEY=…
    SEED_ADMIN_PASSWORD=…
-   ALLOWED_HOSTS=phieudongthuan.benhvien.local
+   ALLOWED_HOSTS=phieudongthuan.bth.org.vn
    DOCUMENTS_PATH=D:\ConsentDocuments     # hoặc để trống để dùng volume consent-documents
    WEB_PORT=8080
    APP_VERSION=1.0.0
@@ -193,7 +193,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
    ```
 
    [`deploy/docker-compose.prod.yml`](../deploy/docker-compose.prod.yml) chạy `api` (không mở cổng) và `web` (nginx, chỉ mở `127.0.0.1:8080`), môi trường Production, không tự migrate, không dữ liệu demo.
-4. Đặt reverse proxy HTTPS phía trước cổng 8080: IIS với ARR (rule chuyển tiếp toàn bộ `https://phieudongthuan.benhvien.local/*` → `http://127.0.0.1:8080/*`, thêm header `X-Forwarded-Proto: https`) hoặc nginx với chứng chỉ của bệnh viện. Thêm header `Strict-Transport-Security` ở lớp này.
+4. Đặt reverse proxy HTTPS phía trước cổng 8080: IIS với ARR (rule chuyển tiếp toàn bộ `https://phieudongthuan.bth.org.vn/*` → `http://127.0.0.1:8080/*`, thêm header `X-Forwarded-Proto: https`) hoặc nginx với chứng chỉ của bệnh viện. Thêm header `Strict-Transport-Security` ở lớp này.
 5. Nâng cấp: `git pull` (hoặc chép mã nguồn mới) → sao lưu CSDL → chạy gói migration → `docker compose -f deploy/docker-compose.prod.yml --env-file … up -d --build`.
 
 Bản `docker-compose.yml` ở thư mục gốc **chỉ dành cho phát triển** (SQL Server trong container, tài khoản `sa`, tự migrate, dữ liệu demo).

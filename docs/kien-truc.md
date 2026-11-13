@@ -41,7 +41,7 @@ flowchart LR
 | Thành phần | Công nghệ |
 |---|---|
 | Backend | ASP.NET Core .NET 10, EF Core 10.0.15 (SQL Server), JWT Bearer, FluentValidation 12, OpenAPI (`Microsoft.AspNetCore.OpenApi`), Health Checks, Rate Limiting |
-| Cơ sở dữ liệu | Microsoft SQL Server (Docker dev: SQL Server 2022 Developer) |
+| Cơ sở dữ liệu | Microsoft SQL Server (Docker dev: SQL Server 2025 Standard Developer) |
 | Frontend | React 19.3, TypeScript 7.0, Vite 8.3, Ant Design 6.7 (locale `vi_VN`), React Router 8.5, TanStack Query 5, dayjs |
 | Kiểm thử backend | xUnit 2.9, `Microsoft.AspNetCore.Mvc.Testing` (integration), Testcontainers (SQL Server thật trong Docker), test kiến trúc bằng reflection |
 | Kiểm thử frontend | Vitest 5, Testing Library, jsdom |
@@ -524,7 +524,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 
 ## 10. Triển khai
 
-**Phát triển/kiểm thử (Docker Compose):** `sqlserver` (SQL Server 2022 Developer, có health check) → `api` (cổng nội bộ 8080, chạy user không phải root) → `web` (nginx không đặc quyền, cổng 8080, phục vụ SPA và chuyển tiếp `/api`, `/health` tới `api`).
+**Phát triển/kiểm thử (Docker Compose):** `sqlserver` (SQL Server 2025 Standard Developer, có health check) → `api` (cổng nội bộ 8080, chạy user không phải root) → `web` (nginx không đặc quyền, cổng 8080, phục vụ SPA và chuyển tiếp `/api`, `/health` tới `api`).
 
 **Chính thức (Windows Server tại bệnh viện):** hướng dẫn đầy đủ trong [trien-khai.md](trien-khai.md) cho cả hai hình thức **IIS + SQL Server có sẵn** và **Docker + SQL Server có sẵn** (`deploy/docker-compose.prod.yml`): HTTPS ở reverse proxy, tài khoản SQL quyền tối thiểu (`deploy/sql/01-create-login.sql`), migration bằng gói `efbundle`, sao lưu/khôi phục CSDL và thư mục PDF (`deploy/sql/02-backup.sql`, `03-restore.sql`), xoay vòng khóa, giám sát, danh sách kiểm tra sau triển khai. Đã diễn tập triển khai sạch hình thức Docker trong CI nội bộ (SQL Server riêng, tài khoản `consent_app`, migration bằng gói, luồng ký và xuất chạy đúng).
 

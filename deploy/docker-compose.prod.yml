@@ -28,8 +28,8 @@ services:
       His__Provider: None
       # Chỉ tin X-Forwarded-* vì API chỉ nhận yêu cầu từ container web (mạng nội bộ Docker).
       ReverseProxy__TrustAllProxies: "true"
-      # Tên máy chủ người dùng truy cập (chống Host header injection), ví dụ: phieudongthuan.benhvien.local
-      AllowedHosts: ${ALLOWED_HOSTS:-*}
+      # Tên máy chủ người dùng truy cập (chống Host header injection). Bắt buộc: phieudongthuan.bth.org.vn
+      AllowedHosts: ${ALLOWED_HOSTS:?Đặt ALLOWED_HOSTS=phieudongthuan.bth.org.vn}
       Storage__DocumentsPath: /app/storage/documents
     volumes:
       # Thư mục PDF đã ký: SAO LƯU CÙNG CSDL. Có thể trỏ tới thư mục trên ổ đĩa/thư mục mạng của máy chủ.

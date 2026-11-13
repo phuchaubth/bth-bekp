@@ -132,7 +132,7 @@ Hoặc từng phần:
 |---|---|
 | `cd backend && dotnet build` | Build (cảnh báo bị coi là lỗi) |
 | `cd backend && dotnet test` | Unit test, integration test API (khởi động SQL Server bằng Testcontainers, **cần Docker**), test quy tắc phụ thuộc Clean Architecture |
-| `CONSENT_TEST_SQL_IMAGE=mcr.microsoft.com/mssql/server:2025-latest dotnet test tests/Consent.Api.IntegrationTests` | Chạy integration test với phiên bản SQL Server khác (mặc định 2022) |
+| `CONSENT_TEST_SQL_IMAGE=mcr.microsoft.com/mssql/server:2022-latest dotnet test tests/Consent.Api.IntegrationTests` | Chạy integration test với phiên bản SQL Server khác (mặc định 2025, phiên bản bệnh viện dùng) |
 | `cd frontend && npm run lint` | oxlint |
 | `cd frontend && npm run typecheck` | Kiểm tra kiểu TypeScript |
 | `cd frontend && npm test` | Unit test giao diện |

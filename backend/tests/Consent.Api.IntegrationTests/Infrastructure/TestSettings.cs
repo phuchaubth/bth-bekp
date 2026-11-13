@@ -8,13 +8,13 @@ internal static class TestSettings
     public const string AdminNewPassword = "Quantri@DaDoi2026";
     public const string DemoPassword = "Demo@KiemThu2026";
     /// <summary>
-    /// Ảnh SQL Server cho kiểm thử tích hợp. Mặc định 2022; đặt biến môi trường <c>CONSENT_TEST_SQL_IMAGE</c> để chạy với
-    /// phiên bản khác (ví dụ <c>mcr.microsoft.com/mssql/server:2025-latest</c>).
+    /// Ảnh SQL Server cho kiểm thử tích hợp. Mặc định 2025 (phiên bản bệnh viện dùng, quyết định 16); đặt biến môi trường
+    /// <c>CONSENT_TEST_SQL_IMAGE</c> để chạy với phiên bản khác (ví dụ <c>mcr.microsoft.com/mssql/server:2022-latest</c>).
     /// </summary>
     public static string SqlServerImage { get; } =
         Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image
             ? image
-            : "mcr.microsoft.com/mssql/server:2022-latest";
+            : "mcr.microsoft.com/mssql/server:2025-latest";
 
     // Khóa bảo vệ dữ liệu chỉ dùng cho kiểm thử (Base64 của 32 byte cố định).
     public const string FieldEncryptionKey = "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=";
