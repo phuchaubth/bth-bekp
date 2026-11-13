@@ -1,0 +1,62 @@
+{
+  "title": "Phiếu tư vấn tham gia và sử dụng\ncổng thông tin chính thức của bệnh viện",
+  "subtitle": "Consultation Form for Participation and Use of the Hospital’s Official Information Portals",
+  "sections": [
+    {
+      "title": "I. Phần tư vấn (Consultation section)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Hiện tại, Bệnh viện Truyền máu Huyết học đang có những cổng thông tin trao đổi với người bệnh với các mục đích: hỗ trợ, cung cấp thông tin khám chữa bệnh; biểu dương những việc làm tốt của cán bộ, y, bác sĩ, nhân viên ngành y tế; tiếp nhận và xử lý những phản ánh của người dân về việc khám chữa bệnh tại các cơ sở y tế. Cụ thể như sau (Currently, the Blood Transfusion and Hematology Hospital provides multiple communication channels for patients with the following purposes: to assist and provide information on medical examination and treatment; to recognize and commend the good deeds of medical staff, doctors, and healthcare workers; and to receive and handle public feedback regarding medical examination and treatment at healthcare facilities. Details are as follows):"
+        },
+        {
+          "type": "paragraph",
+          "text": "1. Đường dây nóng tiếp nhận thông tin (Hotlines for receiving information)"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Đường dây nóng Chăm sóc khách hàng (Customer Service Hotline): 094.169.7766",
+            "Đường dây nóng bệnh viện (Hospital Hotline): 096.797.1010",
+            "Đường dây nóng Sở Y tế (Department of Health Hotline): 096.777.1010",
+            "Đường dây nóng Ngành y tế (Health Sector Hotline): 1900.9095",
+            "Cổng thông tin Ủy ban nhân dân Thành phố Hồ Chí Minh (Ho Chi Minh City People’s Committee Information Portal): 1022"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "2. Kênh cung cấp thông tin, đăng ký khám chữa bệnh (Information and Medical Appointment Registration Channels)"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Tổng đài đăng ký khám bệnh của bệnh viện (Hospital Appointment Registration Call Center): 19001057 – từ 07 giờ 30 đến 16 giờ 00, Thứ Hai đến Thứ Bảy, trừ ngày Lễ (from 7:30 AM to 4:00 PM, Monday through Saturday, excluding public holidays)",
+            "Đăng ký khám chữa bệnh qua ứng dụng di động “BV Truyền máu Huyết học” hoặc “BTH” (Register for medical examination and treatment via the mobile application named “BV Truyền máu Huyết học” or “BTH”)",
+            "Điện thoại Chăm sóc khách hàng (Customer Service Phone Number): 028.3925.1184",
+            "Website bệnh viện (Hospital Website): https://bth.org.vn",
+            "Facebook: Chamsockhachhang Bth",
+            "Email: ctxh_bth@bth.org.vn"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "II. Phần ý kiến của người bệnh/đại diện người bệnh (Patient / patient representative’s feedback)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Người bệnh/người đại diện chọn ý kiến khi ký trên máy tính bảng. Chân thành cám ơn sự hợp tác của ông (bà) (The patient/representative selects the answer when signing on the tablet. Thank you for your cooperation)."
+        }
+      ]
+    }
+  ],
+  "signatures": {
+    "patient": "Người bệnh (Patient)",
+    "representative": "Người đại diện của người bệnh (Patient’s Representative)",
+    "hospital": "Người tư vấn (Consultant)",
+    "decision": "required",
+    "decisionLabel": "Ông/bà đã xem và đồng ý tham gia sử dụng các Cổng thông tin chính thức tại bệnh viện? (Have you reviewed and agreed to participate in using the hospital’s official information portals?)",
+    "agreeLabel": "Đồng ý (Agree)",
+    "refuseLabel": "Không đồng ý (Disagree)"
+  }
+}

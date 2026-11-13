@@ -471,6 +471,10 @@ public sealed class ConsentFormService(
                 PrefillSources.HealthInsuranceNumber => patient.HealthInsuranceNumber,
                 PrefillSources.PhoneNumber => patient.PhoneNumber,
                 PrefillSources.PatientCode => patient.PatientCode,
+                PrefillSources.PermanentAddress => patient.PermanentAddress,
+                PrefillSources.CurrentAddress => patient.CurrentAddress ?? patient.PermanentAddress,
+                PrefillSources.Ethnicity => patient.Ethnicity,
+                PrefillSources.Occupation => patient.Occupation,
                 _ => null,
             };
             if (!string.IsNullOrWhiteSpace(value))

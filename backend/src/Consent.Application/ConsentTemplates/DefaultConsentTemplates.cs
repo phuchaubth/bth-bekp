@@ -6,16 +6,29 @@ namespace Consent.Application.ConsentTemplates;
 public sealed record DefaultConsentTemplate(string Code, string Name, string HospitalSignerRoleCode, string ContentJson);
 
 /// <summary>
-/// Ba mẫu phiếu đề xuất cho giai đoạn 1 (xem <c>docs/mau-phieu-de-xuat.md</c>). Được tạo khi khởi tạo dữ liệu;
-/// bệnh viện duyệt/chỉnh nội dung bằng cách phát hành phiên bản mới, không cần sửa code.
+/// Bốn mẫu phiếu thật của bệnh viện (song ngữ Việt – Anh, chuyển từ bản Word; xem <c>docs/mau-phieu.md</c>). Được tạo
+/// khi khởi tạo dữ liệu nếu chưa có mã; bệnh viện chỉnh nội dung bằng cách phát hành phiên bản mới, không cần sửa code.
 /// </summary>
 public static class DefaultConsentTemplates
 {
     public static IReadOnlyList<DefaultConsentTemplate> All { get; } =
     [
-        new("CK-01", "Giấy cam kết sử dụng dịch vụ khám bệnh, chữa bệnh", SystemRoles.Receptionist, Load("CK-01")),
-        new("TT-01", "Phiếu cung cấp thông tin và cam kết chung", SystemRoles.Nurse, Load("TT-01")),
-        new("TN-01", "Phiếu đánh giá nguy cơ té ngã và cam kết phối hợp phòng ngừa", SystemRoles.Nurse, Load("TN-01")),
+        new(
+            "QT-KNGT-BM02",
+            "Giấy đồng thuận về chế độ thanh toán và quyền lợi khám chữa bệnh BHYT",
+            SystemRoles.Receptionist,
+            Load("QT-KNGT-BM02")),
+        new("TTNB-NGOAITRU", "Phiếu thông tin người bệnh ngoại trú", SystemRoles.Receptionist, Load("TTNB-NGOAITRU")),
+        new(
+            "QT-KNGT-BM10",
+            "Phiếu nhận định ban đầu và nhu cầu giáo dục sức khỏe người bệnh ngoại trú",
+            SystemRoles.Doctor,
+            Load("QT-KNGT-BM10")),
+        new(
+            "TUVAN-CONGTT",
+            "Phiếu tư vấn tham gia và sử dụng cổng thông tin chính thức của bệnh viện",
+            SystemRoles.Receptionist,
+            Load("TUVAN-CONGTT")),
     ];
 
     private static string Load(string code)

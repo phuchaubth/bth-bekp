@@ -321,8 +321,9 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 
 - Mọi khối nhập liệu có `key` (bắt đầu bằng chữ cái; chữ không dấu, số, `_`; không trùng).
 - `visibleWhen`: `{ "field", "in": [...] }` (giá trị của một trường đứng trước thuộc danh sách; chọn nhiều thì chỉ cần một), hoặc `{ "field", "minLevel" }` (trường điểm đạt tối thiểu mức). Trường bị ẩn thì không bắt buộc, và giá trị của nó không được in hay giữ lại khi trình ký.
-- `prefill`: tự điền khi lập phiếu từ `patient.healthInsuranceNumber`, `patient.phoneNumber`, `patient.patientCode`.
-- 3 mẫu giai đoạn 1 (CK-01, TT-01, TN-01) nằm trong mã nguồn (`Consent.Application/ConsentTemplates/Defaults/*.json`), nội dung theo [mẫu phiếu đề xuất](mau-phieu-de-xuat.md). Khi khởi động với `Seed:Enabled`, mẫu nào chưa có (theo mã) thì được tạo: ở trạng thái **nháp** để quản trị viên duyệt rồi phát hành, hoặc **phát hành sẵn** khi bật `Seed:DemoData`. Mẫu đã có không bị ghi đè.
+- `prefill`: tự điền khi lập phiếu từ `patient.healthInsuranceNumber`, `patient.phoneNumber`, `patient.patientCode`, `patient.permanentAddress`, `patient.currentAddress` (chưa có thì dùng địa chỉ thường trú), `patient.ethnicity`, `patient.occupation`.
+- `signatures` (không bắt buộc): `patient`, `representative`, `hospital`, `hospitalHint` thay nhãn khối chữ ký (tối đa 500 ký tự). `decision`: `"required"` (mặc định, người bệnh phải chọn đồng ý/từ chối khi ký) hoặc `"none"` (chỉ ký xác nhận, ví dụ phiếu khai thông tin, phiếu nhận định; không có dòng ý kiến trên PDF và `decision` của phiếu để trống). `decisionLabel`, `agreeLabel`, `refuseLabel` thay câu hỏi và nhãn mặc định ("Ý kiến của người bệnh", "Đồng ý", "Từ chối") trên máy tính bảng và PDF; giá trị lưu vẫn là `Agreed`/`Refused`.
+- 4 mẫu thật của bệnh viện (`QT-KNGT-BM02`, `TTNB-NGOAITRU`, `QT-KNGT-BM10`, `TUVAN-CONGTT`; xem [mẫu phiếu](mau-phieu.md)) nằm trong mã nguồn (`Consent.Application/ConsentTemplates/Defaults/*.json`). Khi khởi động với `Seed:Enabled`, mẫu nào chưa có (theo mã) thì được tạo: ở trạng thái **nháp** để quản trị viên duyệt rồi phát hành, hoặc **phát hành sẵn** khi bật `Seed:DemoData`. Mẫu đã có không bị ghi đè. Ba mẫu đề xuất cũ (CK-01, TT-01, TN-01) nay chỉ dùng trong kiểm thử (`backend/tests/SampleTemplates`).
 
 ## 6c. Phiếu đồng thuận (`/api/v1/consent-forms`)
 
@@ -341,7 +342,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | POST | `/api/v1/consent-forms/{id}/return-to-draft` | `consents.create` | Trả phiếu đang chờ ký về nháp để sửa (bỏ thông tin đã đóng băng) |
 | POST | `/api/v1/consent-forms/{id}/cancel` | `consents.create` | Hủy phiếu nháp hoặc chờ ký `{ "reason": "…" }` (5–500 ký tự) |
 | POST | `/api/v1/consent-forms/{id}/signing-session` | `consents.create` | Mở phiên ký trên máy tính bảng → `{ token, expiresAtUtc }` (mặc định 30 phút). Chỉ cho phiếu chờ ký mà người bệnh chưa ký; mở phiên mới thì phiên cũ hết hiệu lực. Ghi nhật ký `ConsentForms.SigningStarted` |
-| POST | `/api/v1/consent-forms/{id}/patient-signature` | **Token phiên ký** | Người bệnh/người đại diện ký: `{ "decision": "Agreed" \| "Refused", "image": "<PNG Base64>" }` → `{ decision, signedAtUtc }`. Xem mục "Ký tay" bên dưới. Ghi nhật ký `ConsentForms.PatientSigned` |
+| POST | `/api/v1/consent-forms/{id}/patient-signature` | **Token phiên ký** | Người bệnh/người đại diện ký: `{ "decision": "Agreed" \| "Refused", "image": "<PNG Base64>" }` → `{ decision, signedAtUtc }`. Mẫu có `signatures.decision = "none"` thì bỏ `decision` (gửi kèm cũng bị bỏ qua, kết quả `decision = null`); mẫu khác thiếu `decision` → `400` ở trường `decision`. Xem mục "Ký tay" bên dưới. Ghi nhật ký `ConsentForms.PatientSigned` |
 | POST | `/api/v1/consent-forms/{id}/complete` | `consents.sign` + vai trò theo mẫu | Phía bệnh viện xác nhận bằng tài khoản → phiếu `Completed`. Người bệnh chưa ký → `409`; không có vai trò xác nhận của mẫu → `403 consent_forms.signer_role_required`. Ghi nhật ký `ConsentForms.Completed` (kèm SHA-256) |
 | POST | `/api/v1/consent-forms/{id}/revoke` | `consents.revoke` | Thu hồi phiếu đã hoàn tất `{ "reason": "…" }` (5–500 ký tự). Ghi nhật ký `ConsentForms.Revoked` |
 
@@ -351,7 +352,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 - Số phiếu `PDT-<năm>-<6 chữ số>` lấy từ sequence của SQL Server, không trùng kể cả khi nhiều người lập cùng lúc.
 - Nội dung phiếu (`data`) và thông tin đóng băng có dữ liệu cá nhân nên được **mã hóa AES-256-GCM** trong CSDL; nhật ký audit che các giá trị này (`***`).
 - Tên đơn vị in trên PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (**đang để giá trị mẫu, chờ bệnh viện cung cấp**).
-- Chi tiết phiếu có thêm `decision` (`Agreed`/`Refused`), `signatures` (`role`: `Patient`/`Representative`/`Hospital`; `method`: `Handwritten`/`AccountConfirmation`; `signerName`, `signerTitle`, `signedAtUtc`; **không kèm ảnh chữ ký**), `signedPdfSha256`, `replacesForm`/`replacedBy` (`{ id, formNo }`) và `actions`: `canEdit`, `canSubmit`, `canReturnToDraft`, `canCancel`, `canStartSigning`, `canConfirm`, `canRevoke`, `canReplace`.
+- Chi tiết phiếu có thêm `decision` (`Agreed`/`Refused`; `null` khi mẫu chỉ ký xác nhận), `signatures` (`role`: `Patient`/`Representative`/`Hospital`; `method`: `Handwritten`/`AccountConfirmation`; `signerName`, `signerTitle`, `signedAtUtc`; **không kèm ảnh chữ ký**), `signedPdfSha256`, `replacesForm`/`replacedBy` (`{ id, formNo }`) và `actions`: `canEdit`, `canSubmit`, `canReturnToDraft`, `canCancel`, `canStartSigning`, `canConfirm`, `canRevoke`, `canReplace`.
 
 **Ký tay trên máy tính bảng (quyết định 10, 11)**
 

@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Security.Cryptography;
 using Consent.Application.ConsentForms;
 using Consent.Application.Tests.Fakes;
@@ -28,7 +29,7 @@ public sealed class ConsentSigningServiceTests
 
     /// <summary>Mở phiên ký rồi người bệnh ký trên máy tính bảng (dùng token phiên ký).</summary>
     private static async Task<Result<PatientSignatureResultDto>> PatientSigns(
-        ConsentScenario s, Guid formId, ConsentDecision decision = ConsentDecision.Agreed, string? image = null)
+        ConsentScenario s, Guid formId, ConsentDecision? decision = ConsentDecision.Agreed, string? image = null)
     {
         Assert.True((await s.Signing.StartSigningAsync(formId, CancellationToken.None)).IsSuccess);
         var staffLogsInAgain = s.UseSigningToken();
@@ -113,6 +114,53 @@ public sealed class ConsentSigningServiceTests
         Assert.Contains("decision", noDecision.Error!.FieldErrors!.Keys);
         Assert.Contains("image", tooLarge.Error!.FieldErrors!.Keys);
         Assert.Null(s.Ctx.Store.ConsentForms.Single(f => f.Id == form.Id).PatientSignature);
+    }
+
+    /// <summary>Tiếp đón lập và trình ký một phiếu theo mẫu thật <paramref name="code"/>.</summary>
+    private static async Task<(ConsentScenario S, ConsentFormDetailDto Form)> PendingHospitalForm(string code, JsonObject data)
+    {
+        var s = ConsentScenario.Create();
+        var template = s.AddHospitalTemplate(code);
+        s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, template.Id, null), CancellationToken.None)).Value;
+        var updated = await s.Service.UpdateAsync(form.Id, new(data, ConsentSignerKind.Patient, null), CancellationToken.None);
+        Assert.True(updated.IsSuccess, updated.Error?.Message);
+        var submitted = await s.Service.SubmitAsync(form.Id, CancellationToken.None);
+        Assert.True(submitted.IsSuccess, submitted.Error?.Message);
+        return (s, submitted.Value);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(ConsentDecision.Refused)]
+    public async Task ConfirmOnlyTemplate_SignsWithoutDecision_AndIgnoresAnySentDecision(ConsentDecision? sent)
+    {
+        var (s, form) = await PendingHospitalForm(
+            "QT-KNGT-BM02", new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
+
+        var signed = await PatientSigns(s, form.Id, sent);
+        var completed = await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+
+        Assert.True(signed.IsSuccess, signed.Error?.Message);
+        Assert.Null(signed.Value.Decision);
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        Assert.Null(completed.Value.Decision);
+        Assert.Null(s.Ctx.Store.ConsentForms.Single(f => f.Id == form.Id).Decision);
+    }
+
+    [Fact]
+    public async Task TemplateWithCustomDecisionLabels_StillRequiresADecision_NamingTheLabels()
+    {
+        var (s, form) = await PendingHospitalForm("TUVAN-CONGTT", []);
+
+        var missing = await PatientSigns(s, form.Id, decision: null);
+        s.UseSigningToken();
+        var agreed = await s.Signing.SignAsPatientAsync(form.Id, new(ConsentDecision.Agreed, SignaturePng), CancellationToken.None);
+
+        Assert.Equal(
+            "Vui lòng chọn Đồng ý (Agree) hoặc Không đồng ý (Disagree).", missing.Error!.FieldErrors!["decision"][0]);
+        Assert.True(agreed.IsSuccess, agreed.Error?.Message);
+        Assert.Equal(ConsentDecision.Agreed, agreed.Value.Decision);
     }
 
     [Fact]

@@ -111,7 +111,7 @@ backend/
     Consent.Shared/            # Result, Error (kèm lỗi theo trường), PagedResult
     Consent.Application/       # Abstractions (repository, IClock, ICurrentUser, ITokenService…), Auth, Users,
                                #   Departments, Roles, Auditing (service + validator FluentValidation),
-                               #   ConsentTemplates (định nghĩa mẫu, kiểm tra, đánh giá dữ liệu, 3 mẫu mặc định),
+                               #   ConsentTemplates (định nghĩa mẫu, kiểm tra, đánh giá dữ liệu, 4 mẫu của bệnh viện khởi tạo sẵn),
                                #   ConsentForms (lập/soạn/trình ký/hủy phiếu, ký tay và hoàn tất: ConsentSigningService,
                                #   kiểm tra ảnh chữ ký SignatureImage, IConsentPdfRenderer), IDocumentStore
     Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),

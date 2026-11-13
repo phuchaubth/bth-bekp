@@ -1,7 +1,7 @@
 # Kế hoạch triển khai — Quản lý Phiếu đồng thuận
 
 > Trạng thái: **ĐÃ PHÊ DUYỆT** (11/11/2026). **Toàn bộ 7 sprint (0–6) đã hoàn thành**: xem [README](../README.md), [yêu cầu nghiệp vụ](yeu-cau-nghiep-vu.md), [kiến trúc](kien-truc.md) và [tài liệu API](api.md).
-> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10); người bệnh **ký tay trên máy tính bảng** (quyết định số 10, mục 2.5a). Ba mẫu phiếu giai đoạn 1 dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** trong khi chờ bệnh viện duyệt.
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA** (quyết định số 9, mục 10); người bệnh **ký tay trên máy tính bảng** (quyết định số 10, mục 2.5a). **Cập nhật 13/11/2026:** bệnh viện đã gửi 4 mẫu phiếu thật; ứng dụng khởi tạo các mẫu đó thay cho mẫu đề xuất (quyết định số 2, [mẫu phiếu](mau-phieu.md)).
 > Tài liệu này gồm kế hoạch, kiến trúc, cấu trúc dự án, danh sách màn hình và lộ trình sprint.
 > Mọi dữ liệu minh họa trong dự án sẽ là dữ liệu giả lập, không dùng dữ liệu người bệnh thật.
 
@@ -590,7 +590,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 |---|---|---|
 | 1 | Ký số (*tạm hoãn, xem #9*) | Người bệnh và phía bệnh viện đều ký **VNPT SmartCA** (API SP769, xem [`tich-hop-smartca.md`](tich-hop-smartca.md)). Hợp đồng cho phép người bệnh dùng SmartCA cá nhân; **lượt ký trừ vào gói của người bệnh**, hết lượt thì gợi ý PA3 rồi PA2 |
 | 1a | Phương án ký phía người bệnh | **PA1 → PA3 → PA2**. PA2 (ký tay) bắt buộc nhân viên chứng kiến ký SmartCA; người chứng kiến là **bất kỳ nhân viên nào, miễn là người thứ 3**. Danh sách lý do ký tay/ký thay **bệnh viện bổ sung sau** (danh mục cấu hình được) |
-| 2 | Loại phiếu giai đoạn 1 | Cam kết khám DV/BHYT, Phiếu cung cấp thông tin, Đánh giá nguy cơ té ngã. Dùng **[mẫu đề xuất](mau-phieu-de-xuat.md)** (chờ bệnh viện duyệt). **Phiếu cung cấp thông tin: bệnh viện cung cấp, người bệnh xác nhận** (đã xác nhận 11/11/2026) |
+| 2 | Loại phiếu giai đoạn 1 | **Cập nhật 13/11/2026:** 4 mẫu thật của bệnh viện: Giấy đồng thuận BHYT (QT-KNGT-BM02), Phiếu thông tin người bệnh ngoại trú, Phiếu nhận định ban đầu (QT-KNGT-BM10), Phiếu tư vấn cổng thông tin ([mẫu phiếu](mau-phieu.md)). Ba phiếu chỉ ký xác nhận, phiếu tư vấn hỏi Đồng ý/Không đồng ý. Mẫu đề xuất cũ chỉ dùng trong kiểm thử |
 | 3 | HIS | **FPT eHospital**, chỉ đọc. **Tạm chưa kết nối** (xem #9) |
 | 4 | Quy mô | Mức vừa: 50–200 người dùng đồng thời, 500–3.000 phiếu/ngày |
 | 5 | Triển khai | Máy chủ **Windows Server** tại bệnh viện |
@@ -606,7 +606,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. **Duyệt [mẫu phiếu đề xuất](mau-phieu-de-xuat.md)** (nội dung, ngưỡng điểm té ngã, khối chữ ký), hoặc gửi mẫu giấy đang dùng (đã xóa thông tin thật). Cách hiểu phiếu TT-01 đã được xác nhận. Khi có góp ý, chỉ cần sửa mẫu trên màn hình 12 (tạo phiên bản mới), không sửa code.
+1. **Xác nhận các điểm khác bản Word** ở [mẫu phiếu, mục 4](mau-phieu.md) (mã cho 2 phiếu chưa có mã, lỗi đánh máy trong bản gốc) và quyết định có cần chữ ký riêng của điều dưỡng, nhân viên hướng dẫn trên phiếu BM10 hay không (mục 3). Khi có góp ý, chỉ cần sửa mẫu trên màn hình 12 (tạo phiên bản mới), không sửa code.
 2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh — quản trị tự nhập tại màn hình Cấu hình hệ thống sau khi triển khai (không cần gửi trước).
 3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
 4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
@@ -620,3 +620,5 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 Sprint 0–5 đã xong: nền tảng, đăng nhập và phân quyền, người bệnh và quét CCCD, mẫu phiếu, lập phiếu, xuất PDF, ký tay trên máy tính bảng, xuất dữ liệu, báo cáo và nhật ký. Góp ý của bệnh viện về [mẫu phiếu đề xuất](mau-phieu-de-xuat.md) chỉ thay nội dung mẫu (tạo phiên bản mới trên màn hình 12), không chặn tiến độ.
 
 Sprint 6 (cuối) đã xong: rà soát bảo mật, màn hình cấu hình hệ thống, [hướng dẫn triển khai](trien-khai.md), E2E luồng chính và responsive. Giai đoạn 1 **sẵn sàng triển khai thử nghiệm** tại bệnh viện khi có các mục còn chờ ở mục 10 (duyệt mẫu phiếu, chọn IIS hay Docker, máy tính bảng, HTTPS). Việc còn lại thuộc giai đoạn sau: tích hợp HIS FPT eHospital và ký số SmartCA (khi bệnh viện quyết định), công cụ xoay vòng khóa mã hóa, phiếu đồng thuận chuyên môn.
+
+**13/11/2026 – mẫu phiếu thật:** bệnh viện gửi 4 mẫu đang dùng; đã chuyển thành định nghĩa mẫu khởi tạo sẵn ([mẫu phiếu](mau-phieu.md)). Định nghĩa mẫu được mở rộng: phiếu chỉ ký xác nhận (không hỏi Đồng ý/Từ chối), câu hỏi và nhãn ý kiến riêng, tự điền dân tộc, nghề nghiệp, địa chỉ. Đề xuất tiếp theo nếu bệnh viện cần: nhiều bước xác nhận theo vai trò trên cùng một phiếu (BM10 có chữ ký của nhân viên hướng dẫn, điều dưỡng và bác sĩ).

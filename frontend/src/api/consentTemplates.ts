@@ -72,7 +72,22 @@ export interface TemplateDefinition {
   title: string
   subtitle?: string
   sections: TemplateSection[]
-  signatures?: { patient?: string; representative?: string; hospital?: string; hospitalHint?: string }
+  signatures?: TemplateSignatures
+}
+
+/**
+ * Khối chữ ký. `decision: 'none'`: người bệnh chỉ ký xác nhận (phiếu khai thông tin, phiếu nhận định), không hỏi
+ * Đồng ý/Từ chối. Mặc định bắt buộc chọn; `decisionLabel`, `agreeLabel`, `refuseLabel` thay câu hỏi và nhãn mặc định.
+ */
+export interface TemplateSignatures {
+  patient?: string
+  representative?: string
+  hospital?: string
+  hospitalHint?: string
+  decision?: 'required' | 'none'
+  decisionLabel?: string
+  agreeLabel?: string
+  refuseLabel?: string
 }
 
 export type TemplateVersionStatus = 'Draft' | 'Published' | 'Retired'

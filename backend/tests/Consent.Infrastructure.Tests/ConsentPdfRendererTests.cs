@@ -5,6 +5,7 @@ using Consent.Application.ConsentTemplates;
 using Consent.Domain.Patients;
 using Consent.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
+using Consent.Tests.Samples;
 
 namespace Consent.Infrastructure.Tests;
 
@@ -59,7 +60,7 @@ public sealed class ConsentPdfRendererTests
 
     private static ConsentPdfDocument Document(string code, bool representative, bool isFinal, string? examType = null)
     {
-        var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
+        var definition = TemplateDefinitionValidator.Parse(SampleConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
         var data = SampleData(code);
         if (examType is not null)
         {
@@ -131,6 +132,126 @@ public sealed class ConsentPdfRendererTests
         }
 
         // Ảnh chữ ký được nhúng (PDFsharp ghi "/Subtype/Image").
+        Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(bytes));
+    }
+
+    /// <summary>Dữ liệu giả lập đầy đủ cho bốn mẫu thật của bệnh viện.</summary>
+    private static JsonObject HospitalData(string code) => code switch
+    {
+        "QT-KNGT-BM02" => new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" },
+        "TTNB-NGOAITRU" => new JsonObject
+        {
+            ["ethnicity"] = "Kinh",
+            ["religion"] = "other",
+            ["religionOther"] = "Không theo tôn giáo",
+            ["educationLevel"] = "12/12",
+            ["occupation"] = "Nhân viên văn phòng",
+            ["permanentAddress"] = "Số 9 Đường Thử Nghiệm, Phường Mẫu",
+            ["currentAddress"] = "Số 9 Đường Thử Nghiệm, Phường Mẫu",
+            ["familyName"] = "Phạm Văn Chồng (giả lập)",
+            ["familyRelationship"] = "Chồng",
+            ["familyPhone"] = "0900000777",
+            ["familyIsEmergencyContact"] = "no",
+            ["emergencyName"] = "Phạm Thị Em (giả lập)",
+            ["emergencyRelationship"] = "Em gái",
+            ["emergencyPhone"] = "0900000888",
+        },
+        "QT-KNGT-BM10" => new JsonObject
+        {
+            ["consultingRoom"] = "Phòng 05",
+            ["selfFallHistory"] = "no",
+            ["selfMobilityAid"] = "yes",
+            ["infectionSymptoms"] = "yes",
+            ["epidemiologicalExposure"] = "no",
+            ["closeContact"] = "no",
+            ["staffMobilityAid"] = "yes",
+            ["staffUnsteady"] = "no",
+            ["fallInterventions"] = new JsonArray("mobilityAid"),
+            ["infectionAction"] = "maskContinue",
+            ["screeningStaffName"] = "Nhân Viên Hướng Dẫn (giả lập)",
+            ["pulse"] = "82",
+            ["temperature"] = "37,8",
+            ["bloodPressure"] = "125/80",
+            ["respiratoryRate"] = "18",
+            ["height"] = "158",
+            ["weight"] = "45",
+            ["bmi"] = "18,0",
+            ["weight3MonthsAgo"] = "49",
+            ["weightLossPercent"] = "8,9",
+            ["emergencySigns"] = "no",
+            ["visitReason"] = "newPatient",
+            ["visitReasonDetail"] = "Mệt mỏi, xanh xao kéo dài",
+            ["allergies"] = "yes",
+            ["allergiesDetail"] = "Penicillin",
+            ["mentalStatusAppropriate"] = "no",
+            ["barrierLanguage"] = "no",
+            ["barrierCognitive"] = "no",
+            ["barrierSensory"] = "yes",
+            ["barrierSensoryDetail"] = "Nghe kém tai trái",
+            ["barrierReligious"] = "no",
+            ["barrierCultural"] = "no",
+            ["barrierMobility"] = "no",
+            ["livingStatus"] = "withFamily",
+            ["currentPain"] = "yes",
+            ["painOnset"] = "Hai ngày trước",
+            ["painLocation"] = "Thắt lưng",
+            ["painScore"] = "4",
+            ["painScale"] = "nrs",
+            ["nutritionGroup"] = "adult",
+            ["adultBmiScore"] = "below18_5",
+            ["adultWeightLossScore"] = "from5to10",
+            ["adultAcuteIllnessScore"] = "no",
+            ["highFallRisk"] = "yes",
+            ["nurseEduFall"] = "provided",
+            ["nurseEduWound"] = "notNeeded",
+            ["nurseName"] = "Điều Dưỡng Thử Nghiệm (giả lập)",
+            ["adultNutritionRisk"] = "high",
+            ["dietCounseling"] = "required",
+            ["dietRegimens"] = new JsonArray("ironDeficiency", "other"),
+            ["dietRegimenOther"] = "Tăng đạm",
+            ["physicianEduFall"] = "provided",
+            ["physicianEduWound"] = "notRequired",
+            ["physicianEduPain"] = "provided",
+            ["physicianEduNewPatient"] = "provided",
+            ["physicianEduOther"] = "notRequired",
+        },
+        _ => [],
+    };
+
+    /// <summary>
+    /// Bốn mẫu thật: in được, chữ ký nằm trọn một trang. <paramref name="maxPages"/> là giới hạn để phát hiện bố cục
+    /// bị vỡ (phiếu nhận định BM10 có nhiều mục nhất).
+    /// </summary>
+    [Theory]
+    [InlineData("QT-KNGT-BM02", null, 2)]
+    [InlineData("TTNB-NGOAITRU", null, 2)]
+    [InlineData("QT-KNGT-BM10", null, 6)]
+    [InlineData("TUVAN-CONGTT", Consent.Domain.ConsentForms.ConsentDecision.Agreed, 2)]
+    public void HospitalTemplates_RenderSignedPdf(string code, Consent.Domain.ConsentForms.ConsentDecision? decision, int maxPages)
+    {
+        var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
+        var evaluation = FormDataEvaluator.Evaluate(definition, HospitalData(code));
+        Assert.True(evaluation.IsValid, string.Join("; ", evaluation.Errors.Select(e => $"{e.Key}: {string.Join(",", e.Value)}")));
+        var signature = SignatureImage.Normalize(TestPng.Signature());
+        var vietnam = TimeSpan.FromHours(7);
+        var document = new ConsentPdfDocument(
+            new HospitalOptions(), "Khoa Khám bệnh", code, 1, "PDT-2026-000001", definition, evaluation.Data, evaluation.Scores,
+            Patient, null, new DateOnly(2026, 11, 11), IsFinal: true)
+        {
+            Decision = decision,
+            PatientSignature = new ConsentPdfSignature(signature.Png!, new DateTimeOffset(2026, 11, 11, 9, 30, 0, vietnam)),
+            HospitalConfirmation = new ConsentPdfConfirmation("Nhân viên giả lập", "Nhân viên", new DateTimeOffset(2026, 11, 11, 9, 32, 0, vietnam)),
+        };
+
+        var bytes = new MigraDocConsentPdfRenderer().Render(document);
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, $"{code}-signed.pdf"), bytes);
+        }
+
+        using var stream = new MemoryStream(bytes);
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.InRange(pdf.PageCount, 1, maxPages);
         Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(bytes));
     }
 

@@ -1,20 +1,21 @@
 using System.Text.Json.Nodes;
 using Consent.Application.ConsentTemplates;
+using Consent.Tests.Samples;
 
 namespace Consent.Application.Tests;
 
 public sealed class TemplateDefinitionTests
 {
-    public static TheoryData<string> DefaultCodes => new() { "CK-01", "TT-01", "TN-01" };
+    public static TheoryData<string> SampleCodes => new() { "CK-01", "TT-01", "TN-01" };
 
     private static TemplateDefinition Default(string code) =>
-        TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
+        TemplateDefinitionValidator.Parse(SampleConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
 
     [Theory]
-    [MemberData(nameof(DefaultCodes))]
-    public void DefaultTemplates_AreValid(string code)
+    [MemberData(nameof(SampleCodes))]
+    public void SampleTemplates_AreValid(string code)
     {
-        var (definition, errors) = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson);
+        var (definition, errors) = TemplateDefinitionValidator.Parse(SampleConsentTemplates.All.Single(t => t.Code == code).ContentJson);
 
         Assert.Empty(errors);
         Assert.NotNull(definition);
@@ -33,6 +34,7 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"q\",\"label\":\"Q\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]},{\"type\":\"score\",\"key\":\"s\",\"label\":\"S\",\"sumOf\":[\"q\"],\"levels\":[{\"code\":\"low\",\"label\":\"Thấp\",\"min\":0}]}]}]}", "câu hỏi tính điểm")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"q\",\"label\":\"Q\",\"options\":[{\"value\":\"x\",\"label\":\"X\",\"score\":1}]},{\"type\":\"score\",\"key\":\"s\",\"label\":\"S\",\"sumOf\":[\"q\"],\"levels\":[{\"code\":\"a\",\"label\":\"A\",\"min\":5},{\"code\":\"b\",\"label\":\"B\",\"min\":1}]}]}]}", "tăng dần")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\",\"prefill\":\"patient.secret\"}]}]}", "nguồn tự điền")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"decision\":\"maybe\"}}", "\"decision\" chỉ nhận")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);

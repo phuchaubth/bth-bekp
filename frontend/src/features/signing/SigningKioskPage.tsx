@@ -63,15 +63,24 @@ function Kiosk({ session }: { session: SigningSession }) {
 
   const representative = form.representative
   const signerLabel = representative ? 'người đại diện' : 'người bệnh'
+  const labels = form.definition.signatures
+  const asksDecision = labels?.decision !== 'none'
+  const agreeLabel = labels?.agreeLabel ?? decisionLabels.Agreed
+  const refuseLabel = labels?.refuseLabel ?? decisionLabels.Refused
+  const decisionQuestion = labels?.decisionLabel ?? `Ý kiến của ${signerLabel}`
+  const ready = (!asksDecision || !!decision) && hasInk
 
   const submit = async () => {
-    if (!decision || !pad.current) {
+    if (!ready || !pad.current) {
       return
     }
     setSubmitting(true)
     setError(null)
     try {
-      const result = await consentFormsApi.signAsPatient(form.id, session.token, { decision, image: pad.current.toPngBase64() })
+      const result = await consentFormsApi.signAsPatient(form.id, session.token, {
+        decision: asksDecision ? decision : undefined,
+        image: pad.current.toPngBase64(),
+      })
       setSignedAt(result.signedAtUtc)
       setStage('signed')
     } catch (e) {
@@ -110,7 +119,9 @@ function Kiosk({ session }: { session: SigningSession }) {
             <Result
               status="success"
               title="Đã ghi nhận chữ ký"
-              subTitle={`Ký lúc ${formatDateTime(signedAt)} · ${decision ? decisionLabels[decision] : ''}. Vui lòng đưa máy lại cho nhân viên y tế.`}
+              subTitle={`Ký lúc ${formatDateTime(signedAt)}${
+                asksDecision && decision ? ` · ${decision === 'Agreed' ? agreeLabel : refuseLabel}` : ''
+              }. Vui lòng đưa máy lại cho nhân viên y tế.`}
             />
           </Card>
         ) : stage === 'ended' ? (
@@ -129,7 +140,7 @@ function Kiosk({ session }: { session: SigningSession }) {
               </ConfigProvider>
             </Card>
 
-            <Card title={`Ý kiến và chữ ký của ${signerLabel}`}>
+            <Card title={asksDecision ? `Ý kiến và chữ ký của ${signerLabel}` : `Chữ ký xác nhận của ${signerLabel}`}>
               <Flex vertical gap={16}>
                 <Typography.Text>
                   Người ký:{' '}
@@ -139,23 +150,25 @@ function Kiosk({ session }: { session: SigningSession }) {
                       : `${form.patient.fullName} (người bệnh)`}
                   </Typography.Text>
                 </Typography.Text>
-                <div>
-                  <Typography.Paragraph strong style={{ marginBottom: 8 }}>
-                    Ý kiến của {signerLabel}
-                  </Typography.Paragraph>
-                  <Radio.Group
-                    aria-label={`Ý kiến của ${signerLabel}`}
-                    optionType="button"
-                    buttonStyle="solid"
-                    size="large"
-                    value={decision}
-                    onChange={(e) => setDecision(e.target.value as ConsentDecision)}
-                    options={[
-                      { value: 'Agreed', label: decisionLabels.Agreed },
-                      { value: 'Refused', label: decisionLabels.Refused },
-                    ]}
-                  />
-                </div>
+                {asksDecision && (
+                  <div>
+                    <Typography.Paragraph strong style={{ marginBottom: 8 }}>
+                      {decisionQuestion}
+                    </Typography.Paragraph>
+                    <Radio.Group
+                      aria-label={decisionQuestion}
+                      optionType="button"
+                      buttonStyle="solid"
+                      size="large"
+                      value={decision}
+                      onChange={(e) => setDecision(e.target.value as ConsentDecision)}
+                      options={[
+                        { value: 'Agreed', label: agreeLabel },
+                        { value: 'Refused', label: refuseLabel },
+                      ]}
+                    />
+                  </div>
+                )}
                 <SignaturePad ref={pad} onInkChange={setHasInk} disabled={submitting} />
                 {error && <Alert type="error" showIcon title={error} />}
                 <Button
@@ -163,14 +176,16 @@ function Kiosk({ session }: { session: SigningSession }) {
                   size="large"
                   block
                   loading={submitting}
-                  disabled={!decision || !hasInk}
+                  disabled={!ready}
                   onClick={() => void submit()}
                 >
                   Xác nhận chữ ký
                 </Button>
-                {(!decision || !hasInk) && (
+                {!ready && (
                   <Typography.Text type="secondary" style={{ textAlign: 'center' }}>
-                    Chọn Đồng ý hoặc Từ chối và ký vào khung trên để xác nhận.
+                    {asksDecision
+                      ? `Chọn ${agreeLabel} hoặc ${refuseLabel} và ký vào khung trên để xác nhận.`
+                      : 'Ký vào khung trên để xác nhận.'}
                   </Typography.Text>
                 )}
               </Flex>

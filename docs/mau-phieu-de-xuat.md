@@ -1,6 +1,8 @@
 # Mẫu phiếu đề xuất — giai đoạn 1
 
-> Trạng thái: **ĐỀ XUẤT, chờ bệnh viện duyệt** (11/11/2026).
+> **Cập nhật 13/11/2026: đã thay bằng mẫu thật.** Bệnh viện đã gửi 4 mẫu phiếu đang dùng; ứng dụng khởi tạo các mẫu đó (xem [mẫu phiếu](mau-phieu.md)). Ba mẫu đề xuất dưới đây không còn được tạo trong ứng dụng, chỉ giữ làm dữ liệu kiểm thử (`backend/tests/SampleTemplates`) và tham khảo.
+>
+> Trạng thái cũ: **ĐỀ XUẤT, chờ bệnh viện duyệt** (11/11/2026).
 > Bệnh viện chưa gửi mẫu giấy đang dùng, nên ba mẫu dưới đây được soạn để Sprint 3 không phải chờ. Câu chữ cam kết, căn cứ pháp lý và nội dung chuyên môn (thang điểm té ngã, biện pháp phòng ngừa) **cần Phòng Kế hoạch tổng hợp, Phòng Điều dưỡng và bộ phận pháp chế rà soát**. Mục 6 liệt kê các điểm cần bệnh viện xác nhận.
 > Trong ứng dụng, mẫu phiếu là **dữ liệu cấu hình có phiên bản**: sửa câu chữ, thêm/bớt mục hay đổi ngưỡng điểm không cần sửa code. Phiếu đã lập luôn giữ đúng phiên bản mẫu tại thời điểm lập.
 > Mọi tên, số giấy tờ trong ví dụ là dữ liệu giả lập.

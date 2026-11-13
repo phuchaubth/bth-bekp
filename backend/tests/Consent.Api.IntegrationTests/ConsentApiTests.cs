@@ -94,7 +94,10 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(2, formV2.GetProperty("templateVersionNo").GetInt32());
         Assert.Equal("Giấy cam kết (phiên bản 2)", formV2.GetProperty("definition").GetProperty("title").GetString());
 
-        Assert.Equal(["CK-01", "TN-01", "TT-01"], list.EnumerateArray().Select(t => t.GetProperty("code").GetString()));
+        // Bốn mẫu thật do ứng dụng khởi tạo, cộng ba mẫu minh họa do bộ kiểm thử thêm.
+        Assert.Equal(
+            ["CK-01", "QT-KNGT-BM02", "QT-KNGT-BM10", "TN-01", "TT-01", "TTNB-NGOAITRU", "TUVAN-CONGTT"],
+            list.EnumerateArray().Select(t => t.GetProperty("code").GetString()).Order(StringComparer.Ordinal));
         Assert.All(list.EnumerateArray(), t => Assert.Equal(1, t.GetProperty("publishedVersionNo").GetInt32()));
         Assert.Equal(HttpStatusCode.Created, draftStatus);
         Assert.Equal(HttpStatusCode.BadRequest, invalidStatus);
@@ -195,6 +198,35 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(0, nurseList.GetProperty("totalCount").GetInt32());
         Assert.Equal(HttpStatusCode.OK, reporterStatus);
         Assert.Equal(HttpStatusCode.Forbidden, reporterCreate);
+    }
+
+    [Fact]
+    public async Task HospitalInsuranceConsent_IsSignedWithoutAgreeOrRefuse_AndCompletedByReception()
+    {
+        var receptionist = await LoginDemoAsync("tiepdon.demo");
+        var patientId = await DemoPatientIdAsync(receptionist);
+        var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", receptionist);
+        var (createdStatus, created) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId, templateId = TemplateId(available, "QT-KNGT-BM02") });
+        Assert.True(createdStatus == HttpStatusCode.Created, created.ToString());
+        Assert.Equal("none", created.GetProperty("definition").GetProperty("signatures").GetProperty("decision").GetString());
+        var form = $"/api/v1/consent-forms/{created.GetProperty("id").GetString()}";
+        await _client.SendJsonAsync(HttpMethod.Put, form, receptionist, new { data = new { careScheme = "nonInsurance" }, signerKind = "Patient" });
+        var (submittedStatus, submitted) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/submit", receptionist);
+        Assert.True(submittedStatus == HttpStatusCode.OK, submitted.ToString());
+
+        var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
+        var (signedStatus, signed) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
+            new { image = Convert.ToBase64String(TestPng.Signature()) });
+        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+
+        Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
+        Assert.True(completedStatus == HttpStatusCode.OK, completed.ToString());
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+        Assert.True(
+            !completed.TryGetProperty("decision", out var decision) || decision.ValueKind == JsonValueKind.Null,
+            completed.ToString());
     }
 
     [Fact]

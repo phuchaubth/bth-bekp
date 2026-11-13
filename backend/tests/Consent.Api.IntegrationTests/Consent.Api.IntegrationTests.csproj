@@ -19,4 +19,9 @@
   <ItemGroup>
     <PackageReference Include="Testcontainers.MsSql" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Mẫu phiếu minh họa dùng chung cho các project test (không có trong ứng dụng). -->
+    <EmbeddedResource Include="..\SampleTemplates\*.json" LogicalName="SampleTemplates.%(Filename)%(Extension)" />
+    <Compile Include="..\SampleTemplates\SampleConsentTemplates.cs" Link="SampleTemplates\SampleConsentTemplates.cs" />
+  </ItemGroup>
 </Project>

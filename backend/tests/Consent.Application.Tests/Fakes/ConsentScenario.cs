@@ -6,6 +6,7 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
+using Consent.Tests.Samples;
 
 namespace Consent.Application.Tests.Fakes;
 
@@ -72,6 +73,16 @@ internal sealed class ConsentScenario
         };
     }
 
+    /// <summary>Thêm (đã phát hành) một trong bốn mẫu thật khởi tạo sẵn của bệnh viện.</summary>
+    public ConsentTemplate AddHospitalTemplate(string code)
+    {
+        var source = DefaultConsentTemplates.All.Single(t => t.Code == code);
+        var template = ConsentTemplate.Create(code, source.Name, source.HospitalSignerRoleCode, null, source.ContentJson, Ctx.Clock.UtcNow);
+        template.Publish(1, Ctx.Clock.UtcNow);
+        Ctx.Store.ConsentTemplates.Add(template);
+        return template;
+    }
+
     public static ConsentScenario Create()
     {
         var ctx = new AppTestContext();
@@ -89,7 +100,7 @@ internal sealed class ConsentScenario
 
         ConsentTemplate Seed(string code)
         {
-            var source = DefaultConsentTemplates.All.Single(t => t.Code == code);
+            var source = SampleConsentTemplates.All.Single(t => t.Code == code);
             var template = ConsentTemplate.Create(code, source.Name, source.HospitalSignerRoleCode, null, source.ContentJson, ctx.Clock.UtcNow);
             template.Publish(1, ctx.Clock.UtcNow);
             ctx.Store.ConsentTemplates.Add(template);

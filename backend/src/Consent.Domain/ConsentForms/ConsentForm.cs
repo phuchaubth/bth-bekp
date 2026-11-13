@@ -220,10 +220,13 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Người bệnh (hoặc người đại diện đã chọn khi soạn phiếu) ký tay trong phiên ký đang mở.</summary>
+    /// <summary>
+    /// Người bệnh (hoặc người đại diện đã chọn khi soạn phiếu) ký tay trong phiên ký đang mở. <paramref name="decision"/>
+    /// rỗng khi mẫu không hỏi Đồng ý/Từ chối (người bệnh chỉ ký xác nhận nội dung).
+    /// </summary>
     public ConsentSignature SignByPatient(
         Guid sessionId,
-        ConsentDecision decision,
+        ConsentDecision? decision,
         string signerName,
         byte[] imagePng,
         string? device,
@@ -233,7 +236,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         Ensure(Status == ConsentFormStatus.PendingSignature, "Phiếu không ở trạng thái chờ ký.");
         Ensure(PatientSignature is null, "Người bệnh đã ký phiếu này.");
         Ensure(SigningSessionId is { } current && current == sessionId, "Phiên ký đã kết thúc hoặc đã được thay bằng phiên khác.");
-        if (!Enum.IsDefined(decision))
+        if (decision is { } value && !Enum.IsDefined(value))
         {
             throw new DomainException("Quyết định của người bệnh không hợp lệ.");
         }

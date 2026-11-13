@@ -167,8 +167,9 @@ export const consentFormsApi = {
   /** Mở phiên ký trên máy tính bảng: token chỉ dùng để người bệnh ký đúng phiếu này. */
   startSigning: (id: string) => apiRequest<SigningSessionToken>(`${base}/${id}/signing-session`, { method: 'POST' }),
   /** Gửi chữ ký của người bệnh bằng token phiên ký (không dùng phiên đăng nhập của nhân viên). */
-  signAsPatient: (id: string, signingToken: string, input: { decision: ConsentDecision; image: string }) =>
-    apiRequest<{ decision: ConsentDecision; signedAtUtc: string }>(`${base}/${id}/patient-signature`, {
+  /** `decision` bỏ trống khi mẫu không hỏi Đồng ý/Từ chối (`signatures.decision = 'none'`). */
+  signAsPatient: (id: string, signingToken: string, input: { decision?: ConsentDecision; image: string }) =>
+    apiRequest<{ decision: ConsentDecision | null; signedAtUtc: string }>(`${base}/${id}/patient-signature`, {
       method: 'POST',
       body: input,
       token: signingToken,

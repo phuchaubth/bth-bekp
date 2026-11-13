@@ -87,8 +87,27 @@ public sealed record TemplateCondition(string Field, IReadOnlyList<string>? In =
 
 public sealed record ScoreLevel(string Code, string Label, int Min);
 
-/// <summary>Nhãn khối chữ ký; bỏ trống thì dùng nhãn mặc định.</summary>
-public sealed record TemplateSignatures(string? Patient = null, string? Representative = null, string? Hospital = null, string? HospitalHint = null);
+/// <summary>
+/// Khối chữ ký: nhãn (bỏ trống thì dùng nhãn mặc định) và cách ghi nhận ý kiến của người bệnh khi ký.
+/// <see cref="Decision"/> = <c>none</c>: người bệnh chỉ ký xác nhận (phiếu khai thông tin, phiếu nhận định), không hỏi
+/// Đồng ý/Từ chối. Mặc định (<c>required</c>): bắt buộc chọn; <see cref="DecisionLabel"/>, <see cref="AgreeLabel"/>,
+/// <see cref="RefuseLabel"/> thay câu hỏi và nhãn mặc định ("Ý kiến của người bệnh", "Đồng ý", "Từ chối").
+/// </summary>
+public sealed record TemplateSignatures(
+    string? Patient = null,
+    string? Representative = null,
+    string? Hospital = null,
+    string? HospitalHint = null,
+    string? Decision = null,
+    string? DecisionLabel = null,
+    string? AgreeLabel = null,
+    string? RefuseLabel = null)
+{
+    public const string DecisionRequired = "required";
+    public const string DecisionNone = "none";
+
+    public bool RequiresDecision => !string.Equals(Decision, DecisionNone, StringComparison.Ordinal);
+}
 
 public static class BlockTypes
 {
@@ -116,9 +135,15 @@ public static class PrefillSources
     public const string HealthInsuranceNumber = "patient.healthInsuranceNumber";
     public const string PhoneNumber = "patient.phoneNumber";
     public const string PatientCode = "patient.patientCode";
+    public const string PermanentAddress = "patient.permanentAddress";
+    public const string CurrentAddress = "patient.currentAddress";
+    public const string Ethnicity = "patient.ethnicity";
+    public const string Occupation = "patient.occupation";
 
     public static IReadOnlySet<string> All { get; } =
-        new HashSet<string>([HealthInsuranceNumber, PhoneNumber, PatientCode], StringComparer.Ordinal);
+        new HashSet<string>(
+            [HealthInsuranceNumber, PhoneNumber, PatientCode, PermanentAddress, CurrentAddress, Ethnicity, Occupation],
+            StringComparer.Ordinal);
 }
 
 /// <summary>Đọc/ghi định nghĩa mẫu và dữ liệu phiếu dạng JSON (camelCase).</summary>

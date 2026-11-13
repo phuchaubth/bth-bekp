@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Consent.Application.Abstractions;
 using Consent.Application.Common;
+using Consent.Application.ConsentTemplates;
 using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
 using Consent.Shared;
@@ -100,6 +101,18 @@ public sealed class ConsentSigningService(
             return InvalidStatus("Phiên ký đã kết thúc hoặc đã được thay bằng phiên khác.");
         }
 
+        // Mẫu chỉ ký xác nhận: bỏ qua quyết định gửi lên; mẫu còn lại: bắt buộc chọn Đồng ý/Từ chối.
+        var (_, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+        var signatures = ConsentTemplateService.ReadDefinition(version).Signatures;
+        var requiresDecision = signatures?.RequiresDecision ?? true;
+        if (requiresDecision && request.Decision is null)
+        {
+            return Error.ValidationField(
+                "decision",
+                $"Vui lòng chọn {signatures?.AgreeLabel ?? "Đồng ý"} hoặc {signatures?.RefuseLabel ?? "Từ chối"}.");
+        }
+
+        var decision = requiresDecision ? request.Decision : null;
         var image = DecodeImage(request.Image!);
         if (image is null)
         {
@@ -118,7 +131,6 @@ public sealed class ConsentSigningService(
         }
 
         var (patient, representative) = await formService.ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
-        var decision = request.Decision!.Value;
         var signature = form.SignByPatient(
             sessionId,
             decision,
@@ -130,7 +142,7 @@ public sealed class ConsentSigningService(
         formService.AddAudit(
             AuditActions.ConsentFormPatientSigned,
             form.Id,
-            JsonSerializer.Serialize(new { decision = decision.ToString(), signer = signature.Role.ToString() }));
+            JsonSerializer.Serialize(new { decision = decision?.ToString(), signer = signature.Role.ToString() }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return new PatientSignatureResultDto(decision, signature.SignedAtUtc);
     }

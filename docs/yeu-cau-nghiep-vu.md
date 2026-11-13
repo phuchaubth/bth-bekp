@@ -15,7 +15,7 @@ Số hóa việc lập, ký và lưu trữ các phiếu đồng thuận/cam kế
 
 ### 1.2. Phạm vi giai đoạn 1
 
-> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA**. Các yêu cầu FR-HIS-01…03 và FR-SIGN (SmartCA) giữ nguyên làm thiết kế, sẽ thực hiện khi bệnh viện cần. Trong giai đoạn này, phiếu được **ký tay trên máy tính bảng** (mục 3.6a). Ba mẫu phiếu dùng [mẫu đề xuất](mau-phieu-de-xuat.md) trong khi chờ duyệt.
+> **Cập nhật 11/11/2026:** tạm **chưa kết nối HIS và SmartCA**. Các yêu cầu FR-HIS-01…03 và FR-SIGN (SmartCA) giữ nguyên làm thiết kế, sẽ thực hiện khi bệnh viện cần. Trong giai đoạn này, phiếu được **ký tay trên máy tính bảng** (mục 3.6a). **Cập nhật 13/11/2026:** dùng 4 [mẫu phiếu thật](mau-phieu.md) bệnh viện gửi, thay cho mẫu đề xuất.
 
 | Trong phạm vi | Ngoài phạm vi (giai đoạn sau) |
 |---|---|

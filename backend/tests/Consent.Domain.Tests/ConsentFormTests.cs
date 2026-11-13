@@ -187,6 +187,20 @@ public sealed class ConsentFormTests
     }
 
     [Fact]
+    public void PatientSignature_WithoutDecision_ForConfirmOnlyForms_AndRejectsUnknownDecision()
+    {
+        var form = FormIn(Stage.AwaitingPatient);
+
+        Assert.Throws<DomainException>(() =>
+            form.SignByPatient(Session, (ConsentDecision)99, "Người bệnh giả lập", Png, null, null, Now));
+        form.SignByPatient(Session, null, "Người bệnh giả lập", Png, "Thiết bị thử", null, Now);
+        HospitalConfirms(form);
+
+        Assert.Null(form.Decision);
+        Assert.Equal(ConsentFormStatus.Completed, form.Status);
+    }
+
+    [Fact]
     public void RepresentativeSigns_AsRepresentative_AndHospitalConfirmsByAccount()
     {
         var form = NewForm();

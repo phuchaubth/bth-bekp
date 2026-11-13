@@ -361,13 +361,32 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             ? labels?.Representative ?? "Người đại diện hợp pháp"
             : labels?.Patient ?? "Người bệnh";
 
-        // Quyết định ghi nhận khi ký (bản xem trước để trống cả hai ô) và ngày tháng trên cùng một dòng.
+        // Quyết định ghi nhận khi ký (bản xem trước để trống cả hai ô) và ngày tháng trên cùng một dòng. Mẫu chỉ ký xác
+        // nhận (không hỏi Đồng ý/Từ chối) chỉ in ngày tháng.
         var decision = section.AddParagraph();
         decision.Format.SpaceBefore = Unit.FromMillimeter(1);
         decision.Format.KeepWithNext = true;
         decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
-        decision.AddFormattedText($"Ý kiến của {(isRepresentative ? "người đại diện" : "người bệnh")}: ", TextFormat.Bold);
-        decision.AddText($"{Box(document.Decision == ConsentDecision.Agreed)} Đồng ý    {Box(document.Decision == ConsentDecision.Refused)} Từ chối");
+        if (labels?.RequiresDecision ?? true)
+        {
+            var question = labels?.DecisionLabel ?? $"Ý kiến của {(isRepresentative ? "người đại diện" : "người bệnh")}";
+            // Câu hỏi đã có dấu "?" (hoặc kết thúc bằng ngoặc sau dấu "?") thì không thêm dấu ":".
+            var trimmed = question.TrimEnd(':', ' ');
+            var isQuestion = trimmed.EndsWith('?') || trimmed.EndsWith("?)", StringComparison.Ordinal);
+            decision.AddFormattedText(isQuestion ? $"{trimmed} " : $"{trimmed}: ", TextFormat.Bold);
+            if (labels?.DecisionLabel is not null)
+            {
+                // Câu hỏi riêng của mẫu thường dài: đưa lựa chọn và ngày tháng xuống dòng dưới.
+                decision = section.AddParagraph();
+                decision.Format.KeepWithNext = true;
+                decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+            }
+
+            decision.AddText(
+                $"{Box(document.Decision == ConsentDecision.Agreed)} {labels?.AgreeLabel ?? "Đồng ý"}    " +
+                $"{Box(document.Decision == ConsentDecision.Refused)} {labels?.RefuseLabel ?? "Từ chối"}");
+        }
+
         decision.AddTab();
         decision.AddFormattedText(
             $"{document.Hospital.Place}, ngày {document.DocumentDate.Day:00} tháng {document.DocumentDate.Month:00} năm {document.DocumentDate.Year}",

@@ -38,6 +38,23 @@ public sealed class ConsentFormServiceTests
     }
 
     [Fact]
+    public async Task Create_OutpatientInformation_PrefillsEthnicityOccupationAndAddresses()
+    {
+        var s = Setup();
+        var template = s.AddHospitalTemplate("TTNB-NGOAITRU");
+        s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, template.Id, null), CancellationToken.None)).Value;
+
+        Assert.Equal("Kinh", form.Data["ethnicity"]!.GetValue<string>());
+        Assert.Equal("Số 9 Đường Thử Nghiệm", form.Data["permanentAddress"]!.GetValue<string>());
+        // Chưa có chỗ ở hiện nay: dùng địa chỉ thường trú.
+        Assert.Equal("Số 9 Đường Thử Nghiệm", form.Data["currentAddress"]!.GetValue<string>());
+        // Hồ sơ chưa có nghề nghiệp: để trống cho người khai điền.
+        Assert.Null(form.Data["occupation"]);
+    }
+
+    [Fact]
     public async Task Form_KeepsItsTemplateVersion_WhenANewVersionIsPublished()
     {
         var s = Setup();

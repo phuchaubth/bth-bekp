@@ -221,6 +221,67 @@ describe('Màn hình ký trên máy tính bảng (màn hình 6)', () => {
     expect(screen.getByText('Ý kiến của người đại diện')).toBeInTheDocument()
   })
 
+  it('mẫu chỉ ký xác nhận (decision = none): không hỏi Đồng ý/Từ chối, ký là gửi được, không gửi ý kiến', async () => {
+    const confirmOnly = pending({
+      templateName: 'Phiếu thông tin người bệnh ngoại trú',
+      definition: { ...definition, signatures: { patient: 'Người khai (Declarant)', decision: 'none' } },
+    })
+    signingSession.set({ token: 'token-phien-ky', expiresAtUtc: future(), form: confirmOnly, staffUserName: 'tiepdon.demo' })
+    const { calls } = mockApi({
+      ...baseRoutes(anonymous),
+      'POST /api/v1/consent-forms/f-1/patient-signature': { decision: null, signedAtUtc: '2026-11-11T02:10:00Z' },
+    })
+    renderApp('/ky-phieu')
+    const user = userEvent.setup()
+
+    const confirm = await screen.findByRole('button', { name: 'Xác nhận chữ ký' })
+    expect(screen.getByText('Chữ ký xác nhận của người bệnh')).toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.queryByText('Đồng ý')).not.toBeInTheDocument()
+    expect(screen.getByText('Ký vào khung trên để xác nhận.')).toBeInTheDocument()
+    expect(confirm).toBeDisabled()
+
+    drawStroke(screen.getByRole('img', { name: /Khung ký tên/ }))
+    expect(confirm).toBeEnabled()
+    await user.click(confirm)
+
+    expect(await screen.findByText('Đã ghi nhận chữ ký')).toBeInTheDocument()
+    const signature = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/patient-signature')!
+    expect(signature.body).toEqual({ image: 'QU5IX0NIVV9LWQ==' })
+  })
+
+  it('mẫu có câu hỏi và nhãn riêng: hiển thị đúng câu hỏi, nhãn lựa chọn', async () => {
+    const portal = pending({
+      definition: {
+        ...definition,
+        signatures: {
+          decisionLabel: 'Ông/bà đã xem và đồng ý tham gia sử dụng các Cổng thông tin chính thức tại bệnh viện?',
+          agreeLabel: 'Đồng ý (Agree)',
+          refuseLabel: 'Không đồng ý (Disagree)',
+        },
+      },
+    })
+    signingSession.set({ token: 'token-phien-ky', expiresAtUtc: future(), form: portal, staffUserName: 'tiepdon.demo' })
+    const { calls } = mockApi({
+      ...baseRoutes(anonymous),
+      'POST /api/v1/consent-forms/f-1/patient-signature': { decision: 'Refused', signedAtUtc: '2026-11-11T02:10:00Z' },
+    })
+    renderApp('/ky-phieu')
+    const user = userEvent.setup()
+
+    expect(
+      await screen.findByRole('radiogroup', { name: /Cổng thông tin chính thức tại bệnh viện\?/ }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Chọn Đồng ý (Agree) hoặc Không đồng ý (Disagree) và ký vào khung trên để xác nhận.')).toBeInTheDocument()
+    await user.click(screen.getByText('Không đồng ý (Disagree)'))
+    drawStroke(screen.getByRole('img', { name: /Khung ký tên/ }))
+    await user.click(screen.getByRole('button', { name: 'Xác nhận chữ ký' }))
+
+    expect(await screen.findByText(/Không đồng ý \(Disagree\)\. Vui lòng đưa máy lại/)).toBeInTheDocument()
+    const signature = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/patient-signature')!
+    expect(signature.body).toEqual({ decision: 'Refused', image: 'QU5IX0NIVV9LWQ==' })
+  })
+
   it('tải lại trang (mất phiên ký trong bộ nhớ): không ký được, phải đăng nhập lại', async () => {
     mockApi({ ...baseRoutes(anonymous) })
     renderApp('/ky-phieu')

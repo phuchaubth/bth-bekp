@@ -9,6 +9,7 @@ namespace Consent.Application.ConsentTemplates;
 public static partial class TemplateDefinitionValidator
 {
     public const int MaxTextLength = 4000;
+    public const int MaxLabelLength = 500;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(200);
 
     /// <summary>Đọc và kiểm tra JSON. Trả về định nghĩa hợp lệ, hoặc danh sách lỗi (tiếng Việt).</summary>
@@ -76,7 +77,34 @@ public static partial class TemplateDefinitionValidator
             }
         }
 
+        ValidateSignatures(definition.Signatures, errors);
         return errors;
+    }
+
+    private static void ValidateSignatures(TemplateSignatures? signatures, List<string> errors)
+    {
+        if (signatures is null)
+        {
+            return;
+        }
+
+        if (signatures.Decision is not (null or TemplateSignatures.DecisionRequired or TemplateSignatures.DecisionNone))
+        {
+            errors.Add("Khối chữ ký: \"decision\" chỉ nhận \"required\" (bắt buộc chọn Đồng ý/Từ chối) hoặc \"none\" (chỉ ký xác nhận).");
+        }
+
+        foreach (var label in new[]
+                 {
+                     signatures.Patient, signatures.Representative, signatures.Hospital, signatures.HospitalHint,
+                     signatures.DecisionLabel, signatures.AgreeLabel, signatures.RefuseLabel,
+                 })
+        {
+            if (label is { Length: > MaxLabelLength })
+            {
+                errors.Add($"Khối chữ ký: nhãn quá dài (tối đa {MaxLabelLength} ký tự).");
+                return;
+            }
+        }
     }
 
     private static void ValidateBlock(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)

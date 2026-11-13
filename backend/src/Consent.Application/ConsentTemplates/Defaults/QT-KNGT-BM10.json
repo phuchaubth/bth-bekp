@@ -1,0 +1,811 @@
+{
+  "title": "Phiếu nhận định ban đầu và nhu cầu giáo dục sức khỏe người bệnh ngoại trú tại Khoa Khám bệnh\nInitial Assessment Form and Patient Health Education Needs",
+  "subtitle": "(Outpatient – Department of Medical Examination) – Mã số (Code): QT-KNGT/BM10",
+  "sections": [
+    {
+      "title": "Phần người bệnh tự khai (Patient self-declaration section) – người bệnh thực hiện trước khi đến khám (to be completed by the patient prior to consultation)",
+      "blocks": [
+        {
+          "type": "text",
+          "key": "consultingRoom",
+          "label": "Phòng khám (Consulting Room No.)",
+          "required": true,
+          "maxLength": 50
+        },
+        {
+          "type": "paragraph",
+          "text": "A – Nguy cơ té ngã (Fall risk)"
+        },
+        {
+          "type": "choice",
+          "key": "selfFallHistory",
+          "label": "Tôi đã bị té ngã từ 2 lần trở lên trong 3 tháng qua (I have fallen 2 times or more in the past 3 months)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "selfMobilityAid",
+          "label": "Tôi cần phải dùng nạng hoặc xe lăn hoặc cần có người dìu đỡ khi di chuyển (I require a cane, crutches, wheelchair, or assistance from another person when moving)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": "B – Tầm soát bệnh lây nhiễm, dành cho những bệnh tạo thành dịch (Infectious disease screening, for epidemic-prone diseases)"
+        },
+        {
+          "type": "choice",
+          "key": "infectionSymptoms",
+          "label": "1. Triệu chứng: sốt kèm ho, đau họng, nổi mẫn hoặc mệt mỏi, đau đầu,... (Symptoms: fever with cough, sore throat, rash, fatigue, headache, etc.)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "epidemiologicalExposure",
+          "label": "2. Dịch tễ: có yếu tố dịch tễ hay tiếp xúc với người đi từ vùng dịch trong vòng 15 ngày (Epidemiology: history of exposure or contact with individuals from epidemic areas within the past 15 days)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ],
+          "visibleWhen": { "field": "infectionSymptoms", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "closeContact",
+          "label": "3. Dịch tễ: tiếp xúc gần với người có từ 3 triệu chứng sốt, ho, khó thở, mệt mỏi,... (Epidemiology: close contact with a person presenting ≥3 symptoms: fever, cough, dyspnea, fatigue, etc.)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ],
+          "visibleWhen": { "field": "infectionSymptoms", "in": ["yes"] }
+        },
+        {
+          "type": "paragraph",
+          "text": "Nếu trả lời “CÓ” bất kỳ câu nào của mục A hoặc B, quý người bệnh cần đến bàn hướng dẫn để được hỗ trợ (If you answered “YES” to any question in Section A or B, please proceed to the guidance desk for assistance)."
+        }
+      ]
+    },
+    {
+      "title": "Phần nhân viên bộ phận hướng dẫn thực hiện (Section for screening staff)",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "staffMobilityAid",
+          "label": "A1. Người bệnh cần phải dùng nạng/xe lăn hay cần có người dìu đỡ khi di chuyển (The patient requires a cane/crutches/wheelchair or assistance from another person when moving)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "staffUnsteady",
+          "label": "A2. Người bệnh xanh tái, đang chóng mặt, loạng choạng, đứng không vững (The patient appears pale, is experiencing dizziness, staggering, or is unable to stand steadily)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không (No)" }
+          ]
+        },
+        {
+          "type": "multiChoice",
+          "key": "fallInterventions",
+          "label": "Nếu trả lời “CÓ” 1 trong 2 hay cả 2 câu thì phải có hành động can thiệp (If the answer is “YES” to either question, staff must take intervention actions)",
+          "options": [
+            { "value": "mobilityAid", "label": "Cung cấp dụng cụ hỗ trợ di chuyển (Provide mobility aid devices)" },
+            { "value": "assistAmbulation", "label": "Trợ giúp người bệnh di chuyển, đi lại nếu người bệnh không có thân nhân đi theo (Assist the patient with ambulation if not accompanied by a caregiver)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "infectionAction",
+          "label": "B. Xử trí tầm soát bệnh lây nhiễm (Infectious disease screening action)",
+          "required": true,
+          "options": [
+            { "value": "referExposure", "label": "“CÓ” yếu tố dịch tễ kèm ít nhất 01 triệu chứng: chuyển người bệnh đến phòng khám sàng lọc (“YES” to an epidemiological risk factor plus at least one symptom: refer the patient to the screening clinic)" },
+            { "value": "referSymptoms", "label": "“CÓ” từ 03 triệu chứng: chuyển người bệnh đến phòng khám sàng lọc (“YES” to 3 or more symptoms: refer the patient to the screening clinic)" },
+            { "value": "maskContinue", "label": "“CÓ” dưới 03 triệu chứng: hướng dẫn người bệnh đeo khẩu trang và tiếp tục làm thủ tục (“YES” to fewer than 3 symptoms: advise the patient to wear a mask and continue the admission process)" }
+          ],
+          "visibleWhen": { "field": "infectionSymptoms", "in": ["yes"] }
+        },
+        {
+          "type": "text",
+          "key": "screeningStaffName",
+          "label": "Nhân viên bộ phận hướng dẫn, ghi rõ họ tên (Screening staff, full name)",
+          "required": true,
+          "maxLength": 200
+        }
+      ]
+    },
+    {
+      "title": "Phần điều dưỡng thực hiện – Dấu hiệu sinh tồn và các chỉ số đo lường (Section for nursing staff – Vital signs and measurements)",
+      "blocks": [
+        {
+          "type": "text",
+          "key": "pulse",
+          "label": "Mạch (Pulse), lần/phút (beats/min)",
+          "required": true,
+          "maxLength": 3,
+          "pattern": "^[0-9]{2,3}$",
+          "patternMessage": "Nhập số lần/phút, ví dụ 80."
+        },
+        {
+          "type": "text",
+          "key": "temperature",
+          "label": "Nhiệt độ (Temperature), °C",
+          "required": true,
+          "maxLength": 4,
+          "pattern": "^[0-9]{2}([.,][0-9])?$",
+          "patternMessage": "Nhập nhiệt độ, ví dụ 37 hoặc 37,5."
+        },
+        {
+          "type": "text",
+          "key": "bloodPressure",
+          "label": "Huyết áp (Blood pressure), mmHg",
+          "required": true,
+          "maxLength": 7,
+          "pattern": "^[0-9]{2,3}/[0-9]{2,3}$",
+          "patternMessage": "Nhập theo dạng tâm thu/tâm trương, ví dụ 120/80."
+        },
+        {
+          "type": "text",
+          "key": "respiratoryRate",
+          "label": "Nhịp thở (Respiratory rate), lần/phút (breaths/min)",
+          "required": true,
+          "maxLength": 3,
+          "pattern": "^[0-9]{1,3}$",
+          "patternMessage": "Nhập số lần/phút, ví dụ 18."
+        },
+        {
+          "type": "text",
+          "key": "spo2",
+          "label": "SpO₂ – độ bão hòa oxy trong máu, khi có dấu hiệu khó thở (Blood oxygen saturation, if dyspnea is present), %",
+          "maxLength": 3,
+          "pattern": "^[0-9]{2,3}$",
+          "patternMessage": "Nhập phần trăm, ví dụ 97."
+        },
+        {
+          "type": "text",
+          "key": "height",
+          "label": "Chiều cao (Height), cm",
+          "required": true,
+          "maxLength": 5,
+          "pattern": "^[0-9]{2,3}([.,][0-9])?$",
+          "patternMessage": "Nhập chiều cao theo cm, ví dụ 165."
+        },
+        {
+          "type": "text",
+          "key": "weight",
+          "label": "Cân nặng (Weight), kg",
+          "required": true,
+          "maxLength": 5,
+          "pattern": "^[0-9]{1,3}([.,][0-9])?$",
+          "patternMessage": "Nhập cân nặng theo kg, ví dụ 58 hoặc 58,5."
+        },
+        {
+          "type": "text",
+          "key": "bmi",
+          "label": "Chỉ số khối cơ thể (Body Mass Index), kg/m²",
+          "required": true,
+          "maxLength": 5,
+          "pattern": "^[0-9]{1,2}([.,][0-9]{1,2})?$",
+          "patternMessage": "Nhập BMI, ví dụ 21,3."
+        },
+        {
+          "type": "text",
+          "key": "headCircumference",
+          "label": "Vòng đầu, trẻ sơ sinh < 28 ngày tuổi (Head circumference, newborn < 28 days), cm",
+          "maxLength": 4,
+          "pattern": "^[0-9]{2}([.,][0-9])?$",
+          "patternMessage": "Nhập vòng đầu theo cm, ví dụ 34."
+        },
+        {
+          "type": "text",
+          "key": "weight3MonthsAgo",
+          "label": "Cân nặng 3 tháng trước, nếu có (Weight 3 months ago, if available), kg",
+          "maxLength": 5,
+          "pattern": "^[0-9]{1,3}([.,][0-9])?$",
+          "patternMessage": "Nhập cân nặng theo kg."
+        },
+        {
+          "type": "text",
+          "key": "weightLossPercent",
+          "label": "% sụt cân trong 3 tháng, nếu sụt cân (% weight loss over 3 months) = (cân nặng hiện tại – cân nặng 3 tháng trước)/cân nặng hiện tại",
+          "maxLength": 5,
+          "pattern": "^[0-9]{1,2}([.,][0-9]{1,2})?$",
+          "patternMessage": "Nhập phần trăm, ví dụ 5,5."
+        },
+        {
+          "type": "choice",
+          "key": "emergencySigns",
+          "label": "Người bệnh có dấu hiệu bất thường cần cấp cứu (Emergency warning signs)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, ghi rõ (Yes, specify)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "emergencySignsDetail",
+          "label": "Dấu hiệu cần cấp cứu, ghi rõ (Emergency signs, specify)",
+          "required": true,
+          "maxLength": 500,
+          "visibleWhen": { "field": "emergencySigns", "in": ["yes"] }
+        }
+      ]
+    },
+    {
+      "title": "Đánh giá (Assessment) – chỉ thực hiện nếu không có dấu hiệu cần cấp cứu (to be performed only if there are no emergency signs)",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "visitReason",
+          "label": "Lý do đến khám (Reason for visit)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "followUp", "label": "Tái khám theo hẹn (Follow-up appointment)" },
+            { "value": "newPatient", "label": "Người bệnh mới, ghi rõ (New patient, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "visitReasonDetail",
+          "label": "Lý do khám của người bệnh mới (New patient’s reason for visit)",
+          "required": true,
+          "maxLength": 500,
+          "visibleWhen": { "field": "visitReason", "in": ["newPatient"] }
+        },
+        {
+          "type": "choice",
+          "key": "allergies",
+          "label": "Dị ứng (Allergies)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "none", "label": "Không (None)" },
+            { "value": "yes", "label": "Có, ghi rõ (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "allergiesDetail",
+          "label": "Dị ứng, ghi rõ (Allergies, specify)",
+          "required": true,
+          "maxLength": 500,
+          "visibleWhen": { "field": "allergies", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "mentalStatusAppropriate",
+          "label": "Trạng thái tinh thần: đáp ứng phù hợp (Mental status: appropriate response)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, ghi rõ (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "mentalStatusDetail",
+          "label": "Trạng thái tinh thần, ghi rõ (Mental status, specify)",
+          "required": true,
+          "maxLength": 500,
+          "visibleWhen": { "field": "mentalStatusAppropriate", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierLanguage",
+          "label": "Trở ngại chăm sóc – về ngôn ngữ (Barriers to care – Language)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierLanguageDetail",
+          "label": "Trở ngại về ngôn ngữ, giải thích (Language barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierLanguage", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierCognitive",
+          "label": "Trở ngại chăm sóc – về nhận thức (Barriers to care – Cognitive)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierCognitiveDetail",
+          "label": "Trở ngại về nhận thức, giải thích (Cognitive barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierCognitive", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierSensory",
+          "label": "Trở ngại chăm sóc – về giác quan (Barriers to care – Sensory)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierSensoryDetail",
+          "label": "Trở ngại về giác quan, giải thích (Sensory barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierSensory", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierReligious",
+          "label": "Trở ngại chăm sóc – về tôn giáo (Barriers to care – Religious)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierReligiousDetail",
+          "label": "Trở ngại về tôn giáo, giải thích (Religious barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierReligious", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierCultural",
+          "label": "Trở ngại chăm sóc – về văn hóa (Barriers to care – Cultural)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierCulturalDetail",
+          "label": "Trở ngại về văn hóa, giải thích (Cultural barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierCultural", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "barrierMobility",
+          "label": "Trở ngại chăm sóc – về vận động (Barriers to care – Mobility)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, giải thích (Yes, specify)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "barrierMobilityDetail",
+          "label": "Trở ngại về vận động, giải thích (Mobility barrier, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "barrierMobility", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "livingStatus",
+          "label": "Tình trạng sinh sống (Living status)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "alone", "label": "Sống một mình (Lives alone)" },
+            { "value": "withFamily", "label": "Sống với người thân (Lives with family)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "choice",
+          "key": "currentPain",
+          "label": "Đánh giá đau – hiện đang đau (Pain assessment – current pain)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có, tiếp tục điền các tính chất bên dưới (Yes, complete below)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "painOnset",
+          "label": "Thời gian bắt đầu đau (Onset)",
+          "required": true,
+          "maxLength": 100,
+          "visibleWhen": { "field": "currentPain", "in": ["yes"] }
+        },
+        {
+          "type": "text",
+          "key": "painLocation",
+          "label": "Vị trí đau (Location)",
+          "required": true,
+          "maxLength": 100,
+          "visibleWhen": { "field": "currentPain", "in": ["yes"] }
+        },
+        {
+          "type": "text",
+          "key": "painScore",
+          "label": "Thang điểm đau (Pain score), trên 10",
+          "required": true,
+          "maxLength": 2,
+          "pattern": "^([0-9]|10)$",
+          "patternMessage": "Nhập điểm đau từ 0 đến 10.",
+          "visibleWhen": { "field": "currentPain", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "painScale",
+          "label": "Theo thang điểm (Scale used)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "nrs", "label": "NRS" },
+            { "value": "wongBaker", "label": "Wong – Baker" },
+            { "value": "flacc", "label": "FLACC" },
+            { "value": "cries", "label": "CRIES" }
+          ],
+          "visibleWhen": { "field": "currentPain", "in": ["yes"] }
+        },
+        {
+          "type": "choice",
+          "key": "nutritionGroup",
+          "label": "Sàng lọc nguy cơ dinh dưỡng – đối tượng (Nutrition risk screening – patient group)",
+          "required": true,
+          "options": [
+            { "value": "adult", "label": "Người lớn (Adult)" },
+            { "value": "pediatric", "label": "Bệnh nhi < 16 tuổi – thang điểm PNST (Pediatric patient < 16 years – PNST scale). Trẻ sơ sinh < 28 ngày tuổi dùng biểu mẫu DD-05 (Neonates < 28 days: use form DD-05)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        },
+        {
+          "type": "choice",
+          "key": "adultBmiScore",
+          "label": "Người lớn – giá trị BMI (Adult – BMI value)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "atLeast20", "label": "≥ 20", "score": 0 },
+            { "value": "from18_5to20", "label": "18,5 – 20,0", "score": 1 },
+            { "value": "below18_5", "label": "< 18,5", "score": 2 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["adult"] }
+        },
+        {
+          "type": "choice",
+          "key": "adultWeightLossScore",
+          "label": "Người lớn – tỷ lệ % sụt cân trong 3 tháng gần đây (Adult – % weight loss, past 3 months)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "below5", "label": "< 5%", "score": 0 },
+            { "value": "from5to10", "label": "5 – 10%", "score": 1 },
+            { "value": "above10", "label": "> 10%", "score": 2 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["adult"] }
+        },
+        {
+          "type": "choice",
+          "key": "adultAcuteIllnessScore",
+          "label": "Người lớn – có bệnh lý cấp hoặc gần như không ăn gì trong hơn 5 ngày qua (Adult – acute illness / nil per os > 5 days)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)", "score": 0 },
+            { "value": "yes", "label": "Có (Yes)", "score": 2 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["adult"] }
+        },
+        {
+          "type": "score",
+          "key": "adultNutritionTotal",
+          "label": "Tổng điểm sàng lọc dinh dưỡng người lớn (Adult nutrition screening total score, 0–6)",
+          "sumOf": ["adultBmiScore", "adultWeightLossScore", "adultAcuteIllnessScore"],
+          "levels": [
+            { "code": "none", "label": "Không nguy cơ (None)", "min": 0 },
+            { "code": "moderate", "label": "Nguy cơ trung bình (Moderate)", "min": 1 },
+            { "code": "high", "label": "Nguy cơ cao (High)", "min": 2 },
+            { "code": "veryHigh", "label": "Nguy cơ rất cao (Very High)", "min": 5 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "pnstWeightLoss",
+          "label": "PNST – Bé có sụt cân không chủ đích gần đây không? (Unintentional recent weight loss?)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)", "score": 1 },
+            { "value": "no", "label": "Không (No)", "score": 0 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["pediatric"] }
+        },
+        {
+          "type": "choice",
+          "key": "pnstPoorWeightGain",
+          "label": "PNST – Bé có chậm tăng cân trong vài tháng gần đây không? (Poor weight gain in recent months?)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)", "score": 1 },
+            { "value": "no", "label": "Không (No)", "score": 0 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["pediatric"] }
+        },
+        {
+          "type": "choice",
+          "key": "pnstPoorIntake",
+          "label": "PNST – Bé có ăn kém trong vài tuần gần đây không? (Poor oral intake in recent weeks?)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)", "score": 1 },
+            { "value": "no", "label": "Không (No)", "score": 0 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["pediatric"] }
+        },
+        {
+          "type": "choice",
+          "key": "pnstNoticeableLoss",
+          "label": "PNST – Bé có sụt cân một cách rõ ràng không? (Noticeable weight loss?)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có (Yes)", "score": 1 },
+            { "value": "no", "label": "Không (No)", "score": 0 }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["pediatric"] }
+        },
+        {
+          "type": "score",
+          "key": "pnstTotal",
+          "label": "Số yếu tố nguy cơ PNST (Number of PNST risk factors, 0–4)",
+          "sumOf": ["pnstWeightLoss", "pnstPoorWeightGain", "pnstPoorIntake", "pnstNoticeableLoss"],
+          "levels": [
+            { "code": "low", "label": "0 – 1 yếu tố nguy cơ (0–1 risk factor)", "min": 0 },
+            { "code": "risk", "label": "≥ 2 yếu tố nguy cơ (≥ 2 risk factors)", "min": 2 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "highFallRisk",
+          "label": "Nguy cơ té ngã cao (High fall risk)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "no", "label": "Không (No)" },
+            { "value": "yes", "label": "Có (Yes)" }
+          ],
+          "visibleWhen": { "field": "emergencySigns", "in": ["no"] }
+        }
+      ]
+    },
+    {
+      "title": "Nhu cầu giáo dục sức khỏe – điều dưỡng (Health education needs – nursing)",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "nurseEduFall",
+          "label": "Phòng ngừa té ngã (Fall prevention)",
+          "required": true,
+          "options": [
+            { "value": "notNeeded", "label": "Không cần thiết (Not needed)" },
+            { "value": "provided", "label": "Cần thiết – đã hướng dẫn phòng ngừa ngã tại nhà (Needed – provided fall prevention counseling at home)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "nurseEduWound",
+          "label": "Chăm sóc vết thương, đánh giá sau khi bác sĩ thăm khám (Wound care, after physician’s examination)",
+          "required": true,
+          "options": [
+            { "value": "notNeeded", "label": "Không cần thiết (Not needed)" },
+            { "value": "provided", "label": "Cần thiết – đã hướng dẫn người bệnh cách chăm sóc vết thương sau thủ thuật (Needed – provided patient education on wound care after procedure)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "nurseName",
+          "label": "Điều dưỡng thực hiện, ghi rõ họ tên (Nurse in charge, full name)",
+          "required": true,
+          "maxLength": 200
+        }
+      ]
+    },
+    {
+      "title": "Phần bác sĩ thực hiện – Đánh giá dinh dưỡng (Physician section – Nutritional assessment)",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "adultNutritionRisk",
+          "label": "Người lớn – mức độ nguy cơ suy dinh dưỡng và giải pháp dinh dưỡng (Adult – malnutrition risk level and nutritional intervention)",
+          "required": true,
+          "options": [
+            { "value": "none", "label": "Không nguy cơ (0 điểm): duy trì chế độ dinh dưỡng như trước đây (No risk, 0 points: maintain previous nutritional regimen)" },
+            { "value": "moderate", "label": "Nguy cơ trung bình (1 điểm): hướng dẫn người bệnh tăng cường dinh dưỡng từ thức ăn, thức uống dinh dưỡng phù hợp (Moderate risk, 1 point: advise patient to improve nutrition through appropriate foods and nutritional drinks)" },
+            { "value": "high", "label": "Nguy cơ cao (2–4 điểm): hướng dẫn bổ sung dinh dưỡng qua tiêu hóa phù hợp hoặc Phòng khám, tư vấn dinh dưỡng (High risk, 2–4 points: recommend appropriate enteral nutritional supplementation or referral to Nutrition Counseling Clinic)" },
+            { "value": "veryHigh", "label": "Nguy cơ rất cao hoặc suy dinh dưỡng nặng (> 4 điểm hoặc BMI < 16,0 hoặc > 30): hướng dẫn người bệnh tới khám tại Phòng khám, tư vấn dinh dưỡng (Very high risk or severe malnutrition, > 4 points or BMI < 16.0 or > 30: refer patient to Nutrition Counseling Clinic)" }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["adult"] }
+        },
+        {
+          "type": "choice",
+          "key": "pediatricNutritionRisk",
+          "label": "Bệnh nhi – mức độ nguy cơ và kế hoạch chăm sóc dinh dưỡng (Pediatric – risk level and nutritional care plan)",
+          "required": true,
+          "options": [
+            { "value": "low", "label": "PNST có 0 – 1 yếu tố nguy cơ: kết thúc đánh giá (PNST 0–1 risk factor: end assessment)" },
+            { "value": "risk", "label": "PNST có ≥ 2 yếu tố nguy cơ: hướng dẫn gia đình đưa bệnh nhi tới khám tại Phòng khám, tư vấn dinh dưỡng hoặc khám chuyên khoa Dinh dưỡng nhi (PNST ≥ 2 risk factors: advise family to bring child to Nutrition Counseling Clinic or Pediatric Nutrition Specialist)" }
+          ],
+          "visibleWhen": { "field": "nutritionGroup", "in": ["pediatric"] }
+        },
+        {
+          "type": "choice",
+          "key": "dietCounseling",
+          "label": "Tư vấn các chế độ ăn phù hợp bệnh lý/kết quả tổng phân tích của người bệnh (Dietary counseling appropriate to patient’s condition/laboratory results)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "required", "label": "Cần thiết, chọn các chế độ ăn bên dưới (Required – select applicable dietary regimen below)" }
+          ]
+        },
+        {
+          "type": "multiChoice",
+          "key": "dietRegimens",
+          "label": "Chế độ ăn được tư vấn (Dietary regimens advised)",
+          "required": true,
+          "options": [
+            { "value": "leukopenia", "label": "Chế độ ăn uống phù hợp người bệnh giảm bạch cầu hoặc suy giảm miễn dịch (ăn chín, uống sôi,...) (Diet suitable for patients with leukopenia or immunosuppression: well-cooked food, boiled water, etc.)" },
+            { "value": "thrombocytopenia", "label": "Chế độ ăn uống phù hợp người bệnh giảm tiểu cầu hoặc có nguy cơ xuất huyết (hạn chế ăn uống thực phẩm có màu nâu, đỏ) (Diet suitable for patients with thrombocytopenia or bleeding risk: limit intake of foods with brown or red coloring)" },
+            { "value": "ironDeficiency", "label": "Chế độ ăn uống phù hợp người bệnh thiếu sắt (Diet suitable for iron deficiency)" },
+            { "value": "ironOverload", "label": "Chế độ ăn uống phù hợp người bệnh quá tải sắt (Diet suitable for iron overload)" },
+            { "value": "nutritionClinic", "label": "Người bệnh cần khám thêm chuyên khoa Dinh dưỡng tại Phòng khám, tư vấn dinh dưỡng (Patient requires further consultation at Nutrition Counseling Clinic)" },
+            { "value": "other", "label": "Khác, ghi rõ (Other, specify)" }
+          ],
+          "visibleWhen": { "field": "dietCounseling", "in": ["required"] }
+        },
+        {
+          "type": "text",
+          "key": "dietRegimenOther",
+          "label": "Chế độ ăn khác, ghi rõ (Other dietary regimen, specify)",
+          "required": true,
+          "maxLength": 300,
+          "visibleWhen": { "field": "dietRegimens", "in": ["other"] }
+        }
+      ]
+    },
+    {
+      "title": "Nhu cầu giáo dục sức khỏe khác – bác sĩ (Other health education needs – physician)",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "physicianEduFall",
+          "label": "Phòng ngừa té ngã (Fall prevention)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "provided", "label": "Cần thiết, đã thực hiện tư vấn và xử trí (Required – counseling provided and addressed)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "physicianEduWound",
+          "label": "Chăm sóc vết thương (Wound care)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "provided", "label": "Cần thiết, đã thực hiện tư vấn và xử trí (Required – counseling provided and addressed)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "physicianEduPain",
+          "label": "Đau (Pain)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "provided", "label": "Cần thiết, đã thực hiện tư vấn và xử trí (Required – counseling provided and addressed)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "physicianEduNewPatient",
+          "label": "Người bệnh mới cần tư vấn tình trạng bệnh lý, tiên lượng, các biện pháp điều trị và chi phí (Newly diagnosed patients: counseling on disease status, prognosis, treatment options, and costs)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "provided", "label": "Cần thiết, đã thực hiện tư vấn và xử trí (Required – counseling provided and addressed)" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "physicianEduOther",
+          "label": "Khác (Other)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "notRequired", "label": "Không cần thiết (Not required)" },
+            { "value": "provided", "label": "Cần thiết, ghi rõ (Required – specify)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "physicianEduOtherDetail",
+          "label": "Nội dung giáo dục sức khỏe khác, ghi rõ (Other health education content, specify)",
+          "required": true,
+          "maxLength": 500,
+          "visibleWhen": { "field": "physicianEduOther", "in": ["provided"] }
+        }
+      ]
+    }
+  ],
+  "signatures": {
+    "patient": "Người bệnh (Patient)",
+    "representative": "Người đại diện của người bệnh (Patient’s Representative)",
+    "hospital": "Bác sĩ thực hiện (Physician in charge)",
+    "hospitalHint": "(Phần điều dưỡng ghi họ tên điều dưỡng thực hiện ở mục nhu cầu giáo dục sức khỏe – nurse’s name is recorded in the nursing section)",
+    "decision": "none"
+  }
+}

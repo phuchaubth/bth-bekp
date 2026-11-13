@@ -144,10 +144,13 @@ public sealed record RevokeConsentFormRequest(string? Reason);
 /// <summary>Phiên ký vừa mở: token chỉ dùng để người bệnh ký đúng phiếu này, hết hạn sau ít phút.</summary>
 public sealed record SigningSessionDto(string Token, DateTimeOffset ExpiresAtUtc);
 
-/// <summary>Chữ ký tay của người bệnh/người đại diện: quyết định và ảnh PNG của khung ký (Base64).</summary>
+/// <summary>
+/// Chữ ký tay của người bệnh/người đại diện: quyết định (bắt buộc, trừ mẫu chỉ ký xác nhận) và ảnh PNG của khung ký (Base64).
+/// </summary>
 public sealed record PatientSignatureRequest(ConsentDecision? Decision, string? Image);
 
-public sealed record PatientSignatureResultDto(ConsentDecision Decision, DateTimeOffset SignedAtUtc);
+/// <summary>Kết quả ký: <paramref name="Decision"/> rỗng khi mẫu không hỏi Đồng ý/Từ chối.</summary>
+public sealed record PatientSignatureResultDto(ConsentDecision? Decision, DateTimeOffset SignedAtUtc);
 
 public sealed class CreateConsentFormRequestValidator : AbstractValidator<CreateConsentFormRequest>
 {
@@ -193,8 +196,8 @@ public sealed class PatientSignatureRequestValidator : AbstractValidator<Patient
 
     public PatientSignatureRequestValidator()
     {
+        // Có bắt buộc chọn hay không tùy mẫu phiếu: kiểm tra ở ConsentSigningService.
         RuleFor(x => x.Decision)
-            .NotNull().WithMessage("Vui lòng chọn Đồng ý hoặc Từ chối.")
             .IsInEnum().WithMessage("Quyết định không hợp lệ.");
         RuleFor(x => x.Image)
             .NotEmpty().WithMessage("Chưa có chữ ký.")

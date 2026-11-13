@@ -2,7 +2,7 @@
 
 Ứng dụng web giúp bệnh viện lập, ký số (VNPT SmartCA) và lưu trữ các phiếu đồng thuận/cam kết của người bệnh trước khi khám bệnh, chữa bệnh. Thông tin nhân thân lấy từ QR CCCD và HIS FPT eHospital.
 
-> **Trạng thái:** Sprint 6 (cuối) hoàn thành: rà soát bảo mật, **màn hình Cấu hình hệ thống** (tên đơn vị in trên PDF), **[hướng dẫn triển khai](docs/trien-khai.md)** cho IIS và Docker trên Windows Server (sao lưu, khôi phục, khóa), độ bao phủ test Domain/Application > 80%. Sprint 5: **xuất Excel/CSV** theo bộ lọc (che dữ liệu nhạy cảm mặc định, có lịch sử xuất), **báo cáo thống kê** (tỉ lệ từ chối, thời gian hoàn tất, theo khoa/mẫu/ngày), **trang tổng quan** có số liệu thật và **màn hình nhật ký hệ thống**. Trước đó: ký tay trên máy tính bảng, PDF đã ký, thu hồi (Sprint 4); mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). Ba mẫu phiếu giai đoạn 1: xem [mẫu đề xuất](docs/mau-phieu-de-xuat.md). Xem [lộ trình](#lộ-trình).
+> **Trạng thái:** Sprint 6 (cuối) hoàn thành: rà soát bảo mật, **màn hình Cấu hình hệ thống** (tên đơn vị in trên PDF), **[hướng dẫn triển khai](docs/trien-khai.md)** cho IIS và Docker trên Windows Server (sao lưu, khôi phục, khóa), độ bao phủ test Domain/Application > 80%. Sprint 5: **xuất Excel/CSV** theo bộ lọc (che dữ liệu nhạy cảm mặc định, có lịch sử xuất), **báo cáo thống kê** (tỉ lệ từ chối, thời gian hoàn tất, theo khoa/mẫu/ngày), **trang tổng quan** có số liệu thật và **màn hình nhật ký hệ thống**. Trước đó: ký tay trên máy tính bảng, PDF đã ký, thu hồi (Sprint 4); mẫu phiếu có phiên bản, lập phiếu, xuất PDF tiếng Việt (Sprint 3). **Hiện chưa kết nối HIS và SmartCA** (quyết định 11/11/2026). **Bốn mẫu phiếu thật của bệnh viện** (song ngữ) được khởi tạo sẵn: xem [mẫu phiếu](docs/mau-phieu.md). Xem [lộ trình](#lộ-trình).
 >
 > **Không dùng dữ liệu người bệnh thật** trên môi trường phát triển/kiểm thử. Mọi dữ liệu mẫu đều là dữ liệu giả lập.
 
@@ -64,12 +64,12 @@ Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") ch
 **HIS:** mặc định **chưa kết nối** (`His__Provider=None`): sau khi quét chỉ kiểm tra hồ sơ đã có, mã người bệnh nhập tay, giao diện không hiển thị thông tin HIS. Để thử luồng HIS khi phát triển, đặt `His__Provider=Fake` (HIS giả lập; API từ chối khởi động nếu bật ở Production): số CCCD tận cùng `999` → HIS không khả dụng, tận cùng `0` → không có trên HIS, số cuối chẵn → BHYT, lẻ → dịch vụ (chi tiết trong [docs/api.md](docs/api.md#6-người-bệnh-apiv1patients)).
 
 **Thử lập và ký phiếu:**
-1. Đăng nhập `dieuduong.demo` → *Người bệnh* → mở một hồ sơ → **Lập phiếu** → chọn mẫu (CK-01, TT-01, TN-01) → điền → **Lưu nháp** / **Trình ký**.
+1. Đăng nhập `dieuduong.demo` → *Người bệnh* → mở một hồ sơ → **Lập phiếu** → chọn mẫu (ví dụ `QT-KNGT-BM02`, `TTNB-NGOAITRU`, `QT-KNGT-BM10`, `TUVAN-CONGTT`) → điền → **Lưu nháp** / **Trình ký**.
 2. Bấm **Ký trên máy tính bảng**. Máy chuyển sang màn hình ký và phiên đăng nhập trên máy được đóng. Người bệnh chọn Đồng ý/Từ chối, ký vào khung (chuột cũng được), rồi bấm **Xác nhận chữ ký**.
 3. Nhân viên đăng nhập lại ngay trên màn hình ký để thoát chế độ ký.
-4. Người có vai trò xác nhận của mẫu bấm **Xác nhận và hoàn tất**: Tiếp đón (`tiepdon.demo`) cho CK-01, Điều dưỡng cho TT-01/TN-01. Xem **PDF đã ký**.
+4. Người có vai trò xác nhận của mẫu bấm **Xác nhận và hoàn tất**: Tiếp đón (`tiepdon.demo`) cho BM02, phiếu thông tin ngoại trú và phiếu tư vấn cổng thông tin; Bác sĩ (`bacsi.demo`) cho phiếu nhận định BM10. Xem **PDF đã ký**.
 5. Muốn thu hồi thì dùng `truongkhoa.demo`.
- Ở môi trường demo, ba mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF do quản trị nhập tại *Quản trị → Cấu hình hệ thống* (chưa nhập thì dùng giá trị mẫu `Hospital:*` trong `appsettings.json`).
+ Ở môi trường demo, bốn mẫu đã được phát hành sẵn. Khi tắt dữ liệu demo, các mẫu được tạo ở trạng thái nháp: người quản lý mẫu (hoặc `admin`) duyệt và phát hành ở màn hình *Mẫu phiếu*. Tên đơn vị in đầu PDF do quản trị nhập tại *Quản trị → Cấu hình hệ thống* (chưa nhập thì dùng giá trị mẫu `Hospital:*` trong `appsettings.json`).
 
 > **Khóa mã hóa:** số CCCD, số điện thoại, mã BHYT, nội dung phiếu, ảnh chữ ký và file PDF đã ký được mã hóa bằng (khóa dẫn xuất từ) `FIELD_ENCRYPTION_KEY`. Mất khóa này thì không đọc lại được dữ liệu đã lưu: hãy sao lưu khóa ở nơi an toàn, tách khỏi bản sao lưu CSDL. Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu SQL Server).
 
@@ -167,7 +167,8 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 | [docs/yeu-cau-nghiep-vu.md](docs/yeu-cau-nghiep-vu.md) | Yêu cầu nghiệp vụ (SRS) |
 | [docs/kien-truc.md](docs/kien-truc.md) | Kiến trúc, mô hình dữ liệu, xác thực/phân quyền/audit, ADR |
 | [docs/api.md](docs/api.md) | Tài liệu API (endpoint, quyền, mã lỗi, ví dụ; đặc tả định nghĩa mẫu phiếu) |
-| [docs/mau-phieu-de-xuat.md](docs/mau-phieu-de-xuat.md) | Ba mẫu phiếu giai đoạn 1 đề xuất (chờ bệnh viện duyệt) |
+| [docs/mau-phieu.md](docs/mau-phieu.md) | Bốn mẫu phiếu thật của bệnh viện: cách chuyển từ bản giấy, giới hạn, điểm cần xác nhận |
+| [docs/mau-phieu-de-xuat.md](docs/mau-phieu-de-xuat.md) | Ba mẫu đề xuất ban đầu (đã thay bằng mẫu thật, nay chỉ dùng trong kiểm thử) |
 | [docs/trien-khai.md](docs/trien-khai.md) | Hướng dẫn triển khai Windows Server (IIS hoặc Docker), HTTPS, sao lưu/khôi phục, khóa, vận hành; file mẫu trong `deploy/` |
 | [docs/tich-hop-smartca.md](docs/tich-hop-smartca.md) | Thiết kế tích hợp VNPT SmartCA |
 
