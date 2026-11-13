@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Consent.Api.Authorization;
 
-/// <summary>Token phiên ký: scheme xác thực và policy riêng cho chế độ ký trên máy tính bảng.</summary>
+/// <summary>Token phiên ký: scheme xác thực và policy riêng cho chế độ ký trên điện thoại.</summary>
 public static class SigningSession
 {
     public const string AuthenticationScheme = "SigningSession";

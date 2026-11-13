@@ -3,7 +3,7 @@ using Consent.Domain.Common;
 namespace Consent.Domain.ConsentForms;
 
 /// <summary>
-/// Vòng đời phiếu (giai đoạn chưa có SmartCA, ký tay trên máy tính bảng):
+/// Vòng đời phiếu (giai đoạn chưa có SmartCA, ký tay trên điện thoại):
 /// Nháp → Chờ ký (người bệnh ký tay, rồi phía bệnh viện xác nhận) → Hoàn tất → (Thu hồi); Nháp/Chờ ký → Hủy.
 /// Khi tích hợp SmartCA sẽ bổ sung các bước ký số.
 /// </summary>
@@ -109,7 +109,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     /// <summary>Quyết định của người bệnh/người đại diện ghi nhận khi ký.</summary>
     public ConsentDecision? Decision { get; private set; }
 
-    /// <summary>Phiên ký đang mở trên máy tính bảng; chỉ phiên này được nhận chữ ký của người bệnh (dùng một lần).</summary>
+    /// <summary>Phiên ký đang mở trên điện thoại; chỉ phiên này được nhận chữ ký của người bệnh (dùng một lần).</summary>
     public Guid? SigningSessionId { get; private set; }
 
     /// <summary>Phiếu đã thu hồi mà phiếu này thay thế.</summary>
@@ -217,7 +217,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Mở phiên ký trên máy tính bảng. Mở phiên mới thì phiên cũ hết hiệu lực.</summary>
+    /// <summary>Mở phiên ký trên điện thoại. Mở phiên mới thì phiên cũ hết hiệu lực.</summary>
     public void StartSigning(Guid sessionId, DateTimeOffset nowUtc)
     {
         Ensure(CanStartSigning, "Chỉ mở phiên ký được cho phiếu đang chờ ký mà người bệnh chưa ký.");

@@ -1,4 +1,4 @@
-import { Button, Flex, Typography } from 'antd'
+import { Button, Flex, Grid, Typography } from 'antd'
 import { useCallback, useEffect, useImperativeHandle, useRef, type PointerEvent, type Ref } from 'react'
 
 export interface SignaturePadHandle {
@@ -27,6 +27,9 @@ const INK = '#111827'
  */
 export function SignaturePad({ ref, onInkChange, disabled = false }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  // Điện thoại cầm dọc: khung ký cao hơn (2:1 thay vì 3:1) để đủ chỗ ký bằng ngón tay, và gợi ý xoay ngang.
+  const screens = Grid.useBreakpoint()
+  const narrow = screens.sm === false
   // Tọa độ chuẩn hóa 0..1 theo kích thước khung, để vẽ lại đúng khi khung đổi kích thước.
   const strokes = useRef<Point[][]>([])
   const drawing = useRef(false)
@@ -153,7 +156,7 @@ export function SignaturePad({ ref, onInkChange, disabled = false }: Props) {
         onPointerLeave={onPointerUp}
         style={{
           width: '100%',
-          aspectRatio: '3 / 1',
+          aspectRatio: narrow ? '2 / 1' : '3 / 1',
           border: '2px dashed #94a3b8',
           borderRadius: 8,
           background: '#ffffff',
@@ -163,7 +166,9 @@ export function SignaturePad({ ref, onInkChange, disabled = false }: Props) {
         }}
       />
       <Flex justify="space-between" align="center" wrap gap={8}>
-        <Typography.Text type="secondary">Ký trong khung trên bằng ngón tay hoặc bút cảm ứng.</Typography.Text>
+        <Typography.Text type="secondary">
+          Ký trong khung trên bằng ngón tay hoặc bút cảm ứng.{narrow ? ' Có thể xoay ngang điện thoại để khung ký rộng hơn.' : ''}
+        </Typography.Text>
         <Button onClick={clear} disabled={disabled}>
           Ký lại
         </Button>

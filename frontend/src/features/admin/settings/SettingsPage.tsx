@@ -84,7 +84,7 @@ export function SettingsPage() {
                   {settings.data.hisEnabled ? <Tag color="green">Đang bật</Tag> : <Tag>Chưa kết nối</Tag>}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ký số VNPT SmartCA">
-                  {settings.data.smartCaEnabled ? <Tag color="green">Đang bật</Tag> : <Tag>Tạm hoãn – ký tay trên máy tính bảng</Tag>}
+                  {settings.data.smartCaEnabled ? <Tag color="green">Đang bật</Tag> : <Tag>Tạm hoãn – ký tay trên điện thoại</Tag>}
                 </Descriptions.Item>
                 <Descriptions.Item label="Giới hạn mỗi lần xuất dữ liệu">{settings.data.exportMaxRows.toLocaleString('vi-VN')} phiếu</Descriptions.Item>
                 <Descriptions.Item label="Lưu trữ">{settings.data.retentionPolicy}</Descriptions.Item>

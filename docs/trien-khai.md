@@ -1,6 +1,7 @@
 # Hướng dẫn triển khai — Quản lý Phiếu đồng thuận
 
-> Dành cho phòng CNTT bệnh viện. Áp dụng cho máy chủ **Windows Server** tại bệnh viện (quyết định 5), theo một trong hai hình thức: **A. IIS + SQL Server có sẵn** hoặc **B. Docker** (container Linux) + SQL Server có sẵn. Phần sao lưu, khôi phục, khóa và vận hành dùng chung.
+> Dành cho phòng CNTT bệnh viện. Áp dụng cho máy chủ **Windows Server** tại bệnh viện (quyết định 5).
+> **Bệnh viện đã chọn hình thức B. Docker** (container Linux) + SQL Server có sẵn (quyết định 12, 13/11/2026) — làm theo **mục 6**. Hình thức A (IIS) giữ lại để tham khảo. Người bệnh **ký trên điện thoại thông minh** (quyết định 13) — chuẩn bị điện thoại theo **mục 9a**. Phần sao lưu, khôi phục, khóa và vận hành dùng chung.
 > Các file mẫu nằm trong thư mục [`deploy/`](../deploy). Mọi giá trị trong tài liệu này là ví dụ; **không có bí mật thật nào trong repo**.
 
 ---
@@ -8,14 +9,14 @@
 ## 1. Kiến trúc triển khai
 
 ```
-Trình duyệt (máy tính bàn, máy tính bảng tại giường) ──HTTPS──► Reverse proxy (IIS hoặc nginx)
+Trình duyệt (máy tính bàn, điện thoại ký phiếu) ──HTTPS──► Reverse proxy (nginx trong Docker, hoặc IIS)
                                                                    ├── /            → file tĩnh của giao diện web (frontend/dist)
                                                                    └── /api, /health → API ASP.NET Core (cổng nội bộ, không mở ra ngoài)
                                                                                           ├── SQL Server (CSDL ConsentManagement)
                                                                                           └── Thư mục PDF đã ký (Storage:DocumentsPath)
 ```
 
-- **HTTPS là bắt buộc:** camera quét QR CCCD chỉ hoạt động qua HTTPS; cookie phiên đăng nhập chỉ gửi qua HTTPS ngoài môi trường phát triển. Dùng chứng chỉ nội bộ của bệnh viện (CA nội bộ cài trên máy trạm và máy tính bảng) hoặc chứng chỉ công cộng.
+- **HTTPS là bắt buộc:** camera quét QR CCCD chỉ hoạt động qua HTTPS; cookie phiên đăng nhập chỉ gửi qua HTTPS ngoài môi trường phát triển. Dùng chứng chỉ nội bộ của bệnh viện (CA nội bộ cài trên máy trạm và **từng điện thoại**, xem mục 9a) hoặc chứng chỉ công cộng.
 - API chỉ nghe trên `localhost` (hoặc mạng nội bộ Docker) và nhận yêu cầu từ reverse proxy; không mở cổng API ra mạng bệnh viện.
 - Dung lượng: khoảng 200–500 KB cho mỗi PDF đã ký; với 500–3.000 phiếu/ngày cần dự trù **200–550 GB/năm** cho thư mục PDF (xem kế hoạch, mục 2.7). CSDL nhỏ hơn nhiều (nội dung phiếu dạng JSON mã hóa, không chứa PDF).
 
@@ -27,7 +28,8 @@ Trình duyệt (máy tính bàn, máy tính bảng tại giường) ──HTTPS�
 | SQL Server | 2017 trở lên (đã kiểm thử với 2022). Express dùng được cho quy mô vừa (giới hạn 10 GB/CSDL, không có SQL Agent: lên lịch sao lưu bằng Task Scheduler). Collation CSDL: `Vietnamese_CI_AS` hoặc `Latin1_General_100_CI_AI` (ứng dụng tự đặt collation không dấu cho cột tìm kiếm) |
 | Hình thức A (IIS) | IIS 10 với **ASP.NET Core Hosting Bundle 10.0**, **URL Rewrite**, **Application Request Routing (ARR)**; .NET SDK 10 trên máy build |
 | Hình thức B (Docker) | Docker Engine 24+ và Docker Compose v2 (Windows: Docker Desktop hoặc Docker Engine với container Linux) |
-| Máy trạm | Chrome/Edge bản mới; máy tính bảng iPad (Safari) hoặc Android (Chrome), có bút cảm ứng càng tốt |
+| Máy trạm | Chrome/Edge bản mới |
+| Điện thoại ký phiếu | iPhone iOS 16+ (Safari) hoặc Android 10+ (Chrome bản mới), màn hình từ 6 inch; kết nối Wi-Fi nội bộ tới máy chủ |
 | Phần cứng tối thiểu | 4 vCPU, 8 GB RAM cho máy chủ ứng dụng; SQL Server theo khuyến nghị của Microsoft |
 
 ## 3. Bí mật và cấu hình
@@ -205,8 +207,28 @@ Khuyến nghị: bảo vệ hai khóa `DataProtection__*` như bảo vệ CSDL (
 - **Log ứng dụng:** ghi ra stdout/Event Log (IIS: bật `stdoutLogEnabled` tạm thời khi chẩn đoán; Docker: `docker compose logs api`). Log không chứa dữ liệu cá nhân; mỗi dòng có mã truy vết (`CorrelationId`) trùng với mã hiển thị cho người dùng khi lỗi và với nhật ký audit.
 - **Nhật ký audit** nằm trong CSDL (bảng `AuditLogs`, chỉ ghi thêm): xem tại **Nhật ký hệ thống**; lưu theo thời hạn hồ sơ bệnh án, không xóa.
 - **Tài khoản:** quản trị tạo tài khoản cho nhân viên tại **Quản trị → Người dùng** (mật khẩu tạm, bắt buộc đổi), gán vai trò và khoa. Khóa tài khoản khi nhân viên nghỉ việc (không xóa, để giữ nhật ký).
-- **Máy tính bảng ký phiếu:** cài chứng chỉ CA nội bộ (nếu dùng), thêm trang web vào màn hình chính, bật **Guided Access** (iPad) hoặc **Ghim màn hình** (Android) khi đưa máy cho người bệnh; tắt tự khóa màn hình trong lúc ký.
+- **Điện thoại ký phiếu:** xem mục 9a.
 - **Dữ liệu demo:** không bao giờ bật `Seed__DemoData` ở môi trường chính thức (API từ chối khởi động). Dữ liệu người bệnh thật không được nhập vào môi trường thử nghiệm.
+
+## 9a. Điện thoại ký phiếu (quyết định 13)
+
+Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, rồi đưa máy cho người bệnh (hoặc người đại diện) đọc và ký bằng ngón tay. Ứng dụng là trang web, không cần cài ứng dụng riêng.
+
+1. **Mạng:** điện thoại vào Wi-Fi nội bộ truy cập được địa chỉ HTTPS của hệ thống. Không mở hệ thống ra Internet.
+2. **Chứng chỉ:** nếu dùng CA nội bộ, cài chứng chỉ CA lên từng máy.
+   - iPhone: mở file chứng chỉ → *Cài đặt → Đã tải về hồ sơ* → Cài đặt; rồi *Cài đặt → Cài đặt chung → Giới thiệu → Cài đặt tin cậy chứng nhận* → bật tin cậy hoàn toàn cho CA đó.
+   - Android: *Cài đặt → Bảo mật → Mã hóa và thông tin xác thực → Cài đặt chứng chỉ → Chứng chỉ CA*.
+   Không có chứng chỉ tin cậy thì trình duyệt báo lỗi, camera quét QR CCCD không chạy.
+3. **Lối tắt:** mở trang trong Safari/Chrome → *Thêm vào màn hình chính*.
+4. **Khóa ứng dụng khi đưa máy cho người bệnh:**
+   - iPhone: bật *Cài đặt → Trợ năng → Truy cập được hướng dẫn* (Guided Access), khi ký thì nhấn nút sườn 3 lần.
+   - Android: bật *Ghim ứng dụng* trong Bảo mật.
+   Thiết lập này giúp người bệnh không thoát khỏi màn hình ký. Màn hình ký cũng không có menu, và chỉ nhận chữ ký cho đúng phiếu đó; muốn thoát phải đăng nhập lại.
+5. **Màn hình:** đặt thời gian tự khóa ít nhất 2 phút; nên tắt tự xoay nếu người bệnh hay xoay nhầm. Cầm dọc vẫn ký được (khung ký cao hơn); xoay ngang thì khung ký rộng hơn.
+6. **Tài khoản:** mỗi nhân viên đăng nhập tài khoản của mình. Điện thoại dùng chung thì đăng xuất khi đổi ca; phiên đăng nhập tự hết hạn.
+7. **Vệ sinh và an toàn:** lau màn hình giữa các người bệnh. Đặt mã khóa máy. Bật tính năng tìm/xóa máy từ xa (Find My, Find My Device) để xử lý khi mất máy. Ứng dụng không lưu dữ liệu người bệnh trên điện thoại ngoài bộ nhớ tạm của trang đang mở.
+
+Đã kiểm thử tự động trên iPhone 13 và Pixel 7 giả lập (cầm dọc và ngang): lập phiếu, ký, xác nhận, không tràn ngang. Cần thử trên vài điện thoại thật của bệnh viện trước khi dùng chính thức.
 
 ## 10. Danh sách kiểm tra sau triển khai
 
@@ -215,7 +237,7 @@ Khuyến nghị: bảo vệ hai khóa `DataProtection__*` như bảo vệ CSDL (
 3. **Quản trị → Cấu hình hệ thống**: nhập cơ quan chủ quản, tên bệnh viện, địa danh; mở một phiếu nháp → PDF in đúng tên.
 4. **Mẫu phiếu**: Phòng KHTH rà soát 4 mẫu phiếu của bệnh viện (được tạo ở trạng thái nháp khi không có dữ liệu demo, xem [mẫu phiếu](mau-phieu.md)) và **phát hành**.
 5. Tạo khoa/phòng và tài khoản thật; đăng nhập thử từng vai trò (menu chỉ hiện đúng chức năng).
-6. Trên máy tính bảng: quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
+6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
 7. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
 8. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
 9. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.

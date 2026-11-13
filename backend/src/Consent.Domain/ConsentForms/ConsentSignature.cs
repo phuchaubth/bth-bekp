@@ -22,7 +22,7 @@ public enum ConsentSignerRole
     Staff,
 }
 
-/// <summary>Cách ký: ký tay trên máy tính bảng, hoặc xác nhận bằng tài khoản đăng nhập (phía bệnh viện).</summary>
+/// <summary>Cách ký: ký tay trên điện thoại, hoặc xác nhận bằng tài khoản đăng nhập (phía bệnh viện).</summary>
 public enum ConsentSignatureMethod
 {
     Handwritten,

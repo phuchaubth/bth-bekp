@@ -63,8 +63,9 @@ export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; 
         đăng nhập lại để thoát chế độ ký và xác nhận phiếu.
       </Typography.Paragraph>
       <Typography.Paragraph type="secondary">
-        Nên bật khóa ứng dụng của máy tính bảng (Guided Access trên iPad, Ghim màn hình trên Android) để người bệnh không
-        thoát ra ngoài trình duyệt.
+        Nên bật khóa ứng dụng của điện thoại (Truy cập được hướng dẫn – Guided Access trên iPhone, Ghim ứng dụng trên
+        Android) để người bệnh không thoát ra ngoài trình duyệt.{' '}
+        Điện thoại cầm dọc vẫn ký được; xoay ngang thì khung ký rộng hơn.
       </Typography.Paragraph>
       {error && <Alert type="error" showIcon title={error} />}
     </Modal>
@@ -128,7 +129,7 @@ export function FormHistory({ form }: { form: ConsentFormDetail }) {
         ? {
             at: signature.signedAtUtc,
             color: 'blue',
-            text: `${signature.signerName} (${signerRoleLabels[signature.role].toLowerCase()}) ký tay trên máy tính bảng${
+            text: `${signature.signerName} (${signerRoleLabels[signature.role].toLowerCase()}) ký tay trên điện thoại${
               form.decision ? ` – ${decisionLabels[form.decision]}` : ''
             }`,
           }

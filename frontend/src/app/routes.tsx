@@ -64,7 +64,7 @@ const featureRoutes: RouteObject[] = flattenNavItems()
 
 export const appRoutes: RouteObject[] = [
   { path: LOGIN_PATH, element: <LoginPage />, errorElement: <ErrorPage /> },
-  // Chế độ ký trên máy tính bảng: không dùng phiên đăng nhập (chỉ có token phiên ký), không có menu.
+  // Chế độ ký trên điện thoại: không dùng phiên đăng nhập (chỉ có token phiên ký), không có menu.
   {
     path: SIGNING_PATH,
     element: (

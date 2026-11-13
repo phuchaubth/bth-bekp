@@ -189,7 +189,7 @@ internal static class ApiServiceCollectionExtensions
             options.FallbackPolicy = new AuthorizationPolicyBuilder(JwtBearerDefaults.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .Build();
-            // Chỉ token phiên ký (chế độ ký trên máy tính bảng) mới gửi được chữ ký của người bệnh.
+            // Chỉ token phiên ký (chế độ ký trên điện thoại) mới gửi được chữ ký của người bệnh.
             options.AddPolicy(SigningSession.PolicyName, new AuthorizationPolicyBuilder(SigningSession.AuthenticationScheme)
                 .RequireAuthenticatedUser()
                 .RequireClaim(AppClaimTypes.SigningForm)

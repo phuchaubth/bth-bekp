@@ -37,7 +37,7 @@ import { FormHistory, RevokeFormModal, StartSigningModal } from './SigningAction
 
 /**
  * Màn hình 8 (và bước soạn nội dung của màn hình 5): chi tiết phiếu, soạn phiếu nháp, trình ký, chuyển sang chế độ ký
- * trên máy tính bảng, xác nhận phía bệnh viện, xem PDF, thu hồi và lập phiếu thay thế.
+ * trên điện thoại, xác nhận phía bệnh viện, xem PDF, thu hồi và lập phiếu thay thế.
  */
 export function ConsentFormDetailPage() {
   const { id = '' } = useParams()
@@ -111,7 +111,7 @@ export function ConsentFormDetailPage() {
           <Space wrap>
             {form.actions.canStartSigning && (
               <Button type="primary" icon={<EditOutlined />} onClick={() => setSigningOpen(true)}>
-                Ký trên máy tính bảng
+                Ký trên điện thoại
               </Button>
             )}
             {form.actions.canConfirmStep && nextStep && (
@@ -281,7 +281,7 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
         showIcon
         style={{ marginTop: 12 }}
         title="Phiếu đang chờ ký"
-        description="Nội dung và thông tin người bệnh đã được khóa. Bấm “Ký trên máy tính bảng” để người bệnh (hoặc người đại diện) ký; muốn sửa nội dung, hãy trả phiếu về nháp."
+        description="Nội dung và thông tin người bệnh đã được khóa. Bấm “Ký trên điện thoại” để người bệnh (hoặc người đại diện) ký; muốn sửa nội dung, hãy trả phiếu về nháp."
       />
     )
   }

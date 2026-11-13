@@ -65,7 +65,7 @@ public sealed class ConsentFormsController(ConsentFormService forms, ConsentSign
     public async Task<IActionResult> Cancel(Guid id, CancelConsentFormRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await forms.CancelAsync(id, request, cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Mở phiên ký trên máy tính bảng: trả token phiên ký chỉ dùng để người bệnh ký đúng phiếu này.</summary>
+    /// <summary>Mở phiên ký trên điện thoại: trả token phiên ký chỉ dùng để người bệnh ký đúng phiếu này.</summary>
     [HttpPost("{id:guid}/signing-session")]
     [HasPermission(Permissions.ConsentsCreate)]
     public async Task<IActionResult> StartSigning(Guid id, CancellationToken cancellationToken) =>

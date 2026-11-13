@@ -115,7 +115,7 @@ describe('Chuyển sang chế độ ký', () => {
     const { router } = renderApp('/phieu-dong-thuan/f-1')
     const user = userEvent.setup()
 
-    await user.click(await screen.findByRole('button', { name: /Ký trên máy tính bảng/ }))
+    await user.click(await screen.findByRole('button', { name: /Ký trên điện thoại/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Chuyển sang chế độ ký' })
     expect(within(dialog).getByText(/Phiên đăng nhập của bạn trên máy này sẽ được đóng/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Bắt đầu ký' }))
@@ -132,7 +132,7 @@ describe('Chuyển sang chế độ ký', () => {
   })
 })
 
-describe('Màn hình ký trên máy tính bảng (màn hình 6)', () => {
+describe('Màn hình ký trên điện thoại (màn hình 6)', () => {
   const staffLogin = (call: { body: unknown }) =>
     (call.body as { password: string }).password === 'Mat-Khau-Dung-2026'
       ? receptionist()
@@ -282,6 +282,23 @@ describe('Màn hình ký trên máy tính bảng (màn hình 6)', () => {
     expect(await screen.findByText(/Không đồng ý \(Disagree\)\. Vui lòng đưa máy lại/)).toBeInTheDocument()
     const signature = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/patient-signature')!
     expect(signature.body).toEqual({ decision: 'Refused', image: 'QU5IX0NIVV9LWQ==' })
+  })
+
+  it('điện thoại cầm dọc (màn hình hẹp): khung ký cao hơn và gợi ý xoay ngang', async () => {
+    const original = window.matchMedia
+    // Màn hình hẹp hơn mọi mốc của Ant Design (điện thoại cầm dọc).
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: false })) as typeof window.matchMedia
+    try {
+      signingSession.set({ token: 'token-phien-ky', expiresAtUtc: future(), form: pending(), staffUserName: 'tiepdon.demo' })
+      mockApi({ ...baseRoutes(anonymous) })
+      renderApp('/ky-phieu')
+
+      const canvas = await screen.findByRole('img', { name: /Khung ký tên/ })
+      expect(canvas.style.aspectRatio).toBe('2 / 1')
+      expect(screen.getByText(/Có thể xoay ngang điện thoại để khung ký rộng hơn/)).toBeInTheDocument()
+    } finally {
+      window.matchMedia = original
+    }
   })
 
   it('tải lại trang (mất phiên ký trong bộ nhớ): không ký được, phải đăng nhập lại', async () => {

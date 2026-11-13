@@ -10,7 +10,7 @@ using FluentValidation;
 namespace Consent.Application.ConsentForms;
 
 /// <summary>
-/// Ký tay trên máy tính bảng (quyết định 10, 11):
+/// Ký tay trên điện thoại (quyết định 10, 11):
 /// <list type="number">
 /// <item>Nhân viên mở phiên ký: nhận token phiên ký chỉ dùng được để ký đúng phiếu đó (giao diện đóng phiên đăng nhập của
 /// nhân viên trên máy, muốn thoát phải đăng nhập lại).</item>
@@ -39,7 +39,7 @@ public sealed class ConsentSigningService(
 {
     private static readonly Error NotFound = Error.NotFound("consent_forms.not_found", "Không tìm thấy phiếu.");
 
-    /// <summary>Mở phiên ký cho người bệnh trên máy tính bảng (phiên mới thay phiên cũ).</summary>
+    /// <summary>Mở phiên ký cho người bệnh trên điện thoại (phiên mới thay phiên cũ).</summary>
     public async Task<Result<SigningSessionDto>> StartSigningAsync(Guid id, CancellationToken cancellationToken)
     {
         var form = await formService.LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);

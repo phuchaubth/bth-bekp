@@ -489,14 +489,14 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText(/Phạm Thị Dung đã ký lúc .* \(Đồng ý\)/)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Ký trên máy tính bảng/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ký trên điện thoại/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Xác nhận và hoàn tất/ }))
     await user.click(await screen.findByRole('button', { name: 'Xác nhận' }))
 
     expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')).toBe(true)
     expect(screen.getByText('Tiếp đón Demo (Nhân viên tiếp đón) xác nhận bằng tài khoản')).toBeInTheDocument()
-    expect(screen.getByText(/Phạm Thị Dung \(người bệnh\) ký tay trên máy tính bảng – Đồng ý/)).toBeInTheDocument()
+    expect(screen.getByText(/Phạm Thị Dung \(người bệnh\) ký tay trên điện thoại – Đồng ý/)).toBeInTheDocument()
     expect(screen.getByText('ab'.repeat(32))).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Trả về nháp/ })).not.toBeInTheDocument()
   })

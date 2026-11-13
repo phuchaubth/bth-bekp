@@ -19,7 +19,7 @@ public sealed class JwtOptions
 
     public int AccessTokenMinutes { get; set; } = 15;
 
-    /// <summary>Thời hạn token phiên ký (chế độ ký trên máy tính bảng).</summary>
+    /// <summary>Thời hạn token phiên ký (chế độ ký trên điện thoại).</summary>
     public int SigningTokenMinutes { get; set; } = 30;
 
     /// <summary>

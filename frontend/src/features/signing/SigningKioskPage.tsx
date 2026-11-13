@@ -1,5 +1,5 @@
 import { FullscreenOutlined, LockOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, ConfigProvider, Flex, Form, Input, Radio, Result, Typography } from 'antd'
+import { Alert, Button, Card, ConfigProvider, Flex, Form, Grid, Input, Radio, Result, Typography } from 'antd'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { consentFormsApi, decisionLabels, type ConsentDecision, type FormData } from '../../api/consentForms'
@@ -16,7 +16,7 @@ import { signingSession, type SigningSession } from './signingSession'
 type Stage = 'signing' | 'signed' | 'ended'
 
 /**
- * Màn hình 6 – chế độ ký trên máy tính bảng. Phiên đăng nhập của nhân viên đã đóng; trang chỉ có token phiên ký để gửi
+ * Màn hình 6 – chế độ ký trên điện thoại (hoặc máy tính bảng). Phiên đăng nhập của nhân viên đã đóng; trang chỉ có token phiên ký để gửi
  * chữ ký cho đúng phiếu này. Muốn thoát phải đăng nhập lại bằng tài khoản nhân viên.
  */
 export function SigningKioskPage() {
@@ -60,6 +60,9 @@ function Kiosk({ session }: { session: SigningSession }) {
   const [submitting, setSubmitting] = useState(false)
   const [signedAt, setSignedAt] = useState<string | null>(null)
   const [unlockOpen, setUnlockOpen] = useState(false)
+  // Điện thoại: giảm lề để phần nội dung và khung ký rộng hơn.
+  const narrow = Grid.useBreakpoint().sm === false
+  const cardSize = narrow ? 'small' : 'medium'
 
   const representative = form.representative
   const signerLabel = representative ? 'người đại diện' : 'người bệnh'
@@ -96,7 +99,7 @@ function Kiosk({ session }: { session: SigningSession }) {
   const canFullscreen = typeof document.documentElement.requestFullscreen === 'function' && !document.fullscreenElement
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f1f5f9', padding: '16px 16px 48px' }}>
+    <div style={{ minHeight: '100vh', background: '#f1f5f9', padding: narrow ? '12px 8px 40px' : '16px 16px 48px' }}>
       <Flex vertical gap={16} style={{ maxWidth: 960, margin: '0 auto' }}>
         <Flex justify="space-between" align="start" gap={12} wrap>
           <div>
@@ -133,14 +136,17 @@ function Kiosk({ session }: { session: SigningSession }) {
           />
         ) : (
           <>
-            <Card title="Nội dung phiếu (chỉ đọc)">
+            <Card title="Nội dung phiếu (chỉ đọc)" size={cardSize}>
               {/* Nội dung khóa nhưng phải dễ đọc: chữ của ô bị khóa đậm hơn mặc định. */}
               <ConfigProvider theme={{ token: { colorTextDisabled: 'rgba(0, 0, 0, 0.82)' } }}>
                 <DynamicForm definition={form.definition} form={previewForm} initialValues={form.data} disabled />
               </ConfigProvider>
             </Card>
 
-            <Card title={asksDecision ? `Ý kiến và chữ ký của ${signerLabel}` : `Chữ ký xác nhận của ${signerLabel}`}>
+            <Card
+              title={asksDecision ? `Ý kiến và chữ ký của ${signerLabel}` : `Chữ ký xác nhận của ${signerLabel}`}
+              size={cardSize}
+            >
               <Flex vertical gap={16}>
                 <Typography.Text>
                   Người ký:{' '}

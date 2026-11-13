@@ -120,7 +120,7 @@ export function ReportsPage() {
                 <Statistic title="Người bệnh tự ký" value={data.signers.patient} />
                 <Statistic title="Người đại diện ký" value={data.signers.representative} />
               </Flex>
-              <Typography.Text type="secondary">Tất cả ký tay trên máy tính bảng (chưa tích hợp chữ ký số).</Typography.Text>
+              <Typography.Text type="secondary">Tất cả ký tay trên điện thoại (chưa tích hợp chữ ký số).</Typography.Text>
             </Card>
           </Col>
           <Col xs={24} xl={8}>

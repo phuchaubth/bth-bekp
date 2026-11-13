@@ -600,16 +600,20 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
 | 10 | Hình thức ký khi chưa có SmartCA (11/11/2026) | **Người bệnh (hoặc người đại diện) ký tay trên máy tính bảng.** Ảnh chữ ký chèn vào PDF, lưu mã băm, khóa phiếu (mục 2.5a, ADR-018) |
 | 11 | Phía bệnh viện khi ký tay (11/11/2026, đồng ý đề xuất) | Người ký theo cấu hình mẫu **chỉ xác nhận bằng tài khoản đang đăng nhập**, không ký tay thêm. PDF ghi họ tên, chức danh, thời điểm xác nhận |
+| 12 | Hình thức triển khai (13/11/2026) | **Docker** (container Linux) + SQL Server có sẵn trên Windows Server ([hướng dẫn, mục 6](trien-khai.md)) |
+| 13 | Thiết bị ký (13/11/2026) | **Điện thoại thông minh** (iPhone/Android) thay cho máy tính bảng. Màn hình ký tối ưu cho điện thoại cầm dọc và ngang ([hướng dẫn, mục 9a](trien-khai.md)) |
+| 14 | Pháp chế (13/11/2026) | **Đồng ý**: chữ ký tay điện tử trên điện thoại kèm xác nhận bằng tài khoản dùng được cho các phiếu giai đoạn 1; lưu trữ theo thời hạn hồ sơ bệnh án, hệ thống không tự động xóa |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.
 - PDF đã ký lưu trên **thư mục ổ đĩa/thư mục mạng của máy chủ**; metadata và hash lưu trong SQL Server.
 
 **Còn chờ bệnh viện cung cấp / trả lời**
-1. **Xác nhận các điểm khác bản Word** ở [mẫu phiếu, mục 4](mau-phieu.md) (mã cho 2 phiếu chưa có mã, lỗi đánh máy trong bản gốc) và quyết định có cần chữ ký riêng của điều dưỡng, nhân viên hướng dẫn trên phiếu BM10 hay không (mục 3). Khi có góp ý, chỉ cần sửa mẫu trên màn hình 12 (tạo phiên bản mới), không sửa code.
+1. Phiên bản SQL Server đang có (đã kiểm thử với 2022; Express dùng được cho quy mô vừa) và chứng chỉ HTTPS nội bộ (CA nội bộ hay chứng chỉ công cộng).
 2. **Tên đơn vị in trên PDF:** cơ quan chủ quản, tên bệnh viện, địa danh — quản trị tự nhập tại màn hình Cấu hình hệ thống sau khi triển khai (không cần gửi trước).
-3. Trên Windows Server chạy bằng **IIS + SQL Server có sẵn** hay **Docker**? SQL Server đã có giấy phép/phiên bản nào?
-4. Số năm lưu trữ cụ thể theo quy định HSBA áp dụng cho các loại phiếu này (pháp chế xác nhận).
+3. Vài điện thoại thật (iPhone và Android) để thử ký trước khi dùng chính thức.
+
+*Đã có câu trả lời (13/11/2026):* các điểm khác bản Word và chữ ký riêng từng phần (đã làm nhiều bước xác nhận), hình thức triển khai Docker, thiết bị ký là điện thoại, pháp chế đồng ý.
 
 *Không còn chờ (tạm hoãn theo quyết định 9):* thông tin SmartCA UAT và code mẫu VNPT; tài liệu API FPT eHospital; danh sách lý do/quan hệ ký thay (dùng khi có SmartCA).
 

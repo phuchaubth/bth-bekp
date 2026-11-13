@@ -12,7 +12,7 @@ public sealed record StatusCounts(int Total, int Draft, int PendingSignature, in
 /// <summary>Ý kiến của người bệnh trên các phiếu hoàn tất (còn hiệu lực). <see cref="RefusalRate"/> từ 0 đến 1.</summary>
 public sealed record DecisionCounts(int Agreed, int Refused, double? RefusalRate);
 
-/// <summary>Người ký trên các phiếu hoàn tất: người bệnh tự ký hay người đại diện ký thay (hiện đều ký tay trên máy tính bảng).</summary>
+/// <summary>Người ký trên các phiếu hoàn tất: người bệnh tự ký hay người đại diện ký thay (hiện đều ký tay trên điện thoại).</summary>
 public sealed record SignerCounts(int Patient, int Representative);
 
 /// <summary>

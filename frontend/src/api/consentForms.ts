@@ -180,7 +180,7 @@ export const consentFormsApi = {
   returnToDraft: (id: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/return-to-draft`, { method: 'POST' }),
   cancel: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/cancel`, { method: 'POST', body: { reason } }),
   pdf: (id: string) => apiBlob(`${base}/${id}/pdf`),
-  /** Mở phiên ký trên máy tính bảng: token chỉ dùng để người bệnh ký đúng phiếu này. */
+  /** Mở phiên ký trên điện thoại: token chỉ dùng để người bệnh ký đúng phiếu này. */
   startSigning: (id: string) => apiRequest<SigningSessionToken>(`${base}/${id}/signing-session`, { method: 'POST' }),
   /** Gửi chữ ký của người bệnh bằng token phiên ký (không dùng phiên đăng nhập của nhân viên). */
   /** `decision` bỏ trống khi mẫu không hỏi Đồng ý/Từ chối (`signatures.decision = 'none'`). */
@@ -244,6 +244,6 @@ export const signerRoleLabels: Record<ConsentSignerRole, string> = {
 }
 
 export const signatureMethodLabels: Record<ConsentSignatureMethod, string> = {
-  Handwritten: 'Ký tay trên máy tính bảng',
+  Handwritten: 'Ký tay trên điện thoại',
   AccountConfirmation: 'Xác nhận bằng tài khoản',
 }
