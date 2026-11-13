@@ -63,7 +63,7 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 
 | Biến môi trường | Ý nghĩa | Cách tạo |
 |---|---|---|
-| `ConnectionStrings__Default` | Chuỗi kết nối SQL Server bằng tài khoản `consent_app` (quyền tối thiểu, mục 4) | `Server=SQL01;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=False` (`True` nếu SQL Server dùng chứng chỉ tự ký) |
+| `ConnectionStrings__Default` | Chuỗi kết nối SQL Server bằng tài khoản `consent_app` (quyền tối thiểu, mục 4) | `Server=tcp:SQL01,1433;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=False` (`True` nếu SQL Server dùng chứng chỉ tự ký) |
 | `Jwt__SigningKey` | Khóa ký token đăng nhập, ≥ 32 ký tự ngẫu nhiên | `openssl rand -base64 48` hoặc PowerShell (bộ sinh số ngẫu nhiên an toàn, **không dùng `Get-Random`**): `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)` |
 | `DataProtection__FieldEncryptionKey` | Khóa AES-256 mã hóa CCCD, SĐT, BHYT, nội dung phiếu, ảnh chữ ký và PDF đã ký. **Mất khóa = mất dữ liệu** | `openssl rand -base64 32`, hoặc lệnh PowerShell ở dòng trên với `byte[] 32` |
 | `DataProtection__BlindIndexKey` | Khóa HMAC cho chỉ mục mù (tra cứu CCCD). Phải khác khóa trên | `openssl rand -base64 32`, hoặc lệnh PowerShell với `byte[] 32` |
@@ -103,7 +103,7 @@ dotnet tool run dotnet-ef migrations bundle --project src/Consent.Persistence --
 Trên máy chủ (hoặc máy quản trị có kết nối tới SQL Server), chạy bằng tài khoản `consent_migrator`:
 
 ```powershell
-$env:ConnectionStrings__Default = "Server=SQL01;Database=ConsentManagement;User Id=consent_migrator;Password=…;Encrypt=True;TrustServerCertificate=True"
+$env:ConnectionStrings__Default = "Server=tcp:SQL01,1433;Database=ConsentManagement;User Id=consent_migrator;Password=…;Encrypt=True;TrustServerCertificate=True"
 .\efbundle.exe --connection $env:ConnectionStrings__Default
 ```
 
@@ -147,7 +147,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
    $pool = 'ConsentApi'
    $vars = @{
      'ASPNETCORE_ENVIRONMENT'            = 'Production'
-     'ConnectionStrings__Default'        = 'Server=SQL01;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=True'
+     'ConnectionStrings__Default'        = 'Server=tcp:SQL01,1433;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=True'
      'Jwt__SigningKey'                   = '…'
      'DataProtection__FieldEncryptionKey'= '…'
      'DataProtection__BlindIndexKey'     = '…'
@@ -196,7 +196,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 2. Tạo file `C:\ConsentSecrets\consent.env` (Windows) hoặc `/etc/consent/consent.env` (Linux), quyền đọc chỉ cho quản trị:
 
    ```env
-   CONNECTION_STRING=Server=SQL01;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=True
+   CONNECTION_STRING=Server=tcp:SQL01,1433;Database=ConsentManagement;User Id=consent_app;Password=…;Encrypt=True;TrustServerCertificate=True
    JWT_SIGNING_KEY=…
    FIELD_ENCRYPTION_KEY=…
    BLIND_INDEX_KEY=…
@@ -295,6 +295,8 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 | API không khởi động, log ghi "Thiếu khóa ký JWT" / "Thiếu khóa bảo vệ dữ liệu" | Thiếu hoặc sai định dạng biến môi trường | Kiểm tra 3 khóa (Base64 32 byte cho `DataProtection__*`), khởi động lại |
 | "Dữ liệu minh họa (Seed:DemoData) không được bật ở môi trường Production" | `Seed__DemoData=true` | Đặt `false` |
 | `/health/ready` trả 503 | Không kết nối được SQL Server | Kiểm tra chuỗi kết nối, tường lửa cổng 1433, chứng chỉ SQL (`TrustServerCertificate`) |
+| `Named Pipes Provider, error: 40` / `The network path was not found` (khi chạy `efbundle.exe` hoặc API) | Không tới được SQL Server: sai tên máy, bản cài theo tên riêng, TCP/IP tắt, tường lửa chặn 1433, dịch vụ SQL chưa chạy | Dùng `Server=tcp:<máy>,1433` (hoặc `<máy>\<TÊN>` + SQL Server Browser); `Get-Service *SQL*`; bật TCP/IP, cổng 1433 trong SQL Server Configuration Manager; `Test-NetConnection <máy-SQL> -Port 1433` |
+| `Process should have elevated status to access IIS configuration data`, rồi `Cannot find drive 'IIS'` và `No mapping between account names and security IDs` | PowerShell không chạy bằng quyền quản trị nên không tạo được Application Pool; `icacls` lỗi theo vì tài khoản `IIS AppPool\…` chưa tồn tại | Mở PowerShell bằng *Run as administrator*, chạy lại nguyên khối lệnh |
 | Không đọc được CCCD/PDF, lỗi "không khớp mã băm" sau khôi phục | Đặt sai khóa `FieldEncryptionKey` hoặc thư mục PDF khác thời điểm với CSDL | Đặt lại đúng khóa cũ; khôi phục thư mục PDF cùng thời điểm |
 | Camera không bật khi quét CCCD | Trang không chạy qua HTTPS hoặc trình duyệt chưa cấp quyền | Dùng HTTPS với chứng chỉ được tin cậy trên thiết bị; cấp quyền camera |
 | PDF không hiển thị trong ứng dụng (trang trắng) | Reverse proxy ghi đè CSP, thiếu `frame-src blob:` | Dùng CSP như `deploy/iis/web.frontend.config` / `frontend/nginx.conf` |
