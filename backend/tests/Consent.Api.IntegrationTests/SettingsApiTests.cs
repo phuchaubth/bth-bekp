@@ -122,6 +122,48 @@ public sealed class SettingsApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SignatureSpecimen_IsPerAccount_StoredEncrypted_AndRemovable()
+    {
+        var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;
+        var admin = await _client.LoginAsAdministratorAsync();
+
+        async Task<HttpResponseMessage> GetSpecimen(string token)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/account/signature-specimen");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            return await _client.SendAsync(request);
+        }
+
+        Assert.Equal(HttpStatusCode.NotFound, (await GetSpecimen(nurse)).StatusCode);
+        var (savedStatus, saved) = await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/account/signature-specimen", nurse, new { image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.Equal(HttpStatusCode.OK, savedStatus);
+        Assert.True(saved.TryGetProperty("updatedAtUtc", out _));
+
+        using var image = await GetSpecimen(nurse);
+        Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+        Assert.Equal("image/png", image.Content.Headers.ContentType!.MediaType);
+        // Tài khoản khác chỉ thấy chữ ký mẫu của chính mình (chưa có).
+        Assert.Equal(HttpStatusCode.NotFound, (await GetSpecimen(admin)).StatusCode);
+        var (_, me) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/auth/me", nurse);
+        Assert.True(me.GetProperty("hasSignatureSpecimen").GetBoolean());
+
+        // Lưu dạng bản mã: cột không chứa chữ ký PNG đọc được.
+        await using (var connection = new SqlConnection(_factory.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var raw = new SqlCommand("SELECT SignatureSpecimenEncrypted FROM Users WHERE UserName = 'dieuduong.demo'", connection);
+            var stored = (string)(await raw.ExecuteScalarAsync())!;
+            Assert.DoesNotContain("iVBORw0KGgo", stored, StringComparison.Ordinal);
+        }
+
+        using var delete = new HttpRequestMessage(HttpMethod.Delete, "/api/v1/account/signature-specimen");
+        delete.Headers.Authorization = new AuthenticationHeaderValue("Bearer", nurse);
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.SendAsync(delete)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await GetSpecimen(nurse)).StatusCode);
+    }
+
+    [Fact]
     public async Task ApiResponses_AreNotCacheable_AndOversizedBodiesAreRejected()
     {
         var admin = await _client.LoginAsAdministratorAsync();

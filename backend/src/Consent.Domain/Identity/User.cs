@@ -105,6 +105,32 @@ public sealed class User : Entity, IAuditableEntity
         }
     }
 
+    /// <summary>
+    /// Chữ ký mẫu của nhân viên (ảnh PNG đã chuẩn hóa), tự ký ở trang Tài khoản. Hiện cạnh khung ký khi xác nhận phiếu để
+    /// đối chiếu chữ ký vừa ký với chữ ký đã đăng ký. Dữ liệu cá nhân: lưu dạng bản mã.
+    /// </summary>
+    [SensitiveData]
+    public byte[]? SignatureSpecimenPng { get; private set; }
+
+    public DateTimeOffset? SignatureSpecimenUpdatedAtUtc { get; private set; }
+
+    public void SetSignatureSpecimen(byte[] png, DateTimeOffset nowUtc)
+    {
+        if (png is not { Length: > 0 })
+        {
+            throw new DomainException("Thiếu ảnh chữ ký mẫu.");
+        }
+
+        SignatureSpecimenPng = png;
+        SignatureSpecimenUpdatedAtUtc = nowUtc;
+    }
+
+    public void ClearSignatureSpecimen()
+    {
+        SignatureSpecimenPng = null;
+        SignatureSpecimenUpdatedAtUtc = null;
+    }
+
     public void SetPassword(string passwordHash, bool mustChangePassword)
     {
         if (string.IsNullOrWhiteSpace(passwordHash))

@@ -64,6 +64,9 @@ Ví dụ lỗi kiểm tra dữ liệu:
 | POST | `/api/v1/auth/logout` | Không cần đăng nhập (dùng cookie) · cần `X-Requested-With` | Thu hồi refresh token hiện tại, xóa cookie → `204` |
 | GET | `/api/v1/auth/me` | Đã đăng nhập | Thông tin người dùng hiện tại, vai trò, quyền |
 | POST | `/api/v1/auth/change-password` | Đã đăng nhập · 10 lần/phút/IP | Đổi mật khẩu; thu hồi các phiên khác; trả phiên mới |
+| GET | `/api/v1/account/signature-specimen` | Đã đăng nhập | Ảnh PNG chữ ký mẫu **của chính mình** (`Cache-Control: no-store`); chưa có → `404` |
+| PUT | `/api/v1/account/signature-specimen` | Đã đăng nhập | `{ image }` PNG Base64 vẽ trong khung ký; kiểm tra và chuẩn hóa như chữ ký trên phiếu (thiếu/sai → `400` trường `image`, khung trống → `422 consent_forms.signature_blank`); lưu mã hóa (cột `Users.SignatureSpecimenEncrypted`) → `{ updatedAtUtc }`. `auth/me` có `hasSignatureSpecimen`. Hiện cạnh khung ký khi xác nhận phiếu để đối chiếu |
+| DELETE | `/api/v1/account/signature-specimen` | Đã đăng nhập | Xóa chữ ký mẫu → `204` |
 
 `POST /api/v1/auth/login`
 

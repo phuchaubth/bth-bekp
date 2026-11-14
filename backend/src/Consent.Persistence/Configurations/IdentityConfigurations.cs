@@ -1,7 +1,9 @@
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Consent.Persistence.Configurations;
 
@@ -30,6 +32,15 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasRowVersion();
     }
+
+    /// <summary>Ảnh chữ ký mẫu là dữ liệu cá nhân: lưu dạng bản mã (AES-256-GCM).</summary>
+    public static void ConfigureEncryption(ModelBuilder modelBuilder, EncryptedBytesConverter encrypted) =>
+        modelBuilder.Entity<User>().Property(u => u.SignatureSpecimenPng).HasColumnName("SignatureSpecimenEncrypted").IsUnicode(false)
+            .HasConversion((ValueConverter)encrypted)
+            .Metadata.SetValueComparer(new ValueComparer<byte[]?>(
+                (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
+                v => v == null ? 0 : v.Length,
+                v => v));
 }
 
 internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>

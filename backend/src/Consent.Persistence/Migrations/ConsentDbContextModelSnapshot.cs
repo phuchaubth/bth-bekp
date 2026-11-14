@@ -625,6 +625,14 @@ namespace Consent.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("SignatureSpecimenPng")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("SignatureSpecimenEncrypted");
+
+                    b.Property<DateTimeOffset?>("SignatureSpecimenUpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("SmartCaUserId")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");

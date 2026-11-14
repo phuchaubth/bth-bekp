@@ -1,6 +1,7 @@
 import { Card, Col, Descriptions, Row, Space, Tag, Typography } from 'antd'
 import { useAuth } from '../../auth/authContext'
 import { ChangePasswordForm } from './ChangePasswordForm'
+import { SignatureSpecimenCard } from './SignatureSpecimen'
 
 export function AccountPage() {
   const { user } = useAuth()
@@ -31,6 +32,11 @@ export function AccountPage() {
                 </Space>
               </Descriptions.Item>
             </Descriptions>
+          </Card>
+        </Col>
+        <Col xs={24} lg={12}>
+          <Card title="Chữ ký mẫu">
+            <SignatureSpecimenCard />
           </Card>
         </Col>
         <Col xs={24} lg={12}>

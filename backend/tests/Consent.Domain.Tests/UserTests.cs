@@ -116,4 +116,17 @@ public sealed class UserTests
         Assert.Equal("Bác sĩ CKI", user.Title);
         Assert.Null(user.SmartCaUserId);
     }
+
+    [Fact]
+    public void SignatureSpecimen_IsSetAndCleared_AndCannotBeEmpty()
+    {
+        var user = User.Create("bacsi.thu", "Bác sĩ Thử", DateTimeOffset.UnixEpoch);
+
+        Assert.Throws<DomainException>(() => user.SetSignatureSpecimen([], DateTimeOffset.UnixEpoch));
+        user.SetSignatureSpecimen([1, 2, 3], DateTimeOffset.UnixEpoch.AddDays(1));
+        Assert.Equal(DateTimeOffset.UnixEpoch.AddDays(1), user.SignatureSpecimenUpdatedAtUtc);
+        user.ClearSignatureSpecimen();
+        Assert.Null(user.SignatureSpecimenPng);
+        Assert.Null(user.SignatureSpecimenUpdatedAtUtc);
+    }
 }

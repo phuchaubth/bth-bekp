@@ -314,7 +314,7 @@ public sealed class ConsentSigningService(
     /// Kiểm tra và chuẩn hóa ảnh chữ ký tay (người bệnh hoặc nhân viên): Base64 PNG, không quá lớn, có nét ký đủ dài.
     /// Trả về ảnh PNG xám đã cắt sát nét ký.
     /// </summary>
-    private static Result<byte[]> NormalizeSignature(string? image)
+    internal static Result<byte[]> NormalizeSignature(string? image)
     {
         if (string.IsNullOrWhiteSpace(image))
         {

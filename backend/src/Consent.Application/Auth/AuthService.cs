@@ -283,7 +283,8 @@ public sealed class AuthService(
             departmentName,
             [.. userRoles.OrderBy(r => r.Name, VietnameseComparer.Instance).Select(r => new RoleRefDto(r.Id, r.Code, r.Name))],
             user.MustChangePassword ? [] : PermissionResolver.Resolve(userRoles),
-            user.MustChangePassword);
+            user.MustChangePassword,
+            user.SignatureSpecimenPng is not null);
 
     private async Task<string?> GetDepartmentNameAsync(Guid? departmentId, CancellationToken cancellationToken)
     {

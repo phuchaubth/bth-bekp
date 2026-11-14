@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Card, Input, Modal, Timeline, Typography } from 'antd'
+import { Alert, App, Card, Flex, Input, Modal, Timeline, Typography } from 'antd'
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   consentFormKeys,
   consentFormsApi,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../auth/authContext'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
+import { SpecimenImage } from '../account/SignatureSpecimen'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
 
@@ -107,6 +108,22 @@ export function StaffSignModal({
       onCancel={onClose}
     >
       <Typography.Paragraph>{description}</Typography.Paragraph>
+      <Flex
+        align="center"
+        gap={12}
+        wrap
+        style={{ marginBottom: 12, padding: '8px 12px', background: '#f6faf9', border: '1px solid #e1eaeb', borderRadius: 10 }}
+      >
+        <Typography.Text type="secondary">Chữ ký mẫu của bạn (để đối chiếu):</Typography.Text>
+        <SpecimenImage
+          height={56}
+          empty={
+            <Typography.Text type="secondary">
+              chưa có — đăng ký ở <Link to="/tai-khoan">Tài khoản của tôi</Link>
+            </Typography.Text>
+          }
+        />
+      </Flex>
       <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
       {!hasInk && (
         <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>

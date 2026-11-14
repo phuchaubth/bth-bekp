@@ -58,7 +58,9 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
         var encrypted = new EncryptedStringConverter(fieldEncryptor);
         PatientConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         ConsentFormConfiguration.ConfigureEncryption(modelBuilder, encrypted);
-        ConsentSignatureConfiguration.ConfigureEncryption(modelBuilder, new EncryptedBytesConverter(fieldEncryptor));
+        var encryptedBytes = new EncryptedBytesConverter(fieldEncryptor);
+        ConsentSignatureConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
+        UserConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         modelBuilder.HasSequence<long>(ConsentFormNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
         base.OnModelCreating(modelBuilder);
     }

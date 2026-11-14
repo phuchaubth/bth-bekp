@@ -22,6 +22,7 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddScoped<AuthService>();
+        services.AddScoped<SignatureSpecimenService>();
         services.AddScoped<DepartmentService>();
         services.AddScoped<UserAdminService>();
         services.AddScoped<RoleService>();

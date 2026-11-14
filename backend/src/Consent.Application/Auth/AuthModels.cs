@@ -16,7 +16,11 @@ public sealed record CurrentUserDto(
     string? DepartmentName,
     IReadOnlyList<RoleRefDto> Roles,
     IReadOnlyList<string> Permissions,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    bool HasSignatureSpecimen = false);
+
+/// <summary>Chữ ký mẫu của chính mình: ảnh PNG Base64 vẽ trong khung ký.</summary>
+public sealed record SignatureSpecimenRequest(string? Image);
 
 /// <summary>Kết quả đăng nhập/làm mới: access token, refresh token (đặt vào cookie) và thông tin người dùng.</summary>
 public sealed record AuthSession(

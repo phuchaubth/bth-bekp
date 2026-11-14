@@ -169,6 +169,8 @@ internal sealed class AppTestContext
         Documents,
         CreateSettingsService());
 
+    public SignatureSpecimenService CreateSignatureSpecimenService() => new(CurrentUser, new InMemoryUserRepository(Store), Store, Clock);
+
     public SettingsService CreateSettingsService() => new(
         new InMemorySystemSettingRepository(Store),
         Store,
