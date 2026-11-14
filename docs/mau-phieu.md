@@ -124,6 +124,13 @@ rất cao).
 
 - Sửa câu chữ, thêm/bớt câu hỏi, đổi ngưỡng điểm: người quản lý mẫu tạo **phiên bản mới** ở màn hình *Mẫu phiếu* (soạn
   JSON, xem trước), rồi phát hành. Phiếu đã lập giữ đúng phiên bản cũ.
+- **Cấu hình ký** (thẻ *Cấu hình ký* của phiên bản nháp, không cần sửa JSON): thêm, xóa, đổi thứ tự các bước xác nhận
+  (tối đa 5, mỗi bước chọn vai trò và tên ô ký), chọn hỏi Đồng ý/Không đồng ý hay chỉ ký xác nhận, câu hỏi và nhãn lựa
+  chọn, tên các ô ký trên PDF. Ô để trống dùng nhãn mặc định. Lưu xong phải **phát hành** phiên bản thì phiếu mới mới áp
+  dụng; phiếu đã lập ký theo phiên bản của nó.
+- **Vai trò xác nhận cuối** (người bấm "Xác nhận và hoàn tất"), tên mẫu, đang sử dụng hay không: nút **Sửa thông tin
+  mẫu**. Vai trò xác nhận cuối gắn với mẫu, không theo phiên bản, nên đổi là **áp dụng ngay** cho cả phiếu đang chờ xác
+  nhận (màn hình có cảnh báo).
 - Cơ sở dữ liệu đã chạy với ba mẫu đề xuất cũ (CK-01, TT-01, TN-01): khởi động lại sẽ **thêm** bốn mẫu mới, không xóa mẫu
   cũ. Quản trị viên đặt các mẫu cũ thành "ngừng dùng" để không còn được chọn khi lập phiếu; phiếu đã lập theo mẫu cũ vẫn
   xem và in được.

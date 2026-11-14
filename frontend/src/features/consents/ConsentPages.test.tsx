@@ -5,7 +5,7 @@ import type { ConsentFormActions, ConsentFormDetail, ConsentFormListItem } from 
 import type { TemplateDefinition } from '../../api/consentTemplates'
 import type { PatientDetail } from '../../api/patients'
 import { Permissions } from '../../auth/permissions'
-import { baseRoutes, session } from '../../test/fixtures'
+import { baseRoutes, departments, session } from '../../test/fixtures'
 import { json, mockApi, problem } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
@@ -226,6 +226,7 @@ describe('Lập phiếu (màn hình 4–5)', () => {
       'GET /api/v1/consent-templates/available': [
         { templateId: 't-ck', templateCode: 'CK-01', templateName: 'Giấy cam kết', versionId: 'v-1', versionNo: 1, status: 'Published', definition: commitment, updatedAtUtc: '', publishedAtUtc: '' },
       ],
+      'GET /api/v1/departments': departments.filter((d) => d.isActive),
       'POST /api/v1/consent-forms': () => json(detail(), 201),
       'GET /api/v1/consent-forms/f-1': detail(),
     })
@@ -236,7 +237,37 @@ describe('Lập phiếu (màn hình 4–5)', () => {
     await user.click(await screen.findByRole('button', { name: 'Lập phiếu CK-01' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-1'))
-    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toEqual({ patientId: 'p-1', templateId: 't-ck' })
+    // Mặc định khoa của người lập.
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toEqual({
+      patientId: 'p-1',
+      templateId: 't-ck',
+      departmentId: 'd-noi',
+    })
+  })
+
+  it('chọn khoa của phiếu khác khoa mình: tải mẫu của khoa đó và lập phiếu cho khoa đó', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/patients/p-1': patient,
+      'GET /api/v1/consent-templates/available': [
+        { templateId: 't-ck', templateCode: 'CK-01', templateName: 'Giấy cam kết', versionId: 'v-1', versionNo: 1, status: 'Published', definition: commitment, updatedAtUtc: '', publishedAtUtc: '' },
+      ],
+      'GET /api/v1/departments': departments.filter((d) => d.isActive),
+      'POST /api/v1/consent-forms': () => json(detail({ departmentId: 'd-kkb' }), 201),
+      'GET /api/v1/consent-forms/f-1': detail({ departmentId: 'd-kkb' }),
+    })
+    const { router } = renderApp('/phieu-dong-thuan/tao-moi?patientId=p-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByLabelText('Khoa của phiếu'))
+    await user.click(await screen.findByTitle('Khoa Khám bệnh'))
+    await waitFor(() =>
+      expect(calls.some((c) => c.path === '/api/v1/consent-templates/available' && c.search === '?departmentId=d-kkb')).toBe(true),
+    )
+    await user.click(await screen.findByRole('button', { name: 'Lập phiếu CK-01' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-1'))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toMatchObject({ departmentId: 'd-kkb' })
   })
 
   it('hồ sơ còn số thẻ BHYT mã cũ 15 ký tự: báo cho người dùng khi lập phiếu và trên phiếu nháp', async () => {
@@ -247,6 +278,7 @@ describe('Lập phiếu (màn hình 4–5)', () => {
       'GET /api/v1/consent-templates/available': [
         { templateId: 't-ck', templateCode: 'CK-01', templateName: 'Giấy cam kết', versionId: 'v-1', versionNo: 1, status: 'Published', definition: commitment, updatedAtUtc: '', publishedAtUtc: '' },
       ],
+      'GET /api/v1/departments': departments.filter((d) => d.isActive),
       'POST /api/v1/consent-forms': () => json(detail({ notices: [notice] }), 201),
       'GET /api/v1/consent-forms/f-1': detail({ notices: [notice] }),
     })
@@ -637,7 +669,7 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     expect(screen.getByRole('button', { name: /Lập phiếu thay thế/ })).toBeInTheDocument()
   })
 
-  it('lập phiếu thay thế cho phiếu đã thu hồi: cùng người bệnh, cùng mẫu, tham chiếu phiếu cũ', async () => {
+  it('lập phiếu thay thế cho phiếu đã thu hồi: cùng người bệnh, cùng mẫu, cùng khoa, tham chiếu phiếu cũ', async () => {
     const { calls } = mockApi({
       ...baseRoutes(nurse()),
       'GET /api/v1/consent-forms/f-1': completed({
@@ -660,6 +692,8 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toEqual({
       patientId: 'p-1',
       templateId: 't-ck',
+      // Phiếu thay thế giữ khoa của phiếu cũ.
+      departmentId: 'd-noi',
       replacesFormId: 'f-1',
     })
     expect(await screen.findByRole('link', { name: 'PDT-2026-000001' })).toHaveAttribute('href', '/phieu-dong-thuan/f-1')

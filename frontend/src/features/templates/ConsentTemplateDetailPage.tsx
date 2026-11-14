@@ -1,6 +1,6 @@
-import { CheckCircleOutlined, CopyOutlined, StopOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, CopyOutlined, EditOutlined, StopOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Flex, Form, Input, Popconfirm, Space, Spin, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd'
+import { Alert, App, Button, Card, Flex, Form, Input, Modal, Popconfirm, Select, Space, Spin, Switch, Table, Tabs, Tag, Typography, type TableColumnsType } from 'antd'
 import { useState } from 'react'
 import { useParams } from 'react-router'
 import type { FormData } from '../../api/consentForms'
@@ -13,16 +13,18 @@ import {
   type ConsentTemplateDetail,
   type ConsentTemplateVersion,
   type ConsentTemplateVersionSummary,
+  type TemplateInput,
   type TemplateVersionStatus,
 } from '../../api/consentTemplates'
 import { ApiError } from '../../api/http'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
-import { errorMessage } from '../../utils/formErrors'
+import { applyServerFieldErrors, errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { DynamicForm } from '../consents/DynamicForm'
-import { signerRoleLabel } from './signerRoles'
+import { SignatureConfigEditor } from './SignatureConfigEditor'
+import { signerRoleLabel, signerRoleOptions } from './signerRoles'
 import { Bilingual } from '../consents/Bilingual'
 
 const statusColors: Record<TemplateVersionStatus, string> = { Draft: 'default', Published: 'green', Retired: 'volcano' }
@@ -34,6 +36,7 @@ export function ConsentTemplateDetailPage() {
   const canManage = hasPermission(Permissions.TemplatesManage)
   const { data: template, isPending, isError, error } = useConsentTemplate(id)
   const [selected, setSelected] = useState(0)
+  const [editingInfo, setEditingInfo] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
 
@@ -154,18 +157,115 @@ export function ConsentTemplateDetailPage() {
               Phạm vi: <Typography.Text strong>{template.departmentId ? 'Một khoa' : 'Toàn viện'}</Typography.Text>
             </span>
             {!template.isActive && <Tag>Ngừng sử dụng</Tag>}
+            {canManage && (
+              <Button size="small" icon={<EditOutlined />} onClick={() => setEditingInfo(true)}>
+                Sửa thông tin mẫu
+              </Button>
+            )}
           </Space>
         </Card>
+        {editingInfo && (
+          <TemplateInfoModal
+            template={template}
+            onClose={() => setEditingInfo(false)}
+            onSaved={async (updated) => {
+              setEditingInfo(false)
+              await refresh(updated)
+            }}
+          />
+        )}
         <Card title="Các phiên bản">
           <Table<ConsentTemplateVersionSummary> rowKey="versionNo" columns={columns} dataSource={template.versions} pagination={false} scroll={{ x: 700 }} />
         </Card>
-        {versionNo > 0 && <VersionPanel templateId={id} versionNo={versionNo} canManage={canManage} />}
+        {versionNo > 0 && (
+          <VersionPanel templateId={id} versionNo={versionNo} canManage={canManage} finalRoleCode={template.hospitalSignerRoleCode} />
+        )}
       </Flex>
     </>
   )
 }
 
-function VersionPanel({ templateId, versionNo, canManage }: { templateId: string; versionNo: number; canManage: boolean }) {
+/** Sửa tên, vai trò xác nhận cuối và trạng thái sử dụng của mẫu (không đổi mã mẫu và phạm vi khoa). */
+function TemplateInfoModal({
+  template,
+  onClose,
+  onSaved,
+}: {
+  template: ConsentTemplateDetail
+  onClose: () => void
+  onSaved: (updated: ConsentTemplateDetail) => Promise<void>
+}) {
+  const [form] = Form.useForm<TemplateInput>()
+  const { message } = App.useApp()
+  const roleCode = Form.useWatch('hospitalSignerRoleCode', form)
+  const save = useMutation({
+    mutationFn: (values: TemplateInput) =>
+      consentTemplatesApi.update(template.id, { ...values, departmentId: template.departmentId }),
+    onSuccess: async (updated) => {
+      message.success('Đã cập nhật thông tin mẫu.')
+      await onSaved(updated)
+    },
+    onError: (e) => {
+      if (!applyServerFieldErrors(form, e)) {
+        message.error(errorMessage(e))
+      }
+    },
+  })
+
+  return (
+    <Modal
+      open
+      title={`Sửa thông tin mẫu ${template.code}`}
+      okText="Lưu"
+      cancelText="Hủy"
+      onOk={() => form.submit()}
+      onCancel={onClose}
+      confirmLoading={save.isPending}
+    >
+      <Form<TemplateInput>
+        form={form}
+        layout="vertical"
+        onFinish={(values) => save.mutate(values)}
+        initialValues={{ name: template.name, hospitalSignerRoleCode: template.hospitalSignerRoleCode, isActive: template.isActive }}
+      >
+        <Form.Item label="Tên mẫu" name="name" rules={[{ required: true, message: 'Vui lòng nhập tên mẫu.' }]}>
+          <Input maxLength={200} />
+        </Form.Item>
+        <Form.Item
+          label="Vai trò xác nhận cuối (Xác nhận và hoàn tất)"
+          name="hospitalSignerRoleCode"
+          rules={[{ required: true, message: 'Vui lòng chọn vai trò.' }]}
+        >
+          <Select options={signerRoleOptions} />
+        </Form.Item>
+        {roleCode && roleCode !== template.hospitalSignerRoleCode && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 16 }}
+            title="Áp dụng ngay cho mọi phiếu chưa hoàn tất của mẫu này"
+            description={`Phiếu đang chờ xác nhận sẽ cần nhân viên có vai trò ${signerRoleLabel(roleCode)} hoàn tất. Phiếu đã hoàn tất giữ nguyên.`}
+          />
+        )}
+        <Form.Item label="Đang sử dụng" name="isActive" valuePropName="checked" extra="Tắt để không lập phiếu mới từ mẫu này; phiếu đã lập giữ nguyên.">
+          <Switch />
+        </Form.Item>
+      </Form>
+    </Modal>
+  )
+}
+
+function VersionPanel({
+  templateId,
+  versionNo,
+  canManage,
+  finalRoleCode,
+}: {
+  templateId: string
+  versionNo: number
+  canManage: boolean
+  finalRoleCode: string
+}) {
   const { data: version, isPending, isError, error } = useTemplateVersion(templateId, versionNo)
   const [previewForm] = Form.useForm<FormData>()
 
@@ -199,6 +299,19 @@ function VersionPanel({ templateId, versionNo, canManage }: { templateId: string
                 )}
                 <DynamicForm key={version.updatedAtUtc} definition={version.definition} form={previewForm} initialValues={{}} />
               </>
+            ),
+          },
+          {
+            key: 'signatures',
+            label: 'Cấu hình ký',
+            // key: dựng lại biểu mẫu khi đổi phiên bản hoặc sau khi lưu (định nghĩa đã được máy chủ chuẩn hóa).
+            children: (
+              <SignatureConfigEditor
+                key={`${version.versionNo}-${version.updatedAtUtc}`}
+                version={version}
+                editable={editable}
+                finalRoleCode={finalRoleCode}
+              />
             ),
           },
           {

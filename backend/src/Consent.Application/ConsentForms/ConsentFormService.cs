@@ -101,11 +101,8 @@ public sealed class ConsentFormService(
             return Error.ValidationField("departmentId", "Vui lòng chọn khoa/phòng lập phiếu.");
         }
 
-        if (!ScopeAll && departmentId != currentUser.DepartmentId)
-        {
-            return Error.Forbidden("consent_forms.department_forbidden", "Bạn chỉ lập phiếu được cho khoa của mình.");
-        }
-
+        // Quyết định 19: người lập chọn khoa của phiếu (khoa điều trị người bệnh, nơi nhân viên sẽ xác nhận), không bắt buộc
+        // trùng khoa của mình. Người lập vẫn thấy phiếu mình lập; nhân viên khoa được chọn thấy phiếu để xác nhận.
         var department = await departments.GetByIdAsync(departmentId.Value, cancellationToken).ConfigureAwait(false);
         if (department is not { IsActive: true })
         {

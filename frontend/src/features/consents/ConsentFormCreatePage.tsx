@@ -1,8 +1,9 @@
 import { FileAddOutlined, UserAddOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Descriptions, Empty, Flex, Input, Spin, Steps, Table, Typography } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Empty, Flex, Form, Input, Select, Spin, Steps, Table, Typography } from 'antd'
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
+import { useDepartments } from '../../api/admin'
 import { consentFormKeys, consentFormsApi } from '../../api/consentForms'
 import { useAvailableTemplates } from '../../api/consentTemplates'
 import { usePatient, usePatients, type PatientListItem } from '../../api/patients'
@@ -18,13 +19,17 @@ export function ConsentFormCreatePage() {
   const [params] = useSearchParams()
   const [patientId, setPatientId] = useState<string>(params.get('patientId') ?? '')
   const patient = usePatient(patientId)
-  const templates = useAvailableTemplates(null)
+  const { user } = useAuth()
+  // Quyết định 19: khoa của phiếu là khoa điều trị người bệnh (nơi nhân viên sẽ xác nhận); mặc định khoa của người lập.
+  const [departmentId, setDepartmentId] = useState<string | null>(user?.departmentId ?? null)
+  const departments = useDepartments(false)
+  const templates = useAvailableTemplates(departmentId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { message } = App.useApp()
 
   const create = useMutation({
-    mutationFn: (templateId: string) => consentFormsApi.create({ patientId, templateId }),
+    mutationFn: (templateId: string) => consentFormsApi.create({ patientId, templateId, departmentId }),
     onSuccess: async (form) => {
       await queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       message.success(`Đã lập phiếu nháp ${form.formNo}.`)
@@ -68,6 +73,25 @@ export function ConsentFormCreatePage() {
         </Card>
 
         <Card title="2. Mẫu phiếu">
+          <Form layout="vertical">
+            <Form.Item
+              label="Khoa của phiếu"
+              htmlFor="consent-form-department"
+              extra="Khoa điều trị người bệnh. Nhân viên của khoa này (ví dụ điều dưỡng khoa) sẽ thấy phiếu để xác nhận; bạn vẫn thấy phiếu mình lập."
+              style={{ maxWidth: 480 }}
+            >
+              <Select
+                id="consent-form-department"
+                showSearch
+                optionFilterProp="label"
+                placeholder="Chọn khoa/phòng"
+                loading={departments.isPending}
+                value={departmentId ?? undefined}
+                onChange={(value: string) => setDepartmentId(value)}
+                options={(departments.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
+              />
+            </Form.Item>
+          </Form>
           {!patientId ? (
             <Typography.Text type="secondary">Chọn người bệnh trước.</Typography.Text>
           ) : templates.isPending ? (
@@ -75,7 +99,7 @@ export function ConsentFormCreatePage() {
           ) : templates.isError ? (
             <Alert type="error" showIcon title={errorMessage(templates.error)} />
           ) : templates.data.length === 0 ? (
-            <Empty description="Chưa có mẫu phiếu nào đang phát hành cho khoa của bạn." />
+            <Empty description="Chưa có mẫu phiếu nào đang phát hành cho khoa này." />
           ) : (
             <Table
               rowKey="templateId"

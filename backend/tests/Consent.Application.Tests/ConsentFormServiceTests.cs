@@ -112,17 +112,36 @@ public sealed class ConsentFormServiceTests
     }
 
     [Fact]
-    public async Task Create_ForAnotherDepartment_IsForbidden_UnlessHospitalWideScope()
+    public async Task Create_ForAnotherDepartment_IsVisibleToCreatorAndThatDepartment_NotToOthers()
     {
         var s = Setup();
+        var other = s.Ctx.AddDepartment("NGOAI", "Khoa Ngoại");
         s.LogIn(s.Kkb);
-        var forbidden = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, s.Noi.Id), CancellationToken.None);
 
-        s.LogIn(s.Kkb, Permissions.ScopeAllDepartments);
-        var allowed = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, s.Noi.Id), CancellationToken.None);
+        // Tiếp đón (khoa Khám bệnh) lập phiếu cho khoa Nội, nơi điều dưỡng sẽ xác nhận.
+        var created = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, s.Noi.Id), CancellationToken.None);
+        var byCreator = await s.Service.GetAsync(created.Value.Id, CancellationToken.None);
+        s.LogIn(s.Noi);
+        var byTargetDepartment = await s.Service.GetAsync(created.Value.Id, CancellationToken.None);
+        s.LogIn(other);
+        var byOtherDepartment = await s.Service.GetAsync(created.Value.Id, CancellationToken.None);
 
-        Assert.Equal(ErrorType.Forbidden, forbidden.Error!.Type);
-        Assert.Equal(s.Noi.Id, allowed.Value.DepartmentId);
+        Assert.Equal(s.Noi.Id, created.Value.DepartmentId);
+        Assert.True(byCreator.IsSuccess);
+        Assert.True(byTargetDepartment.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, byOtherDepartment.Error!.Type);
+    }
+
+    [Fact]
+    public async Task Create_ForInactiveDepartment_IsRejected()
+    {
+        var s = Setup();
+        var closed = s.Ctx.AddDepartment("DONG", "Khoa đã đóng", active: false);
+        s.LogIn(s.Kkb);
+
+        var result = await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, closed.Id), CancellationToken.None);
+
+        Assert.Contains("departmentId", result.Error!.FieldErrors!.Keys);
     }
 
     [Fact]

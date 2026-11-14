@@ -89,7 +89,13 @@ export function ConsentFormDetailPage() {
 
   const replace = useMutation({
     mutationFn: (source: ConsentFormDetail) =>
-      consentFormsApi.create({ patientId: source.patient.id, templateId: source.templateId, replacesFormId: source.id }),
+      consentFormsApi.create({
+        patientId: source.patient.id,
+        templateId: source.templateId,
+        // Phiếu thay thế giữ khoa của phiếu cũ.
+        departmentId: source.departmentId,
+        replacesFormId: source.id,
+      }),
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       message.success(`Đã lập phiếu thay thế ${created.formNo}; nội dung được chép từ phiếu cũ.`)

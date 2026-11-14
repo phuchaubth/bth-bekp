@@ -213,6 +213,103 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     expect(screen.getByText('Định nghĩa chưa hợp lệ')).toBeInTheDocument()
   })
 
+  it('sửa thông tin mẫu: đổi vai trò xác nhận cuối có cảnh báo áp dụng ngay, giữ phạm vi khoa', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'PUT /api/v1/consent-templates/t-1': () => ({ ...template([summary(2, 'Draft'), summary(1, 'Published')]), hospitalSignerRoleCode: 'DOCTOR' }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Sửa thông tin mẫu/ }))
+    const dialog = await screen.findByRole('dialog')
+    await user.click(within(dialog).getByLabelText('Vai trò xác nhận cuối (Xác nhận và hoàn tất)'))
+    await user.click(await screen.findByTitle('Bác sĩ'))
+    expect(within(dialog).getByText('Áp dụng ngay cho mọi phiếu chưa hoàn tất của mẫu này')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/v1/consent-templates/t-1')).toBe(true))
+    expect(calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/consent-templates/t-1')!.body).toEqual({
+      name: 'Phiếu thử nghiệm',
+      hospitalSignerRoleCode: 'DOCTOR',
+      isActive: true,
+      departmentId: null,
+    })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+  })
+
+  it('cấu hình ký bằng biểu mẫu: thêm bước xác nhận, chỉ ký xác nhận, đặt tên ô ký; lưu vào khối signatures', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'PUT /api/v1/consent-templates/t-1/versions/2': (request) =>
+        ({ ...version(2, 'Draft'), definition: (request.body as { definition: TemplateDefinition }).definition }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: 'Cấu hình ký' }))
+    expect(screen.getByText('Không có bước xác nhận trung gian.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Thêm bước xác nhận/ }))
+    await user.click(screen.getByLabelText('Vai trò xác nhận'))
+    await user.click(await screen.findByTitle('Tiếp đón'))
+    await user.type(screen.getByLabelText('Tên ô ký trên phiếu'), 'Người tư vấn (Consultant)')
+    await user.click(screen.getByLabelText('Chỉ ký xác nhận (không hỏi)'))
+    await user.type(screen.getByLabelText('Ô xác nhận cuối (để trống: “Nhân viên y tế”)'), 'Điều dưỡng khoa (Ward Nurse)')
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/v1/consent-templates/t-1/versions/2')).toBe(true))
+    const saved = calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/consent-templates/t-1/versions/2')!.body as {
+      definition: TemplateDefinition
+    }
+    // Giữ nguyên phần nội dung, chỉ thay khối signatures; ô để trống không ghi (dùng nhãn mặc định).
+    expect(saved.definition.sections).toEqual(definition.sections)
+    expect(saved.definition.signatures).toEqual({
+      hospital: 'Điều dưỡng khoa (Ward Nurse)',
+      decision: 'none',
+      steps: [{ key: 'step1', roleCode: 'RECEPTIONIST', label: 'Người tư vấn (Consultant)' }],
+    })
+  })
+
+  it('cấu hình ký: bắt buộc chọn vai trò và tên ô ký cho mỗi bước; giữ mã bước cũ khi đổi thứ tự', async () => {
+    const withSteps: TemplateDefinition = {
+      ...definition,
+      signatures: {
+        steps: [
+          { key: 'screeningStaff', roleCode: 'RECEPTIONIST', label: 'Nhân viên hướng dẫn' },
+          { key: 'nurse', roleCode: 'NURSE', label: 'Điều dưỡng thực hiện' },
+        ],
+      },
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'GET /api/v1/consent-templates/t-1/versions/2': () => ({ ...version(2, 'Draft'), definition: withSteps }),
+      'PUT /api/v1/consent-templates/t-1/versions/2': (request) => ({
+        ...version(2, 'Draft'),
+        definition: (request.body as { definition: TemplateDefinition }).definition,
+      }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: 'Cấu hình ký' }))
+    await user.click(screen.getByRole('button', { name: /Thêm bước xác nhận/ }))
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
+    expect(await screen.findByText('Vui lòng chọn vai trò.')).toBeInTheDocument()
+    expect(screen.getByText('Vui lòng nhập tên ô ký.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /Xóa bước 3/ }))
+    await user.click(screen.getByRole('button', { name: /Đưa bước 2 lên/ }))
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
+    const saved = calls.find((c) => c.method === 'PUT')!.body as { definition: TemplateDefinition }
+    expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['nurse', 'screeningStaff'])
+  })
+
   it('người chỉ được xem: không có nút phát hành hay tạo phiên bản, định nghĩa chỉ đọc', async () => {
     mockApi({ ...baseRoutes(reader()), ...templateServer() })
     renderApp('/mau-phieu/t-1')
