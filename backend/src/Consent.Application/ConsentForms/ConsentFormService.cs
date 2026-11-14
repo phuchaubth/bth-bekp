@@ -346,7 +346,10 @@ public sealed class ConsentFormService(
             form.Decision,
             patientSignature,
             confirmation,
-            steps);
+            steps)
+        {
+            Logo = await settingsService.ResolveLogoAsync(cancellationToken).ConfigureAwait(false),
+        };
     }
 
     internal static string Sha256(byte[] content) =>

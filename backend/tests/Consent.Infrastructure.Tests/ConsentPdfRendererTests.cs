@@ -1,7 +1,9 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.Settings;
 using Consent.Domain.Patients;
 using Consent.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
@@ -96,6 +98,41 @@ public sealed class ConsentPdfRendererTests
             File.WriteAllBytes(Path.Combine(output, $"{code}.pdf"), bytes);
         }
     }
+
+    [Theory]
+    [InlineData("png")]
+    [InlineData("jpeg")]
+    public void Logo_IsPrintedInTheHeader(string kind)
+    {
+        var logo = LogoImage.Read(Convert.FromBase64String(kind == "png" ? TestLogos.Png64 : TestLogos.Jpeg40x32))!;
+        var renderer = new MigraDocConsentPdfRenderer();
+
+        var without = renderer.Render(Document("CK-01", representative: false, isFinal: false));
+        var with = renderer.Render(Document("CK-01", representative: false, isFinal: false) with { Logo = logo });
+
+        Assert.Equal(0, ImageCount(without));
+        Assert.Equal(1, ImageCount(with));
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, $"CK-01-logo-{kind}.pdf"), with);
+        }
+    }
+
+    [Fact]
+    public void Logo_ThatCannotBeDecoded_IsSkipped_AndThePdfStillRenders()
+    {
+        // Phần đầu PNG hợp lệ (qua được kiểm tra lúc tải lên) nhưng dữ liệu ảnh hỏng.
+        var bytes = Convert.FromBase64String(TestLogos.Png64);
+        Array.Fill(bytes, (byte)0x5A, 33, bytes.Length - 33);
+        var logo = LogoImage.Read(bytes)!;
+
+        var pdf = new MigraDocConsentPdfRenderer().Render(Document("CK-01", representative: false, isFinal: false) with { Logo = logo });
+
+        Assert.Equal("%PDF", Encoding.ASCII.GetString(pdf, 0, 4));
+        Assert.Equal(0, ImageCount(pdf));
+    }
+
+    private static int ImageCount(byte[] pdf) => Regex.Matches(Encoding.Latin1.GetString(pdf), @"/Subtype\s*/Image").Count;
 
     /// <summary>
     /// <paramref name="maxPages"/>: cam kết khám BHYT thông thường (phổ biến nhất) gọn trong một trang; trường hợp nhiều

@@ -73,6 +73,55 @@ public sealed class SettingsApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Logo_IsManagedByAdministrators_ServedAsImage_AndPrintedOnPdfs()
+    {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;
+        // Logo giả lập (PNG 64 × 64 vẽ bằng máy, không phải logo thật).
+        const string Png = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABq0lEQVR4nO1aQRLCMAhUx3949gX+/+gLPPuSeogzZhJCIJAAtXt1ZHdDk9LAedu2U2RcrAVIcVWP+LzdkV8f75cu3VnlEcJFt6BiRmRgTHcNiZNBA1rSc4zZYBvoSsd1CP9eg2egRT+2eCrRGAZAPvlGFIYlGZgkXYWib6AOrX6WS7g6BrgRiacTEoTLiJUSK9ceocAXhVELLVA/QNQ0UPheph6kQ5IAG7BVD5K2PAAGPKgHqUEPnT1gqJ4ooDQwo0pTRC0Py4D58icw3gPOlz+hENnMgJPlT0DEhP+o/xnIU+Nq+RNySbnUHWUgKPr3QjOOJlZM0jHqfAMkgNsg/CN0GLDGYcAahwFrHAas8TXQqvVcASwXwmegX8yxSiP53SgX4TPwM+B8G7Tq5R1loICrJFAvd91+yuQoRPIaHCbgNTicJ6GW19nE5knoCgAM0Lsjs0HpVMAZ8OCB2GehXu4u9kDvEjFeZMs8sIh4DY4FHjQb3eCfp3rQHzVoxaWEZmHisIecY2rYfxp4wlmJ9MYjZ3QdA1g09Jcj8NhlgaiDryBCjh4bIvxH/Qc4GQtKXacLhQAAAABJRU5ErkJggg==";
+
+        var (nurseStatus, _) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/logo", nurse, new { image = Png });
+        var (svgStatus, svg) = await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/settings/logo", admin, new { image = Convert.ToBase64String("<svg/>"u8.ToArray()) });
+        var (savedStatus, saved) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/logo", admin, new { image = "data:image/png;base64," + Png });
+
+        Assert.Equal(HttpStatusCode.Forbidden, nurseStatus);
+        Assert.Equal(HttpStatusCode.BadRequest, svgStatus);
+        Assert.True(svg.GetProperty("errors").TryGetProperty("image", out _));
+        Assert.Equal(HttpStatusCode.OK, savedStatus);
+        Assert.Equal(64, saved.GetProperty("logo").GetProperty("width").GetInt32());
+
+        using (var get = new HttpRequestMessage(HttpMethod.Get, "/api/v1/settings/logo"))
+        {
+            get.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
+            using var image = await _client.SendAsync(get);
+            Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+            Assert.Equal("image/png", image.Content.Headers.ContentType!.MediaType);
+            Assert.Equal(Convert.FromBase64String(Png), await image.Content.ReadAsByteArrayAsync());
+        }
+
+        // PDF xem trước của phiếu mới có ảnh logo.
+        var (_, patients) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/patients?keyword=001085000001", nurse);
+        var patientId = patients.GetProperty("items")[0].GetProperty("id").GetString();
+        var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", nurse);
+        var templateId = available.EnumerateArray().First().GetProperty("templateId").GetString();
+        var (_, form) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/consent-forms", nurse, new { patientId, templateId });
+        using (var pdfRequest = new HttpRequestMessage(HttpMethod.Get, $"/api/v1/consent-forms/{form.GetProperty("id").GetString()}/pdf"))
+        {
+            pdfRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", nurse);
+            using var pdf = await _client.SendAsync(pdfRequest);
+            Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(await pdf.Content.ReadAsByteArrayAsync()));
+        }
+
+        var (deletedStatus, deleted) = await _client.SendJsonAsync(HttpMethod.Delete, "/api/v1/settings/logo", admin);
+        Assert.Equal(HttpStatusCode.OK, deletedStatus);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, deleted.GetProperty("logo").ValueKind);
+        using var missing = new HttpRequestMessage(HttpMethod.Get, "/api/v1/settings/logo");
+        missing.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.SendAsync(missing)).StatusCode);
+    }
+
+    [Fact]
     public async Task ApiResponses_AreNotCacheable_AndOversizedBodiesAreRejected()
     {
         var admin = await _client.LoginAsAdministratorAsync();

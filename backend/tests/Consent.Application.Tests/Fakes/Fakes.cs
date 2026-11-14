@@ -454,6 +454,8 @@ internal sealed class InMemorySystemSettingRepository(InMemoryStore store) : ISy
         Task.FromResult<IReadOnlyList<SystemSetting>>([.. store.SystemSettings]);
 
     public void Add(SystemSetting setting) => store.SystemSettings.Add(setting);
+
+    public void Remove(SystemSetting setting) => store.SystemSettings.Remove(setting);
 }
 
 internal sealed class InMemoryExportJobRepository(InMemoryStore store) : IExportJobRepository

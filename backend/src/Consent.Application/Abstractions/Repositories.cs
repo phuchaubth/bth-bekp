@@ -165,6 +165,8 @@ public interface ISystemSettingRepository
     Task<IReadOnlyList<SystemSetting>> GetAllAsync(CancellationToken cancellationToken);
 
     void Add(SystemSetting setting);
+
+    void Remove(SystemSetting setting);
 }
 
 public interface IExportJobRepository

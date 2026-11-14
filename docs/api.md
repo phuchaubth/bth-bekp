@@ -427,6 +427,9 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 |---|---|---|---|
 | GET | `/api/v1/settings` | `settings.manage` | `hospital` (cơ quan chủ quản, tên bệnh viện, địa danh, `updatedAtUtc`), `hisEnabled`, `smartCaEnabled`, `exportMaxRows`, `retentionPolicy`. Không có bí mật nào |
 | PUT | `/api/v1/settings/hospital` | `settings.manage` | `{ parentAgency, name, place }` (bắt buộc, ≤ 500 ký tự). Lưu trong bảng `SystemSettings`, ghi audit; phiếu in sau đó dùng tên mới, PDF đã ký giữ nguyên. Chưa đặt thì dùng cấu hình `Hospital:*` |
+| GET | `/api/v1/settings/logo` | `settings.manage` | Ảnh logo đang dùng (`image/png` hoặc `image/jpeg`, `Cache-Control: no-store`); chưa có → `404` |
+| PUT | `/api/v1/settings/logo` | `settings.manage` | `{ image }`: PNG/JPG dạng Base64 (có thể kèm `data:image/...;base64,`), tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; nhận dạng theo nội dung file, không nhận SVG/GIF (`400` ở trường `image`). File lưu trong kho tài liệu (mã hóa), khóa lưu trong `SystemSettings` (`Logo.*`, ghi audit). In ở góc trên bên trái phiếu (khoảng 18 × 18 mm) cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên. File hỏng không đọc được thì phiếu in không có logo |
+| DELETE | `/api/v1/settings/logo` | `settings.manage` | Bỏ logo; trả cấu hình mới (`logo: null`) |
 
 Mọi phản hồi của API có `Cache-Control: no-store`; thân yêu cầu lớn hơn 2 MB bị từ chối.
 

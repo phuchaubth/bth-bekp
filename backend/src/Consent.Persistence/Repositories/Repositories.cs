@@ -217,4 +217,6 @@ internal sealed class SystemSettingRepository(ConsentDbContext db) : ISystemSett
         await db.SystemSettings.ToListAsync(cancellationToken).ConfigureAwait(false);
 
     public void Add(SystemSetting setting) => db.SystemSettings.Add(setting);
+
+    public void Remove(SystemSetting setting) => db.SystemSettings.Remove(setting);
 }

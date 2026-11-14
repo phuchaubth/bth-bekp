@@ -13,9 +13,16 @@ public sealed record HospitalSettingsDto(string ParentAgency, string Name, strin
 
 public sealed record UpdateHospitalSettingsRequest(string? ParentAgency, string? Name, string? Place);
 
+/// <summary>Logo bệnh viện: ảnh PNG/JPG dạng Base64 (có thể kèm tiền tố <c>data:image/...;base64,</c>), tối đa 1 MB.</summary>
+public sealed record UploadLogoRequest(string? Image);
+
+/// <summary>Logo đang dùng (không có thì null ở <see cref="SystemSettingsDto.Logo"/>).</summary>
+public sealed record LogoInfoDto(string ContentType, int Width, int Height, DateTimeOffset UpdatedAtUtc);
+
 /// <summary>Cấu hình hệ thống đang có hiệu lực (phần sửa được và phần chỉ đọc lấy từ cấu hình triển khai).</summary>
 public sealed record SystemSettingsDto(
     HospitalSettingsDto Hospital,
+    LogoInfoDto? Logo,
     bool HisEnabled,
     bool SmartCaEnabled,
     int ExportMaxRows,
@@ -44,7 +51,8 @@ public sealed class SettingsService(
     IClock clock,
     IHisGateway his,
     IOptions<HospitalOptions> hospitalDefaults,
-    IValidator<UpdateHospitalSettingsRequest> validator)
+    IValidator<UpdateHospitalSettingsRequest> validator,
+    IDocumentStore documents)
 {
     public const string RetentionPolicy = "Theo thời hạn lưu trữ hồ sơ bệnh án; hệ thống không tự động xóa phiếu.";
 
@@ -68,8 +76,11 @@ public sealed class SettingsService(
         var hospital = await ResolveHospitalAsync(cancellationToken).ConfigureAwait(false);
         var updatedAt = stored.Where(s => s.Key.StartsWith("Hospital.", StringComparison.Ordinal))
             .Select(s => (DateTimeOffset?)s.UpdatedAtUtc).DefaultIfEmpty(null).Max();
+        var logo = await ResolveLogoAsync(cancellationToken).ConfigureAwait(false);
+        var logoUpdatedAt = stored.FirstOrDefault(s => s.Key == SettingKeys.LogoStorageKey)?.UpdatedAtUtc;
         return new SystemSettingsDto(
             new HospitalSettingsDto(hospital.ParentAgency, hospital.Name, hospital.Place, updatedAt),
+            logo is null || logoUpdatedAt is null ? null : new LogoInfoDto(logo.ContentType, logo.Width, logo.Height, logoUpdatedAt.Value),
             his.IsEnabled,
             SmartCaEnabled: false,
             Exports.ConsentFormExportService.MaxRows,
@@ -92,17 +103,76 @@ public sealed class SettingsService(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await GetAsync(cancellationToken).ConfigureAwait(false);
 
-        void Upsert(string key, string value)
+        void Upsert(string key, string value) => UpsertSetting(stored, key, value, now);
+    }
+
+    /// <summary>
+    /// Logo in ở đầu phiếu: đọc từ kho tài liệu theo khóa đã lưu. Chưa có logo, hoặc file mất/hỏng, thì trả về null (phiếu
+    /// vẫn in được, không có logo).
+    /// </summary>
+    public async Task<LogoImage?> ResolveLogoAsync(CancellationToken cancellationToken)
+    {
+        var stored = await settings.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        if (stored.FirstOrDefault(s => s.Key == SettingKeys.LogoStorageKey)?.Value is not { } key)
         {
-            var existing = stored.FirstOrDefault(s => s.Key == key);
-            if (existing is null)
-            {
-                settings.Add(SystemSetting.Create(key, value, now));
-            }
-            else if (!string.Equals(existing.Value, value.Trim(), StringComparison.Ordinal))
-            {
-                existing.Update(value, now);
-            }
+            return null;
+        }
+
+        try
+        {
+            return LogoImage.Read(await documents.ReadAsync(key, cancellationToken).ConfigureAwait(false));
+        }
+        catch (DocumentUnavailableException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Tải lên hoặc thay logo. Áp dụng cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên.</summary>
+    public async Task<Result<SystemSettingsDto>> UploadLogoAsync(UploadLogoRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var image = LogoImage.Parse(request.Image);
+        if (image.IsFailure)
+        {
+            return image.Error!;
+        }
+
+        var extension = image.Value.ContentType == LogoImage.Png ? "png" : "jpg";
+        var key = await documents.SaveAsync($"logo.{extension}", image.Value.Content, cancellationToken).ConfigureAwait(false);
+        var stored = (await settings.GetAllAsync(cancellationToken).ConfigureAwait(false)).ToList();
+        var now = clock.UtcNow;
+        UpsertSetting(stored, SettingKeys.LogoStorageKey, key, now);
+        UpsertSetting(stored, SettingKeys.LogoContentType, image.Value.ContentType, now);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return await GetAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Bỏ logo: phiếu in sau đó không có logo.</summary>
+    public async Task<SystemSettingsDto> DeleteLogoAsync(CancellationToken cancellationToken)
+    {
+        var stored = await settings.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        foreach (var setting in stored.Where(s => s.Key is SettingKeys.LogoStorageKey or SettingKeys.LogoContentType))
+        {
+            settings.Remove(setting);
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return await GetAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private void UpsertSetting(List<SystemSetting> stored, string key, string value, DateTimeOffset now)
+    {
+        var existing = stored.FirstOrDefault(s => s.Key == key);
+        if (existing is null)
+        {
+            var created = SystemSetting.Create(key, value, now);
+            settings.Add(created);
+            stored.Add(created);
+        }
+        else if (!string.Equals(existing.Value, value.Trim(), StringComparison.Ordinal))
+        {
+            existing.Update(value, now);
         }
     }
 }

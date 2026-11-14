@@ -65,8 +65,14 @@ public static class SettingKeys
     /// <summary>Địa danh ghi ở dòng ngày tháng của phiếu.</summary>
     public const string HospitalPlace = "Hospital.Place";
 
+    /// <summary>Khóa lưu trữ của file logo bệnh viện (file nằm trong kho tài liệu, không lưu trong CSDL).</summary>
+    public const string LogoStorageKey = "Logo.StorageKey";
+
+    /// <summary>Kiểu ảnh của logo: <c>image/png</c> hoặc <c>image/jpeg</c>.</summary>
+    public const string LogoContentType = "Logo.ContentType";
+
     public static IReadOnlySet<string> All { get; } =
-        new HashSet<string>([HospitalParentAgency, HospitalName, HospitalPlace], StringComparer.Ordinal);
+        new HashSet<string>([HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType], StringComparer.Ordinal);
 
     public static bool IsDefined(string key) => key is not null && All.Contains(key);
 }

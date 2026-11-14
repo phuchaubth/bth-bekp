@@ -2,10 +2,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Col, Descriptions, Form, Input, Row, Tag, Typography } from 'antd'
 import { settingsApi, settingsKeys, useSystemSettings, type HospitalSettingsInput } from '../../../api/settings'
 import { PageHeader } from '../../../components/PageHeader'
+import { LogoCard } from './LogoCard'
 import { applyServerFieldErrors, errorMessage } from '../../../utils/formErrors'
 import { formatDateTime } from '../../../utils/format'
 
-/** Màn hình 19: tên đơn vị in trên PDF (sửa được) và cấu hình triển khai đang có hiệu lực (chỉ đọc, không có bí mật). */
+/** Màn hình 19: tên đơn vị và logo in trên PDF (sửa được) và cấu hình triển khai đang có hiệu lực (chỉ đọc, không có bí mật). */
 export function SettingsPage() {
   const settings = useSystemSettings()
   const [form] = Form.useForm<HospitalSettingsInput>()
@@ -76,6 +77,11 @@ export function SettingsPage() {
             )}
           </Card>
         </Col>
+        {settings.data && (
+          <Col xs={24} xl={12}>
+            <LogoCard settings={settings.data} />
+          </Col>
+        )}
         <Col xs={24} xl={12}>
           <Card title="Cấu hình triển khai (chỉ đọc)" loading={settings.isPending}>
             {settings.data && (

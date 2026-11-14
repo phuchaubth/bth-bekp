@@ -175,7 +175,8 @@ internal sealed class AppTestContext
         Clock,
         His,
         Microsoft.Extensions.Options.Options.Create(new HospitalOptions()),
-        new UpdateHospitalSettingsRequestValidator());
+        new UpdateHospitalSettingsRequestValidator(),
+        Documents);
 
     public ConsentSigningService CreateConsentSigningService() => new(
         CreateConsentFormService(),

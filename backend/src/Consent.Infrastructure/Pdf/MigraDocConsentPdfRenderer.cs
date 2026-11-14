@@ -3,10 +3,12 @@ using System.Globalization;
 using System.Text.Json.Nodes;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.Settings;
 using Consent.Domain.ConsentForms;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
+using PdfSharp.Drawing;
 using PdfSharp.Fonts;
 
 namespace Consent.Infrastructure.Pdf;
@@ -106,13 +108,29 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     private static void AddDocumentHead(Section section, ConsentPdfDocument document)
     {
         var table = section.AddTable();
-        table.AddColumn(Unit.FromMillimeter(72));
-        table.AddColumn(Unit.FromMillimeter(95));
-        var row = table.AddRow();
+        // Có logo: cột logo bên trái, tên đơn vị và quốc hiệu thu hẹp lại; tổng vẫn 167 mm (lề A4).
+        var logo = document.Logo is { } candidate && CanDecode(candidate) ? candidate : null;
+        if (logo is not null)
+        {
+            table.AddColumn(Unit.FromMillimeter(LogoColumnMm));
+        }
 
-        var left = row.Cells[0].AddParagraph();
+        table.AddColumn(Unit.FromMillimeter(logo is null ? 72 : 60));
+        table.AddColumn(Unit.FromMillimeter(logo is null ? 95 : 167 - 60 - LogoColumnMm));
+        var row = table.AddRow();
+        row.VerticalAlignment = VerticalAlignment.Center;
+        var textColumn = 0;
+        if (logo is not null)
+        {
+            AddLogo(row.Cells[0], logo);
+            textColumn = 1;
+        }
+
+        // Có logo thì cột chữ hẹp hơn: chữ nhỏ hơn một cỡ để tên đơn vị và quốc hiệu vẫn nằm trên một dòng.
+        var headSize = logo is null ? 11 : 10;
+        var left = row.Cells[textColumn].AddParagraph();
         left.Format.Alignment = ParagraphAlignment.Center;
-        left.Format.Font.Size = 11;
+        left.Format.Font.Size = headSize;
         left.AddText(document.Hospital.ParentAgency.ToUpper(Vietnamese));
         left.AddLineBreak();
         var hospital = left.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
@@ -123,9 +141,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             left.AddText($"Khoa/phòng: {document.DepartmentName}");
         }
 
-        var right = row.Cells[1].AddParagraph();
+        var right = row.Cells[textColumn + 1].AddParagraph();
         right.Format.Alignment = ParagraphAlignment.Center;
-        right.Format.Font.Size = 11;
+        right.Format.Font.Size = headSize;
         right.AddFormattedText("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", TextFormat.Bold);
         right.AddLineBreak();
         var motto = right.AddFormattedText("Độc lập - Tự do - Hạnh phúc", TextFormat.Bold);
@@ -500,6 +518,41 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 }
             }
         }
+    }
+
+    private const double LogoColumnMm = 20;
+
+    /// <summary>
+    /// Logo chỉ được kiểm tra phần đầu file lúc tải lên; thử giải mã trước khi in để một file hỏng không làm hỏng việc in
+    /// mọi phiếu (khi đó phiếu in không có logo).
+    /// </summary>
+    private static bool CanDecode(LogoImage logo)
+    {
+        try
+        {
+            using var stream = new MemoryStream(logo.Content, writable: false);
+            using var image = XImage.FromStream(stream);
+            return image.PixelWidth > 0 && image.PixelHeight > 0;
+        }
+#pragma warning disable CA1031 // Mọi lỗi giải mã ảnh đều xử lý giống nhau: bỏ logo.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Logo bệnh viện, thu vừa ô 18 × 18 mm, giữ đúng tỉ lệ.</summary>
+    private static void AddLogo(Cell cell, LogoImage logo)
+    {
+        const double MaxMm = 18;
+        var scale = Math.Min(MaxMm / logo.Width, MaxMm / logo.Height);
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Left;
+        var image = paragraph.AddImage("base64:" + Convert.ToBase64String(logo.Content));
+        image.LockAspectRatio = false;
+        image.Width = Unit.FromMillimeter(logo.Width * scale);
+        image.Height = Unit.FromMillimeter(logo.Height * scale);
     }
 
     /// <summary>Ảnh chữ ký tay, thu vừa khung 70 × 12 mm, giữ đúng tỉ lệ.</summary>

@@ -21,4 +21,27 @@ public sealed class SettingsController(SettingsService settings) : ControllerBas
     [HasPermission(Permissions.SettingsManage)]
     public async Task<IActionResult> UpdateHospital(UpdateHospitalSettingsRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await settings.UpdateHospitalAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Ảnh logo đang dùng (để xem trước). Chưa có logo → 404.</summary>
+    [HttpGet("logo")]
+    [HasPermission(Permissions.SettingsManage)]
+    [Produces("image/png", "image/jpeg")]
+    public async Task<IActionResult> GetLogo(CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-store";
+        return await settings.ResolveLogoAsync(cancellationToken).ConfigureAwait(false) is { } logo
+            ? File(logo.Content, logo.ContentType)
+            : NotFound();
+    }
+
+    /// <summary>Tải lên hoặc thay logo in ở đầu phiếu (PNG/JPG, tối đa 1 MB). PDF đã ký giữ nguyên.</summary>
+    [HttpPut("logo")]
+    [HasPermission(Permissions.SettingsManage)]
+    public async Task<IActionResult> UploadLogo(UploadLogoRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await settings.UploadLogoAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Bỏ logo: phiếu in sau đó không có logo.</summary>
+    [HttpDelete("logo")]
+    [HasPermission(Permissions.SettingsManage)]
+    public Task<SystemSettingsDto> DeleteLogo(CancellationToken cancellationToken) => settings.DeleteLogoAsync(cancellationToken);
 }

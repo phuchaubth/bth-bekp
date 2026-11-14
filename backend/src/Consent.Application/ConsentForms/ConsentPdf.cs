@@ -36,7 +36,11 @@ public sealed record ConsentPdfDocument(
     ConsentDecision? Decision = null,
     ConsentPdfSignature? PatientSignature = null,
     ConsentPdfConfirmation? HospitalConfirmation = null,
-    IReadOnlyList<ConsentPdfConfirmation?>? StepConfirmations = null);
+    IReadOnlyList<ConsentPdfConfirmation?>? StepConfirmations = null)
+{
+    /// <summary>Logo bệnh viện in ở góc trên bên trái (PNG/JPEG); không có thì in như cũ.</summary>
+    public Settings.LogoImage? Logo { get; init; }
+}
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
 public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt);

@@ -32,6 +32,55 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public async Task Logo_Upload_IsStoredInDocumentStore_UsedForPdf_AndCanBeRemoved()
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreateSettingsService();
+
+        var none = await service.GetAsync(CancellationToken.None);
+        var uploaded = await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
+        var resolved = await service.ResolveLogoAsync(CancellationToken.None);
+        var removed = await service.DeleteLogoAsync(CancellationToken.None);
+
+        Assert.Null(none.Logo);
+        Assert.True(uploaded.IsSuccess, uploaded.Error?.Message);
+        Assert.Equal(new LogoInfoDto("image/png", 64, 64, ctx.Clock.UtcNow), uploaded.Value.Logo);
+        Assert.Equal(Convert.FromBase64String(TestLogos.Png64), resolved!.Content);
+        Assert.Single(ctx.Documents.Files);
+        Assert.Null(removed.Logo);
+        Assert.Null(await service.ResolveLogoAsync(CancellationToken.None));
+        Assert.DoesNotContain(ctx.Store.SystemSettings, s => s.Key.StartsWith("Logo.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Logo_Replace_KeepsOneSetting_AndInvalidFileIsRejected()
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreateSettingsService();
+        await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
+
+        var replaced = await service.UploadLogoAsync(new(TestLogos.Jpeg40x32), CancellationToken.None);
+        var invalid = await service.UploadLogoAsync(new("PHN2Zz48L3N2Zz4="), CancellationToken.None);
+
+        Assert.Equal("image/jpeg", replaced.Value.Logo!.ContentType);
+        Assert.Single(ctx.Store.SystemSettings, s => s.Key == SettingKeys.LogoStorageKey);
+        Assert.Contains("image", invalid.Error!.FieldErrors!.Keys);
+        Assert.Equal("image/jpeg", (await service.ResolveLogoAsync(CancellationToken.None))!.ContentType);
+    }
+
+    [Fact]
+    public async Task Logo_MissingFile_PrintsWithoutLogo()
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreateSettingsService();
+        await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
+        ctx.Documents.Files.Clear();
+
+        Assert.Null(await service.ResolveLogoAsync(CancellationToken.None));
+        Assert.Null((await service.GetAsync(CancellationToken.None)).Logo);
+    }
+
+    [Fact]
     public async Task Update_TrimsValues_OnlyTouchesChangedKeys_AndRejectsEmptyOrTooLong()
     {
         var ctx = new AppTestContext();
