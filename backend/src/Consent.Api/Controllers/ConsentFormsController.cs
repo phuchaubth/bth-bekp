@@ -83,11 +83,11 @@ public sealed class ConsentFormsController(ConsentFormService forms, ConsentSign
     public async Task<IActionResult> ConfirmStep(Guid id, ConfirmStepRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await signing.ConfirmStepAsync(id, request, cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Phía bệnh viện xác nhận bằng tài khoản (vai trò theo cấu hình mẫu) và hoàn tất phiếu.</summary>
+    /// <summary>Phía bệnh viện xác nhận bằng tài khoản kèm chữ ký tay (vai trò theo cấu hình mẫu) và hoàn tất phiếu.</summary>
     [HttpPost("{id:guid}/complete")]
     [HasPermission(Permissions.ConsentsSign)]
-    public async Task<IActionResult> Complete(Guid id, CancellationToken cancellationToken) =>
-        this.ToActionResult(await signing.CompleteAsync(id, cancellationToken).ConfigureAwait(false));
+    public async Task<IActionResult> Complete(Guid id, CompleteConsentFormRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.CompleteAsync(id, request, cancellationToken).ConfigureAwait(false));
 
     [HttpPost("{id:guid}/revoke")]
     [HasPermission(Permissions.ConsentsRevoke)]

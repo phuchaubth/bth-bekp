@@ -64,7 +64,7 @@ public sealed class ConfirmationStepTests
     }
 
     private static Task<Result<ConsentFormDetailDto>> Confirm(ConsentScenario s, Guid formId, string step) =>
-        s.Signing.ConfirmStepAsync(formId, new ConfirmStepRequest(step), CancellationToken.None);
+        s.Signing.ConfirmStepAsync(formId, new ConfirmStepRequest(step, Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
     [Fact]
     public async Task Steps_AreConfirmedInOrder_ByTheirRoles_ThenTheDoctorCompletes()
@@ -72,7 +72,7 @@ public sealed class ConfirmationStepTests
         var (s, formId) = await PatientSignedBm10();
 
         // Bác sĩ chưa hoàn tất được khi còn bước; điều dưỡng chưa đến lượt.
-        var doctorTooEarly = await s.Signing.CompleteAsync(formId, CancellationToken.None);
+        var doctorTooEarly = await s.Signing.CompleteAsync(formId, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
         s.LogInAs(s.Kkb, SystemRoles.Nurse);
         var nurseTooEarly = await Confirm(s, formId, "nurse");
         var nurseView = await s.Service.GetAsync(formId, CancellationToken.None);
@@ -87,7 +87,7 @@ public sealed class ConfirmationStepTests
 
         s.LogInAs(s.Kkb, SystemRoles.Doctor);
         var doctorView = await s.Service.GetAsync(formId, CancellationToken.None);
-        var completed = await s.Signing.CompleteAsync(formId, CancellationToken.None);
+        var completed = await s.Signing.CompleteAsync(formId, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         Assert.Contains("Nhân viên bộ phận hướng dẫn", doctorTooEarly.Error!.Message, StringComparison.Ordinal);
         Assert.Equal("consent_forms.invalid_status", nurseTooEarly.Error!.Code);
@@ -115,6 +115,27 @@ public sealed class ConfirmationStepTests
         Assert.True(pdf.IsFinal);
         Assert.Equal(2, pdf.StepConfirmations!.Count);
         Assert.All(pdf.StepConfirmations, c => Assert.NotNull(c));
+    }
+
+    [Fact]
+    public async Task StepConfirmation_RequiresAHandwrittenSignature_PrintedInTheStepBox()
+    {
+        var (s, formId) = await PatientSignedBm10();
+        s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+
+        var missing = await s.Signing.ConfirmStepAsync(formId, new ConfirmStepRequest("screeningStaff"), CancellationToken.None);
+        var blank = await s.Signing.ConfirmStepAsync(
+            formId, new ConfirmStepRequest("screeningStaff", Convert.ToBase64String(TestPng.Blank())), CancellationToken.None);
+        var confirmed = await Confirm(s, formId, "screeningStaff");
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        await Confirm(s, formId, "nurse");
+        s.LogInAs(s.Kkb, SystemRoles.Doctor);
+        await s.Signing.CompleteAsync(formId, new(SignaturePng), CancellationToken.None);
+
+        Assert.Contains("image", missing.Error!.FieldErrors!.Keys);
+        Assert.Equal("consent_forms.signature_blank", blank.Error!.Code);
+        Assert.True(confirmed.IsSuccess, confirmed.Error?.Message);
+        Assert.All(s.Ctx.Pdf.Last!.StepConfirmations!, c => Assert.NotNull(c!.ImagePng));
     }
 
     [Fact]
@@ -155,7 +176,7 @@ public sealed class ConfirmationStepTests
         var receptionistUserId = s.Ctx.Store.ConsentForms.Single(f => f.Id == formId).StepSignatures.First().UserId!.Value;
         s.Ctx.CurrentUser.UserId = receptionistUserId;
         s.Ctx.CurrentUser.Roles.Add(SystemRoles.Doctor);
-        var final = await s.Signing.CompleteAsync(formId, CancellationToken.None);
+        var final = await s.Signing.CompleteAsync(formId, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         Assert.Equal("consent_forms.same_confirmer", final.Error!.Code);
     }

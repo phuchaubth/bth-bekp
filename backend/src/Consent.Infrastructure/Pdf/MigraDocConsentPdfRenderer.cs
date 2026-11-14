@@ -370,7 +370,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
 
         lines.Add($"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
-        return new SignatureSlot(role, "(Đã xác nhận bằng tài khoản)", null, confirmation.Name, lines);
+        // Quyết định 17: nhân viên ký tay khi xác nhận; phiếu hoàn tất trước đó không có ảnh.
+        var signedHint = confirmation.ImagePng is null ? "(Đã xác nhận bằng tài khoản)" : "(Đã ký, xác nhận bằng tài khoản)";
+        return new SignatureSlot(role, signedHint, confirmation.ImagePng, confirmation.Name, lines);
     }
 
     private static void AddSignatures(Section section, ConsentPdfDocument document)

@@ -139,7 +139,7 @@ public sealed class ConsentSigningServiceTests
             "QT-KNGT-BM02", new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
 
         var signed = await PatientSigns(s, form.Id, sent);
-        var completed = await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        var completed = await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         Assert.True(signed.IsSuccess, signed.Error?.Message);
         Assert.Null(signed.Value.Decision);
@@ -164,14 +164,35 @@ public sealed class ConsentSigningServiceTests
     }
 
     [Fact]
+    public async Task Complete_RequiresTheStaffHandwrittenSignature_StoresItAndPrintsItOnThePdf()
+    {
+        var (s, form) = await PendingCk01();
+        await PatientSigns(s, form.Id);
+
+        var missing = await s.Signing.CompleteAsync(form.Id, new(null), CancellationToken.None);
+        var blank = await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Blank())), CancellationToken.None);
+        var notPng = await s.Signing.CompleteAsync(form.Id, new("@@@"), CancellationToken.None);
+        var completed = await s.Signing.CompleteAsync(form.Id, new(SignaturePng), CancellationToken.None);
+
+        Assert.Contains("image", missing.Error!.FieldErrors!.Keys);
+        Assert.Equal("consent_forms.signature_blank", blank.Error!.Code);
+        Assert.Contains("image", notPng.Error!.FieldErrors!.Keys);
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        var hospital = s.Ctx.Store.ConsentForms.Single(f => f.Id == form.Id).HospitalSignature!;
+        // Ảnh lưu lại là ảnh đã chuẩn hóa ở máy chủ (PNG xám), giống chữ ký của người bệnh.
+        Assert.Equal(0, TestPng.ReadHeader(hospital.ImagePng!).ColorType);
+        Assert.Equal(hospital.ImagePng, s.Ctx.Pdf.Last!.HospitalConfirmation!.ImagePng);
+    }
+
+    [Fact]
     public async Task Complete_NeedsPatientSignatureFirst_AndTheRoleConfiguredOnTheTemplate()
     {
         var (s, form) = await PendingCk01();
 
-        var beforePatient = await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        var beforePatient = await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
         await PatientSigns(s, form.Id);
         s.LogIn(s.Kkb); // điều dưỡng cùng khoa: không phải vai trò xác nhận của CK-01
-        var wrongRole = await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        var wrongRole = await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         Assert.Equal("consent_forms.invalid_status", beforePatient.Error!.Code);
         Assert.Equal(ErrorType.Forbidden, wrongRole.Error!.Type);
@@ -185,7 +206,7 @@ public sealed class ConsentSigningServiceTests
         var (s, form) = await PendingCk01(ConsentSignerKind.Representative);
         await PatientSigns(s, form.Id);
 
-        var completed = await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        var completed = await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         Assert.True(completed.IsSuccess, completed.Error?.Message);
         var detail = completed.Value;
@@ -233,7 +254,7 @@ public sealed class ConsentSigningServiceTests
     {
         var (s, form) = await PendingCk01();
         await PatientSigns(s, form.Id);
-        await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
 
         s.Ctx.Documents.Tamper(s.Ctx.Documents.Files.Keys.Single());
         var download = await s.Service.GetPdfAsync(form.Id, CancellationToken.None);
@@ -246,7 +267,7 @@ public sealed class ConsentSigningServiceTests
     {
         var (s, form) = await PendingCk01();
         await PatientSigns(s, form.Id);
-        await s.Signing.CompleteAsync(form.Id, CancellationToken.None);
+        await s.Signing.CompleteAsync(form.Id, new(Convert.ToBase64String(TestPng.Signature())), CancellationToken.None);
         s.Ctx.CurrentUser.Permissions.Add(Permissions.ConsentsRevoke);
 
         var noReason = await s.Signing.RevokeAsync(form.Id, new(" "), CancellationToken.None);

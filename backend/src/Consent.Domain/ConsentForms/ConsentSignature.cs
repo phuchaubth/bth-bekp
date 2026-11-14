@@ -22,7 +22,11 @@ public enum ConsentSignerRole
     Staff,
 }
 
-/// <summary>Cách ký: ký tay trên điện thoại, hoặc xác nhận bằng tài khoản đăng nhập (phía bệnh viện).</summary>
+/// <summary>
+/// Cách ký: <see cref="Handwritten"/> (người bệnh/người đại diện ký tay trong phiên ký), hoặc
+/// <see cref="AccountConfirmation"/> (nhân viên đăng nhập bằng tài khoản và ký tay khi xác nhận; phiếu hoàn tất trước
+/// quyết định 17 có thể không kèm ảnh).
+/// </summary>
 public enum ConsentSignatureMethod
 {
     Handwritten,
@@ -31,7 +35,8 @@ public enum ConsentSignatureMethod
 
 /// <summary>
 /// Một chữ ký trên phiếu. Chữ ký tay chỉ lưu ảnh PNG đã chuẩn hóa (không lưu nét ký, thời gian từng nét), ảnh được mã
-/// hóa khi lưu và luôn bị che trong nhật ký audit. Xác nhận phía bệnh viện không có ảnh, chỉ có tài khoản người xác nhận.
+/// hóa khi lưu và luôn bị che trong nhật ký audit. Nhân viên phía bệnh viện xác nhận bằng tài khoản đăng nhập kèm chữ ký
+/// tay (quyết định 17).
 /// </summary>
 public sealed class ConsentSignature : Entity, IAuditableEntity
 {
@@ -119,7 +124,8 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
             nowUtc);
     }
 
-    internal static ConsentSignature AccountConfirmation(Guid formId, Guid userId, string name, string? title, DateTimeOffset nowUtc) =>
+    internal static ConsentSignature AccountConfirmation(
+        Guid formId, Guid userId, string name, string? title, byte[] imagePng, DateTimeOffset nowUtc) =>
         new(
             Guid.CreateVersion7(),
             formId,
@@ -128,12 +134,12 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
             RequireName(name),
             Truncate(title, TitleMaxLength),
             userId,
-            null,
+            RequireImage(imagePng),
             null,
             nowUtc);
 
     internal static ConsentSignature StepConfirmation(
-        Guid formId, string stepKey, Guid userId, string name, string? title, DateTimeOffset nowUtc)
+        Guid formId, string stepKey, Guid userId, string name, string? title, byte[] imagePng, DateTimeOffset nowUtc)
     {
         var key = stepKey?.Trim() ?? string.Empty;
         if (key.Length is 0 or > StepKeyMaxLength)
@@ -149,11 +155,14 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
             RequireName(name),
             Truncate(title, TitleMaxLength),
             userId,
-            null,
+            RequireImage(imagePng),
             null,
             nowUtc,
             key);
     }
+
+    private static byte[] RequireImage(byte[] imagePng) =>
+        imagePng is { Length: > 0 } ? imagePng : throw new DomainException("Thiếu ảnh chữ ký.");
 
     private static string RequireName(string name)
     {

@@ -41,7 +41,7 @@ public sealed class ConsentFormTests
         form.SignByPatient(Session, ConsentDecision.Agreed, "Người bệnh giả lập", Png, "Thiết bị thử", Guid.NewGuid(), Now);
 
     private static void HospitalConfirms(ConsentForm form) =>
-        form.Complete(Guid.NewGuid(), "Nhân viên giả lập", "Điều dưỡng", "2026/11/a.pdf.enc", new string('a', 64), 1000, Now);
+        form.Complete(Guid.NewGuid(), "Nhân viên giả lập", "Điều dưỡng", Png, "2026/11/a.pdf.enc", new string('a', 64), 1000, Now);
 
     /// <summary>Đưa phiếu mới tới trạng thái cần kiểm thử bằng các bước hợp lệ.</summary>
     private static ConsentForm FormIn(Stage stage)
@@ -206,18 +206,18 @@ public sealed class ConsentFormTests
         var nurse = Guid.NewGuid();
         var doctor = Guid.NewGuid();
         var beforePatient = FormIn(Stage.AwaitingPatient);
-        Assert.Throws<DomainException>(() => beforePatient.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", null, Now));
+        Assert.Throws<DomainException>(() => beforePatient.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", null, Png, Now));
 
         var form = FormIn(Stage.AwaitingHospital);
         Assert.Throws<DomainException>(() =>
-            form.Complete(doctor, "Bác sĩ giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]));
+            form.Complete(doctor, "Bác sĩ giả lập", null, Png, "k", new string('a', 64), 1, Now, ["nurse"]));
 
-        var step = form.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", "Điều dưỡng", Now);
-        Assert.Throws<DomainException>(() => form.ConfirmStep("nurse", Guid.NewGuid(), "Người khác", null, Now));
-        Assert.Throws<DomainException>(() => form.ConfirmStep("screening", nurse, "Điều dưỡng giả lập", null, Now));
+        var step = form.ConfirmStep("nurse", nurse, "Điều dưỡng giả lập", "Điều dưỡng", Png, Now);
+        Assert.Throws<DomainException>(() => form.ConfirmStep("nurse", Guid.NewGuid(), "Người khác", null, Png, Now));
+        Assert.Throws<DomainException>(() => form.ConfirmStep("screening", nurse, "Điều dưỡng giả lập", null, Png, Now));
         Assert.Throws<DomainException>(() =>
-            form.Complete(nurse, "Điều dưỡng giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]));
-        form.Complete(doctor, "Bác sĩ giả lập", null, "k", new string('a', 64), 1, Now, ["nurse"]);
+            form.Complete(nurse, "Điều dưỡng giả lập", null, Png, "k", new string('a', 64), 1, Now, ["nurse"]));
+        form.Complete(doctor, "Bác sĩ giả lập", null, Png, "k", new string('a', 64), 1, Now, ["nurse"]);
 
         Assert.Equal(ConsentSignerRole.Staff, step.Role);
         Assert.Equal("nurse", step.StepKey);
@@ -227,10 +227,21 @@ public sealed class ConsentFormTests
     }
 
     [Fact]
+    public void StaffConfirmations_RequireASignatureImage()
+    {
+        var form = FormIn(Stage.AwaitingHospital);
+
+        Assert.Throws<DomainException>(() => form.ConfirmStep("nurse", Guid.NewGuid(), "Điều dưỡng giả lập", null, [], Now));
+        Assert.Throws<DomainException>(() =>
+            form.Complete(Guid.NewGuid(), "Bác sĩ giả lập", null, [], "k", new string('a', 64), 1, Now));
+        Assert.Equal(ConsentFormStatus.PendingSignature, form.Status);
+    }
+
+    [Fact]
     public void ReturnToDraft_ClearsConfirmationSteps()
     {
         var form = FormIn(Stage.AwaitingHospital);
-        form.ConfirmStep("nurse", Guid.NewGuid(), "Điều dưỡng giả lập", null, Now);
+        form.ConfirmStep("nurse", Guid.NewGuid(), "Điều dưỡng giả lập", null, Png, Now);
 
         form.ReturnToDraft(Now);
 
@@ -251,7 +262,8 @@ public sealed class ConsentFormTests
         Assert.Equal(ConsentSignerRole.Representative, form.PatientSignature!.Role);
         var hospital = form.HospitalSignature!;
         Assert.Equal(ConsentSignatureMethod.AccountConfirmation, hospital.Method);
-        Assert.Null(hospital.ImagePng);
+        // Quyết định 17: nhân viên xác nhận bằng tài khoản kèm chữ ký tay.
+        Assert.Equal(Png, hospital.ImagePng);
         Assert.Equal("Điều dưỡng", hospital.SignerTitle);
         Assert.Equal(new string('a', 64), form.SignedPdfSha256);
         Assert.Equal(Now, form.CompletedAtUtc);

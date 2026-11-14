@@ -260,12 +260,13 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     /// định nghĩa mẫu). Mỗi bước một lần; một tài khoản chỉ xác nhận một bước trên một phiếu, để mỗi phần có người chịu
     /// trách nhiệm riêng.
     /// </summary>
-    public ConsentSignature ConfirmStep(string stepKey, Guid userId, string name, string? title, DateTimeOffset nowUtc)
+    public ConsentSignature ConfirmStep(
+        string stepKey, Guid userId, string name, string? title, byte[] signaturePng, DateTimeOffset nowUtc)
     {
         Ensure(CanComplete, "Chỉ xác nhận được phiếu đang chờ ký sau khi người bệnh đã ký.");
         Ensure(!StepSignatures.Any(s => s.StepKey == stepKey), "Bước này đã được xác nhận.");
         EnsureNotConfirmedBy(userId);
-        var signature = ConsentSignature.StepConfirmation(Id, stepKey, userId, name, title, nowUtc);
+        var signature = ConsentSignature.StepConfirmation(Id, stepKey, userId, name, title, signaturePng, nowUtc);
         _signatures.Add(signature);
         UpdatedAtUtc = nowUtc;
         return signature;
@@ -281,13 +282,14 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     }
 
     /// <summary>
-    /// Phía bệnh viện xác nhận bằng tài khoản và hoàn tất phiếu, kèm file PDF đã ký (khóa lưu trữ, SHA-256).
+    /// Phía bệnh viện xác nhận bằng tài khoản kèm chữ ký tay và hoàn tất phiếu, kèm file PDF đã ký (khóa lưu trữ, SHA-256).
     /// Phiếu hoàn tất không sửa được; muốn thay đổi thì thu hồi rồi lập phiếu thay thế.
     /// </summary>
     public void Complete(
         Guid confirmedByUserId,
         string confirmedByName,
         string? confirmedByTitle,
+        byte[] signaturePng,
         string signedPdfKey,
         string signedPdfSha256,
         long signedPdfSize,
@@ -302,7 +304,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
             (requiredStepKeys ?? []).All(key => StepSignatures.Any(s => s.StepKey == key)),
             "Còn bước xác nhận chưa thực hiện.");
         EnsureNotConfirmedBy(confirmedByUserId);
-        _signatures.Add(ConsentSignature.AccountConfirmation(Id, confirmedByUserId, confirmedByName, confirmedByTitle, nowUtc));
+        _signatures.Add(ConsentSignature.AccountConfirmation(
+            Id, confirmedByUserId, confirmedByName, confirmedByTitle, signaturePng, nowUtc));
         SignedPdfKey = signedPdfKey;
         SignedPdfSha256 = signedPdfSha256;
         SignedPdfSize = signedPdfSize;

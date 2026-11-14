@@ -599,12 +599,13 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 8 | Người ký phía bệnh viện | **Cấu hình theo từng mẫu phiếu** (bác sĩ / điều dưỡng / tiếp đón); người chứng kiến (PA2) phải khác người ký phía bệnh viện |
 | 9 | Tích hợp (11/11/2026) | **Chưa cần kết nối HIS và SmartCA ở thời điểm hiện tại.** HIS tắt mặc định, giao diện ẩn thông tin HIS; ký số SmartCA (#1, #1a) tạm hoãn. Kiến trúc giữ sẵn interface để bật lại (ADR-017) |
 | 10 | Hình thức ký khi chưa có SmartCA (11/11/2026) | **Người bệnh (hoặc người đại diện) ký tay trên máy tính bảng.** Ảnh chữ ký chèn vào PDF, lưu mã băm, khóa phiếu (mục 2.5a, ADR-018) |
-| 11 | Phía bệnh viện khi ký tay (11/11/2026, đồng ý đề xuất) | Người ký theo cấu hình mẫu **chỉ xác nhận bằng tài khoản đang đăng nhập**, không ký tay thêm. PDF ghi họ tên, chức danh, thời điểm xác nhận |
+| 11 | Phía bệnh viện khi ký tay (11/11/2026, đồng ý đề xuất; **thay bởi quyết định 17**) | Người ký theo cấu hình mẫu xác nhận bằng tài khoản đang đăng nhập. PDF ghi họ tên, chức danh, thời điểm xác nhận |
 | 12 | Hình thức triển khai (13/11/2026, điều chỉnh) | **IIS + SQL Server 2025 Standard** trên Windows Server ([hướng dẫn, mục 5](trien-khai.md)). Ban đầu chọn Docker, nhưng hiện chưa bố trí hạ tầng Docker; hướng dẫn Docker giữ lại để chuyển sau |
 | 13 | Thiết bị ký (13/11/2026) | **Điện thoại thông minh** (iPhone/Android) thay cho máy tính bảng. Màn hình ký tối ưu cho điện thoại cầm dọc và ngang ([hướng dẫn, mục 9a](trien-khai.md)) |
 | 14 | Pháp chế (13/11/2026) | **Đồng ý**: chữ ký tay điện tử trên điện thoại kèm xác nhận bằng tài khoản dùng được cho các phiếu giai đoạn 1; lưu trữ theo thời hạn hồ sơ bệnh án, hệ thống không tự động xóa |
 | 15 | Chứng chỉ HTTPS (13/11/2026) | **Chứng chỉ công cộng** cho **`phieudongthuan.bth.org.vn`**, DNS nội bộ trỏ về máy chủ; tự động gia hạn ([hướng dẫn, mục 2a](trien-khai.md)) |
 | 16 | SQL Server (13/11/2026) | **SQL Server 2025 Standard**; không dùng Express cho môi trường chính thức. Kiểm thử tích hợp mặc định chạy trên 2025 ([hướng dẫn, mục 2b](trien-khai.md)) |
+| 17 | Nhân viên ký tay khi xác nhận (14/11/2026) | **Mọi nhân viên xác nhận phiếu đều ký tay** như người bệnh (bước trung gian và xác nhận cuối), ngoài việc đăng nhập bằng tài khoản của mình. Ảnh chữ ký được chuẩn hóa, kiểm tra, lưu mã hóa và in vào ô của nhân viên trên PDF. Phiếu hoàn tất trước đó giữ nguyên |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.

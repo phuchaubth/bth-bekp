@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Card, Input, Modal, Timeline, Typography } from 'antd'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import {
   consentFormKeys,
@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../auth/authContext'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
+import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
 
 /**
@@ -68,6 +69,50 @@ export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; 
         Điện thoại cầm dọc vẫn ký được; xoay ngang thì khung ký rộng hơn.
       </Typography.Paragraph>
       {error && <Alert type="error" showIcon title={error} />}
+    </Modal>
+  )
+}
+
+/**
+ * Nhân viên ký tay khi xác nhận (quyết định 17): ký bằng ngón tay, bút hoặc chuột vào khung, rồi bấm xác nhận. Tài khoản
+ * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF.
+ */
+export function StaffSignModal({
+  title,
+  description,
+  okText,
+  loading,
+  onSign,
+  onClose,
+}: {
+  title: string
+  description: string
+  okText: string
+  loading: boolean
+  onSign: (image: string) => void
+  onClose: () => void
+}) {
+  const pad = useRef<SignaturePadHandle>(null)
+  const [hasInk, setHasInk] = useState(false)
+
+  return (
+    <Modal
+      open
+      title={title}
+      okText={okText}
+      cancelText="Đóng"
+      width={640}
+      okButtonProps={{ disabled: !hasInk, loading }}
+      onOk={() => pad.current && onSign(pad.current.toPngBase64())}
+      onCancel={onClose}
+    >
+      <Typography.Paragraph>{description}</Typography.Paragraph>
+      <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
+      {!hasInk && (
+        <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+          Ký vào khung trên để bật nút {okText}.
+        </Typography.Paragraph>
+      )}
     </Modal>
   )
 }
@@ -136,7 +181,7 @@ export function FormHistory({ form }: { form: ConsentFormDetail }) {
         : {
             at: signature.signedAtUtc,
             color: 'blue',
-            text: `${signature.signerName}${signature.signerTitle ? ` (${signature.signerTitle})` : ''} xác nhận bằng tài khoản${
+            text: `${signature.signerName}${signature.signerTitle ? ` (${signature.signerTitle})` : ''} ký xác nhận${
               signature.stepKey ? `: ${form.steps.find((step) => step.key === signature.stepKey)?.label ?? signature.stepKey}` : ''
             }`,
           },

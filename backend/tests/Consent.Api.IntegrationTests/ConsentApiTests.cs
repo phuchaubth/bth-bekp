@@ -219,7 +219,7 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         var (signedStatus, signed) = await _client.SendJsonAsync(
             HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
             new { image = Convert.ToBase64String(TestPng.Signature()) });
-        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
 
         Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
         Assert.True(completedStatus == HttpStatusCode.OK, completed.ToString());
@@ -246,12 +246,12 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
             new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
         Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
 
-        var (completeTooEarly, early) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+        var (completeTooEarly, early) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
         var (stepStatus, afterStep) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant" });
+            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant", image = Convert.ToBase64String(TestPng.Signature()) });
         var (againStatus, _) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant" });
-        var (completeWrongRole, wrongRole) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist);
+            HttpMethod.Post, $"{form}/confirm-step", receptionist, new { stepKey = "consultant", image = Convert.ToBase64String(TestPng.Signature()) });
+        var (completeWrongRole, wrongRole) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
 
         Assert.Equal(HttpStatusCode.Conflict, completeTooEarly);
         Assert.Contains("Người tư vấn", early.GetProperty("title").GetString()!, StringComparison.Ordinal);
@@ -315,7 +315,7 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, againStatus);
 
         // Phía bệnh viện (điều dưỡng: vai trò xác nhận của TN-01) xác nhận bằng tài khoản → hoàn tất.
-        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", nurse);
+        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", nurse, new { image = Convert.ToBase64String(TestPng.Signature()) });
         Assert.True(completedStatus == HttpStatusCode.OK, completed.ToString());
         Assert.Equal("Completed", completed.GetProperty("status").GetString());
         Assert.Equal("Agreed", completed.GetProperty("decision").GetString());

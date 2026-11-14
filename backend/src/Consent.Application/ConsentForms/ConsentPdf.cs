@@ -45,7 +45,7 @@ public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedA
 /// Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam). Với các bước trung gian,
 /// <see cref="ConsentPdfDocument.StepConfirmations"/> theo đúng thứ tự <c>signatures.steps</c> (bước chưa làm là <c>null</c>).
 /// </summary>
-public sealed record ConsentPdfConfirmation(string Name, string? Title, DateTimeOffset ConfirmedAt);
+public sealed record ConsentPdfConfirmation(string Name, string? Title, DateTimeOffset ConfirmedAt, byte[]? ImagePng = null);
 
 public sealed record ConsentPdfFile(byte[] Content, string FileName);
 

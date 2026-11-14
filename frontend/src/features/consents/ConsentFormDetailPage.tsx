@@ -33,7 +33,7 @@ import { relationshipLabels } from '../patients/labels'
 import { signerRoleLabel } from '../templates/signerRoles'
 import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
-import { FormHistory, RevokeFormModal, StartSigningModal } from './SigningActions'
+import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
 
 /**
  * Màn hình 8 (và bước soạn nội dung của màn hình 5): chi tiết phiếu, soạn phiếu nháp, trình ký, chuyển sang chế độ ký
@@ -62,21 +62,26 @@ export function ConsentFormDetailPage() {
     onError: (e) => message.error(errorMessage(e)),
   })
 
+  // Hộp thoại ký của nhân viên: bước trung gian đang chờ, hoặc xác nhận cuối.
+  const [staffSign, setStaffSign] = useState<'step' | 'complete' | null>(null)
+
   const complete = useMutation({
-    mutationFn: () => consentFormsApi.complete(id),
+    mutationFn: (image: string) => consentFormsApi.complete(id, image),
     onSuccess: (updated) => {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      setStaffSign(null)
       message.success('Đã xác nhận và hoàn tất phiếu. PDF đã ký được lưu.')
     },
     onError: (e) => message.error(errorMessage(e)),
   })
 
   const confirmStep = useMutation({
-    mutationFn: (stepKey: string) => consentFormsApi.confirmStep(id, stepKey),
+    mutationFn: ({ stepKey, image }: { stepKey: string; image: string }) => consentFormsApi.confirmStep(id, stepKey, image),
     onSuccess: (updated) => {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      setStaffSign(null)
       message.success('Đã xác nhận bước của bạn.')
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -115,30 +120,14 @@ export function ConsentFormDetailPage() {
               </Button>
             )}
             {form.actions.canConfirmStep && nextStep && (
-              <Popconfirm
-                title={`Xác nhận: ${nextStep.label}?`}
-                description="Bạn xác nhận phần này bằng tài khoản đang đăng nhập. Mỗi bước cần một người khác nhau."
-                okText="Xác nhận"
-                cancelText="Đóng"
-                onConfirm={() => confirmStep.mutate(nextStep.key)}
-              >
-                <Button type="primary" icon={<CheckCircleOutlined />} loading={confirmStep.isPending}>
-                  Xác nhận: {nextStep.label}
-                </Button>
-              </Popconfirm>
+              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setStaffSign('step')}>
+                Xác nhận: {nextStep.label}
+              </Button>
             )}
             {form.actions.canConfirm && (
-              <Popconfirm
-                title="Xác nhận và hoàn tất phiếu?"
-                description="Bạn xác nhận bằng tài khoản đang đăng nhập. Phiếu sẽ bị khóa, PDF đã ký được lưu kèm mã băm."
-                okText="Xác nhận"
-                cancelText="Đóng"
-                onConfirm={() => complete.mutate()}
-              >
-                <Button type="primary" icon={<CheckCircleOutlined />} loading={complete.isPending}>
-                  Xác nhận và hoàn tất
-                </Button>
-              </Popconfirm>
+              <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setStaffSign('complete')}>
+                Xác nhận và hoàn tất
+              </Button>
             )}
             <Button icon={<FilePdfOutlined />} onClick={() => setPdfOpen(true)}>
               {form.signedPdfSha256 ? 'Xem PDF đã ký' : 'Xem PDF'}
@@ -187,6 +176,26 @@ export function ConsentFormDetailPage() {
       {cancelOpen && <CancelFormModal form={form} onClose={() => setCancelOpen(false)} />}
       {signingOpen && <StartSigningModal form={form} onClose={() => setSigningOpen(false)} />}
       {revokeOpen && <RevokeFormModal form={form} onClose={() => setRevokeOpen(false)} />}
+      {staffSign === 'step' && nextStep && (
+        <StaffSignModal
+          title={`Ký xác nhận: ${nextStep.label}`}
+          description="Ký vào khung bên dưới để xác nhận phần của bạn. Chữ ký được in vào ô của bạn trên phiếu, kèm họ tên và thời điểm theo tài khoản đang đăng nhập. Mỗi bước cần một người khác nhau."
+          okText="Ký và xác nhận"
+          loading={confirmStep.isPending}
+          onSign={(image) => confirmStep.mutate({ stepKey: nextStep.key, image })}
+          onClose={() => setStaffSign(null)}
+        />
+      )}
+      {staffSign === 'complete' && (
+        <StaffSignModal
+          title="Ký xác nhận và hoàn tất phiếu"
+          description="Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm."
+          okText="Ký và hoàn tất"
+          loading={complete.isPending}
+          onSign={(image) => complete.mutate(image)}
+          onClose={() => setStaffSign(null)}
+        />
+      )}
     </>
   )
 }
@@ -299,10 +308,10 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
             {form.steps.length > 0 && <StepProgress form={form} />}
             {pendingStep
               ? form.actions.canConfirmStep
-                ? `Bấm “Xác nhận: ${pendingStep.label}” để xác nhận phần của bạn bằng tài khoản.`
+                ? `Bấm “Xác nhận: ${pendingStep.label}” và ký vào khung để xác nhận phần của bạn.`
                 : `Chờ nhân viên có vai trò ${pendingStep.roleName} xác nhận bước “${pendingStep.label}”.`
               : form.actions.canConfirm
-                ? 'Bấm “Xác nhận và hoàn tất” để xác nhận bằng tài khoản của bạn và khóa phiếu.'
+                ? 'Bấm “Xác nhận và hoàn tất”, ký vào khung để xác nhận và khóa phiếu.'
                 : `Chờ nhân viên có vai trò ${signerRoleLabel(form.hospitalSignerRoleCode)} xác nhận bằng tài khoản.`}
           </>
         }

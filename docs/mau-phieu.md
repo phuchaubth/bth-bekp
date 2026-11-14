@@ -21,7 +21,7 @@ hai mã này (13/11/2026).
 
 - **Thông tin hành chính** (họ tên, ngày sinh, giới tính, mã người bệnh, CCCD, điện thoại, địa chỉ) in tự động ở mục
   "I. Thông tin người bệnh" từ hồ sơ, nên không lặp lại trong nội dung riêng của mẫu.
-- **Ngày tháng và chữ ký** do hệ thống in: người bệnh ký tay trên máy tính bảng, phía bệnh viện xác nhận bằng tài khoản.
+- **Ngày tháng và chữ ký** do hệ thống in: người bệnh ký tay trên điện thoại; nhân viên phía bệnh viện đăng nhập bằng tài khoản và cũng ký tay khi xác nhận (quyết định 17). PDF có ảnh chữ ký, họ tên, chức danh và thời điểm của từng người.
   Các dòng "Ngày … tháng … năm …" trên giấy được thay bằng ngày lập và thời điểm ký.
 - **Ô đánh dấu** chuyển thành câu hỏi chọn một hoặc chọn nhiều. Dòng "Có, ghi rõ…" mở thêm ô nhập chỉ khi chọn "Có".
 - **Song ngữ** giữ nguyên: nhãn tiếng Việt kèm tiếng Anh trong ngoặc, như bản giấy.

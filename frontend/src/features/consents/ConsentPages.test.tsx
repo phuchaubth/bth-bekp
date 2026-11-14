@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ConsentFormActions, ConsentFormDetail, ConsentFormListItem } from '../../api/consentForms'
@@ -441,7 +441,31 @@ describe('Phiếu chờ ký', () => {
   })
 })
 
+/** jsdom không vẽ được canvas: giả lập phần vẽ và ảnh xuất ra của khung ký. */
+function mockCanvas() {
+  const context = { setTransform: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn() }
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never)
+  vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,TkhBTl9WSUVOX0tZ')
+  vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue(
+    { left: 0, top: 0, right: 600, bottom: 200, width: 600, height: 200, x: 0, y: 0, toJSON: () => ({}) } as DOMRect,
+  )
+}
+
+/** Nhân viên ký một nét vào khung ký trong hộp thoại xác nhận. */
+async function staffSigns(dialogName: RegExp) {
+  const dialog = await screen.findByRole('dialog', { name: dialogName })
+  const canvas = within(dialog).getByRole('img', { name: /Khung ký tên/ })
+  fireEvent.pointerDown(canvas, { clientX: 40, clientY: 120, pointerId: 1, pointerType: 'mouse' })
+  fireEvent.pointerMove(canvas, { clientX: 160, clientY: 80, pointerId: 1, pointerType: 'mouse' })
+  fireEvent.pointerMove(canvas, { clientX: 260, clientY: 140, pointerId: 1, pointerType: 'mouse' })
+  fireEvent.pointerUp(canvas, { clientX: 260, clientY: 140, pointerId: 1, pointerType: 'mouse' })
+  return dialog
+}
+
 describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
+  beforeEach(() => mockCanvas())
+  afterEach(() => vi.restoreAllMocks())
+
   const patientSignature = {
     role: 'Patient' as const,
     method: 'Handwritten' as const,
@@ -491,11 +515,16 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     expect(await screen.findByText(/Phạm Thị Dung đã ký lúc .* \(Đồng ý\)/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Ký trên điện thoại/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Xác nhận và hoàn tất/ }))
-    await user.click(await screen.findByRole('button', { name: 'Xác nhận' }))
+    // Nhân viên phải ký vào khung (quyết định 17): chưa ký thì chưa bấm được.
+    const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeDisabled()
+    await staffSigns(/Ký xác nhận và hoàn tất phiếu/)
+    await user.click(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' }))
 
     expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
-    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')).toBe(true)
-    expect(screen.getByText('Tiếp đón Demo (Nhân viên tiếp đón) xác nhận bằng tài khoản')).toBeInTheDocument()
+    const completeCall = calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')!
+    expect(completeCall.body).toEqual({ image: 'TkhBTl9WSUVOX0tZ' })
+    expect(screen.getByText('Tiếp đón Demo (Nhân viên tiếp đón) ký xác nhận')).toBeInTheDocument()
     expect(screen.getByText(/Phạm Thị Dung \(người bệnh\) ký tay trên điện thoại – Đồng ý/)).toBeInTheDocument()
     expect(screen.getByText('ab'.repeat(32))).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Trả về nháp/ })).not.toBeInTheDocument()
@@ -539,13 +568,14 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     expect(await screen.findByRole('list', { name: 'Các bước xác nhận' })).toHaveTextContent('đang chờ (Điều dưỡng)')
     expect(screen.queryByRole('button', { name: /Xác nhận và hoàn tất/ })).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Xác nhận: Điều dưỡng thực hiện/ }))
-    await user.click(await screen.findByRole('button', { name: 'Xác nhận' }))
+    const dialog = await staffSigns(/Ký xác nhận: Điều dưỡng thực hiện/)
+    await user.click(within(dialog).getByRole('button', { name: 'Ký và xác nhận' }))
 
     expect(await screen.findByText(/Điều dưỡng Demo đã xác nhận lúc/)).toBeInTheDocument()
     expect(screen.getByText('Chờ nhân viên có vai trò Tiếp đón xác nhận bằng tài khoản.')).toBeInTheDocument()
-    expect(screen.getByText(/Điều dưỡng Demo \(Điều dưỡng\) xác nhận bằng tài khoản: Điều dưỡng thực hiện/)).toBeInTheDocument()
+    expect(screen.getByText(/Điều dưỡng Demo \(Điều dưỡng\) ký xác nhận: Điều dưỡng thực hiện/)).toBeInTheDocument()
     const call = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/confirm-step')!
-    expect(call.body).toEqual({ stepKey: 'nurse' })
+    expect(call.body).toEqual({ stepKey: 'nurse', image: 'TkhBTl9WSUVOX0tZ' })
   })
 
   it('người bệnh đã ký nhưng người xem không đúng vai trò xác nhận: chỉ báo chờ', async () => {

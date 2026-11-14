@@ -115,21 +115,10 @@ public sealed class ConsentSigningService(
         }
 
         var decision = requiresDecision ? request.Decision : null;
-        var image = DecodeImage(request.Image!);
-        if (image is null)
+        var normalized = NormalizeSignature(request.Image);
+        if (normalized.IsFailure)
         {
-            return Error.ValidationField("image", "Ảnh chữ ký không đúng định dạng PNG.");
-        }
-
-        var normalized = SignatureImage.Normalize(image);
-        if (normalized.IsBlank)
-        {
-            return Error.BusinessRule("consent_forms.signature_blank", normalized.Error!);
-        }
-
-        if (!normalized.IsValid)
-        {
-            return Error.ValidationField("image", normalized.Error!);
+            return normalized.Error!;
         }
 
         var (patient, representative) = await formService.ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
@@ -137,7 +126,7 @@ public sealed class ConsentSigningService(
             sessionId,
             decision,
             representative?.FullName ?? patient.FullName,
-            normalized.Png!,
+            normalized.Value,
             requestContext.UserAgent,
             currentUser.UserId,
             clock.UtcNow);
@@ -160,6 +149,12 @@ public sealed class ConsentSigningService(
         if (string.IsNullOrWhiteSpace(request.StepKey))
         {
             return Error.ValidationField("stepKey", "Thiếu bước cần xác nhận.");
+        }
+
+        var signaturePng = NormalizeSignature(request.Image);
+        if (signaturePng.IsFailure)
+        {
+            return signaturePng.Error!;
         }
 
         var form = await formService.LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);
@@ -205,7 +200,7 @@ public sealed class ConsentSigningService(
 
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
-        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, clock.UtcNow);
+        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, signaturePng.Value, clock.UtcNow);
         formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
@@ -215,8 +210,16 @@ public sealed class ConsentSigningService(
     /// Phía bệnh viện xác nhận bằng tài khoản (người có vai trò theo cấu hình mẫu) sau khi người bệnh đã ký: dựng PDF bản
     /// cuối có ảnh chữ ký, lưu file (mã hóa) kèm SHA-256 và khóa phiếu.
     /// </summary>
-    public async Task<Result<ConsentFormDetailDto>> CompleteAsync(Guid id, CancellationToken cancellationToken)
+    public async Task<Result<ConsentFormDetailDto>> CompleteAsync(
+        Guid id, CompleteConsentFormRequest request, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(request);
+        var signaturePng = NormalizeSignature(request.Image);
+        if (signaturePng.IsFailure)
+        {
+            return signaturePng.Error!;
+        }
+
         var form = await formService.LoadInScopeAsync(id, cancellationToken).ConfigureAwait(false);
         if (form is null)
         {
@@ -256,13 +259,14 @@ public sealed class ConsentSigningService(
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
         var now = clock.UtcNow;
-        var confirmation = new ConsentPdfConfirmation(user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset));
+        var confirmation = new ConsentPdfConfirmation(
+            user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Value);
         var pdf = pdfRenderer.Render(await formService.BuildPdfDocumentAsync(form, confirmation, cancellationToken).ConfigureAwait(false));
         var sha256 = ConsentFormService.Sha256(pdf);
         // Lưu file trước; nếu lưu CSDL thất bại thì chỉ còn một file thừa (không ảnh hưởng dữ liệu).
         var key = await documents.SaveAsync($"{form.FormNo}.pdf", pdf, cancellationToken).ConfigureAwait(false);
 
-        form.Complete(userId, user.FullName, user.Title, key, sha256, pdf.LongLength, now, stepKeys);
+        form.Complete(userId, user.FullName, user.Title, signaturePng.Value, key, sha256, pdf.LongLength, now, stepKeys);
         formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256 }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
@@ -292,6 +296,37 @@ public sealed class ConsentSigningService(
         formService.AddAudit(AuditActions.ConsentFormRevoked, form.Id);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Kiểm tra và chuẩn hóa ảnh chữ ký tay (người bệnh hoặc nhân viên): Base64 PNG, không quá lớn, có nét ký đủ dài.
+    /// Trả về ảnh PNG xám đã cắt sát nét ký.
+    /// </summary>
+    private static Result<byte[]> NormalizeSignature(string? image)
+    {
+        if (string.IsNullOrWhiteSpace(image))
+        {
+            return Error.ValidationField("image", "Vui lòng ký vào khung ký.");
+        }
+
+        if (image.Length > PatientSignatureRequestValidator.MaxImageLength)
+        {
+            return Error.ValidationField("image", "Ảnh chữ ký quá lớn.");
+        }
+
+        var decoded = DecodeImage(image);
+        if (decoded is null)
+        {
+            return Error.ValidationField("image", "Ảnh chữ ký không đúng định dạng PNG.");
+        }
+
+        var normalized = SignatureImage.Normalize(decoded);
+        if (normalized.IsBlank)
+        {
+            return Error.BusinessRule("consent_forms.signature_blank", normalized.Error!);
+        }
+
+        return normalized.IsValid ? normalized.Png! : Error.ValidationField("image", normalized.Error!);
     }
 
     /// <summary>Nhận Base64, có hoặc không có tiền tố <c>data:image/png;base64,</c>.</summary>

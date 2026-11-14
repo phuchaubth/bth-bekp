@@ -329,7 +329,7 @@ public sealed class ConsentFormService(
             : null;
         var steps = definition.Signatures?.Steps is { Count: > 0 } stepDefinitions
             ? stepDefinitions.Select(step => form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key) is { } done
-                ? new ConsentPdfConfirmation(done.SignerName, done.SignerTitle, done.SignedAtUtc.ToOffset(VietnamOffset))
+                ? new ConsentPdfConfirmation(done.SignerName, done.SignerTitle, done.SignedAtUtc.ToOffset(VietnamOffset), done.ImagePng)
                 : null).ToList()
             : null;
 

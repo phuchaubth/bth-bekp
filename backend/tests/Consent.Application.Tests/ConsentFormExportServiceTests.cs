@@ -36,7 +36,7 @@ public sealed class ConsentFormExportServiceTests
         var staffLogsInAgain = s.UseSigningToken();
         Assert.True((await s.Signing.SignAsPatientAsync(completed, new(ConsentDecision.Agreed, SignaturePng), ct)).IsSuccess);
         staffLogsInAgain();
-        Assert.True((await s.Signing.CompleteAsync(completed, ct)).IsSuccess);
+        Assert.True((await s.Signing.CompleteAsync(completed, new(SignaturePng), ct)).IsSuccess);
 
         s.Ctx.Clock.Advance(TimeSpan.FromHours(1));
         var draft = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), ct)).Value.Id;

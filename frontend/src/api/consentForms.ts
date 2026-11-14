@@ -190,9 +190,12 @@ export const consentFormsApi = {
       body: input,
       token: signingToken,
     }),
-  confirmStep: (id: string, stepKey: string) =>
-    apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey } }),
-  complete: (id: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST' }),
+  /** Xác nhận bước trung gian, kèm ảnh chữ ký tay của nhân viên (PNG Base64, quyết định 17). */
+  confirmStep: (id: string, stepKey: string, image: string) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey, image } }),
+  /** Xác nhận cuối và hoàn tất phiếu, kèm ảnh chữ ký tay của nhân viên. */
+  complete: (id: string, image: string) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: { image } }),
   revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
 }
 
@@ -245,5 +248,5 @@ export const signerRoleLabels: Record<ConsentSignerRole, string> = {
 
 export const signatureMethodLabels: Record<ConsentSignatureMethod, string> = {
   Handwritten: 'Ký tay trên điện thoại',
-  AccountConfirmation: 'Xác nhận bằng tài khoản',
+  AccountConfirmation: 'Xác nhận bằng tài khoản, ký tay',
 }

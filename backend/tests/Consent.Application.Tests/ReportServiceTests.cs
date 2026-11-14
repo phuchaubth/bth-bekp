@@ -26,7 +26,7 @@ public sealed class ReportServiceTests
         Assert.True((await s.Signing.SignAsPatientAsync(id, new(decision, SignaturePng), ct)).IsSuccess);
         back();
         s.Ctx.Clock.Advance(TimeSpan.FromMinutes(minutes));
-        Assert.True((await s.Signing.CompleteAsync(id, ct)).IsSuccess);
+        Assert.True((await s.Signing.CompleteAsync(id, new(SignaturePng), ct)).IsSuccess);
         return id;
     }
 
