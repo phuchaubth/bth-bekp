@@ -68,7 +68,11 @@ public static class FormDataEvaluator
                 continue;
             }
 
-            var value = Normalize(block, input[key], out var typeError);
+            // Câu hỏi tự chọn theo giá trị số của trường đứng trước (ví dụ mức BMI): bỏ qua lựa chọn người dùng gửi lên.
+            var raw = block.ValueFrom is not null && DerivedOption(block, visibleValues) is { } derived
+                ? JsonValue.Create(derived)
+                : input[key];
+            var value = Normalize(block, raw, out var typeError);
             if (!IsVisible(block.VisibleWhen, visibleValues, scores, blocks))
             {
                 if (keepHidden && value is not null && typeError is null)
@@ -154,6 +158,18 @@ public static class FormDataEvaluator
 
         error = "Giá trị không hợp lệ.";
         return null;
+    }
+
+    /// <summary>Lựa chọn có khoảng [min, max) chứa giá trị số của trường nguồn; chưa có giá trị hoặc không khớp thì null.</summary>
+    internal static string? DerivedOption(TemplateBlock block, JsonObject visibleValues)
+    {
+        var source = visibleValues[block.ValueFrom!] is JsonValue v && v.TryGetValue<string>(out var text) ? text : null;
+        if (ComputedFormulas.ParseNumber(source) is not { } number)
+        {
+            return null;
+        }
+
+        return block.Options?.FirstOrDefault(o => (o.Min is null || number >= o.Min) && (o.Max is null || number < o.Max))?.Value;
     }
 
     private static JsonArray? NormalizeRows(TemplateBlock block, JsonNode raw, out string? error)

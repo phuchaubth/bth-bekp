@@ -194,6 +194,7 @@ public static partial class TemplateDefinitionValidator
             case BlockTypes.Choice:
             case BlockTypes.MultiChoice:
                 ValidateOptions(block, where, errors);
+                ValidateValueFrom(block, where, declared, errors);
                 break;
             case BlockTypes.Repeater:
                 ValidateColumns(block, where, errors);
@@ -265,6 +266,29 @@ public static partial class TemplateDefinitionValidator
         if (block.Columns.Select(c => c.Key).Distinct(StringComparer.Ordinal).Count() != block.Columns.Count)
         {
             errors.Add($"{where}: tên cột bị trùng.");
+        }
+    }
+
+    private static void ValidateValueFrom(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)
+    {
+        if (block.ValueFrom is null)
+        {
+            return;
+        }
+
+        if (block.Type != BlockTypes.Choice)
+        {
+            errors.Add($"{where}: chỉ câu hỏi chọn một mới tự chọn theo trường khác.");
+        }
+
+        if (!declared.TryGetValue(block.ValueFrom, out var source) || source.Type is not (BlockTypes.Computed or BlockTypes.Text))
+        {
+            errors.Add($"{where}: \"{block.ValueFrom}\" phải là trường văn bản hoặc trường tự tính đứng trước.");
+        }
+
+        if (block.Options?.Any(o => o is null || (o.Min is null && o.Max is null) || o.Min >= o.Max) == true)
+        {
+            errors.Add($"{where}: mỗi lựa chọn phải có khoảng giá trị \"min\" và/hoặc \"max\" (min < max).");
         }
     }
 

@@ -313,7 +313,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | `paragraph`, `list` | Đoạn văn, danh sách cố định (không nhập liệu) | `text`; `items`, `layout: "ordered"` |
 | `text` | Ô chữ | `maxLength` (1–4.000), `pattern` + `patternMessage`, `prefill` |
 | `date`, `datetime` | Ngày (`yyyy-MM-dd`), ngày giờ (`yyyy-MM-ddTHH:mm`, giờ Việt Nam) | |
-| `choice` | Chọn một | `options` (`value`, `label`, `score` nếu là câu hỏi tính điểm), `layout: "inline"` |
+| `choice` | Chọn một | `options` (`value`, `label`, `score` nếu là câu hỏi tính điểm), `layout: "inline"`. Tự chọn theo giá trị số của trường đứng trước: `valueFrom` (trường văn bản hoặc `computed`) và mỗi lựa chọn có `min` (≥) và/hoặc `max` (<); khi trường nguồn có giá trị, máy chủ chọn theo khoảng và bỏ qua lựa chọn gửi lên, chưa có giá trị thì chọn tay |
 | `multiChoice` | Chọn nhiều | `options`, `minItems`, `maxItems`, `requireAll` (phải chọn đủ mọi mục) |
 | `confirm` | Ô xác nhận (phải đánh dấu nếu `required`) | |
 | `repeater` | Bảng nhiều dòng | `columns` (`key`, `label`, `required`, `maxLength`, `pattern`), `minItems`, `maxItems` |

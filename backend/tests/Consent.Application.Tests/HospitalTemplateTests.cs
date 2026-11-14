@@ -130,6 +130,36 @@ public sealed class HospitalTemplateTests
         Assert.DoesNotContain("bmi", result.Errors.Keys);
     }
 
+    [Theory]
+    [InlineData("64", "atLeast20")]      // 25,0
+    [InlineData("51,2", "atLeast20")]    // 20,0 (đúng ngưỡng 20 thuộc mức ≥ 20)
+    [InlineData("51", "from18_5to20")]   // 19,9
+    [InlineData("47,4", "from18_5to20")] // 18,5
+    [InlineData("47,3", "from18_5to20")] // 18,48 làm tròn thành 18,5: chọn theo BMI hiển thị trên phiếu
+    [InlineData("47,2", "below18_5")]    // 18,4
+    public void Bm10_AdultBmiScore_IsSelectedFromComputedBmi_IgnoringUserChoice(string weight, string expected)
+    {
+        var data = InitialAssessment();
+        data["weight"] = weight;
+        data["adultBmiScore"] = "atLeast20" == expected ? "below18_5" : "atLeast20";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal(expected, result.Data["adultBmiScore"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Bm10_AdultBmiScore_IsChosenByHand_WhenBmiCannotBeComputed()
+    {
+        var data = InitialAssessment();
+        data.Remove("weight");
+        data["adultBmiScore"] = "below18_5";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal("below18_5", result.Data["adultBmiScore"]!.GetValue<string>());
+    }
+
     [Fact]
     public void Bm10_Bmi_IsEmptyUntilWeightAndHeightAreEntered()
     {
@@ -166,7 +196,8 @@ public sealed class HospitalTemplateTests
         string bmi, string weightLoss, string acuteIllness, int expectedTotal, string expectedLevel)
     {
         var data = InitialAssessment();
-        data["adultBmiScore"] = bmi;
+        // Mức BMI tự chọn theo BMI tính từ cân nặng (cao 160 cm): 60 kg → 23,4; 50 kg → 19,5; 45 kg → 17,6.
+        data["weight"] = bmi switch { "atLeast20" => "60", "from18_5to20" => "50", _ => "45" };
         data["adultWeightLossScore"] = weightLoss;
         data["adultAcuteIllnessScore"] = acuteIllness;
 

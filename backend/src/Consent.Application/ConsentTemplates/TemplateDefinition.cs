@@ -71,6 +71,12 @@ public sealed record TemplateBlock
     /// <summary>Khối <c>score</c>: các mức theo tổng điểm, tăng dần theo <see cref="ScoreLevel.Min"/>.</summary>
     public IReadOnlyList<ScoreLevel>? Levels { get; init; }
 
+    /// <summary>
+    /// Câu hỏi chọn một tự chọn theo giá trị số của trường đứng trước (ví dụ mức BMI theo BMI tự tính): chọn lựa chọn có
+    /// khoảng <c>min</c>/<c>max</c> chứa giá trị đó. Trường nguồn chưa có giá trị thì người dùng chọn tay.
+    /// </summary>
+    public string? ValueFrom { get; init; }
+
     /// <summary>Khối <c>computed</c>: công thức (xem <see cref="ComputedFormulas"/>, ví dụ <c>bmi</c>).</summary>
     public string? Formula { get; init; }
 
@@ -79,7 +85,9 @@ public sealed record TemplateBlock
 }
 
 /// <summary>Lựa chọn; <see cref="Score"/> có giá trị khi là câu hỏi tính điểm.</summary>
-public sealed record TemplateOption(string Value, string Label, int? Score = null);
+/// <param name="Min">Khi câu hỏi có <see cref="TemplateBlock.ValueFrom"/>: giá trị nguồn ≥ Min (bỏ trống: không giới hạn dưới).</param>
+/// <param name="Max">Khi câu hỏi có <see cref="TemplateBlock.ValueFrom"/>: giá trị nguồn &lt; Max (bỏ trống: không giới hạn trên).</param>
+public sealed record TemplateOption(string Value, string Label, int? Score = null, decimal? Min = null, decimal? Max = null);
 
 public sealed record TemplateColumn(
     string Key, string Label, bool Required = false, int? MaxLength = null, string? Pattern = null, string? PatternMessage = null);

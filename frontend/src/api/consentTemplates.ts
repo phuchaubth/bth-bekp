@@ -19,6 +19,9 @@ export interface TemplateOption {
   value: string
   label: string
   score?: number
+  /** Khi câu hỏi có `valueFrom`: giá trị nguồn ≥ min và < max (bỏ trống: không giới hạn). */
+  min?: number
+  max?: number
 }
 
 export interface TemplateColumn {
@@ -62,6 +65,8 @@ export interface TemplateBlock {
   visibleWhen?: TemplateCondition
   sumOf?: string[]
   levels?: ScoreLevel[]
+  /** Câu hỏi chọn một tự chọn theo giá trị số của trường đứng trước (ví dụ mức BMI theo BMI tự tính). */
+  valueFrom?: string
   /** Khối `computed`: công thức (hiện có `bmi`) và các trường đầu vào theo thứ tự (bmi: cân nặng kg, chiều cao cm). */
   formula?: string
   inputs?: string[]

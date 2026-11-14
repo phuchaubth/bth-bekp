@@ -79,7 +79,8 @@ Một phiếu điện tử gồm đủ các phần của bản giấy, theo th�
    trạng sinh sống, đánh giá đau (thời gian, vị trí, điểm 0–10, thang NRS / Wong-Baker / FLACC / CRIES), nguy cơ té ngã
    cao.
 5. **Sàng lọc dinh dưỡng**, chọn đối tượng:
-   - Người lớn: điểm BMI (0/1/2), % sụt cân (0/1/2), bệnh lý cấp hoặc gần như không ăn > 5 ngày (0/2). Hệ thống tự cộng
+   - Người lớn: điểm BMI (0/1/2; **tự chọn theo BMI tự tính**: ≥ 20 → 0, 18,5 đến dưới 20 → 1, dưới 18,5 → 2, so với BMI đã
+     làm tròn như in trên phiếu; chưa có BMI thì chọn tay), % sụt cân (0/1/2), bệnh lý cấp hoặc gần như không ăn > 5 ngày (0/2). Hệ thống tự cộng
      tổng 0–6 và xếp mức: 0 không nguy cơ, 1 trung bình, 2–4 cao, ≥ 5 rất cao.
    - Bệnh nhi < 16 tuổi (PNST): 4 câu Có/Không, tự đếm số yếu tố nguy cơ; 0–1 kết thúc đánh giá, ≥ 2 có nguy cơ.
 6. **Nhu cầu GDSK do điều dưỡng thực hiện** (phòng ngừa té ngã, chăm sóc vết thương). Điều dưỡng xác nhận bằng tài

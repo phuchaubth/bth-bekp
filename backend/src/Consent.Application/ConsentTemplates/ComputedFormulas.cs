@@ -23,7 +23,7 @@ public static class ComputedFormulas
         ArgumentNullException.ThrowIfNull(inputs);
         switch (formula)
         {
-            case Bmi when inputs.Count == 2 && Parse(inputs[0]) is { } weightKg && Parse(inputs[1]) is { } heightCm:
+            case Bmi when inputs.Count == 2 && ParseNumber(inputs[0]) is { } weightKg && ParseNumber(inputs[1]) is { } heightCm:
                 if (weightKg <= 0 || heightCm <= 0)
                 {
                     return null;
@@ -38,7 +38,7 @@ public static class ComputedFormulas
     }
 
     /// <summary>Số nhập tay: chấp nhận dấu phẩy hoặc dấu chấm thập phân ("58,5", "58.5").</summary>
-    private static decimal? Parse(string? text) =>
+    public static decimal? ParseNumber(string? text) =>
         decimal.TryParse(
             text?.Trim().Replace(',', '.'), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value)
             ? value

@@ -310,7 +310,7 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['nurse', 'screeningStaff'])
   })
 
-  it('xem trước: BMI tự tính ngay khi nhập chiều cao và cân nặng, không nhập tay được', async () => {
+  it('xem trước: BMI tự tính ngay khi nhập chiều cao và cân nặng; mức BMI tự chọn theo BMI', async () => {
     const withBmi: TemplateDefinition = {
       title: 'Phiếu thử nghiệm',
       sections: [
@@ -319,6 +319,17 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
             { type: 'text', key: 'height', label: 'Chiều cao (Height), cm' },
             { type: 'text', key: 'weight', label: 'Cân nặng (Weight), kg' },
             { type: 'computed', key: 'bmi', label: 'Chỉ số khối cơ thể (Body Mass Index), kg/m²', formula: 'bmi', inputs: ['weight', 'height'] },
+            {
+              type: 'choice',
+              key: 'bmiScore',
+              label: 'Giá trị BMI',
+              valueFrom: 'bmi',
+              options: [
+                { value: 'atLeast20', label: '≥ 20', score: 0, min: 20 },
+                { value: 'from18_5to20', label: '18,5 – 20,0', score: 1, min: 18.5, max: 20 },
+                { value: 'below18_5', label: '< 18,5', score: 2, max: 18.5 },
+              ],
+            },
           ],
         },
       ],
@@ -338,6 +349,15 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     await user.type(screen.getByLabelText(/Cân nặng/), '58,5')
     expect(bmi).toHaveValue('21,5')
     expect(screen.getByText(/Tự tính = cân nặng \(kg\)/)).toBeInTheDocument()
+
+    // Mức BMI tự chọn theo BMI và bị khóa; đổi cân nặng thì đổi mức.
+    expect(screen.getByRole('radio', { name: '≥ 20 (0 điểm)' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: '≥ 20 (0 điểm)' })).toBeDisabled()
+    expect(screen.getByText('Tự chọn theo Chỉ số khối cơ thể 21,5.')).toBeInTheDocument()
+    await user.clear(screen.getByLabelText(/Cân nặng/))
+    await user.type(screen.getByLabelText(/Cân nặng/), '48')
+    expect(bmi).toHaveValue('17,6')
+    expect(screen.getByRole('radio', { name: '< 18,5 (2 điểm)' })).toBeChecked()
   })
 
   it('người chỉ được xem: không có nút phát hành hay tạo phiên bản, định nghĩa chỉ đọc', async () => {

@@ -512,10 +512,11 @@
           "label": "Người lớn – giá trị BMI (Adult – BMI value)",
           "required": true,
           "layout": "inline",
+          "valueFrom": "bmi",
           "options": [
-            { "value": "atLeast20", "label": "≥ 20", "score": 0 },
-            { "value": "from18_5to20", "label": "18,5 – 20,0", "score": 1 },
-            { "value": "below18_5", "label": "< 18,5", "score": 2 }
+            { "value": "atLeast20", "label": "≥ 20", "score": 0, "min": 20 },
+            { "value": "from18_5to20", "label": "18,5 – 20,0", "score": 1, "min": 18.5, "max": 20 },
+            { "value": "below18_5", "label": "< 18,5", "score": 2, "max": 18.5 }
           ],
           "visibleWhen": { "field": "nutritionGroup", "in": ["adult"] }
         },

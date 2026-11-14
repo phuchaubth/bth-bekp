@@ -9,6 +9,15 @@ export interface Evaluation {
   scores: Record<string, ScoreResult>
   /** Giá trị của các trường tự tính (khối `computed`), ví dụ BMI "21,5". */
   computed: Record<string, string>
+  /** Câu hỏi tự chọn theo trường khác (`valueFrom`): lựa chọn được chọn, ví dụ mức BMI "atLeast20". */
+  derived: Record<string, string>
+}
+
+/** Lựa chọn có khoảng [min, max) chứa giá trị số của trường nguồn (giống FormDataEvaluator.DerivedOption). */
+export function derivedOption(block: TemplateBlock, values: Values): string | null {
+  const number = parseNumber(values[block.valueFrom ?? ''])
+  if (number == null) return null
+  return block.options?.find((o) => (o.min == null || number >= o.min) && (o.max == null || number < o.max))?.value ?? null
 }
 
 const parseNumber = (value: unknown) => {
@@ -45,6 +54,7 @@ export function evaluate(definition: TemplateDefinition, values: Values): Evalua
   const visibleValues: Values = {}
   const scores: Record<string, ScoreResult> = {}
   const computed: Record<string, string> = {}
+  const derived: Record<string, string> = {}
   const blocks = new Map<string, TemplateBlock>()
 
   for (const block of definition.sections.flatMap((s) => s.blocks).filter(isInput)) {
@@ -58,6 +68,14 @@ export function evaluate(definition: TemplateDefinition, values: Values): Evalua
       continue
     }
     visible.add(key)
+    if (block.valueFrom) {
+      const option = derivedOption(block, visibleValues)
+      if (option) {
+        visibleValues[key] = option
+        derived[key] = option
+        continue
+      }
+    }
     if (block.type === 'computed') {
       const value = computeFormula(block.formula, (block.inputs ?? []).map((k) => visibleValues[k]))
       if (value) {
@@ -71,7 +89,7 @@ export function evaluate(definition: TemplateDefinition, values: Values): Evalua
     }
   }
 
-  return { visible, scores, computed }
+  return { visible, scores, computed, derived }
 }
 
 function conditionHolds(

@@ -1,7 +1,7 @@
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { Button, Checkbox, DatePicker, Flex, Form, Input, Radio, Tag, Typography, type FormInstance } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import type { FormData, ScoreResult } from '../../api/consentForms'
 import type { TemplateBlock, TemplateDefinition, TemplateOption } from '../../api/consentTemplates'
 import { Bilingual } from './Bilingual'
@@ -27,7 +27,17 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
   // preserve: tính cả giá trị của trường đang ẩn (giữ lại khi lưu nháp, giống máy chủ).
   const watched = Form.useWatch((values: FormData) => values, { form, preserve: true })
   const values = watched ?? initialValues
-  const { visible, scores, computed } = useMemo(() => evaluate(definition, values ?? {}), [definition, values])
+  const { visible, scores, computed, derived } = useMemo(() => evaluate(definition, values ?? {}), [definition, values])
+
+  // Câu hỏi tự chọn theo trường khác (ví dụ mức BMI): ghi lựa chọn vào biểu mẫu để lưu nháp và tính điểm như máy chủ.
+  useEffect(() => {
+    if (disabled) return
+    for (const [key, value] of Object.entries(derived)) {
+      if (form.getFieldValue(key) !== value) {
+        form.setFieldValue(key, value)
+      }
+    }
+  }, [derived, disabled, form])
 
   return (
     <Form<FormData>
@@ -75,7 +85,14 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
             if (block.type === 'computed') {
               return <ComputedField key={key} block={block} value={computed[block.key!]} error={errors?.[block.key!]} />
             }
-            return <Field key={key} block={block} error={errors?.[block.key!]} />
+            return (
+              <Field
+                key={key}
+                block={block}
+                error={errors?.[block.key!]}
+                derivedFrom={derived[block.key!] && block.valueFrom ? sourceText(definition, block.valueFrom, computed, values) : undefined}
+              />
+            )
           })}
         </section>
       ))}
@@ -83,13 +100,15 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
   )
 }
 
-function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
+function Field({ block, error, derivedFrom }: { block: TemplateBlock; error?: string[]; derivedFrom?: string }) {
   const common = {
     name: block.key!,
     label: block.type === 'confirm' ? undefined : <Bilingual text={block.label} />,
     required: block.required,
     validateStatus: error ? ('error' as const) : undefined,
     help: error?.join(' '),
+    // Tự chọn theo trường khác: ghi rõ căn cứ (ví dụ "Tự chọn theo BMI 21,5").
+    extra: derivedFrom ? `Tự chọn theo ${derivedFrom}.` : undefined,
   }
 
   switch (block.type) {
@@ -122,7 +141,7 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
     case 'choice':
       return (
         <Form.Item {...common}>
-          <Radio.Group>
+          <Radio.Group disabled={derivedFrom ? true : undefined}>
             <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
               {block.options?.map((option) => (
                 <Radio key={option.value} value={option.value}>
@@ -160,6 +179,13 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
     default:
       return null
   }
+}
+
+/** Căn cứ tự chọn, ví dụ "Chỉ số khối cơ thể 21,5" (nhãn tiếng Việt của trường nguồn và giá trị). */
+function sourceText(definition: TemplateDefinition, key: string, computed: Record<string, string>, values?: FormData) {
+  const label = definition.sections.flatMap((s) => s.blocks).find((b) => b.key === key)?.label ?? key
+  const value = computed[key] ?? String(values?.[key] ?? '')
+  return `${label.split('(')[0].trim()} ${value}`
 }
 
 const formulaHints: Record<string, string> = {
