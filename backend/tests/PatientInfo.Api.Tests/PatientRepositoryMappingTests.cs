@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Configuration;
+
 namespace PatientInfo.Api.Tests;
 
 public sealed class PatientRepositoryMappingTests
@@ -16,6 +18,37 @@ public sealed class PatientRepositoryMappingTests
 
         Assert.Equal(expected, patient.Gender);
     }
+
+    [Fact]
+    public void ConfiguredGenderValues_ReplaceTheDefaults()
+    {
+        // CSDL lưu 0 = Nam, 1 = Nữ (ngược với mặc định): đặt cả hai danh sách qua cấu hình như biến môi trường.
+        var settings = Bind(new() { ["PatientInfo:MaleValues:0"] = "0", ["PatientInfo:FemaleValues:0"] = "1" });
+
+        Assert.Equal(["0"], settings.EffectiveMaleValues);
+        Assert.Equal(["1"], settings.EffectiveFemaleValues);
+        Assert.True(settings.HasUnambiguousGenderValues);
+        Assert.Equal("Male", Gender("0", settings));
+        Assert.Equal("Female", Gender("1", settings));
+        Assert.Null(Gender("Nam", settings));
+    }
+
+    [Fact]
+    public void SettingOnlyOneGenderList_IsRejectedAsAmbiguous()
+    {
+        Assert.True(new PatientInfoOptions().HasUnambiguousGenderValues);
+        Assert.False(Bind(new() { ["PatientInfo:MaleValues:0"] = "0" }).HasUnambiguousGenderValues);
+    }
+
+    private static PatientInfoOptions Bind(Dictionary<string, string?> values)
+    {
+        var options = new PatientInfoOptions();
+        new ConfigurationBuilder().AddInMemoryCollection(values).Build().GetSection(PatientInfoOptions.SectionName).Bind(options);
+        return options;
+    }
+
+    private static string? Gender(string raw, PatientInfoOptions settings) =>
+        PatientRepository.Map(new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase) { ["Gender"] = raw }, settings).Gender;
 
     [Theory]
     [InlineData("03/02/1970")]

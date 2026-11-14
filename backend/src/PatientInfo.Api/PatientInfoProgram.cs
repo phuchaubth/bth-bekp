@@ -30,6 +30,8 @@ public static partial class PatientInfoProgram
             .Validate(o => o.HasValidQuery, "PatientInfo:Query phải là một câu SELECT (hoặc WITH … SELECT) dùng tham số @PatientCode và/hoặc @CitizenId, không có dấu ';' giữa câu.")
             .Validate(o => o.HasValidApiKeys, $"Thiếu khóa API: đặt PatientInfo__ApiKeys__0 (mỗi khóa ≥ {PatientInfoOptions.MinimumApiKeyLength} ký tự ngẫu nhiên).")
             .Validate(o => o.QueryTimeoutSeconds is >= 1 and <= 60, "PatientInfo:QueryTimeoutSeconds phải trong khoảng 1–60 giây.")
+            .Validate(o => o.HasUnambiguousGenderValues,
+                "Giá trị giới tính bị trùng giữa Nam và Nữ: đặt cả PatientInfo__MaleValues__0… và PatientInfo__FemaleValues__0… (danh sách đặt thay hẳn mặc định).")
             .ValidateOnStart();
         builder.Services.AddSingleton<PatientRepository>();
         builder.Services.ConfigureHttpJsonOptions(o =>

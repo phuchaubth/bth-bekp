@@ -91,11 +91,11 @@ public sealed class PatientRepository(IOptions<PatientInfoOptions> options)
             return null;
         }
 
-        if (settings.MaleValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
+        if (settings.EffectiveMaleValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)))
         {
             return "Male";
         }
 
-        return settings.FemaleValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)) ? "Female" : null;
+        return settings.EffectiveFemaleValues.Any(v => string.Equals(v, value, StringComparison.OrdinalIgnoreCase)) ? "Female" : null;
     }
 }

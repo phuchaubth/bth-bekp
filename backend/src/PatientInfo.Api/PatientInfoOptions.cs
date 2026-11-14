@@ -31,10 +31,26 @@ public sealed class PatientInfoOptions
     /// <summary>Thời gian chờ tối đa của câu truy vấn (giây).</summary>
     public int QueryTimeoutSeconds { get; set; } = 10;
 
-    /// <summary>Giá trị cột Gender được hiểu là Nam / Nữ (không phân biệt hoa thường).</summary>
-    public string[] MaleValues { get; set; } = ["Nam", "M", "Male", "1"];
+    private static readonly string[] DefaultMaleValues = ["Nam", "M", "Male", "1"];
 
-    public string[] FemaleValues { get; set; } = ["Nữ", "Nu", "F", "Female", "0", "2"];
+    private static readonly string[] DefaultFemaleValues = ["Nữ", "Nu", "F", "Female", "0", "2"];
+
+    /// <summary>
+    /// Giá trị cột Gender được hiểu là Nam / Nữ (không phân biệt hoa thường). Để trống thì dùng mặc định (Nam/M/Male/1 và
+    /// Nữ/Nu/F/Female/0/2); đặt cấu hình thì danh sách đặt <b>thay hẳn</b> mặc định (bộ đọc cấu hình .NET cộng thêm vào
+    /// mảng có sẵn, nên mặc định không đặt ở đây).
+    /// </summary>
+    public string[] MaleValues { get; set; } = [];
+
+    public string[] FemaleValues { get; set; } = [];
+
+    public IReadOnlyList<string> EffectiveMaleValues => MaleValues.Length > 0 ? MaleValues : DefaultMaleValues;
+
+    public IReadOnlyList<string> EffectiveFemaleValues => FemaleValues.Length > 0 ? FemaleValues : DefaultFemaleValues;
+
+    /// <summary>Không giá trị nào vừa là Nam vừa là Nữ (ví dụ chỉ đặt MaleValues = 0 mà quên đặt FemaleValues).</summary>
+    public bool HasUnambiguousGenderValues =>
+        !EffectiveMaleValues.Intersect(EffectiveFemaleValues, StringComparer.OrdinalIgnoreCase).Any();
 
     public bool HasValidApiKeys => ApiKeys.Length > 0 && ApiKeys.All(k => k is { Length: >= MinimumApiKeyLength });
 

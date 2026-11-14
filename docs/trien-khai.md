@@ -216,7 +216,7 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
    | `PatientInfo__ConnectionString` | `Server=tcp:SQLHIS,1433;Database=…;User Id=patientinfo_reader;Password=…;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly` |
    | `PatientInfo__Query` | Câu truy vấn ở bước 2 (một dòng) |
    | `PatientInfo__ApiKeys__0` | Khóa API ngẫu nhiên ≥ 32 ký tự, tạo như `Jwt__SigningKey` ở mục 3 (bộ sinh số ngẫu nhiên an toàn, không dùng `Get-Random`) |
-   | `PatientInfo__MaleValues__0`… | (Tùy chọn) nếu cột giới tính dùng giá trị khác `Nam/M/Male/1` và `Nữ/F/Female/0/2` |
+   | `PatientInfo__MaleValues__0`…, `PatientInfo__FemaleValues__0`… | (Tùy chọn) khi cột giới tính không theo mặc định (`Nam/M/Male/1` là Nam, `Nữ/F/Female/0/2` là Nữ). Đặt **cả hai** danh sách, danh sách đặt thay hẳn mặc định. Ví dụ CSDL lưu 0 = Nam, 1 = Nữ: `PatientInfo__MaleValues__0 = 0`, `PatientInfo__FemaleValues__0 = 1`. Cũng có thể đổi ngay trong câu truy vấn: `CASE GioiTinh WHEN 0 THEN N'Nam' WHEN 1 THEN N'Nữ' END AS Gender` |
 
 5. Kiểm tra: `curl http://127.0.0.1:5081/health` → `Healthy`; tra thử:
    `curl -X POST http://127.0.0.1:5081/api/v1/patients/lookup -H "X-Api-Key: …" -H "Content-Type: application/json" -d "{\"patientCode\":\"…\"}"`.

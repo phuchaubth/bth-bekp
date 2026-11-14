@@ -284,7 +284,7 @@ Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của
   "ethnicity": null, "occupation": null, "nationality": null, "healthInsuranceNumber": null }
 ```
 
-- `gender`: `Male` / `Female` / `null` (giá trị cột giới tính được đổi theo `PatientInfo:MaleValues`, `PatientInfo:FemaleValues`).
+- `gender`: `Male` / `Female` / `null` (giá trị cột giới tính được đổi theo `PatientInfo:MaleValues`, `PatientInfo:FemaleValues`; đặt thì thay hẳn mặc định, một giá trị không được vừa là Nam vừa là Nữ).
 - Khóa API so sánh thời gian hằng; nhiều khóa (`PatientInfo__ApiKeys__0`, `__1`…) để xoay vòng không gián đoạn.
 - Nhật ký chỉ ghi tra theo gì và kết quả (`Found`/`NotFound`), mã lỗi SQL; không ghi mã người bệnh, CCCD hay thông tin trả về.
 
