@@ -182,7 +182,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
    ARR tự thêm header `X-Forwarded-For` (IP thật của người dùng) để API ghi đúng vào nhật ký.
 2. Tạo site `ConsentWeb` trỏ `D:\Apps\ConsentWeb`, binding **https cổng 443**, hostname `phieudongthuan.bth.org.vn`, chọn chứng chỉ; thêm binding http 80 với rule chuyển hướng sang https (hoặc không mở 80).
-3. `web.config` của site (bản mẫu) chuyển tiếp `/api/*` và `/health*` tới `http://localhost:5080`, các đường dẫn khác trả `index.html`, và đặt security header giống `frontend/nginx.conf` (CSP có `frame-src blob:` để xem PDF trong ứng dụng). Nếu API chạy cổng khác, sửa URL trong rule *API proxy*.
+3. `web.config` của site (bản mẫu) chuyển tiếp `/api/*` và `/health*` tới `http://127.0.0.1:5080` (dùng IP: `localhost` có thể thành IPv6 `::1` mà site API chỉ nhận `127.0.0.1`, IIS trả 400 *Invalid Hostname*), các đường dẫn khác trả `index.html`, và đặt security header giống `frontend/nginx.conf` (CSP có `frame-src blob:` để xem PDF trong ứng dụng). Nếu API chạy cổng khác, sửa URL trong rule *API proxy*.
 4. Kiểm tra qua IIS: `https://phieudongthuan.bth.org.vn/health/ready` trả `Healthy`. Lỗi 400 thường do `AllowedHosts` hoặc `preserveHostHeader`; lỗi 500 thường do thiếu `allowedServerVariables` (bước 1).
 5. Mở `https://phieudongthuan.bth.org.vn`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
 
@@ -295,6 +295,7 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 | API không khởi động, log ghi "Thiếu khóa ký JWT" / "Thiếu khóa bảo vệ dữ liệu" | Thiếu hoặc sai định dạng biến môi trường | Kiểm tra 3 khóa (Base64 32 byte cho `DataProtection__*`), khởi động lại |
 | "Dữ liệu minh họa (Seed:DemoData) không được bật ở môi trường Production" | `Seed__DemoData=true` | Đặt `false` |
 | HTTP 500.19, mã `0x8007000d`, file `D:\Apps\ConsentApi\web.config` | IIS chưa có mô-đun ASP.NET Core: chưa cài Hosting Bundle 10, hoặc cài trước IIS | Cài (hoặc *Repair*) **ASP.NET Core Hosting Bundle 10.0**, rồi `iisreset`. Kiểm tra: `(Get-WebGlobalModule -Name AspNetCoreModuleV2).Name` in ra tên mô-đun; `dotnet --list-runtimes` có `Microsoft.AspNetCore.App 10.0.x` |
+| `Bad Request - Invalid Hostname` (400) khi gọi `/api` hoặc `/health` qua site `ConsentWeb` | Rule *API proxy* chuyển tới `http://localhost:5080`; Windows có thể hiểu `localhost` là IPv6 `::1`, trong khi site `ConsentApi` chỉ nhận `127.0.0.1` | Sửa `web.config` của `ConsentWeb` thành `http://127.0.0.1:5080/{R:1}` (gói từ ngày 14/11/2026 đã sửa sẵn) |
 | HTTP 500.19, file `D:\Apps\ConsentWeb\web.config` | Chưa cài URL Rewrite | Cài URL Rewrite và ARR, rồi `iisreset` |
 | HTTP 500.30, nhật ký *.NET Runtime* ghi `Seed:AdminPassword … chưa đủ mạnh` | Mật khẩu tạm của `admin` không đạt quy tắc (10–128 ký tự, có chữ thường, chữ hoa, chữ số, ký tự đặc biệt, **không chứa `admin`**) | Đặt lại biến `Seed__AdminPassword`, rồi `Restart-WebAppPool ConsentApi`. Xem lỗi: `$e = Get-WinEvent -LogName Application -MaxEvents 50 \| Where-Object ProviderName -eq '.NET Runtime' \| Select-Object -First 1; ($e.Message -split "`r?`n")[0..14]` |
 | `/health/ready` trả 503 | Không kết nối được SQL Server | Kiểm tra chuỗi kết nối, tường lửa cổng 1433, chứng chỉ SQL (`TrustServerCertificate`) |
