@@ -221,7 +221,7 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
 5. Kiểm tra: `curl http://127.0.0.1:5081/health` → `Healthy`; tra thử:
    `curl -X POST http://127.0.0.1:5081/api/v1/patients/lookup -H "X-Api-Key: …" -H "Content-Type: application/json" -d "{\"patientCode\":\"…\"}"`.
 6. **Bật trong phần mềm phiếu**: thêm biến môi trường cho Application Pool `ConsentApi` rồi khởi động lại:
-   `PatientSource__Provider = Api`, `PatientSource__BaseUrl = http://localhost:5081/` (hoặc `https://…/` nếu khác máy; ngoài localhost bắt buộc https), `PatientSource__ApiKey = <khóa ở bước 4>`. Đăng nhập lại: màn hình lập phiếu có ô **Lấy thông tin**.
+   `PatientSource__Provider = Api`, `PatientSource__BaseUrl = http://127.0.0.1:5081/` (dùng IP như mục 5.3: `localhost` có thể thành IPv6 `::1` mà site chỉ nhận `127.0.0.1`, IIS trả 400 *Invalid Hostname*; nếu API ở máy khác thì dùng `https://…/`, ngoài máy này bắt buộc https), `PatientSource__ApiKey = <khóa ở bước 4>`. Đăng nhập lại: màn hình lập phiếu có ô **Lấy thông tin**. Nếu báo "Chưa kết nối được hệ thống thông tin người bệnh", xem nhật ký của `ConsentApi`: dòng *API thông tin người bệnh trả mã 401* là sai khóa, *Không gọi được…* là sai địa chỉ hoặc site `PatientInfoApi` chưa chạy.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
