@@ -163,7 +163,7 @@ public sealed class ConsentSigningService(
             return Error.ValidationField("stepKey", "Thiếu bước cần xác nhận.");
         }
 
-        var signaturePng = NormalizeSignature(request.Image);
+        var signaturePng = await StaffSignatureAsync(request.Image, request.UseSpecimen, cancellationToken).ConfigureAwait(false);
         if (signaturePng.IsFailure)
         {
             return signaturePng.Error!;
@@ -212,8 +212,8 @@ public sealed class ConsentSigningService(
 
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
-        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, signaturePng.Value, clock.UtcNow);
-        formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key }));
+        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, signaturePng.Value.Png, clock.UtcNow);
+        formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key, signature = signaturePng.Value.Source }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
@@ -226,7 +226,7 @@ public sealed class ConsentSigningService(
         Guid id, CompleteConsentFormRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        var signaturePng = NormalizeSignature(request.Image);
+        var signaturePng = await StaffSignatureAsync(request.Image, request.UseSpecimen, cancellationToken).ConfigureAwait(false);
         if (signaturePng.IsFailure)
         {
             return signaturePng.Error!;
@@ -272,14 +272,14 @@ public sealed class ConsentSigningService(
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
         var now = clock.UtcNow;
         var confirmation = new ConsentPdfConfirmation(
-            user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Value);
+            user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Value.Png);
         var pdf = pdfRenderer.Render(await formService.BuildPdfDocumentAsync(form, confirmation, cancellationToken).ConfigureAwait(false));
         var sha256 = ConsentFormService.Sha256(pdf);
         // Lưu file trước; nếu lưu CSDL thất bại thì chỉ còn một file thừa (không ảnh hưởng dữ liệu).
         var key = await documents.SaveAsync($"{form.FormNo}.pdf", pdf, cancellationToken).ConfigureAwait(false);
 
-        form.Complete(userId, user.FullName, user.Title, signaturePng.Value, key, sha256, pdf.LongLength, now, stepKeys);
-        formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256 }));
+        form.Complete(userId, user.FullName, user.Title, signaturePng.Value.Png, key, sha256, pdf.LongLength, now, stepKeys);
+        formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256, signature = signaturePng.Value.Source }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
@@ -314,6 +314,27 @@ public sealed class ConsentSigningService(
     /// Kiểm tra và chuẩn hóa ảnh chữ ký tay (người bệnh hoặc nhân viên): Base64 PNG, không quá lớn, có nét ký đủ dài.
     /// Trả về ảnh PNG xám đã cắt sát nét ký.
     /// </summary>
+    /// <summary>Chữ ký của nhân viên xác nhận và nguồn của nó (ghi nhật ký): "specimen" = chữ ký mẫu đã lưu, "drawn" = vẽ khi ký.</summary>
+    private sealed record StaffSignature(byte[] Png, string Source);
+
+    /// <summary>
+    /// Chữ ký của nhân viên khi xác nhận: chữ ký mẫu đã lưu của tài khoản (không cần vẽ), hoặc ảnh vẽ trong khung ký khi
+    /// tài khoản chưa có chữ ký mẫu hoặc người ký chọn ký tay lần này.
+    /// </summary>
+    private async Task<Result<StaffSignature>> StaffSignatureAsync(string? image, bool useSpecimen, CancellationToken cancellationToken)
+    {
+        if (useSpecimen)
+        {
+            var user = currentUser.UserId is { } userId ? await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false) : null;
+            return user?.SignatureSpecimenPng is { } specimen
+                ? new StaffSignature(specimen, "specimen")
+                : Error.ValidationField("image", "Tài khoản chưa có chữ ký mẫu. Vui lòng ký vào khung ký.");
+        }
+
+        var drawn = NormalizeSignature(image);
+        return drawn.IsFailure ? drawn.Error! : new StaffSignature(drawn.Value, "drawn");
+    }
+
     internal static Result<byte[]> NormalizeSignature(string? image)
     {
         if (string.IsNullOrWhiteSpace(image))

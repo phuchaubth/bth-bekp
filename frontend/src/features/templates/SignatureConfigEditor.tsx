@@ -302,7 +302,7 @@ export function SignatureConfigEditor({
         <Card size="small" title="Lời xác nhận của người ký">
           <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
             Ô để người bệnh (hoặc người đại diện) ghi lời xác nhận ngay trên khung ký, ví dụ “Tôi đã nghe, hiểu và đồng ý”.
-            Các câu gợi ý hiện thành nút bấm chọn nhanh; lời xác nhận in trên PDF ngay trên chữ ký (chữ nâu đậm, nghiêng).
+            Các câu gợi ý hiện thành nút bấm chọn nhanh; lời xác nhận in trên PDF ngay trên chữ ký (chữ đỏ, đậm nghiêng).
           </Typography.Paragraph>
           <Form.Item name="statementEnabled" valuePropName="checked" style={{ marginBottom: statementEnabled ? 12 : 0 }}>
             <Checkbox>Có ô lời xác nhận</Checkbox>

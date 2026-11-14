@@ -12,7 +12,7 @@ interface Props {
 
 /**
  * Ô lời xác nhận của người ký ở khung ký (ví dụ "Tôi đã nghe, hiểu và đồng ý"): bấm một câu gợi ý để điền nhanh, vẫn
- * sửa hoặc tự gõ được. Chữ nâu đậm, nghiêng như trên PDF.
+ * sửa hoặc tự gõ được. Chữ đỏ, đậm nghiêng như trên PDF.
  */
 export function StatementBox({ config, value, onChange, disabled }: Props) {
   const label = config.label ?? 'Lời xác nhận của người ký'

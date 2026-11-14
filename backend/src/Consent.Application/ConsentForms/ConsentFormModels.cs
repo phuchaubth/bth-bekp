@@ -112,10 +112,12 @@ public sealed record ConsentFormStepDto(
 /// Xác nhận bước <paramref name="StepKey"/> (phải là bước đang chờ, để tránh xác nhận nhầm bước) kèm chữ ký tay của nhân
 /// viên: ảnh PNG Base64 của khung ký (quyết định 17).
 /// </summary>
-public sealed record ConfirmStepRequest(string? StepKey, string? Image = null);
+/// <param name="UseSpecimen">Ký bằng chữ ký mẫu đã lưu của tài khoản (không cần vẽ); khi đó bỏ qua <paramref name="Image"/>.</param>
+public sealed record ConfirmStepRequest(string? StepKey, string? Image = null, bool UseSpecimen = false);
 
 /// <summary>Xác nhận cuối và hoàn tất phiếu, kèm chữ ký tay của nhân viên (ảnh PNG Base64).</summary>
-public sealed record CompleteConsentFormRequest(string? Image);
+/// <param name="UseSpecimen">Ký bằng chữ ký mẫu đã lưu của tài khoản (không cần vẽ); khi đó bỏ qua <paramref name="Image"/>.</param>
+public sealed record CompleteConsentFormRequest(string? Image, bool UseSpecimen = false);
 
 /// <summary>Tham chiếu tới một phiếu khác (phiếu bị thay thế / phiếu thay thế).</summary>
 public sealed record ConsentFormRef(Guid Id, string FormNo);

@@ -30,8 +30,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     /// <summary>Màu phần tiếng Anh của mẫu song ngữ (in nghiêng; tiếng Việt giữ màu đen, chữ đứng).</summary>
     internal static readonly Color English = new(0x00, 0x70, 0xC0);
 
-    /// <summary>Màu lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng.</summary>
-    internal static readonly Color Statement = new(0x5C, 0x3A, 0x1E);
+    /// <summary>Màu lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): đỏ, chữ đậm nghiêng.</summary>
+    internal static readonly Color Statement = new(0xC0, 0x00, 0x00);
     private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
     private static readonly Lock FontGate = new();
 
@@ -605,7 +605,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             var words = cell.AddParagraph();
             words.Format.Alignment = ParagraphAlignment.Center;
             words.Format.SpaceBefore = Unit.FromPoint(2);
-            var text = words.AddFormattedText($"“{statement}”", TextFormat.Italic);
+            var text = words.AddFormattedText($"“{statement}”", TextFormat.Bold | TextFormat.Italic);
             text.Color = Statement;
         }
     }

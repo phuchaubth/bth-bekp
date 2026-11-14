@@ -59,6 +59,9 @@ export type ConsentSignerRole = 'Patient' | 'Representative' | 'Hospital' | 'Sta
 export type ConsentSignatureMethod = 'Handwritten' | 'AccountConfirmation'
 
 /** Một chữ ký trên phiếu (ảnh chữ ký tay chỉ có trong PDF). */
+/** Chữ ký của nhân viên khi xác nhận: dùng chữ ký mẫu đã lưu, hoặc ảnh vẽ trong khung ký (PNG Base64). */
+export type StaffSignatureInput = { useSpecimen: true } | { image: string }
+
 export interface ConsentSignature {
   role: ConsentSignerRole
   method: ConsentSignatureMethod
@@ -195,11 +198,11 @@ export const consentFormsApi = {
       token: signingToken,
     }),
   /** Xác nhận bước trung gian, kèm ảnh chữ ký tay của nhân viên (PNG Base64, quyết định 17). */
-  confirmStep: (id: string, stepKey: string, image: string) =>
-    apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey, image } }),
+  confirmStep: (id: string, stepKey: string, signature: StaffSignatureInput) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey, ...signature } }),
   /** Xác nhận cuối và hoàn tất phiếu, kèm ảnh chữ ký tay của nhân viên. */
-  complete: (id: string, image: string) =>
-    apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: { image } }),
+  complete: (id: string, signature: StaffSignatureInput) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: signature }),
   revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
 }
 

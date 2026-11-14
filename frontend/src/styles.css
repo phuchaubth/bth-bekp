@@ -21,9 +21,10 @@ body {
   color: inherit;
 }
 
-/* Lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng (giống PDF). */
+/* Lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): đỏ, chữ đậm nghiêng (giống PDF). */
 .signer-statement,
 .signer-statement textarea {
-  color: #5c3a1e;
+  color: #c00000;
   font-style: italic;
+  font-weight: 700;
 }

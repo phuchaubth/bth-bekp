@@ -41,7 +41,7 @@ hai mã này (13/11/2026).
 - Nguồn tự điền mới: `patient.permanentAddress`, `patient.currentAddress`, `patient.ethnicity`, `patient.occupation`.
 - `signatures.statement`: **ô lời xác nhận của người ký** ở khung ký (bệnh viện yêu cầu 14/11/2026), ví dụ "Tôi đã nghe,
   hiểu và đồng ý": các câu gợi ý hiện thành nút bấm chọn nhanh, vẫn sửa hoặc tự gõ được; có thể bắt buộc. Lời xác nhận in
-  trên PDF ngay trên chữ ký (chữ nâu đậm, nghiêng) và hiện trong lịch sử phiếu. Cả 4 mẫu thật bật ô này (bắt buộc); sửa ở
+  trên PDF ngay trên chữ ký (chữ đỏ, đậm nghiêng) và hiện trong lịch sử phiếu. Cả 4 mẫu thật bật ô này (bắt buộc); sửa ở
   thẻ *Cấu hình ký*.
 - `signatures.steps`: **nhiều bước xác nhận theo vai trò** (bệnh viện đồng ý 13/11/2026). Sau khi người bệnh ký, nhân viên
   đúng vai trò của từng bước lần lượt bấm "Xác nhận: …" trên trang chi tiết phiếu; người có vai trò xác nhận cuối hoàn tất

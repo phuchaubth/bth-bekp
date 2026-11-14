@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Card, Flex, Input, Modal, Timeline, Typography } from 'antd'
+import { Alert, App, Button, Card, Flex, Input, Modal, Spin, Timeline, Typography } from 'antd'
 import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import {
@@ -8,10 +8,12 @@ import {
   decisionLabels,
   signerRoleLabels,
   type ConsentFormDetail,
+  type StaffSignatureInput,
 } from '../../api/consentForms'
 import { useAuth } from '../../auth/authContext'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
+import { useSignatureSpecimen } from '../../api/account'
 import { SpecimenImage } from '../account/SignatureSpecimen'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
@@ -90,11 +92,15 @@ export function StaffSignModal({
   description: string
   okText: string
   loading: boolean
-  onSign: (image: string) => void
+  onSign: (signature: StaffSignatureInput) => void
   onClose: () => void
 }) {
   const pad = useRef<SignaturePadHandle>(null)
   const [hasInk, setHasInk] = useState(false)
+  const specimen = useSignatureSpecimen()
+  // Có chữ ký mẫu: ký bằng chữ ký mẫu, không cần vẽ; vẫn chọn được "Ký tay lần này".
+  const [drawInstead, setDrawInstead] = useState(false)
+  const useSpecimen = !!specimen.data && !drawInstead
 
   return (
     <Modal
@@ -103,32 +109,64 @@ export function StaffSignModal({
       okText={okText}
       cancelText="Đóng"
       width={640}
-      okButtonProps={{ disabled: !hasInk, loading }}
-      onOk={() => pad.current && onSign(pad.current.toPngBase64())}
+      okButtonProps={{ disabled: specimen.isPending || (!useSpecimen && !hasInk), loading }}
+      onOk={() => {
+        if (useSpecimen) {
+          onSign({ useSpecimen: true })
+        } else if (pad.current) {
+          onSign({ image: pad.current.toPngBase64() })
+        }
+      }}
       onCancel={onClose}
     >
       <Typography.Paragraph>{description}</Typography.Paragraph>
-      <Flex
-        align="center"
-        gap={12}
-        wrap
-        style={{ marginBottom: 12, padding: '8px 12px', background: '#f6faf9', border: '1px solid #e1eaeb', borderRadius: 10 }}
-      >
-        <Typography.Text type="secondary">Chữ ký mẫu của bạn (để đối chiếu):</Typography.Text>
-        <SpecimenImage
-          height={56}
-          empty={
-            <Typography.Text type="secondary">
-              chưa có — đăng ký ở <Link to="/tai-khoan">Tài khoản của tôi</Link>
-            </Typography.Text>
-          }
-        />
-      </Flex>
-      <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
-      {!hasInk && (
-        <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-          Ký vào khung trên để bật nút {okText}.
-        </Typography.Paragraph>
+      {specimen.isPending ? (
+        <Spin />
+      ) : useSpecimen ? (
+        <Flex vertical gap={8}>
+          <Typography.Text strong>Ký bằng chữ ký mẫu của bạn:</Typography.Text>
+          <div
+            style={{
+              display: 'grid',
+              placeItems: 'center',
+              minHeight: 120,
+              padding: 12,
+              background: '#ffffff',
+              border: '1px solid #e1eaeb',
+              borderRadius: 10,
+            }}
+          >
+            <SpecimenImage height={96} />
+          </div>
+          <Typography.Text type="secondary">
+            Bấm “{okText}” để ký bằng chữ ký mẫu.{' '}
+            <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setDrawInstead(true)}>
+              Ký tay lần này
+            </Button>
+          </Typography.Text>
+        </Flex>
+      ) : (
+        <>
+          {specimen.data ? (
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+              Ký tay vào khung dưới.{' '}
+              <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setDrawInstead(false)}>
+                Dùng chữ ký mẫu
+              </Button>
+            </Typography.Paragraph>
+          ) : (
+            <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+              Tài khoản chưa có chữ ký mẫu: ký vào khung dưới. Đăng ký chữ ký mẫu ở{' '}
+              <Link to="/tai-khoan">Tài khoản của tôi</Link> để lần sau không phải ký lại.
+            </Typography.Paragraph>
+          )}
+          <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
+          {!hasInk && (
+            <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+              Ký vào khung trên để bật nút {okText}.
+            </Typography.Paragraph>
+          )}
+        </>
       )}
     </Modal>
   )

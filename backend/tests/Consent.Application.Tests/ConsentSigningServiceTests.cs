@@ -134,6 +134,25 @@ public sealed class ConsentSigningServiceTests
         return (s, submitted.Value);
     }
 
+    [Fact]
+    public async Task Staff_WithSavedSpecimen_ConfirmsWithoutDrawing_AndThePdfUsesTheSpecimen()
+    {
+        var (s, form) = await PendingHospitalForm(
+            "QT-KNGT-BM02", new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
+        await PatientSigns(s, form.Id);
+        var specimen = SignatureImage.Normalize(TestPng.Signature()).Png!;
+        var receptionist = s.Ctx.Store.Users.Single(u => u.Id == s.Ctx.CurrentUser.UserId);
+
+        var withoutSpecimen = await s.Signing.CompleteAsync(form.Id, new(null, UseSpecimen: true), CancellationToken.None);
+        receptionist.SetSignatureSpecimen(specimen, s.Ctx.Clock.UtcNow);
+        var completed = await s.Signing.CompleteAsync(form.Id, new(null, UseSpecimen: true), CancellationToken.None);
+
+        Assert.Equal(["Tài khoản chưa có chữ ký mẫu. Vui lòng ký vào khung ký."], withoutSpecimen.Error!.FieldErrors!["image"]);
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        Assert.Equal(specimen, s.Ctx.Pdf.Last!.HospitalConfirmation!.ImagePng);
+        Assert.Contains(s.Ctx.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormCompleted && a.Details!.Contains("\"signature\":\"specimen\"", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData(ConsentDecision.Refused)]

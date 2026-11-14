@@ -20,6 +20,7 @@ import {
   type ConsentFormDetail,
   type FormData,
   type SignerKind,
+  type StaffSignatureInput,
 } from '../../api/consentForms'
 import { ApiError } from '../../api/http'
 import { usePatient } from '../../api/patients'
@@ -67,7 +68,7 @@ export function ConsentFormDetailPage() {
   const [staffSign, setStaffSign] = useState<'step' | 'complete' | null>(null)
 
   const complete = useMutation({
-    mutationFn: (image: string) => consentFormsApi.complete(id, image),
+    mutationFn: (signature: StaffSignatureInput) => consentFormsApi.complete(id, signature),
     onSuccess: (updated) => {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
@@ -78,7 +79,8 @@ export function ConsentFormDetailPage() {
   })
 
   const confirmStep = useMutation({
-    mutationFn: ({ stepKey, image }: { stepKey: string; image: string }) => consentFormsApi.confirmStep(id, stepKey, image),
+    mutationFn: ({ stepKey, signature }: { stepKey: string; signature: StaffSignatureInput }) =>
+      consentFormsApi.confirmStep(id, stepKey, signature),
     onSuccess: (updated) => {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
@@ -189,7 +191,7 @@ export function ConsentFormDetailPage() {
           description="Ký vào khung bên dưới để xác nhận phần của bạn. Chữ ký được in vào ô của bạn trên phiếu, kèm họ tên và thời điểm theo tài khoản đang đăng nhập. Mỗi bước cần một người khác nhau."
           okText="Ký và xác nhận"
           loading={confirmStep.isPending}
-          onSign={(image) => confirmStep.mutate({ stepKey: nextStep.key, image })}
+          onSign={(signature) => confirmStep.mutate({ stepKey: nextStep.key, signature })}
           onClose={() => setStaffSign(null)}
         />
       )}
@@ -199,7 +201,7 @@ export function ConsentFormDetailPage() {
           description="Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm."
           okText="Ký và hoàn tất"
           loading={complete.isPending}
-          onSign={(image) => complete.mutate(image)}
+          onSign={(signature) => complete.mutate(signature)}
           onClose={() => setStaffSign(null)}
         />
       )}

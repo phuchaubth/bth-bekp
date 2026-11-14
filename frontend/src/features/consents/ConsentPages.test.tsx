@@ -555,25 +555,37 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
       ...overrides,
     })
 
-  it('hộp thoại ký xác nhận hiện chữ ký mẫu của người xác nhận để đối chiếu; chưa có thì chỉ chỗ đăng ký', async () => {
+  it('có chữ ký mẫu: xác nhận bằng chữ ký mẫu, không cần vẽ; vẫn chọn ký tay lần này được', async () => {
     URL.createObjectURL = vi.fn(() => 'blob:chu-ky-mau')
     URL.revokeObjectURL = vi.fn()
-    mockApi({
+    let current = signedByPatient(true)
+    const { calls } = mockApi({
       ...baseRoutes(nurse()),
-      'GET /api/v1/consent-forms/f-1': () => signedByPatient(true),
+      'GET /api/v1/consent-forms/f-1': () => current,
       'GET /api/v1/account/signature-specimen': () => new Response('PNG-gia-lap', { headers: { 'Content-Type': 'image/png' } }),
+      'POST /api/v1/consent-forms/f-1/complete': () => (current = completed({ actions: actions() })),
     })
     renderApp('/phieu-dong-thuan/f-1')
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /Xác nhận và hoàn tất/ }))
     const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
-
-    expect(within(dialog).getByText('Chữ ký mẫu của bạn (để đối chiếu):')).toBeInTheDocument()
     expect(await within(dialog).findByRole('img', { name: 'Chữ ký mẫu của bạn' })).toHaveAttribute('src', 'blob:chu-ky-mau')
+    expect(within(dialog).queryByRole('img', { name: /Khung ký tên/ })).not.toBeInTheDocument()
+
+    // Chọn ký tay rồi quay lại dùng chữ ký mẫu.
+    await user.click(within(dialog).getByRole('button', { name: 'Ký tay lần này' }))
+    expect(within(dialog).getByRole('img', { name: /Khung ký tên/ })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeDisabled()
+    await user.click(within(dialog).getByRole('button', { name: 'Dùng chữ ký mẫu' }))
+
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeEnabled()
+    await user.click(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' }))
+    expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')!.body).toEqual({ useSpecimen: true })
   })
 
-  it('chưa có chữ ký mẫu: hộp thoại ký xác nhận chỉ chỗ đăng ký', async () => {
+  it('chưa có chữ ký mẫu: phải ký vào khung, có chỗ đăng ký chữ ký mẫu', async () => {
     mockApi({ ...baseRoutes(nurse()), 'GET /api/v1/consent-forms/f-1': () => signedByPatient(true) })
     renderApp('/phieu-dong-thuan/f-1')
     const user = userEvent.setup()
@@ -582,6 +594,8 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
 
     expect(await within(dialog).findByRole('link', { name: 'Tài khoản của tôi' })).toHaveAttribute('href', '/tai-khoan')
+    expect(within(dialog).getByRole('img', { name: /Khung ký tên/ })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeDisabled()
   })
 
   it('người bệnh đã ký: người đúng vai trò xác nhận bằng tài khoản thì phiếu hoàn tất', async () => {
