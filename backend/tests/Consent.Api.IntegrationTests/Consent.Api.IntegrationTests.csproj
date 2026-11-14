@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Consent.Api\Consent.Api.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Mẫu phiếu minh họa dùng chung cho các project test (không có trong ứng dụng). -->
+    <EmbeddedResource Include="..\SampleTemplates\*.json" LogicalName="SampleTemplates.%(Filename)%(Extension)" />
+    <Compile Include="..\SampleTemplates\SampleConsentTemplates.cs" Link="SampleTemplates\SampleConsentTemplates.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,83 @@
+name: Gói triển khai IIS
+
+# Đóng gói sẵn bản triển khai IIS (docs/trien-khai.md, mục 5) để phòng CNTT không cần máy build:
+# ConsentApi (API đã publish cho win-x64, chạy bằng ASP.NET Core Hosting Bundle 10), ConsentWeb (giao diện đã build),
+# efbundle.exe (gói cập nhật lược đồ CSDL), các file web.config mẫu và script SQL. Không chứa bí mật.
+# Tải về ở trang Actions của lần chạy: mục "Artifacts", file goi-trien-khai-iis-<mã commit>.
+
+on:
+  push:
+    branches: [main, 'claude/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-iis-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Đóng gói IIS (win-x64)
+    runs-on: ubuntu-latest
+    env:
+      OUT: ${{ github.workspace }}/out/goi-trien-khai-iis
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Publish API (win-x64, cần Hosting Bundle 10 trên máy chủ)
+        working-directory: backend
+        run: |
+          dotnet publish src/Consent.Api/Consent.Api.csproj -c Release -r win-x64 --self-contained false -o "$OUT/ConsentApi"
+          # web.config mẫu có giới hạn 2 MB và tắt header lộ thông tin (docs/trien-khai.md, mục 5.1).
+          cp ../deploy/iis/web.config "$OUT/ConsentApi/web.config"
+
+      - name: Gói cập nhật lược đồ CSDL (efbundle.exe)
+        working-directory: backend
+        run: |
+          dotnet tool restore
+          dotnet tool run dotnet-ef migrations bundle --project src/Consent.Persistence --startup-project src/Consent.Persistence \
+            --configuration Release --self-contained -r win-x64 --output "$OUT/efbundle.exe"
+
+      - name: Build giao diện
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          mkdir -p "$OUT/ConsentWeb"
+          cp -r dist/. "$OUT/ConsentWeb/"
+          cp ../deploy/iis/web.frontend.config "$OUT/ConsentWeb/web.config"
+
+      - name: Script SQL và thông tin phiên bản
+        run: |
+          mkdir -p "$OUT/sql"
+          cp deploy/sql/*.sql "$OUT/sql/"
+          {
+            echo "Quan ly Phieu dong thuan - goi trien khai IIS"
+            echo "Ma commit: ${GITHUB_SHA}"
+            echo "Nhanh/the: ${GITHUB_REF_NAME}"
+            echo "Ngay dong goi (UTC): $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo
+            echo "ConsentApi  -> D:\\Apps\\ConsentApi  (site ConsentApi, http 127.0.0.1:5080)"
+            echo "ConsentWeb  -> D:\\Apps\\ConsentWeb  (site ConsentWeb, https 443, phieudongthuan.bth.org.vn)"
+            echo "efbundle.exe: chay bang tai khoan consent_migrator truoc khi khoi dong API (muc 4.2)"
+            echo "sql\\01-create-login.sql: doi 2 mat khau mau truoc khi chay (muc 4.1)"
+            echo "Huong dan day du: docs/trien-khai.md, muc 5"
+          } > "$OUT/PHIEN-BAN.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: goi-trien-khai-iis-${{ github.sha }}
+          path: out/goi-trien-khai-iis
+          retention-days: 30
+          if-no-files-found: error

@@ -1,0 +1,171 @@
+{
+  "title": "Phiếu đánh giá nguy cơ té ngã\nvà cam kết phối hợp phòng ngừa",
+  "subtitle": "(Thang điểm Morse, áp dụng cho người bệnh người lớn)",
+  "sections": [
+    {
+      "title": "II. Thông tin đánh giá",
+      "blocks": [
+        { "type": "text", "key": "bed", "label": "Buồng/giường", "maxLength": 50 },
+        {
+          "type": "choice",
+          "key": "assessmentReason",
+          "label": "Thời điểm đánh giá",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "initial", "label": "Lần đầu (tiếp nhận/nhập viện)" },
+            { "value": "changed", "label": "Tình trạng thay đổi" },
+            { "value": "afterFall", "label": "Sau té ngã" },
+            { "value": "periodic", "label": "Định kỳ" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "III. Đánh giá theo thang điểm Morse",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "morseFallHistory",
+          "label": "1. Tiền sử té ngã (trong 3 tháng gần đây hoặc trong lần điều trị này)",
+          "required": true,
+          "options": [
+            { "value": "no", "label": "Không", "score": 0 },
+            { "value": "yes", "label": "Có", "score": 25 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "morseSecondaryDiagnosis",
+          "label": "2. Có từ 2 chẩn đoán bệnh trở lên",
+          "required": true,
+          "options": [
+            { "value": "no", "label": "Không", "score": 0 },
+            { "value": "yes", "label": "Có", "score": 15 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "morseAmbulatoryAid",
+          "label": "3. Hỗ trợ khi di chuyển",
+          "required": true,
+          "options": [
+            { "value": "none", "label": "Không cần / nằm tại giường / có nhân viên y tế hỗ trợ", "score": 0 },
+            { "value": "crutches", "label": "Nạng, gậy, khung tập đi", "score": 15 },
+            { "value": "furniture", "label": "Phải vịn vào đồ vật xung quanh (giường, bàn, tường)", "score": 30 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "morseIntravenous",
+          "label": "4. Đang truyền dịch hoặc có đường truyền tĩnh mạch (kim luồn)",
+          "required": true,
+          "options": [
+            { "value": "no", "label": "Không", "score": 0 },
+            { "value": "yes", "label": "Có", "score": 20 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "morseGait",
+          "label": "5. Dáng đi",
+          "required": true,
+          "options": [
+            { "value": "normal", "label": "Bình thường / nằm tại giường / ngồi xe lăn", "score": 0 },
+            { "value": "weak", "label": "Yếu", "score": 10 },
+            { "value": "impaired", "label": "Suy giảm, không vững", "score": 20 }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "morseMentalStatus",
+          "label": "6. Nhận thức",
+          "required": true,
+          "options": [
+            { "value": "oriented", "label": "Biết đúng khả năng của bản thân", "score": 0 },
+            { "value": "overestimates", "label": "Đánh giá quá khả năng hoặc quên giới hạn của bản thân", "score": 15 }
+          ]
+        },
+        {
+          "type": "score",
+          "key": "morseTotal",
+          "label": "Tổng điểm Morse (0–125)",
+          "sumOf": ["morseFallHistory", "morseSecondaryDiagnosis", "morseAmbulatoryAid", "morseIntravenous", "morseGait", "morseMentalStatus"],
+          "levels": [
+            { "code": "low", "label": "Nguy cơ thấp", "min": 0 },
+            { "code": "medium", "label": "Nguy cơ trung bình", "min": 25 },
+            { "code": "high", "label": "Nguy cơ cao", "min": 45 }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "IV. Biện pháp phòng ngừa đã áp dụng",
+      "blocks": [
+        {
+          "type": "multiChoice",
+          "key": "measuresStandard",
+          "label": "Biện pháp chuẩn (mọi người bệnh)",
+          "required": true,
+          "options": [
+            { "value": "callBell", "label": "Hướng dẫn cách gọi nhân viên y tế (chuông gọi)" },
+            { "value": "lowBed", "label": "Giường ở vị trí thấp, khóa bánh xe; vật dụng cá nhân trong tầm với" },
+            { "value": "environment", "label": "Sàn khô, đủ ánh sáng; giày dép chống trơn trượt" },
+            { "value": "education", "label": "Hướng dẫn người bệnh và người nhà về phòng ngừa té ngã" }
+          ]
+        },
+        {
+          "type": "multiChoice",
+          "key": "measuresMedium",
+          "label": "Nguy cơ trung bình (thêm)",
+          "required": true,
+          "options": [
+            { "value": "marker", "label": "Đánh dấu người bệnh có nguy cơ té ngã (biển báo, vòng tay màu theo quy định)" },
+            { "value": "assist", "label": "Hỗ trợ khi di chuyển, khi đi vệ sinh" },
+            { "value": "bedRails", "label": "Dựng thanh chắn giường khi cần" },
+            { "value": "reassessOnChange", "label": "Đánh giá lại khi tình trạng thay đổi" }
+          ],
+          "visibleWhen": { "field": "morseTotal", "minLevel": "medium" }
+        },
+        {
+          "type": "multiChoice",
+          "key": "measuresHigh",
+          "label": "Nguy cơ cao (thêm)",
+          "required": true,
+          "options": [
+            { "value": "companion", "label": "Người nhà ở cùng người bệnh 24/24 giờ, hoặc bố trí giường gần buồng trực" },
+            { "value": "frequentChecks", "label": "Kiểm tra người bệnh thường xuyên theo quy định của khoa" },
+            { "value": "medicationReview", "label": "Rà soát thuốc làm tăng nguy cơ ngã (an thần, hạ huyết áp, lợi tiểu…) và báo bác sĩ điều trị" }
+          ],
+          "visibleWhen": { "field": "morseTotal", "minLevel": "high" }
+        },
+        {
+          "type": "datetime",
+          "key": "reassessAt",
+          "label": "Hẹn đánh giá lại",
+          "required": true,
+          "visibleWhen": { "field": "morseTotal", "minLevel": "medium" }
+        }
+      ]
+    },
+    {
+      "title": "V. Cam kết phối hợp của người bệnh và người nhà",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tôi/gia đình đã được thông báo mức nguy cơ té ngã và được hướng dẫn các biện pháp phòng ngừa. Chúng tôi cam kết phối hợp:"
+        },
+        {
+          "type": "list",
+          "items": [
+            "Gọi nhân viên y tế khi cần hỗ trợ đi lại, đi vệ sinh.",
+            "Không tự ý hạ thanh chắn giường.",
+            "Luôn có người nhà ở cùng nếu được yêu cầu.",
+            "Báo ngay khi người bệnh chóng mặt, mệt, yếu hơn hoặc đã bị ngã."
+          ]
+        }
+      ]
+    }
+  ],
+  "signatures": { "patient": "Người bệnh", "representative": "Người nhà người bệnh", "hospital": "Điều dưỡng đánh giá" }
+}

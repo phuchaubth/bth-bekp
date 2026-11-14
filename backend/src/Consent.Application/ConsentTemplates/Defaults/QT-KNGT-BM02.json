@@ -1,0 +1,81 @@
+{
+  "title": "Giấy đồng thuận\nConsent Form",
+  "subtitle": "Về chế độ thanh toán và quyền lợi khám chữa bệnh Bảo hiểm y tế\n(Regarding Payment Policy and Health Insurance Benefits for Medical Examination and Treatment)",
+  "sections": [
+    {
+      "title": "Nội dung tư vấn (Counseling content)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tôi xin xác nhận thông tin được tư vấn về chế độ thanh toán và quyền lợi khám chữa bệnh Bảo hiểm y tế tại Bệnh viện Truyền máu Huyết học như sau (I hereby acknowledge that I have received counseling regarding the payment policy and Health Insurance benefits for medical examination and treatment at the Blood Transfusion Hematology Hospital, as follows):"
+        },
+        {
+          "type": "list",
+          "layout": "ordered",
+          "items": [
+            "Trường hợp người bệnh khám chữa bệnh không Bảo hiểm y tế, người bệnh cần chi trả toàn bộ chi phí phát sinh trong quá trình điều trị (In the absence of Health Insurance coverage, the patient shall be responsible for payment of all expenses incurred during the course of medical examination and treatment).",
+            "Trường hợp khám chữa bệnh có Bảo hiểm y tế, quyền lợi và chế độ thanh toán của người bệnh như sau (For patients receiving medical care under Health Insurance coverage, the patient’s benefits and payment policy are as follows):"
+          ]
+        },
+        {
+          "type": "list",
+          "items": [
+            "Người bệnh được hưởng quyền lợi Bảo hiểm y tế theo mức hưởng và đơn giá khám chữa bệnh theo quy định về Bảo hiểm y tế (The patient shall be entitled to Health Insurance benefits according to the applicable reimbursement level and medical service fee schedule stipulated under Health Insurance regulations).",
+            "Người bệnh cần thanh toán thêm chi phí cùng chi trả Bảo hiểm y tế và chi phí chênh lệch dịch vụ tại bệnh viện (là khoảng chênh lệch chi phí khám chữa bệnh của Bệnh viện Truyền máu Huyết học so với đơn giá khám chữa bệnh do Bảo hiểm y tế quy định) (The patient shall be responsible for payment of the applicable Health Insurance co-payment and any service fee differentials charged by the hospital, representing the difference between the medical service fees at the Blood Transfusion Hematology Hospital and the reimbursement rates established under Health Insurance regulations).",
+            "Các khoản chi phí dịch vụ khám chữa bệnh, thuốc, vật tư y tế không có trong danh mục thanh toán của Bảo hiểm y tế hoặc không đủ điều kiện thanh toán Bảo hiểm y tế theo quy định của Bộ Y tế hoặc các dịch vụ thực hiện do người bệnh/người nhà yêu cầu thực hiện thêm trong quá trình điều trị sẽ không được thanh toán Bảo hiểm y tế (Expenses related to medical services, medications, and medical supplies that are not included in the Health Insurance reimbursement list, are not eligible for reimbursement under regulations of the Ministry of Health, or arise from additional services requested by the patient or family members during the treatment process, shall not be covered by Health Insurance)."
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Lựa chọn chế độ khám chữa bệnh (Medical care scheme)",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tôi đã hiểu rõ và đồng thuận thanh toán chi phí theo quy định nêu trên trong suốt quá trình khám chữa bệnh tại Bệnh viện Truyền máu Huyết học. Đồng thời, tôi lựa chọn khám chữa bệnh theo chế độ (I confirm that I have fully understood and agree to comply with the above payment policy throughout the course of medical examination and treatment at the Blood Transfusion Hematology Hospital. I hereby choose the following medical care scheme):"
+        },
+        {
+          "type": "choice",
+          "key": "careScheme",
+          "label": "Chế độ khám chữa bệnh (Medical care scheme)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "insurance", "label": "Bảo hiểm y tế (Health Insurance)" },
+            { "value": "nonInsurance", "label": "Không Bảo hiểm y tế (Non–Health Insurance)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "insuranceNumber",
+          "label": "Số thẻ Bảo hiểm y tế (Health Insurance Card Number)",
+          "required": true,
+          "maxLength": 17,
+          "pattern": "^[A-Z]{2}([0-9]{15}|[0-9]{13})$",
+          "patternMessage": "Số thẻ BHYT gồm 17 ký tự (2 chữ in hoa + 15 số); mã thẻ cũ 15 ký tự (2 chữ in hoa + 13 số) vẫn được chấp nhận.",
+          "prefill": "patient.healthInsuranceNumber",
+          "visibleWhen": { "field": "careScheme", "in": ["insurance"] }
+        },
+        {
+          "type": "paragraph",
+          "text": "Tôi xin cam đoan không khiếu kiện gì về sau (I undertake not to raise any complaint, dispute, or claim thereafter)."
+        }
+      ]
+    }
+  ],
+  "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi đã nghe, hiểu và đồng ý",
+        "Tôi đã được tư vấn đầy đủ và đồng ý",
+        "Tôi đã đọc, hiểu và đồng ý"
+      ]
+    },
+    "patient": "Người thỏa thuận (Declarant)",
+    "representative": "Người thỏa thuận – người đại diện (Declarant – representative)",
+    "hospital": "Nhân viên hướng dẫn (Counseling Staff)",
+    "decision": "none"
+  }
+}

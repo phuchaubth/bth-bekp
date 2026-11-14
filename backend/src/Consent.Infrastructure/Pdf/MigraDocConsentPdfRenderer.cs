@@ -1,0 +1,724 @@
+using System.Buffers.Binary;
+using System.Globalization;
+using System.Text.Json.Nodes;
+using Consent.Application.ConsentForms;
+using Consent.Application.ConsentTemplates;
+using Consent.Application.Settings;
+using Consent.Domain.ConsentForms;
+using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
+using MigraDoc.Rendering;
+using PdfSharp.Drawing;
+using PdfSharp.Fonts;
+
+namespace Consent.Infrastructure.Pdf;
+
+/// <summary>
+/// Dựng PDF phiếu bằng MigraDoc (MIT) theo bố cục văn bản hành chính: cơ quan chủ quản và tên bệnh viện bên trái,
+/// quốc hiệu – tiêu ngữ bên phải, tên phiếu, thông tin người bệnh, nội dung theo mẫu, ngày tháng và khối chữ ký.
+/// Phông Tinos được nhúng vào file nên hiển thị đúng tiếng Việt trên mọi máy.
+/// </summary>
+internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
+{
+    private const string Checked = "■";
+    private const string Unchecked = "□";
+
+    private static string Box(bool selected) => selected ? Checked : Unchecked;
+    private const string Blank = "……………………";
+    private static readonly Color Muted = new(0x55, 0x5D, 0x6B);
+
+    /// <summary>Màu phần tiếng Anh của mẫu song ngữ (in nghiêng; tiếng Việt giữ màu đen, chữ đứng).</summary>
+    internal static readonly Color English = new(0x00, 0x70, 0xC0);
+
+    /// <summary>Màu lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng.</summary>
+    internal static readonly Color Statement = new(0x5C, 0x3A, 0x1E);
+    private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
+    private static readonly Lock FontGate = new();
+
+    public MigraDocConsentPdfRenderer() => EnsureFontResolver();
+
+    public byte[] Render(ConsentPdfDocument document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+        var pdf = new Document();
+        pdf.Info.Title = $"{document.TemplateCode} – {document.FormNo}";
+        pdf.Info.Subject = Flatten(document.Definition.Title);
+        DefineStyles(pdf);
+
+        var section = pdf.AddSection();
+        section.PageSetup.PageFormat = PageFormat.A4;
+        section.PageSetup.TopMargin = Unit.FromMillimeter(15);
+        section.PageSetup.BottomMargin = Unit.FromMillimeter(18);
+        section.PageSetup.LeftMargin = Unit.FromMillimeter(25);
+        section.PageSetup.RightMargin = Unit.FromMillimeter(18);
+        section.PageSetup.HeaderDistance = Unit.FromMillimeter(7);
+        section.PageSetup.FooterDistance = Unit.FromMillimeter(8);
+
+        AddPreviewNotice(section, document);
+        AddDocumentHead(section, document);
+        AddTitle(section, document);
+        AddPatient(section, document);
+        foreach (var block in document.Definition.Sections)
+        {
+            AddSection(section, block, document);
+        }
+
+        AddSignatures(section, document);
+        AddFooter(section, document);
+
+        var renderer = new PdfDocumentRenderer { Document = pdf };
+        renderer.RenderDocument();
+        using var stream = new MemoryStream();
+        renderer.PdfDocument.Save(stream, false);
+        return stream.ToArray();
+    }
+
+    private static void EnsureFontResolver()
+    {
+        lock (FontGate)
+        {
+            if (GlobalFontSettings.FontResolver is not EmbeddedFontResolver)
+            {
+                GlobalFontSettings.FontResolver = new EmbeddedFontResolver();
+            }
+        }
+    }
+
+    private static void DefineStyles(Document pdf)
+    {
+        var normal = pdf.Styles[StyleNames.Normal]!;
+        normal.Font.Name = EmbeddedFontResolver.FamilyName;
+        normal.Font.Size = 12;
+        normal.ParagraphFormat.SpaceAfter = Unit.FromPoint(2);
+        normal.ParagraphFormat.LineSpacingRule = LineSpacingRule.Multiple;
+        normal.ParagraphFormat.LineSpacing = 1.0;
+    }
+
+    private static void AddPreviewNotice(Section section, ConsentPdfDocument document)
+    {
+        if (document.IsFinal)
+        {
+            return;
+        }
+
+        var notice = section.Headers.Primary.AddParagraph("BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ");
+        notice.Format.Alignment = ParagraphAlignment.Right;
+        notice.Format.Font.Size = 9;
+        notice.Format.Font.Italic = true;
+        notice.Format.Font.Color = Muted;
+    }
+
+    private static void AddDocumentHead(Section section, ConsentPdfDocument document)
+    {
+        var table = section.AddTable();
+        // Có logo: cột logo bên trái, tên đơn vị và quốc hiệu thu hẹp lại; tổng vẫn 167 mm (lề A4).
+        var logo = document.Logo is { } candidate && CanDecode(candidate) ? candidate : null;
+        if (logo is not null)
+        {
+            table.AddColumn(Unit.FromMillimeter(LogoColumnMm));
+        }
+
+        table.AddColumn(Unit.FromMillimeter(logo is null ? 72 : 60));
+        table.AddColumn(Unit.FromMillimeter(logo is null ? 95 : 167 - 60 - LogoColumnMm));
+        var row = table.AddRow();
+        row.VerticalAlignment = VerticalAlignment.Center;
+        var textColumn = 0;
+        if (logo is not null)
+        {
+            AddLogo(row.Cells[0], logo);
+            textColumn = 1;
+        }
+
+        // Có logo thì cột chữ hẹp hơn: chữ nhỏ hơn một cỡ để tên đơn vị và quốc hiệu vẫn nằm trên một dòng.
+        var headSize = logo is null ? 11 : 10;
+        var left = row.Cells[textColumn].AddParagraph();
+        left.Format.Alignment = ParagraphAlignment.Center;
+        left.Format.Font.Size = headSize;
+        left.AddText(document.Hospital.ParentAgency.ToUpper(Vietnamese));
+        left.AddLineBreak();
+        var hospital = left.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
+        hospital.Underline = Underline.Single;
+        if (!string.IsNullOrWhiteSpace(document.DepartmentName))
+        {
+            left.AddLineBreak();
+            left.AddText($"Khoa/phòng: {document.DepartmentName}");
+        }
+
+        var right = row.Cells[textColumn + 1].AddParagraph();
+        right.Format.Alignment = ParagraphAlignment.Center;
+        right.Format.Font.Size = headSize;
+        right.AddFormattedText("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM", TextFormat.Bold);
+        right.AddLineBreak();
+        var motto = right.AddFormattedText("Độc lập - Tự do - Hạnh phúc", TextFormat.Bold);
+        motto.Underline = Underline.Single;
+
+        var meta = section.AddParagraph();
+        meta.Format.SpaceBefore = Unit.FromMillimeter(3);
+        meta.Format.Font.Size = 10;
+        meta.Format.Font.Color = Muted;
+        meta.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+        meta.AddText($"MS: {document.TemplateCode} (phiên bản {document.TemplateVersionNo})");
+        meta.AddTab();
+        meta.AddText($"Số phiếu: {document.FormNo}");
+    }
+
+    private static void AddTitle(Section section, ConsentPdfDocument document)
+    {
+        var title = section.AddParagraph();
+        title.Format.Alignment = ParagraphAlignment.Center;
+        title.Format.SpaceBefore = Unit.FromMillimeter(4);
+        title.Format.SpaceAfter = Unit.FromMillimeter(document.Definition.Subtitle is null ? 4 : 1);
+        title.Format.Font.Size = 14;
+        title.Format.Font.Bold = true;
+        var lines = document.Definition.Title.Split('\n').Select(line => line.Trim());
+        AddBilingual(title, string.Join('\n', lines), upper: true, wholeLines: true);
+
+        if (document.Definition.Subtitle is { } subtitle)
+        {
+            var sub = section.AddParagraph();
+            AddBilingual(sub, subtitle, wholeLines: true);
+            sub.Format.Alignment = ParagraphAlignment.Center;
+            sub.Format.Font.Italic = true;
+            sub.Format.SpaceAfter = Unit.FromMillimeter(4);
+        }
+    }
+
+    private static void AddPatient(Section section, ConsentPdfDocument document)
+    {
+        AddSectionTitle(section, "I. Thông tin người bệnh");
+        var patient = document.Patient;
+        var age = VietnameseLabels.Age(patient.DateOfBirth, document.DocumentDate);
+
+        var line1 = TwoColumns(section);
+        AddLabelValue(line1, "Họ và tên: ", patient.FullName.ToUpper(Vietnamese), bold: true);
+        line1.AddTab();
+        AddLabelValue(line1, "Giới tính: ", VietnameseLabels.Gender(patient.Gender));
+
+        var line2 = TwoColumns(section);
+        AddLabelValue(line2, "Ngày sinh: ", $"{patient.DateOfBirth:dd/MM/yyyy} ({age} tuổi)");
+        line2.AddTab();
+        AddLabelValue(line2, "Mã người bệnh: ", patient.PatientCode);
+
+        var line3 = TwoColumns(section);
+        AddLabelValue(line3, "Số CCCD: ", patient.CitizenId);
+        line3.AddTab();
+        AddLabelValue(line3, "Điện thoại: ", patient.PhoneNumber);
+
+        AddLabelValue(section.AddParagraph(), "Địa chỉ: ", patient.Address);
+
+        if (document.Representative is { } representative)
+        {
+            var signer = section.AddParagraph();
+            AddLabelValue(signer, "Người ký thay mặt người bệnh: ", representative.FullName.ToUpper(Vietnamese), bold: true);
+            AddLabelValue(signer, " – Quan hệ: ", VietnameseLabels.Relationship(representative.Relationship));
+            AddLabelValue(signer, " – Số CCCD: ", representative.CitizenId);
+        }
+    }
+
+    private static void AddSection(Section section, TemplateSection templateSection, ConsentPdfDocument document)
+    {
+        if (!string.IsNullOrWhiteSpace(templateSection.Title))
+        {
+            AddSectionTitle(section, templateSection.Title);
+        }
+
+        foreach (var block in templateSection.Blocks)
+        {
+            switch (block.Type)
+            {
+                case BlockTypes.Paragraph:
+                    var paragraph = section.AddParagraph();
+                    AddBilingual(paragraph, block.Text ?? string.Empty);
+                    paragraph.Format.Alignment = ParagraphAlignment.Justify;
+                    break;
+                case BlockTypes.List:
+                    AddList(section, block);
+                    break;
+                case BlockTypes.Score:
+                    AddScore(section, block, document);
+                    break;
+                default:
+                    // Trường không hiển thị (điều kiện chưa thỏa) thì không in.
+                    if (IsShown(block, document))
+                    {
+                        AddField(section, block, document.Data[block.Key!]);
+                    }
+
+                    break;
+            }
+        }
+    }
+
+    /// <summary>Trường có giá trị, hoặc không có điều kiện hiển thị (in ô trống để người bệnh thấy đủ nội dung).</summary>
+    private static bool IsShown(TemplateBlock block, ConsentPdfDocument document) =>
+        block.VisibleWhen is null || document.Data[block.Key!] is not null;
+
+    private static void AddField(Section section, TemplateBlock block, JsonNode? value)
+    {
+        switch (block.Type)
+        {
+            case BlockTypes.Choice:
+            case BlockTypes.MultiChoice:
+                AddChoices(section, block, value);
+                break;
+            case BlockTypes.Confirm:
+                var confirm = section.AddParagraph();
+                confirm.Format.LeftIndent = Unit.FromMillimeter(6);
+                confirm.Format.FirstLineIndent = Unit.FromMillimeter(-6);
+                confirm.AddText($"{(value is JsonValue v && v.TryGetValue<bool>(out var flag) && flag ? Checked : Unchecked)}\t");
+                confirm.Format.TabStops.AddTabStop(Unit.FromMillimeter(6));
+                AddBilingual(confirm, block.Label ?? string.Empty);
+                break;
+            case BlockTypes.Repeater:
+                AddRows(section, block, value as JsonArray);
+                break;
+            default:
+                AddLabelValue(section.AddParagraph(), $"{block.Label}: ", FormatValue(block.Type, value));
+                break;
+        }
+    }
+
+    private static void AddChoices(Section section, TemplateBlock block, JsonNode? value)
+    {
+        var selected = value switch
+        {
+            JsonArray array => array.Select(v => v!.GetValue<string>()).ToHashSet(StringComparer.Ordinal),
+            JsonValue single when single.TryGetValue<string>(out var text) => [text],
+            _ => new HashSet<string>(StringComparer.Ordinal),
+        };
+        var options = block.Options ?? [];
+        void Mark(Paragraph paragraph, TemplateOption option)
+        {
+            paragraph.AddText($"{(selected.Contains(option.Value) ? Checked : Unchecked)} ");
+            AddBilingual(paragraph, option.Label);
+            if (option.Score is { } score)
+            {
+                paragraph.AddText($" ({score} điểm)");
+            }
+        }
+
+        if (block.Layout == "inline")
+        {
+            var line = section.AddParagraph();
+            AddBilingual(line, $"{block.Label}: ");
+            for (var i = 0; i < options.Count; i++)
+            {
+                if (i > 0)
+                {
+                    // Khoảng trắng không ngắt để các lựa chọn trên cùng dòng không dính vào nhau.
+                    line.AddText("\u00A0\u00A0\u00A0 ");
+                }
+
+                Mark(line, options[i]);
+            }
+
+            return;
+        }
+
+        AddBilingual(section.AddParagraph(), $"{block.Label}:");
+        foreach (var option in options)
+        {
+            var item = section.AddParagraph();
+            Mark(item, option);
+            item.Format.LeftIndent = Unit.FromMillimeter(10);
+            item.Format.FirstLineIndent = Unit.FromMillimeter(-4);
+        }
+    }
+
+    private static void AddRows(Section section, TemplateBlock block, JsonArray? rows)
+    {
+        AddBilingual(section.AddParagraph(), $"{block.Label}:");
+        var columns = block.Columns ?? [];
+        var table = section.AddTable();
+        table.Borders.Width = 0.5;
+        table.Format.Font.Size = 11;
+        table.AddColumn(Unit.FromMillimeter(10));
+        var width = (167d - 10d) / Math.Max(1, columns.Count);
+        foreach (var _ in columns)
+        {
+            table.AddColumn(Unit.FromMillimeter(width));
+        }
+
+        var header = table.AddRow();
+        header.HeadingFormat = true;
+        header.Format.Font.Bold = true;
+        header.Cells[0].AddParagraph("TT");
+        for (var c = 0; c < columns.Count; c++)
+        {
+            AddBilingual(header.Cells[c + 1].AddParagraph(), columns[c].Label);
+        }
+
+        var count = Math.Max(rows?.Count ?? 0, 1);
+        for (var r = 0; r < count; r++)
+        {
+            var row = table.AddRow();
+            row.Cells[0].AddParagraph((r + 1).ToString(Vietnamese));
+            var data = rows is not null && r < rows.Count ? rows[r] as JsonObject : null;
+            for (var c = 0; c < columns.Count; c++)
+            {
+                row.Cells[c + 1].AddParagraph(data?[columns[c].Key]?.GetValue<string>() ?? string.Empty);
+            }
+        }
+
+        section.AddParagraph().Format.SpaceAfter = Unit.FromPoint(2);
+    }
+
+    private static void AddScore(Section section, TemplateBlock block, ConsentPdfDocument document)
+    {
+        var score = document.Scores.TryGetValue(block.Key!, out var result) ? result : null;
+        var line = section.AddParagraph();
+        line.Format.SpaceBefore = Unit.FromPoint(3);
+        AddBilingual(line, $"{block.Label}: ");
+        AddBilingual(
+            line, score?.Total is { } total ? $"{total} điểm – {score.LevelLabel}" : "chưa đủ câu trả lời", TextFormat.Bold);
+    }
+
+    private static void AddList(Section section, TemplateBlock block)
+    {
+        var items = block.Items ?? [];
+        for (var i = 0; i < items.Count; i++)
+        {
+            var marker = block.Layout == "ordered" ? $"{i + 1}." : "–";
+            var item = section.AddParagraph();
+            item.Format.LeftIndent = Unit.FromMillimeter(7);
+            item.Format.FirstLineIndent = Unit.FromMillimeter(-7);
+            item.Format.TabStops.AddTabStop(Unit.FromMillimeter(7));
+            item.Format.Alignment = ParagraphAlignment.Justify;
+            item.AddText($"{marker}\t");
+            AddBilingual(item, items[i]);
+        }
+    }
+
+    /// <summary>Một ô chữ ký: vai trò, ghi chú, ảnh chữ ký tay (nếu có), họ tên ("tên|phần thêm") và các dòng nhỏ.</summary>
+    private sealed record SignatureSlot(string Role, string Hint, byte[]? ImagePng, string? Name, IReadOnlyList<string> Lines)
+    {
+        /// <summary>Lời xác nhận người ký ghi khi ký (ví dụ "Tôi đã nghe, hiểu và đồng ý"), in ngay trên chữ ký.</summary>
+        public string? Statement { get; init; }
+    }
+
+    private static SignatureSlot ConfirmationSlot(string role, string? hint, ConsentPdfConfirmation? confirmation)
+    {
+        if (confirmation is null)
+        {
+            return new SignatureSlot(role, hint ?? "(Xác nhận bằng tài khoản)", null, null, []);
+        }
+
+        var lines = new List<string>();
+        if (confirmation.Title is { Length: > 0 } title)
+        {
+            lines.Add(title);
+        }
+
+        lines.Add($"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
+        // Quyết định 17: nhân viên ký tay khi xác nhận; phiếu hoàn tất trước đó không có ảnh.
+        var signedHint = confirmation.ImagePng is null ? "(Đã xác nhận bằng tài khoản)" : "(Đã ký, xác nhận bằng tài khoản)";
+        return new SignatureSlot(role, signedHint, confirmation.ImagePng, confirmation.Name, lines);
+    }
+
+    private static void AddSignatures(Section section, ConsentPdfDocument document)
+    {
+        var labels = document.Definition.Signatures;
+        var isRepresentative = document.Representative is not null;
+        var patientRole = isRepresentative
+            ? labels?.Representative ?? "Người đại diện hợp pháp"
+            : labels?.Patient ?? "Người bệnh";
+
+        // Quyết định ghi nhận khi ký (bản xem trước để trống cả hai ô) và ngày tháng trên cùng một dòng. Mẫu chỉ ký xác
+        // nhận (không hỏi Đồng ý/Từ chối) chỉ in ngày tháng.
+        var decision = section.AddParagraph();
+        decision.Format.SpaceBefore = Unit.FromMillimeter(1);
+        decision.Format.KeepWithNext = true;
+        decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+        if (labels?.RequiresDecision ?? true)
+        {
+            var question = labels?.DecisionLabel ?? $"Ý kiến của {(isRepresentative ? "người đại diện" : "người bệnh")}";
+            // Câu hỏi đã có dấu "?" (hoặc kết thúc bằng ngoặc sau dấu "?") thì không thêm dấu ":".
+            var trimmed = question.TrimEnd(':', ' ');
+            var isQuestion = trimmed.EndsWith('?') || trimmed.EndsWith("?)", StringComparison.Ordinal);
+            AddBilingual(decision, isQuestion ? $"{trimmed} " : $"{trimmed}: ", TextFormat.Bold);
+            if (labels?.DecisionLabel is not null)
+            {
+                // Câu hỏi riêng của mẫu thường dài: đưa lựa chọn và ngày tháng xuống dòng dưới.
+                decision = section.AddParagraph();
+                decision.Format.KeepWithNext = true;
+                decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+            }
+
+            decision.AddText($"{Box(document.Decision == ConsentDecision.Agreed)} ");
+            AddBilingual(decision, labels?.AgreeLabel ?? "Đồng ý");
+            decision.AddText($"    {Box(document.Decision == ConsentDecision.Refused)} ");
+            AddBilingual(decision, labels?.RefuseLabel ?? "Từ chối");
+        }
+
+        decision.AddTab();
+        decision.AddFormattedText(
+            $"{document.Hospital.Place}, ngày {document.DocumentDate.Day:00} tháng {document.DocumentDate.Month:00} năm {document.DocumentDate.Year}",
+            TextFormat.Italic);
+
+        // Ô chữ ký theo thứ tự: người bệnh/người đại diện, các bước xác nhận trung gian (nếu mẫu có), xác nhận cuối của
+        // bệnh viện; xếp hai ô mỗi hàng.
+        var patientLines = new List<string>();
+        var patientName = document.Representative is { } representative
+            // Số CCCD và quan hệ của người đại diện đã in ở phần thông tin người bệnh; ở đây nhắc lại quan hệ.
+            ? $"{representative.FullName}|({VietnameseLabels.Relationship(representative.Relationship)})"
+            : document.Patient.FullName;
+        if (document.PatientSignature is { } signed)
+        {
+            patientLines.Add($"Ký lúc {signed.SignedAt:HH:mm}, {signed.SignedAt:dd/MM/yyyy}");
+        }
+
+        var slots = new List<SignatureSlot>
+        {
+            new(patientRole, "(Ký, ghi rõ họ tên)", document.PatientSignature?.ImagePng, patientName, patientLines)
+            {
+                Statement = document.PatientSignature?.Statement,
+            },
+        };
+        var steps = labels?.Steps ?? [];
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var done = document.StepConfirmations is { } confirmations && i < confirmations.Count ? confirmations[i] : null;
+            slots.Add(ConfirmationSlot(steps[i].Label, steps[i].Hint, done));
+        }
+
+        slots.Add(ConfirmationSlot(labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint, document.HospitalConfirmation));
+
+        var table = section.AddTable();
+        table.AddColumn(Unit.FromMillimeter(83));
+        table.AddColumn(Unit.FromMillimeter(84));
+        for (var start = 0; start < slots.Count; start += 2)
+        {
+            var pair = slots.Skip(start).Take(2).ToList();
+            var roles = table.AddRow();
+            roles.KeepWith = 2; // giữ dòng vai trò, khoảng ký và họ tên trên cùng một trang
+            if (start > 0)
+            {
+                roles.TopPadding = Unit.FromMillimeter(4);
+            }
+
+            var space = table.AddRow();
+            space.Height = Unit.FromMillimeter(14);
+            space.VerticalAlignment = VerticalAlignment.Center;
+            var names = table.AddRow();
+            for (var c = 0; c < pair.Count; c++)
+            {
+                var slot = pair[c];
+                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement);
+                if (slot.ImagePng is { } image)
+                {
+                    AddSignatureImage(space.Cells[c], image);
+                }
+
+                if (slot.Name is { } fullName)
+                {
+                    var name = names.Cells[c].AddParagraph();
+                    name.Format.Alignment = ParagraphAlignment.Center;
+                    name.Format.SpaceAfter = 0;
+                    var parts = fullName.Split('|', 2);
+                    name.AddFormattedText(parts[0], TextFormat.Bold);
+                    if (parts.Length > 1)
+                    {
+                        name.AddText($" {parts[1]}");
+                    }
+                }
+
+                foreach (var line in slot.Lines)
+                {
+                    AddSmallLine(names.Cells[c], line);
+                }
+            }
+        }
+    }
+
+    private const double LogoColumnMm = 20;
+
+    /// <summary>
+    /// Logo chỉ được kiểm tra phần đầu file lúc tải lên; thử giải mã trước khi in để một file hỏng không làm hỏng việc in
+    /// mọi phiếu (khi đó phiếu in không có logo).
+    /// </summary>
+    private static bool CanDecode(LogoImage logo)
+    {
+        try
+        {
+            using var stream = new MemoryStream(logo.Content, writable: false);
+            using var image = XImage.FromStream(stream);
+            return image.PixelWidth > 0 && image.PixelHeight > 0;
+        }
+#pragma warning disable CA1031 // Mọi lỗi giải mã ảnh đều xử lý giống nhau: bỏ logo.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Logo bệnh viện, thu vừa ô 18 × 18 mm, giữ đúng tỉ lệ.</summary>
+    private static void AddLogo(Cell cell, LogoImage logo)
+    {
+        const double MaxMm = 18;
+        var scale = Math.Min(MaxMm / logo.Width, MaxMm / logo.Height);
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Left;
+        var image = paragraph.AddImage("base64:" + Convert.ToBase64String(logo.Content));
+        image.LockAspectRatio = false;
+        image.Width = Unit.FromMillimeter(logo.Width * scale);
+        image.Height = Unit.FromMillimeter(logo.Height * scale);
+    }
+
+    /// <summary>Ảnh chữ ký tay, thu vừa khung 70 × 12 mm, giữ đúng tỉ lệ.</summary>
+    private static void AddSignatureImage(Cell cell, byte[] png)
+    {
+        const double MaxWidthMm = 70;
+        const double MaxHeightMm = 12;
+        var width = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4));
+        var height = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4));
+        var scale = Math.Min(MaxWidthMm / width, MaxHeightMm / height);
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Center;
+        var image = paragraph.AddImage("base64:" + Convert.ToBase64String(png));
+        image.LockAspectRatio = false;
+        image.Width = Unit.FromMillimeter(width * scale);
+        image.Height = Unit.FromMillimeter(height * scale);
+    }
+
+    private static void AddSmallLine(Cell cell, string text)
+    {
+        var line = cell.AddParagraph(text);
+        line.Format.Alignment = ParagraphAlignment.Center;
+        line.Format.Font.Size = 10;
+        line.Format.SpaceAfter = 0;
+    }
+
+    private static void AddSignatureCell(Cell cell, string role, string hint, string? statement = null)
+    {
+        var title = cell.AddParagraph();
+        title.Format.Alignment = ParagraphAlignment.Center;
+        AddBilingual(title, role, TextFormat.Bold, upper: true);
+        var help = cell.AddParagraph();
+        AddBilingual(help, hint);
+        help.Format.Alignment = ParagraphAlignment.Center;
+        help.Format.Font.Italic = true;
+        help.Format.Font.Size = 10;
+        if (statement is not null)
+        {
+            // Lời xác nhận người ký ghi khi ký, như dòng viết tay trên phiếu giấy.
+            var words = cell.AddParagraph();
+            words.Format.Alignment = ParagraphAlignment.Center;
+            words.Format.SpaceBefore = Unit.FromPoint(2);
+            var text = words.AddFormattedText($"“{statement}”", TextFormat.Italic);
+            text.Color = Statement;
+        }
+    }
+
+    private static void AddFooter(Section section, ConsentPdfDocument document)
+    {
+        var footer = section.Footers.Primary.AddParagraph();
+        footer.Format.Font.Size = 8;
+        footer.Format.Font.Color = Muted;
+        footer.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
+        footer.AddText($"MS: {document.TemplateCode} · Phiên bản {document.TemplateVersionNo} · Số phiếu {document.FormNo}");
+        footer.AddTab();
+        footer.AddText("Trang ");
+        footer.AddPageField();
+        footer.AddText("/");
+        footer.AddNumPagesField();
+    }
+
+    private static void AddSectionTitle(Section section, string text)
+    {
+        var title = section.AddParagraph();
+        AddBilingual(title, text);
+        title.Format.Font.Bold = true;
+        title.Format.SpaceBefore = Unit.FromMillimeter(3);
+        title.Format.SpaceAfter = Unit.FromPoint(3);
+        title.Format.KeepWithNext = true;
+    }
+
+    private static Paragraph TwoColumns(Section section)
+    {
+        var paragraph = section.AddParagraph();
+        paragraph.Format.TabStops.AddTabStop(Unit.FromMillimeter(100));
+        return paragraph;
+    }
+
+    /// <summary>Thêm chữ của mẫu song ngữ: phần tiếng Anh màu xanh, chữ nghiêng; tiếng Việt giữ màu đen; "\n" thành xuống dòng.</summary>
+    private static void AddBilingual(
+        Paragraph paragraph, string text, TextFormat? format = null, bool upper = false, bool wholeLines = false)
+    {
+        foreach (var segment in BilingualText.Split(text, wholeLines))
+        {
+            if (segment.Text == "\n")
+            {
+                paragraph.AddLineBreak();
+                continue;
+            }
+
+            var content = upper ? segment.Text.ToUpper(Vietnamese) : segment.Text;
+            var run = format is { } f ? paragraph.AddFormattedText(content, f) : paragraph.AddFormattedText(content);
+            if (segment.IsEnglish)
+            {
+                run.Color = English;
+                run.Italic = true;
+            }
+        }
+    }
+
+    private static void AddLabelValue(Paragraph paragraph, string label, string? value, bool bold = false)
+    {
+        AddBilingual(paragraph, label);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            paragraph.AddText(Blank);
+            return;
+        }
+
+        paragraph.AddFormattedText(value, bold ? TextFormat.Bold : TextFormat.NotBold);
+    }
+
+    private static string? FormatValue(string type, JsonNode? value)
+    {
+        if (value is not JsonValue v || !v.TryGetValue<string>(out var text))
+        {
+            return null;
+        }
+
+        return type switch
+        {
+            BlockTypes.Date when DateOnly.TryParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) =>
+                date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture),
+            BlockTypes.DateTime when DateTime.TryParseExact(text, "yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time) =>
+                time.ToString("HH:mm 'ngày' dd/MM/yyyy", CultureInfo.InvariantCulture),
+            _ => text,
+        };
+    }
+
+    private static string Flatten(string text) => text.Replace('\n', ' ');
+}
+
+/// <summary>Cấp phông Tinos nhúng sẵn trong assembly cho PDFsharp (không phụ thuộc phông cài trên máy chủ).</summary>
+internal sealed class EmbeddedFontResolver : IFontResolver
+{
+    public const string FamilyName = "Tinos";
+
+    public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
+        (isBold, isItalic) switch
+        {
+            (true, true) => new FontResolverInfo("Tinos-Bold", false, true),
+            (true, false) => new FontResolverInfo("Tinos-Bold"),
+            (false, true) => new FontResolverInfo("Tinos-Italic"),
+            _ => new FontResolverInfo("Tinos-Regular"),
+        };
+
+    public byte[]? GetFont(string faceName)
+    {
+        using var stream = typeof(EmbeddedFontResolver).Assembly.GetManifestResourceStream($"Pdf.Fonts.{faceName}.ttf");
+        if (stream is null)
+        {
+            return null;
+        }
+
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
+    }
+}

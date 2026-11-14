@@ -1,0 +1,114 @@
+{
+  "title": "Giấy cam kết\nsử dụng dịch vụ khám bệnh, chữa bệnh",
+  "sections": [
+    {
+      "title": "II. Hình thức khám, chữa bệnh",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "examType",
+          "label": "Hình thức khám, chữa bệnh",
+          "required": true,
+          "options": [
+            { "value": "bhyt", "label": "Khám, chữa bệnh BHYT" },
+            { "value": "service", "label": "Khám, chữa bệnh dịch vụ (tự chi trả toàn bộ)" },
+            { "value": "bhytWithService", "label": "BHYT kết hợp sử dụng dịch vụ theo yêu cầu (tự chi trả phần chênh lệch)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "insuranceNumber",
+          "label": "Số thẻ BHYT",
+          "required": true,
+          "maxLength": 17,
+          "pattern": "^[A-Z]{2}([0-9]{15}|[0-9]{13})$",
+          "patternMessage": "Số thẻ BHYT gồm 17 ký tự (2 chữ in hoa + 15 số); mã thẻ cũ 15 ký tự (2 chữ in hoa + 13 số) vẫn được chấp nhận.",
+          "prefill": "patient.healthInsuranceNumber",
+          "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
+        },
+        {
+          "type": "date",
+          "key": "insuranceValidFrom",
+          "label": "Thẻ có giá trị từ ngày",
+          "required": true,
+          "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
+        },
+        {
+          "type": "date",
+          "key": "insuranceValidTo",
+          "label": "Đến ngày",
+          "required": true,
+          "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
+        },
+        {
+          "type": "text",
+          "key": "primaryCareFacility",
+          "label": "Nơi đăng ký khám, chữa bệnh ban đầu",
+          "required": true,
+          "maxLength": 200,
+          "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
+        },
+        {
+          "type": "choice",
+          "key": "referralPaper",
+          "label": "Giấy chuyển tuyến/chuyển cơ sở khám, chữa bệnh",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "yes", "label": "Có" },
+            { "value": "no", "label": "Không" },
+            { "value": "later", "label": "Bổ sung sau" }
+          ],
+          "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
+        },
+        {
+          "type": "multiChoice",
+          "key": "requestedServices",
+          "label": "Dịch vụ theo yêu cầu",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "doctor", "label": "Chọn bác sĩ/chuyên gia" },
+            { "value": "time", "label": "Chọn thời gian khám" },
+            { "value": "room", "label": "Buồng bệnh theo yêu cầu" },
+            { "value": "other", "label": "Khác" }
+          ],
+          "visibleWhen": { "field": "examType", "in": ["bhytWithService"] }
+        },
+        {
+          "type": "text",
+          "key": "requestedServicesOther",
+          "label": "Dịch vụ khác",
+          "required": true,
+          "maxLength": 200,
+          "visibleWhen": { "field": "requestedServices", "in": ["other"] }
+        }
+      ]
+    },
+    {
+      "title": "III. Nội dung cam kết",
+      "blocks": [
+        { "type": "paragraph", "text": "Tôi đã được nhân viên bệnh viện giải thích và hiểu rõ, và cam kết:" },
+        {
+          "type": "list",
+          "layout": "ordered",
+          "items": [
+            "Giá dịch vụ khám bệnh, chữa bệnh được bệnh viện niêm yết công khai. Tôi được hỏi và được trả lời về chi phí trước khi sử dụng dịch vụ.",
+            "Khi khám, chữa bệnh BHYT: quỹ BHYT chi trả theo phạm vi và mức hưởng của thẻ. Tôi tự chi trả phần cùng chi trả, phần chênh lệch giá, và chi phí thuốc, vật tư, dịch vụ ngoài phạm vi BHYT.",
+            "Khi sử dụng dịch vụ theo yêu cầu: tôi tự nguyện lựa chọn và tự chi trả chi phí dịch vụ theo yêu cầu, hoặc phần chênh lệch so với mức BHYT chi trả.",
+            "Tôi xuất trình thẻ BHYT, giấy tờ tùy thân và giấy chuyển tuyến (nếu có) theo quy định. Nếu không xuất trình đủ trong thời hạn bệnh viện thông báo, tôi chi trả chi phí theo giá dịch vụ.",
+            "Tôi cung cấp thông tin trung thực, chấp hành nội quy bệnh viện và thanh toán đầy đủ chi phí theo quy định.",
+            "Khi muốn thay đổi hình thức khám, tôi báo nhân viên tiếp đón để lập cam kết mới."
+          ]
+        },
+        {
+          "type": "confirm",
+          "key": "acknowledged",
+          "label": "Tôi đã được giải thích, đọc và hiểu nội dung cam kết trên.",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "signatures": { "hospital": "Nhân viên tiếp đón" }
+}

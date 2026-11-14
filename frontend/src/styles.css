@@ -1,0 +1,29 @@
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: #f3f7f8;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mẫu phiếu song ngữ: tiếng Anh màu xanh, chữ nghiêng; tiếng Việt giữ màu chữ thường (giống PDF). */
+.bilingual-en {
+  color: #0070c0;
+  font-style: italic;
+}
+
+/* Trên nền xanh của lựa chọn đang chọn thì dùng màu chữ của nút để vẫn đọc được. */
+.ant-radio-button-wrapper-checked .bilingual-en {
+  color: inherit;
+}
+
+/* Lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng (giống PDF). */
+.signer-statement,
+.signer-statement textarea {
+  color: #5c3a1e;
+  font-style: italic;
+}

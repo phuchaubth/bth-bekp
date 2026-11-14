@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Consent.Api/Consent.Api.csproj" />
+    <Project Path="src/Consent.Application/Consent.Application.csproj" />
+    <Project Path="src/Consent.Domain/Consent.Domain.csproj" />
+    <Project Path="src/Consent.Infrastructure/Consent.Infrastructure.csproj" />
+    <Project Path="src/Consent.Persistence/Consent.Persistence.csproj" />
+    <Project Path="src/Consent.Shared/Consent.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Consent.Api.IntegrationTests/Consent.Api.IntegrationTests.csproj" />
+    <Project Path="tests/Consent.Application.Tests/Consent.Application.Tests.csproj" />
+    <Project Path="tests/Consent.ArchitectureTests/Consent.ArchitectureTests.csproj" />
+    <Project Path="tests/Consent.Domain.Tests/Consent.Domain.Tests.csproj" />
+    <Project Path="tests/Consent.Infrastructure.Tests/Consent.Infrastructure.Tests.csproj" />
+  </Folder>
+</Solution>

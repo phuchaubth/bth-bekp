@@ -1,0 +1,153 @@
+{
+  "title": "Phiếu thông tin người bệnh ngoại trú\nOutpatient Information Form",
+  "subtitle": "Họ tên, giới tính, ngày sinh, số giấy tờ tùy thân và số điện thoại của người bệnh in ở phần thông tin người bệnh (Patient's name, gender, date of birth, ID number and phone number are printed in the patient information section)",
+  "sections": [
+    {
+      "title": "Thông tin bổ sung của người bệnh (Additional patient information)",
+      "blocks": [
+        {
+          "type": "text",
+          "key": "ethnicity",
+          "label": "Dân tộc (Ethnicity)",
+          "required": true,
+          "maxLength": 50,
+          "prefill": "patient.ethnicity"
+        },
+        {
+          "type": "choice",
+          "key": "religion",
+          "label": "Tôn giáo (Religion)",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "buddhism", "label": "Phật giáo (Buddhism)" },
+            { "value": "catholicism", "label": "Thiên chúa giáo (Catholicism)" },
+            { "value": "other", "label": "Khác (Other)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "religionOther",
+          "label": "Tôn giáo khác, ghi rõ (Other religion, specify)",
+          "required": true,
+          "maxLength": 100,
+          "visibleWhen": { "field": "religion", "in": ["other"] }
+        },
+        {
+          "type": "text",
+          "key": "educationLevel",
+          "label": "Trình độ văn hóa (Education Level)",
+          "required": true,
+          "maxLength": 100
+        },
+        {
+          "type": "text",
+          "key": "occupation",
+          "label": "Nghề nghiệp (Occupation)",
+          "required": true,
+          "maxLength": 100,
+          "prefill": "patient.occupation"
+        },
+        {
+          "type": "text",
+          "key": "permanentAddress",
+          "label": "Địa chỉ thường trú (theo hộ khẩu) (Permanent Address, as per household registration)",
+          "required": true,
+          "maxLength": 300,
+          "prefill": "patient.permanentAddress"
+        },
+        {
+          "type": "text",
+          "key": "currentAddress",
+          "label": "Chỗ ở hiện nay (Current Address)",
+          "required": true,
+          "maxLength": 300,
+          "prefill": "patient.currentAddress"
+        }
+      ]
+    },
+    {
+      "title": "Người nhà và người liên hệ khẩn cấp (Family member and emergency contact)",
+      "blocks": [
+        {
+          "type": "text",
+          "key": "familyName",
+          "label": "Họ và tên người nhà (Full Name of Family Member)",
+          "required": true,
+          "maxLength": 200
+        },
+        {
+          "type": "text",
+          "key": "familyRelationship",
+          "label": "Quan hệ với người bệnh (Relationship to Patient)",
+          "required": true,
+          "maxLength": 50
+        },
+        {
+          "type": "text",
+          "key": "familyPhone",
+          "label": "Số điện thoại (Phone number)",
+          "required": true,
+          "maxLength": 20,
+          "pattern": "^\\+?[0-9][0-9 .-]{7,18}$",
+          "patternMessage": "Số điện thoại không hợp lệ."
+        },
+        {
+          "type": "choice",
+          "key": "familyIsEmergencyContact",
+          "label": "Đây có phải là thông tin của người liên hệ khẩn cấp không? (Is this the emergency contact information?)",
+          "required": true,
+          "options": [
+            { "value": "yes", "label": "Có (Yes)" },
+            { "value": "no", "label": "Không, điền thêm thông tin dưới đây (No, please provide additional information below)" }
+          ]
+        },
+        {
+          "type": "text",
+          "key": "emergencyName",
+          "label": "Họ và tên người liên hệ khẩn cấp (Full Name of Emergency Contact)",
+          "required": true,
+          "maxLength": 200,
+          "visibleWhen": { "field": "familyIsEmergencyContact", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "emergencyRelationship",
+          "label": "Quan hệ với người bệnh (Relationship to Patient)",
+          "required": true,
+          "maxLength": 50,
+          "visibleWhen": { "field": "familyIsEmergencyContact", "in": ["no"] }
+        },
+        {
+          "type": "text",
+          "key": "emergencyPhone",
+          "label": "Số điện thoại (Phone number)",
+          "required": true,
+          "maxLength": 20,
+          "pattern": "^\\+?[0-9][0-9 .-]{7,18}$",
+          "patternMessage": "Số điện thoại không hợp lệ.",
+          "visibleWhen": { "field": "familyIsEmergencyContact", "in": ["no"] }
+        },
+        {
+          "type": "paragraph",
+          "text": "Tôi, người ký tên dưới đây, chịu trách nhiệm với tất cả các thông tin tôi cung cấp trong phiếu này là đúng sự thật (I, the undersigned, am responsible for the accuracy of all the information I have provided in this form)."
+        }
+      ]
+    }
+  ],
+  "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi xác nhận các thông tin trên là đúng sự thật",
+        "Tôi đã nghe, hiểu và đồng ý"
+      ]
+    },
+    "patient": "Người khai (Declarant)",
+    "representative": "Người khai – không phải người bệnh (Declarant – not the patient)",
+    "hospital": "Nhân viên tiếp nhận (Patient Admission Staff)",
+    "hospitalHint": "(Đã đối chiếu thông tin trên giấy tờ tùy thân – verified against identification documents)",
+    "decision": "none"
+  }
+}

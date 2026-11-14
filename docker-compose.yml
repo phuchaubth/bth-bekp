@@ -1,0 +1,66 @@
+# Môi trường phát triển/kiểm thử cục bộ: SQL Server + API + Web.
+# Sao chép .env.example thành .env và đặt mật khẩu trước khi chạy.
+name: consent-management
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2025-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      # Bản Standard Developer: cùng tính năng với SQL Server 2025 Standard dùng ở bệnh viện.
+      MSSQL_PID: StandardDeveloper
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Đặt MSSQL_SA_PASSWORD trong file .env}
+    ports:
+      # Chỉ mở trên localhost để chạy API ngoài Docker khi phát triển.
+      - "127.0.0.1:${SQL_PORT:-14333}:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  api:
+    build:
+      context: ./backend
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      # Chỉ bật tự động migrate cho môi trường dev/test.
+      Database__ApplyMigrationsOnStartup: "true"
+      # Chỉ dùng cho môi trường dev trong mạng nội bộ Docker. Production dùng login riêng, không dùng sa.
+      ConnectionStrings__Default: "Server=sqlserver,1433;Database=ConsentManagement;User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+      # Khóa ký JWT (bí mật, ≥ 32 ký tự). Tạo bằng: openssl rand -base64 48
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:?Đặt JWT_SIGNING_KEY trong file .env}
+      # Khóa mã hóa dữ liệu nhạy cảm (CCCD, SĐT, BHYT) và khóa chỉ mục mù. Tạo bằng: openssl rand -base64 32
+      # MẤT KHÓA = MẤT DỮ LIỆU ĐÃ MÃ HÓA: phải sao lưu khóa an toàn, tách khỏi bản sao lưu CSDL.
+      DataProtection__FieldEncryptionKey: ${FIELD_ENCRYPTION_KEY:?Đặt FIELD_ENCRYPTION_KEY trong file .env}
+      DataProtection__BlindIndexKey: ${BLIND_INDEX_KEY:?Đặt BLIND_INDEX_KEY trong file .env}
+      # Tài khoản quản trị đầu tiên (chỉ tạo khi chưa có người dùng nào; phải đổi mật khẩu ở lần đăng nhập đầu).
+      Seed__Enabled: "true"
+      Seed__AdminPassword: ${SEED_ADMIN_PASSWORD:-}
+      # Dữ liệu minh họa (khoa, tài khoản demo) chỉ cho môi trường phát triển.
+      Seed__DemoData: ${SEED_DEMO_DATA:-true}
+      Seed__DemoPassword: ${SEED_DEMO_PASSWORD:-}
+      # API không mở cổng ra ngoài, chỉ nhận yêu cầu từ nginx nên tin header X-Forwarded-*.
+      ReverseProxy__TrustAllProxies: "true"
+      # PDF phiếu đã ký (mã hóa bằng khóa dẫn xuất từ FIELD_ENCRYPTION_KEY). Sao lưu volume này cùng CSDL.
+      Storage__DocumentsPath: /app/storage/documents
+    volumes:
+      - documents:/app/storage
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      - api
+
+volumes:
+  sqlserver-data:
+  documents:
