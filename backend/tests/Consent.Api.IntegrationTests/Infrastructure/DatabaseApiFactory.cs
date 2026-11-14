@@ -14,7 +14,10 @@ namespace Consent.Api.IntegrationTests.Infrastructure;
 /// (vai trò hệ thống, tài khoản quản trị, khoa và tài khoản demo, bốn mẫu thật). Thêm ba mẫu minh họa
 /// (<see cref="SampleConsentTemplates"/>, đã phát hành) mà các kịch bản kiểm thử dùng.
 /// </summary>
-public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary<string, string?>? overrides = null)
+public sealed class DatabaseApiFactory(
+    SqlServerFixture sql,
+    IReadOnlyDictionary<string, string?>? overrides = null,
+    Action<IServiceCollection>? testServices = null)
     : ConsentApiFactory
 {
     public string DatabaseName { get; } = "consent_test_" + Guid.NewGuid().ToString("N");
@@ -54,7 +57,11 @@ public sealed class DatabaseApiFactory(SqlServerFixture sql, IReadOnlyDictionary
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         base.ConfigureWebHost(builder);
-        builder.ConfigureTestServices(services => services.AddHostedService<SampleTemplateSeeder>());
+        builder.ConfigureTestServices(services =>
+        {
+            services.AddHostedService<SampleTemplateSeeder>();
+            testServices?.Invoke(services);
+        });
     }
 
     public override async ValueTask DisposeAsync()

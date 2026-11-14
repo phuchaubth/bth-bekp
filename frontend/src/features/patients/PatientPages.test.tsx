@@ -42,7 +42,7 @@ const detail = (overrides: Partial<PatientDetail> = {}): PatientDetail => ({
 })
 
 // Máy chủ mặc định chưa kết nối HIS (baseRoutes); các kịch bản HIS bật cờ này.
-const withHis = { 'GET /api/v1/features': { his: true, smartCa: false } }
+const withHis = { 'GET /api/v1/features': { his: true, smartCa: false, patientSource: false } }
 
 const hisFound: PatientLookupResult = {
   existingPatient: null,
@@ -444,6 +444,113 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
       gender: 'Male',
       phoneNumber: null,
       address: 'Số 9 Đường Thử Nghiệm',
+    })
+  })
+
+  describe('lấy thông tin từ hệ thống bệnh viện', () => {
+    const withSource = { 'GET /api/v1/features': { his: false, smartCa: false, patientSource: true } }
+    const sourcePatient = {
+      patientCode: 'BN-GL-001',
+      fullName: 'Lê Văn Thử',
+      dateOfBirth: '1970-02-03',
+      gender: 'Male',
+      citizenId: '079070000123',
+      phoneNumber: '0900000123',
+      permanentAddress: 'Số 1 Đường Giả Lập',
+      currentAddress: null,
+      ethnicity: 'Kinh',
+      occupation: null,
+      nationality: null,
+      healthInsuranceNumber: null,
+    }
+
+    it('ẩn khi chưa cấu hình', async () => {
+      mockApi(baseRoutes(nurse()))
+      renderApp('/nguoi-benh/tiep-nhan')
+
+      await screen.findByLabelText('Mã QR trên CCCD')
+      expect(screen.queryByText('Lấy thông tin từ hệ thống bệnh viện')).not.toBeInTheDocument()
+    })
+
+    it('theo mã người bệnh: điền thông tin hành chính vào form, gửi mã trong thân yêu cầu', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(nurse()),
+        ...withSource,
+        'POST /api/v1/patients/lookup-source': { status: 'Found', patient: sourcePatient, existingPatient: null },
+      })
+      renderApp('/nguoi-benh/tiep-nhan')
+      const user = userEvent.setup()
+
+      await user.type(await screen.findByLabelText('Mã người bệnh cần tra'), 'BN-GL-001')
+      await user.click(screen.getByRole('button', { name: /Lấy thông tin/ }))
+
+      await waitFor(() => expect(screen.getByLabelText('Họ và tên')).toHaveValue('Lê Văn Thử'))
+      expect(screen.getByLabelText('Số điện thoại')).toHaveValue('0900000123')
+      // Đủ thông tin bắt buộc: chỉ báo các ô còn trống để bổ sung nếu có.
+      expect(screen.getByText('Đã lấy thông tin từ hệ thống bệnh viện')).toBeInTheDocument()
+      expect(screen.getByText(/Chỉ cần bổ sung nếu có: Địa chỉ hiện tại, .*Mã thẻ BHYT\./)).toBeInTheDocument()
+      expect(calls.find((c) => c.path === '/api/v1/patients/lookup-source')!.body).toEqual({ patientCode: 'BN-GL-001' })
+    })
+
+    it('theo CCCD: kiểm tra 12 chữ số, báo hồ sơ đã có', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(nurse()),
+        ...withSource,
+        'POST /api/v1/patients/lookup-source': {
+          status: 'Found',
+          patient: { ...sourcePatient, citizenId: '036188000125' },
+          existingPatient: detail(),
+        },
+      })
+      renderApp('/nguoi-benh/tiep-nhan')
+      const user = userEvent.setup()
+
+      await user.click((await screen.findByRole('radio', { name: 'Số CCCD' })).closest('label')!)
+      await user.type(screen.getByLabelText('Số CCCD cần tra'), '123')
+      await user.click(screen.getByRole('button', { name: /Lấy thông tin/ }))
+      expect(await screen.findByText('Số CCCD gồm 12 chữ số.')).toBeInTheDocument()
+      expect(calls.some((c) => c.path === '/api/v1/patients/lookup-source')).toBe(false)
+
+      await user.clear(screen.getByLabelText('Số CCCD cần tra'))
+      await user.type(screen.getByLabelText('Số CCCD cần tra'), '036188000125{Enter}')
+
+      expect(await screen.findByText('Người bệnh đã có hồ sơ trong hệ thống')).toBeInTheDocument()
+      expect(calls.find((c) => c.path === '/api/v1/patients/lookup-source')!.body).toEqual({ citizenId: '036188000125' })
+    })
+
+    it('quét CCCD: lấy thêm từ hệ thống bệnh viện, chỉ điền ô còn trống (thông tin trên thẻ được ưu tiên)', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(nurse()),
+        ...withSource,
+        'POST /api/v1/patients/lookup': { existingPatient: null, hisStatus: 'Disabled', hisPatient: null },
+        'POST /api/v1/patients/lookup-source': {
+          status: 'Found',
+          patient: { ...sourcePatient, fullName: 'Tên khác trên hệ thống', gender: null, dateOfBirth: null, citizenId: '036188000125' },
+          existingPatient: null,
+        },
+      })
+      renderApp('/nguoi-benh/tiep-nhan')
+
+      await scan(QR)
+
+      await waitFor(() => expect(screen.getByLabelText('Số điện thoại')).toHaveValue('0900000123'))
+      expect(screen.getByLabelText('Họ và tên')).toHaveValue('Phạm Thị Dung')
+      expect(screen.getByRole('textbox', { name: 'Mã người bệnh' })).toHaveValue('BN-GL-001')
+      expect(calls.find((c) => c.path === '/api/v1/patients/lookup-source')!.body).toEqual({ citizenId: '036188000125' })
+    })
+
+    it('không tìm thấy hoặc mất kết nối: báo để nhập tay', async () => {
+      mockApi({
+        ...baseRoutes(nurse()),
+        ...withSource,
+        'POST /api/v1/patients/lookup-source': { status: 'Unavailable', patient: null, existingPatient: null },
+      })
+      renderApp('/nguoi-benh/tiep-nhan')
+      const user = userEvent.setup()
+
+      await user.type(await screen.findByLabelText('Mã người bệnh cần tra'), 'BN-GL-001{Enter}')
+
+      expect(await screen.findByText(/Chưa kết nối được hệ thống thông tin người bệnh/)).toBeInTheDocument()
     })
   })
 })

@@ -100,6 +100,30 @@ export interface PatientLookupResult {
   hisPatient: HisPatient | null
 }
 
+/** Thông tin hành chính lấy từ API thông tin người bệnh của bệnh viện (trường nào thiếu thì null). */
+export interface SourcePatient {
+  patientCode: string | null
+  fullName: string | null
+  dateOfBirth: string | null
+  gender: Gender | null
+  citizenId: string | null
+  phoneNumber: string | null
+  permanentAddress: string | null
+  currentAddress: string | null
+  ethnicity: string | null
+  occupation: string | null
+  nationality: string | null
+  healthInsuranceNumber: string | null
+}
+
+export interface PatientSourceLookupResult {
+  status: HisStatus
+  patient: SourcePatient | null
+  existingPatient: PatientDetail | null
+}
+
+export type PatientSourceQuery = { patientCode: string } | { citizenId: string }
+
 export interface PatientQuery {
   keyword?: string
   page: number
@@ -118,6 +142,9 @@ export const patientsApi = {
   // Số CCCD gửi trong body (không đưa vào URL để tránh lộ qua log/lịch sử trình duyệt).
   lookup: (citizenId: string) =>
     apiRequest<PatientLookupResult>('/api/v1/patients/lookup', { method: 'POST', body: { citizenId } }),
+  // Mã người bệnh/CCCD gửi trong body (không đưa vào URL).
+  lookupSource: (query: PatientSourceQuery) =>
+    apiRequest<PatientSourceLookupResult>('/api/v1/patients/lookup-source', { method: 'POST', body: query }),
   create: (input: PatientInput) => apiRequest<PatientDetail>('/api/v1/patients', { method: 'POST', body: input }),
   update: (id: string, input: PatientInput) =>
     apiRequest<PatientDetail>(`/api/v1/patients/${id}`, { method: 'PUT', body: input }),

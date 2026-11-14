@@ -6,6 +6,7 @@
     <Project Path="src/Consent.Infrastructure/Consent.Infrastructure.csproj" />
     <Project Path="src/Consent.Persistence/Consent.Persistence.csproj" />
     <Project Path="src/Consent.Shared/Consent.Shared.csproj" />
+    <Project Path="src/PatientInfo.Api/PatientInfo.Api.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Consent.Api.IntegrationTests/Consent.Api.IntegrationTests.csproj" />
@@ -13,5 +14,6 @@
     <Project Path="tests/Consent.ArchitectureTests/Consent.ArchitectureTests.csproj" />
     <Project Path="tests/Consent.Domain.Tests/Consent.Domain.Tests.csproj" />
     <Project Path="tests/Consent.Infrastructure.Tests/Consent.Infrastructure.Tests.csproj" />
+    <Project Path="tests/PatientInfo.Api.Tests/PatientInfo.Api.Tests.csproj" />
   </Folder>
 </Solution>

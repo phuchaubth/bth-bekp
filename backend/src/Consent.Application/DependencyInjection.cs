@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ReportService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<SettingsService>();
+        services.AddScoped<PatientSourceService>();
 
         RegisterValidators(services);
         return services;

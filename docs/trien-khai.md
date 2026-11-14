@@ -74,6 +74,7 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 | `ReverseProxy__TrustAllProxies` | `true` khi API chỉ nhận yêu cầu từ reverse proxy trên cùng máy (để ghi đúng IP người dùng vào nhật ký) | — |
 | `Jwt__AccessTokenMinutes`, `Jwt__SigningTokenMinutes`, `Auth__*`, `RateLimiting__*` | Tùy chọn; mặc định hợp lý (xem [kiến trúc, mục 9](kien-truc.md#9-cấu-hình-và-bí-mật)) | — |
 | `His__Provider` | `None` (chưa kết nối HIS) | — |
+| `PatientSource__Provider`, `PatientSource__BaseUrl`, `PatientSource__ApiKey` | Tùy chọn: lấy thông tin người bệnh qua API thông tin người bệnh (mục 5.5). Mặc định `None` (tắt) | Khóa API giống khóa đặt ở `PatientInfo__ApiKeys__0` |
 
 **Lưu khóa:** in hoặc ghi 3 khóa (`Jwt__SigningKey`, hai khóa `DataProtection__*`) vào kho mật khẩu của phòng CNTT và một bản niêm phong, **tách khỏi bản sao lưu CSDL**. Không có khóa thì bản sao lưu CSDL và thư mục PDF không đọc được.
 
@@ -119,8 +120,9 @@ Gói migration áp dụng lần lượt các migration còn thiếu (idempotent;
 |---|---|---|
 | `ConsentApi\` | `D:\Apps\ConsentApi` | Đã gồm `web.config` mẫu (`deploy/iis/web.config`) |
 | `ConsentWeb\` | `D:\Apps\ConsentWeb` | Đã gồm `web.config` mẫu (`deploy/iis/web.frontend.config`) |
+| `PatientInfoApi\` | `C:\Apps\PatientInfoApi` | Tùy chọn: API thông tin người bệnh (mục 5.5); đã gồm `web.config` mẫu (`deploy/iis/web.patientinfo.config`) |
 | `efbundle.exe` | Thư mục tạm trên máy chủ | Cập nhật lược đồ CSDL (mục 4.2) |
-| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql` |
+| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql` |
 | `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Mã commit và ngày đóng gói |
 
 **Cách 2: tự build** trên một máy có .NET SDK 10 và Node.js 24.15 trở lên (kết quả giống cách 1):
@@ -189,6 +191,37 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 ### 5.4. Nâng cấp phiên bản
 
 1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Kiểm tra `/health/ready` và đăng nhập thử.
+
+### 5.5. API thông tin người bệnh (tùy chọn, quyết định 22)
+
+Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL của bệnh viện (HIS) theo mã người bệnh hoặc CCCD. Phần mềm phiếu đồng thuận **chỉ gọi API này**, không giữ chuỗi kết nối CSDL bệnh viện. Không cài thì phần mềm vẫn chạy bình thường (nhập tay/quét CCCD).
+
+1. **Tài khoản SQL chỉ đọc** trên CSDL bệnh viện: sửa rồi chạy `sql\04-patientinfo-reader.sql` (tên CSDL, bảng/view, mật khẩu). Chỉ cấp `SELECT` trên đúng bảng/view cần dùng.
+2. **Câu truy vấn**: một câu `SELECT` trả **một dòng**, dùng tham số `@PatientCode` và/hoặc `@CitizenId` (tham số không dùng là NULL), đặt tên cột bằng `AS`: `PatientCode, FullName, DateOfBirth, Gender, CitizenId, PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity, Occupation, Nationality, HealthInsuranceNumber` (thiếu cột nào thì trường đó để trống). Ví dụ (tên bảng/cột thay theo CSDL thật):
+
+   ```sql
+   SELECT TOP 1 MaBN AS PatientCode, HoTen AS FullName, NgaySinh AS DateOfBirth, GioiTinh AS Gender, SoCCCD AS CitizenId,
+          DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DanToc AS Ethnicity, SoTheBHYT AS HealthInsuranceNumber
+   FROM dbo.BenhNhan
+   WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId
+   ```
+
+   Chạy thử trong SSMS (khai báo `DECLARE @PatientCode nvarchar(50) = N'…', @CitizenId nvarchar(20) = NULL;`) trước khi cấu hình. Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, bị từ chối khi khởi động.
+3. **Site IIS**: Application Pool `PatientInfoApi` (No Managed Code), site `PatientInfoApi` trỏ `C:\Apps\PatientInfoApi`, binding **http `127.0.0.1` cổng 5081** nếu cùng máy với phần mềm phiếu. Nếu đặt ở máy khác (gần CSDL), dùng binding **https** với chứng chỉ nội bộ và chỉ mở tường lửa cho máy chạy phần mềm phiếu.
+4. **Biến môi trường** của Application Pool `PatientInfoApi` (cách đặt như mục 5.2):
+
+   | Biến | Giá trị |
+   |---|---|
+   | `ASPNETCORE_ENVIRONMENT` | `Production` |
+   | `PatientInfo__ConnectionString` | `Server=tcp:SQLHIS,1433;Database=…;User Id=patientinfo_reader;Password=…;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly` |
+   | `PatientInfo__Query` | Câu truy vấn ở bước 2 (một dòng) |
+   | `PatientInfo__ApiKeys__0` | Khóa API ngẫu nhiên ≥ 32 ký tự, tạo như `Jwt__SigningKey` ở mục 3 (bộ sinh số ngẫu nhiên an toàn, không dùng `Get-Random`) |
+   | `PatientInfo__MaleValues__0`… | (Tùy chọn) nếu cột giới tính dùng giá trị khác `Nam/M/Male/1` và `Nữ/F/Female/0/2` |
+
+5. Kiểm tra: `curl http://127.0.0.1:5081/health` → `Healthy`; tra thử:
+   `curl -X POST http://127.0.0.1:5081/api/v1/patients/lookup -H "X-Api-Key: …" -H "Content-Type: application/json" -d "{\"patientCode\":\"…\"}"`.
+6. **Bật trong phần mềm phiếu**: thêm biến môi trường cho Application Pool `ConsentApi` rồi khởi động lại:
+   `PatientSource__Provider = Api`, `PatientSource__BaseUrl = http://localhost:5081/` (hoặc `https://…/` nếu khác máy; ngoài localhost bắt buộc https), `PatientSource__ApiKey = <khóa ở bước 4>`. Đăng nhập lại: màn hình lập phiếu có ô **Lấy thông tin**.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

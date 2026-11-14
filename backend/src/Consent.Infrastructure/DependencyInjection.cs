@@ -3,6 +3,7 @@ using Consent.Application.ConsentForms;
 using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.His;
 using Consent.Infrastructure.Pdf;
+using Consent.Infrastructure.PatientSource;
 using Consent.Infrastructure.Security;
 using Consent.Infrastructure.Storage;
 using Consent.Infrastructure.Time;
@@ -62,6 +63,20 @@ public static class DependencyInjection
         services.AddSingleton<IHisGateway>(sp => sp.GetRequiredService<IOptions<HisGatewayOptions>>().Value.IsFake
             ? ActivatorUtilities.CreateInstance<FakeHisGateway>(sp)
             : new DisabledHisGateway());
+
+        // Nguồn thông tin hành chính người bệnh: mặc định tắt; "Api" gọi dịch vụ riêng PatientInfo.Api (chỉ đọc CSDL bệnh viện).
+        services.AddOptions<PatientSourceOptions>()
+            .Bind(configuration.GetSection(PatientSourceOptions.SectionName))
+            .Validate(o => o.IsKnownProvider, "PatientSource:Provider chỉ nhận 'None' (mặc định) hoặc 'Api'.")
+            .Validate(o => !o.IsApi || o.HasValidBaseUrl,
+                "PatientSource:BaseUrl phải là địa chỉ HTTPS của API thông tin người bệnh (chỉ cho phép HTTP khi cùng máy: localhost).")
+            .Validate(o => !o.IsApi || o.HasValidApiKey,
+                $"Thiếu khóa API: đặt biến môi trường PatientSource__ApiKey (≥ {PatientSourceOptions.MinimumApiKeyLength} ký tự).")
+            .ValidateOnStart();
+        services.TryAddSingleton(_ => new PatientSourceHttp(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }));
+        services.AddSingleton<IPatientSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
+            ? ActivatorUtilities.CreateInstance<ApiPatientSource>(sp)
+            : new DisabledPatientSource());
 
         return services;
     }

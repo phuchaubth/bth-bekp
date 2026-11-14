@@ -6,13 +6,16 @@ import { Link, useNavigate, useSearchParams } from 'react-router'
 import { useDepartments } from '../../api/admin'
 import { consentFormKeys, consentFormsApi } from '../../api/consentForms'
 import { useAvailableTemplates } from '../../api/consentTemplates'
-import { usePatient, usePatients, type PatientListItem } from '../../api/patients'
+import { useFeatures } from '../../api/features'
+import { usePatient, usePatients, type PatientListItem, type PatientSourceLookupResult, type SourcePatient } from '../../api/patients'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDate } from '../../utils/format'
 import { genderLabels } from '../patients/labels'
+import { QuickPatientModal } from '../patients/QuickPatientModal'
+import { SourceLookup } from '../patients/SourceLookup'
 
 /** Màn hình 4–5 (lập phiếu): chọn người bệnh → chọn mẫu đang phát hành → tạo phiếu nháp rồi chuyển sang soạn nội dung. */
 export function ConsentFormCreatePage() {
@@ -148,11 +151,38 @@ export function ConsentFormCreatePage() {
 
 function PatientPicker({ onPick }: { onPick: (id: string) => void }) {
   const { hasPermission } = useAuth()
+  const { patientSource } = useFeatures()
   const [keyword, setKeyword] = useState('')
+  const [toSave, setToSave] = useState<SourcePatient | null>(null)
   const results = usePatients({ keyword, page: 1, pageSize: 8 })
+  const canManage = hasPermission(Permissions.PatientsManage)
+
+  // Lấy từ hệ thống bệnh viện: đã có hồ sơ thì chọn luôn; chưa có thì lưu nhanh (chỉ nhập phần còn thiếu) rồi chọn.
+  const onSourceFound = (result: PatientSourceLookupResult) => {
+    if (result.existingPatient) {
+      onPick(result.existingPatient.id)
+    } else {
+      setToSave(result.patient)
+    }
+  }
 
   return (
     <Flex vertical gap={12}>
+      {patientSource && canManage && (
+        <>
+          <Typography.Text strong>Lấy từ hệ thống bệnh viện</Typography.Text>
+          <SourceLookup onFound={onSourceFound} />
+          <QuickPatientModal
+            source={toSave}
+            onClose={() => setToSave(null)}
+            onSaved={(id) => {
+              setToSave(null)
+              onPick(id)
+            }}
+          />
+          <Typography.Text strong style={{ marginTop: 8 }}>Hoặc tìm hồ sơ đã có</Typography.Text>
+        </>
+      )}
       <Flex gap={12} wrap>
         <Input.Search
           allowClear
@@ -160,8 +190,8 @@ function PatientPicker({ onPick }: { onPick: (id: string) => void }) {
           onSearch={(value) => setKeyword(value.trim())}
           style={{ width: 380, maxWidth: '100%' }}
         />
-        {hasPermission(Permissions.PatientsManage) && (
-          <Link to="/nguoi-benh/tiep-nhan">
+        {canManage && (
+          <Link to="/nguoi-benh/tiep-nhan?tiepTheo=lap-phieu">
             <Button icon={<UserAddOutlined />}>Tiếp nhận người bệnh mới</Button>
           </Link>
         )}

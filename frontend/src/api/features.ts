@@ -5,10 +5,12 @@ import { apiRequest } from './http'
 export interface Features {
   his: boolean
   smartCa: boolean
+  /** Đã cấu hình API thông tin người bệnh: lấy thông tin hành chính theo mã người bệnh hoặc CCCD. */
+  patientSource: boolean
 }
 
 // Trong lúc chờ (hoặc lỗi) coi như chưa kết nối: không hiển thị thông tin HIS.
-const notConnected: Features = { his: false, smartCa: false }
+const notConnected: Features = { his: false, smartCa: false, patientSource: false }
 
 export const featuresApi = {
   get: (signal?: AbortSignal) => apiRequest<Features>('/api/v1/features', { signal }),

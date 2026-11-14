@@ -93,6 +93,9 @@ public static class AuditActions
     public const string PasswordChanged = "Auth.PasswordChanged";
     public const string PatientViewed = "Patients.Viewed";
     public const string PatientLookedUp = "Patients.LookedUp";
+
+    /// <summary>Tra cứu nguồn thông tin người bệnh bên ngoài (CSDL bệnh viện) theo mã người bệnh hoặc CCCD.</summary>
+    public const string PatientSourceLookedUp = "Patients.SourceLookedUp";
     public const string ConsentFormViewed = "ConsentForms.Viewed";
     public const string ConsentFormPdfViewed = "ConsentForms.PdfViewed";
     public const string ConsentFormSigningStarted = "ConsentForms.SigningStarted";

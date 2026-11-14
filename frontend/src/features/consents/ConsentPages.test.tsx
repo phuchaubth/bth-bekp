@@ -292,6 +292,76 @@ describe('Lập phiếu (màn hình 4–5)', () => {
   })
 })
 
+describe('Lập phiếu: lấy người bệnh từ hệ thống bệnh viện', () => {
+  const staff = () =>
+    session({
+      userName: 'dieuduong.demo',
+      fullName: 'Điều dưỡng Demo',
+      permissions: [Permissions.PatientsRead, Permissions.PatientsManage, Permissions.ConsentsRead, Permissions.ConsentsCreate, Permissions.TemplatesRead],
+    })
+  const available = [
+    { templateId: 't-ck', templateCode: 'CK-01', templateName: 'Giấy cam kết', versionId: 'v-1', versionNo: 1, status: 'Published', definition: commitment, updatedAtUtc: '', publishedAtUtc: '' },
+  ]
+  const source = {
+    patientCode: 'BN000125',
+    fullName: 'Phạm Thị Dung',
+    dateOfBirth: '1988-04-05',
+    gender: 'Female',
+    citizenId: '036188000125',
+    phoneNumber: null,
+    permanentAddress: 'Số 9 Đường Thử Nghiệm',
+    currentAddress: null,
+    ethnicity: null,
+    occupation: null,
+    nationality: null,
+    healthInsuranceNumber: null,
+  }
+  const routes = (lookup: object) => ({
+    ...baseRoutes(staff()),
+    'GET /api/v1/features': { his: false, smartCa: false, patientSource: true },
+    'GET /api/v1/patients': page([]),
+    'GET /api/v1/patients/p-1': patient,
+    'GET /api/v1/consent-templates/available': available,
+    'GET /api/v1/departments': departments.filter((d) => d.isActive),
+    'POST /api/v1/patients/lookup-source': lookup,
+  })
+
+  it('đã có hồ sơ: chọn luôn người bệnh, không phải tạo lại', async () => {
+    mockApi(routes({ status: 'Found', patient: source, existingPatient: patient }))
+    renderApp('/phieu-dong-thuan/tao-moi')
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Mã người bệnh cần tra'), 'BN000125{Enter}')
+
+    expect(await screen.findByRole('button', { name: 'Đổi người bệnh' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Lập phiếu CK-01' })).toBeInTheDocument()
+  })
+
+  it('chưa có hồ sơ: điền sẵn, chỉ nhập phần thiếu, lưu rồi chọn ngay để lập phiếu', async () => {
+    const { calls } = mockApi({
+      ...routes({ status: 'Found', patient: source, existingPatient: null }),
+      'POST /api/v1/patients': () => json(patient, 201),
+    })
+    renderApp('/phieu-dong-thuan/tao-moi')
+    const user = userEvent.setup()
+
+    await user.type(await screen.findByLabelText('Mã người bệnh cần tra'), 'BN000125{Enter}')
+    const dialog = await screen.findByRole('dialog', { name: 'Lưu hồ sơ người bệnh' })
+    expect(within(dialog).getByLabelText('Họ và tên')).toHaveValue('Phạm Thị Dung')
+    expect(within(dialog).getByText(/Chỉ cần bổ sung nếu có: .*Số điện thoại/)).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Số điện thoại'), '0900000125')
+    await user.click(within(dialog).getByRole('button', { name: /Lưu và chọn người bệnh/ }))
+
+    expect(await screen.findByRole('button', { name: 'Lập phiếu CK-01' })).toBeInTheDocument()
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/patients')!.body).toMatchObject({
+      fullName: 'Phạm Thị Dung',
+      citizenId: '036188000125',
+      phoneNumber: '0900000125',
+      patientCode: 'BN000125',
+    })
+  })
+})
+
 describe('Soạn và trình ký phiếu (màn hình 5, 8)', () => {
   it('trường chỉ hiện khi đủ điều kiện; lưu nháp gửi nội dung và người ký', async () => {
     const { calls } = mockApi({

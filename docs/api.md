@@ -197,6 +197,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 | GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**) |
 | GET | `/api/v1/patients/{id}` | `patients.read` | Hồ sơ đầy đủ, kèm người đại diện; ghi nhật ký `Patients.Viewed` |
 | POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS (`Disabled` khi chưa kết nối HIS); ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
+| POST | `/api/v1/patients/lookup-source` | `patients.manage` | Lấy thông tin hành chính từ **API thông tin người bệnh** của bệnh viện (quyết định 22): `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một) → `{ status, patient, existingPatient }`. `status`: `Found` / `NotFound` / `Unavailable` (API lỗi, quá thời gian `His:TimeoutSeconds`) / `Disabled` (chưa cấu hình). `existingPatient`: hồ sơ đã có cùng số CCCD (để chọn luôn, không tạo trùng). Ghi nhật ký `Patients.SourceLookedUp` (chỉ ghi tra theo gì và kết quả, không ghi mã/CCCD) |
 | POST | `/api/v1/patients` | `patients.manage` | Tạo hồ sơ → `201`. Trùng CCCD → `409 patients.duplicate_citizen_id` kèm `existingPatientId`; trùng mã người bệnh → `409 patients.duplicate_patient_code` |
 | PUT | `/api/v1/patients/{id}` | `patients.manage` | Cập nhật hồ sơ |
 | POST | `/api/v1/patients/{id}/representatives` | `patients.manage` | Thêm người đại diện/người ký thay → trả hồ sơ cập nhật |
@@ -261,11 +262,31 @@ Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth
 | GET | `/api/v1/features` | Đăng nhập | Tích hợp đang bật, để giao diện ẩn/hiện phần tương ứng |
 
 ```json
-{ "his": false, "smartCa": false }
+{ "his": false, "smartCa": false, "patientSource": false }
 ```
 
 - `his`: đã kết nối HIS (theo `His:Provider`). `false` → giao diện ẩn khung kết quả HIS, cột/nhãn "Đối chiếu HIS"; mã người bệnh nhập tay.
+- `patientSource`: đã cấu hình API thông tin người bệnh (`PatientSource:Provider = Api`). `true` → màn hình tiếp nhận và bước 1 của lập phiếu có ô "Lấy thông tin" theo mã người bệnh hoặc CCCD; quét CCCD cũng tự lấy thêm thông tin còn thiếu.
 - `smartCa`: đã tích hợp ký số VNPT SmartCA. Hiện luôn `false` (tạm hoãn) → ẩn ô "Mã tài khoản SmartCA" ở màn hình người dùng (giá trị đã lưu được giữ nguyên khi sửa).
+
+## 6a1. API thông tin người bệnh (dịch vụ riêng `PatientInfo.Api`)
+
+Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của bệnh viện (phần mềm phiếu đồng thuận không giữ chuỗi kết nối CSDL đó). Các phần mềm khác cũng gọi được với khóa API riêng.
+
+| Phương thức | Đường dẫn | Xác thực | Mô tả |
+|---|---|---|---|
+| GET | `/health` | Không | `{"status":"Healthy"}` |
+| POST | `/api/v1/patients/lookup` | Header `X-Api-Key` | `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một; mã ≤ 50 ký tự, CCCD 12 chữ số) → `200` thông tin hành chính; `404` không có; `400` sai dữ liệu; `401` thiếu/sai khóa; `503` lỗi CSDL |
+
+```json
+{ "patientCode": "BN-GL-001", "fullName": "Lê Văn Thử (giả lập)", "dateOfBirth": "1970-02-03", "gender": "Male",
+  "citizenId": "079070000123", "phoneNumber": null, "permanentAddress": null, "currentAddress": null,
+  "ethnicity": null, "occupation": null, "nationality": null, "healthInsuranceNumber": null }
+```
+
+- `gender`: `Male` / `Female` / `null` (giá trị cột giới tính được đổi theo `PatientInfo:MaleValues`, `PatientInfo:FemaleValues`).
+- Khóa API so sánh thời gian hằng; nhiều khóa (`PatientInfo__ApiKeys__0`, `__1`…) để xoay vòng không gián đoạn.
+- Nhật ký chỉ ghi tra theo gì và kết quả (`Found`/`NotFound`), mã lỗi SQL; không ghi mã người bệnh, CCCD hay thông tin trả về.
 
 ---
 

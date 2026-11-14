@@ -11,7 +11,7 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/patients")]
 [Produces("application/json")]
-public sealed class PatientsController(PatientService patients) : ControllerBase
+public sealed class PatientsController(PatientService patients, PatientSourceService source) : ControllerBase
 {
     /// <summary>Tìm kiếm theo họ tên (không dấu), mã người bệnh hoặc số CCCD; số CCCD trong kết quả đã được che.</summary>
     [HttpGet]
@@ -30,6 +30,15 @@ public sealed class PatientsController(PatientService patients) : ControllerBase
     [HasPermission(Permissions.PatientsRead)]
     public async Task<IActionResult> Lookup(PatientLookupRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await patients.LookupAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>
+    /// Lấy thông tin hành chính từ API thông tin người bệnh của bệnh viện theo mã người bệnh hoặc số CCCD, gửi trong thân yêu cầu
+    /// (không qua URL). Kèm hồ sơ đã có trong hệ thống (nếu trùng CCCD) để mở thay vì tạo trùng.
+    /// </summary>
+    [HttpPost("lookup-source")]
+    [HasPermission(Permissions.PatientsManage)]
+    public async Task<IActionResult> LookupSource(PatientSourceLookupRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await source.LookupAsync(request, cancellationToken).ConfigureAwait(false));
 
     [HttpPost]
     [HasPermission(Permissions.PatientsManage)]
