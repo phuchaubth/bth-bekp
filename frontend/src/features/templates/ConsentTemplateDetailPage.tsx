@@ -23,6 +23,7 @@ import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { DynamicForm } from '../consents/DynamicForm'
 import { signerRoleLabel } from './signerRoles'
+import { Bilingual } from '../consents/Bilingual'
 
 const statusColors: Record<TemplateVersionStatus, string> = { Draft: 'default', Published: 'green', Retired: 'volcano' }
 
@@ -189,11 +190,11 @@ function VersionPanel({ templateId, versionNo, canManage }: { templateId: string
                   Thử điền để kiểm tra điều kiện hiển thị và cách tính điểm. Dữ liệu thử không được lưu.
                 </Typography.Paragraph>
                 <Typography.Title level={4} style={{ textAlign: 'center', whiteSpace: 'pre-line', textTransform: 'uppercase' }}>
-                  {version.definition.title}
+                  <Bilingual text={version.definition.title} wholeLines />
                 </Typography.Title>
                 {version.definition.subtitle && (
                   <Typography.Paragraph italic style={{ textAlign: 'center' }}>
-                    {version.definition.subtitle}
+                    <Bilingual text={version.definition.subtitle} wholeLines />
                   </Typography.Paragraph>
                 )}
                 <DynamicForm key={version.updatedAtUtc} definition={version.definition} form={previewForm} initialValues={{}} />

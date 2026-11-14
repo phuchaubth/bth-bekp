@@ -12,6 +12,7 @@ import { DynamicForm } from '../consents/DynamicForm'
 import { relationshipLabels } from '../patients/labels'
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad'
 import { signingSession, type SigningSession } from './signingSession'
+import { Bilingual } from '../consents/Bilingual'
 
 type Stage = 'signing' | 'signed' | 'ended'
 
@@ -159,7 +160,7 @@ function Kiosk({ session }: { session: SigningSession }) {
                 {asksDecision && (
                   <div>
                     <Typography.Paragraph strong style={{ marginBottom: 8 }}>
-                      {decisionQuestion}
+                      <Bilingual text={decisionQuestion} />
                     </Typography.Paragraph>
                     <Radio.Group
                       aria-label={decisionQuestion}
@@ -169,8 +170,8 @@ function Kiosk({ session }: { session: SigningSession }) {
                       value={decision}
                       onChange={(e) => setDecision(e.target.value as ConsentDecision)}
                       options={[
-                        { value: 'Agreed', label: agreeLabel },
-                        { value: 'Refused', label: refuseLabel },
+                        { value: 'Agreed', label: <Bilingual text={agreeLabel} /> },
+                        { value: 'Refused', label: <Bilingual text={refuseLabel} /> },
                       ]}
                     />
                   </div>

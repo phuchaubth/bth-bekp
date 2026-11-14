@@ -9,3 +9,14 @@ body {
   background: #f5f7fa;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Mẫu phiếu song ngữ: tiếng Anh màu xanh, chữ nghiêng; tiếng Việt giữ màu chữ thường (giống PDF). */
+.bilingual-en {
+  color: #0070c0;
+  font-style: italic;
+}
+
+/* Trên nền xanh của lựa chọn đang chọn thì dùng màu chữ của nút để vẫn đọc được. */
+.ant-radio-button-wrapper-checked .bilingual-en {
+  color: inherit;
+}

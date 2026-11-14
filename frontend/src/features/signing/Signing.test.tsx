@@ -276,7 +276,9 @@ describe('Màn hình ký trên điện thoại (màn hình 6)', () => {
       await screen.findByRole('radiogroup', { name: /Cổng thông tin chính thức tại bệnh viện\?/ }),
     ).toBeInTheDocument()
     expect(screen.getByText('Chọn Đồng ý (Agree) hoặc Không đồng ý (Disagree) và ký vào khung trên để xác nhận.')).toBeInTheDocument()
-    await user.click(screen.getByText('Không đồng ý (Disagree)'))
+    // Phần tiếng Anh của nhãn hiển thị màu xanh, chữ nghiêng (giống PDF).
+    expect(screen.getByText('(Disagree)')).toHaveClass('bilingual-en')
+    await user.click(screen.getByText('(Disagree)'))
     drawStroke(screen.getByRole('img', { name: /Khung ký tên/ }))
     await user.click(screen.getByRole('button', { name: 'Xác nhận chữ ký' }))
 

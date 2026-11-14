@@ -4,6 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { useMemo } from 'react'
 import type { FormData, ScoreResult } from '../../api/consentForms'
 import type { TemplateBlock, TemplateDefinition, TemplateOption } from '../../api/consentTemplates'
+import { Bilingual } from './Bilingual'
 import { evaluate, levelIndex } from './templateLogic'
 
 interface Props {
@@ -41,7 +42,7 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
         <section key={section.title ?? s} style={{ marginBottom: 8 }}>
           {section.title && (
             <Typography.Title level={5} style={{ marginTop: 8 }}>
-              {section.title}
+              <Bilingual text={section.title} />
             </Typography.Title>
           )}
           {section.blocks.map((block, b) => {
@@ -49,7 +50,7 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
             if (block.type === 'paragraph') {
               return (
                 <Typography.Paragraph key={key} style={{ textAlign: 'justify' }}>
-                  {block.text}
+                  <Bilingual text={block.text} />
                 </Typography.Paragraph>
               )
             }
@@ -59,7 +60,7 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
                 <ListTag key={key} style={{ paddingLeft: 22, marginTop: 0 }}>
                   {block.items?.map((item) => (
                     <li key={item} style={{ marginBottom: 4 }}>
-                      {item}
+                      <Bilingual text={item} />
                     </li>
                   ))}
                 </ListTag>
@@ -82,7 +83,7 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
 function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
   const common = {
     name: block.key!,
-    label: block.type === 'confirm' ? undefined : block.label,
+    label: block.type === 'confirm' ? undefined : <Bilingual text={block.label} />,
     required: block.required,
     validateStatus: error ? ('error' as const) : undefined,
     help: error?.join(' '),
@@ -136,7 +137,7 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
             <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
               {block.options?.map((option) => (
                 <Checkbox key={option.value} value={option.value}>
-                  {option.label}
+                  <Bilingual text={option.label} />
                 </Checkbox>
               ))}
             </Flex>
@@ -146,7 +147,9 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
     case 'confirm':
       return (
         <Form.Item {...common} valuePropName="checked" normalize={(checked: boolean) => (checked ? true : undefined)}>
-          <Checkbox>{block.label}</Checkbox>
+          <Checkbox>
+            <Bilingual text={block.label} />
+          </Checkbox>
         </Form.Item>
       )
     case 'repeater':
@@ -159,10 +162,10 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
 function optionLabel(option: TemplateOption) {
   // == null: thuộc tính trống có thể vắng mặt hoặc là null.
   return option.score == null ? (
-    option.label
+    <Bilingual text={option.label} />
   ) : (
     <>
-      {option.label}{' '}
+      <Bilingual text={option.label} />{' '}
       <Typography.Text type="secondary" style={{ fontVariantNumeric: 'tabular-nums' }}>
         ({option.score} điểm)
       </Typography.Text>
@@ -173,7 +176,7 @@ function optionLabel(option: TemplateOption) {
 function Rows({ block, error }: { block: TemplateBlock; error?: string[] }) {
   const columns = block.columns ?? []
   return (
-    <Form.Item label={block.label} required={block.required} validateStatus={error ? 'error' : undefined} help={error?.join(' ')}>
+    <Form.Item label={<Bilingual text={block.label} />} required={block.required} validateStatus={error ? 'error' : undefined} help={error?.join(' ')}>
       <Form.List name={block.key!}>
         {(rows, { add, remove }) => (
           <Flex vertical gap={8}>
@@ -209,7 +212,9 @@ function ScoreLine({ block, score }: { block: TemplateBlock; score?: ScoreResult
   const index = levelIndex(block, score?.levelCode ?? null)
   return (
     <Flex align="center" gap={8} wrap style={{ margin: '4px 0 16px' }} role="status" aria-label={block.label}>
-      <Typography.Text strong>{block.label}:</Typography.Text>
+      <Typography.Text strong>
+        <Bilingual text={`${block.label}:`} />
+      </Typography.Text>
       {score?.total == null ? (
         <Typography.Text type="secondary">trả lời đủ các câu để tính điểm</Typography.Text>
       ) : (
@@ -217,7 +222,9 @@ function ScoreLine({ block, score }: { block: TemplateBlock; score?: ScoreResult
           <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
             {score.total} điểm
           </Typography.Text>
-          <Tag color={levelColors[Math.min(index, levelColors.length - 1)] ?? 'default'}>{score.levelLabel}</Tag>
+          <Tag color={levelColors[Math.min(index, levelColors.length - 1)] ?? 'default'}>
+            <Bilingual text={score.levelLabel} />
+          </Tag>
         </>
       )}
     </Flex>

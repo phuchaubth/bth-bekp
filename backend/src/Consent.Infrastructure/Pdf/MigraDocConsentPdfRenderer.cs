@@ -24,6 +24,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     private static string Box(bool selected) => selected ? Checked : Unchecked;
     private const string Blank = "……………………";
     private static readonly Color Muted = new(0x55, 0x5D, 0x6B);
+
+    /// <summary>Màu phần tiếng Anh của mẫu song ngữ (in nghiêng; tiếng Việt giữ màu đen, chữ đứng).</summary>
+    internal static readonly Color English = new(0x00, 0x70, 0xC0);
     private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
     private static readonly Lock FontGate = new();
 
@@ -146,20 +149,13 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         title.Format.SpaceAfter = Unit.FromMillimeter(document.Definition.Subtitle is null ? 4 : 1);
         title.Format.Font.Size = 14;
         title.Format.Font.Bold = true;
-        var lines = document.Definition.Title.ToUpper(Vietnamese).Split('\n');
-        for (var i = 0; i < lines.Length; i++)
-        {
-            if (i > 0)
-            {
-                title.AddLineBreak();
-            }
-
-            title.AddText(lines[i].Trim());
-        }
+        var lines = document.Definition.Title.Split('\n').Select(line => line.Trim());
+        AddBilingual(title, string.Join('\n', lines), upper: true, wholeLines: true);
 
         if (document.Definition.Subtitle is { } subtitle)
         {
-            var sub = section.AddParagraph(subtitle);
+            var sub = section.AddParagraph();
+            AddBilingual(sub, subtitle, wholeLines: true);
             sub.Format.Alignment = ParagraphAlignment.Center;
             sub.Format.Font.Italic = true;
             sub.Format.SpaceAfter = Unit.FromMillimeter(4);
@@ -210,7 +206,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             switch (block.Type)
             {
                 case BlockTypes.Paragraph:
-                    var paragraph = section.AddParagraph(block.Text ?? string.Empty);
+                    var paragraph = section.AddParagraph();
+                    AddBilingual(paragraph, block.Text ?? string.Empty);
                     paragraph.Format.Alignment = ParagraphAlignment.Justify;
                     break;
                 case BlockTypes.List:
@@ -249,7 +246,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 confirm.Format.FirstLineIndent = Unit.FromMillimeter(-6);
                 confirm.AddText($"{(value is JsonValue v && v.TryGetValue<bool>(out var flag) && flag ? Checked : Unchecked)}\t");
                 confirm.Format.TabStops.AddTabStop(Unit.FromMillimeter(6));
-                confirm.AddText(block.Label ?? string.Empty);
+                AddBilingual(confirm, block.Label ?? string.Empty);
                 break;
             case BlockTypes.Repeater:
                 AddRows(section, block, value as JsonArray);
@@ -269,22 +266,39 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             _ => new HashSet<string>(StringComparer.Ordinal),
         };
         var options = block.Options ?? [];
-        string Mark(TemplateOption option) =>
-            $"{(selected.Contains(option.Value) ? Checked : Unchecked)} {option.Label}{(option.Score is { } score ? $" ({score} điểm)" : string.Empty)}";
+        void Mark(Paragraph paragraph, TemplateOption option)
+        {
+            paragraph.AddText($"{(selected.Contains(option.Value) ? Checked : Unchecked)} ");
+            AddBilingual(paragraph, option.Label);
+            if (option.Score is { } score)
+            {
+                paragraph.AddText($" ({score} điểm)");
+            }
+        }
 
         if (block.Layout == "inline")
         {
             var line = section.AddParagraph();
-            line.AddText($"{block.Label}: ");
-            // Khoảng trắng không ngắt để các lựa chọn trên cùng dòng không dính vào nhau.
-            line.AddText(string.Join("\u00A0\u00A0\u00A0 ", options.Select(Mark)));
+            AddBilingual(line, $"{block.Label}: ");
+            for (var i = 0; i < options.Count; i++)
+            {
+                if (i > 0)
+                {
+                    // Khoảng trắng không ngắt để các lựa chọn trên cùng dòng không dính vào nhau.
+                    line.AddText("\u00A0\u00A0\u00A0 ");
+                }
+
+                Mark(line, options[i]);
+            }
+
             return;
         }
 
-        section.AddParagraph($"{block.Label}:");
+        AddBilingual(section.AddParagraph(), $"{block.Label}:");
         foreach (var option in options)
         {
-            var item = section.AddParagraph(Mark(option));
+            var item = section.AddParagraph();
+            Mark(item, option);
             item.Format.LeftIndent = Unit.FromMillimeter(10);
             item.Format.FirstLineIndent = Unit.FromMillimeter(-4);
         }
@@ -292,7 +306,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     private static void AddRows(Section section, TemplateBlock block, JsonArray? rows)
     {
-        section.AddParagraph($"{block.Label}:");
+        AddBilingual(section.AddParagraph(), $"{block.Label}:");
         var columns = block.Columns ?? [];
         var table = section.AddTable();
         table.Borders.Width = 0.5;
@@ -310,7 +324,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         header.Cells[0].AddParagraph("TT");
         for (var c = 0; c < columns.Count; c++)
         {
-            header.Cells[c + 1].AddParagraph(columns[c].Label);
+            AddBilingual(header.Cells[c + 1].AddParagraph(), columns[c].Label);
         }
 
         var count = Math.Max(rows?.Count ?? 0, 1);
@@ -333,9 +347,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         var score = document.Scores.TryGetValue(block.Key!, out var result) ? result : null;
         var line = section.AddParagraph();
         line.Format.SpaceBefore = Unit.FromPoint(3);
-        line.AddText($"{block.Label}: ");
-        line.AddFormattedText(
-            score?.Total is { } total ? $"{total} điểm – {score.LevelLabel}" : "chưa đủ câu trả lời", TextFormat.Bold);
+        AddBilingual(line, $"{block.Label}: ");
+        AddBilingual(
+            line, score?.Total is { } total ? $"{total} điểm – {score.LevelLabel}" : "chưa đủ câu trả lời", TextFormat.Bold);
     }
 
     private static void AddList(Section section, TemplateBlock block)
@@ -349,7 +363,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             item.Format.FirstLineIndent = Unit.FromMillimeter(-7);
             item.Format.TabStops.AddTabStop(Unit.FromMillimeter(7));
             item.Format.Alignment = ParagraphAlignment.Justify;
-            item.AddText($"{marker}\t{items[i]}");
+            item.AddText($"{marker}\t");
+            AddBilingual(item, items[i]);
         }
     }
 
@@ -395,7 +410,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             // Câu hỏi đã có dấu "?" (hoặc kết thúc bằng ngoặc sau dấu "?") thì không thêm dấu ":".
             var trimmed = question.TrimEnd(':', ' ');
             var isQuestion = trimmed.EndsWith('?') || trimmed.EndsWith("?)", StringComparison.Ordinal);
-            decision.AddFormattedText(isQuestion ? $"{trimmed} " : $"{trimmed}: ", TextFormat.Bold);
+            AddBilingual(decision, isQuestion ? $"{trimmed} " : $"{trimmed}: ", TextFormat.Bold);
             if (labels?.DecisionLabel is not null)
             {
                 // Câu hỏi riêng của mẫu thường dài: đưa lựa chọn và ngày tháng xuống dòng dưới.
@@ -404,9 +419,10 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
             }
 
-            decision.AddText(
-                $"{Box(document.Decision == ConsentDecision.Agreed)} {labels?.AgreeLabel ?? "Đồng ý"}    " +
-                $"{Box(document.Decision == ConsentDecision.Refused)} {labels?.RefuseLabel ?? "Từ chối"}");
+            decision.AddText($"{Box(document.Decision == ConsentDecision.Agreed)} ");
+            AddBilingual(decision, labels?.AgreeLabel ?? "Đồng ý");
+            decision.AddText($"    {Box(document.Decision == ConsentDecision.Refused)} ");
+            AddBilingual(decision, labels?.RefuseLabel ?? "Từ chối");
         }
 
         decision.AddTab();
@@ -514,8 +530,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     {
         var title = cell.AddParagraph();
         title.Format.Alignment = ParagraphAlignment.Center;
-        title.AddFormattedText(role.ToUpper(Vietnamese), TextFormat.Bold);
-        var help = cell.AddParagraph(hint);
+        AddBilingual(title, role, TextFormat.Bold, upper: true);
+        var help = cell.AddParagraph();
+        AddBilingual(help, hint);
         help.Format.Alignment = ParagraphAlignment.Center;
         help.Format.Font.Italic = true;
         help.Format.Font.Size = 10;
@@ -537,7 +554,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     private static void AddSectionTitle(Section section, string text)
     {
-        var title = section.AddParagraph(text);
+        var title = section.AddParagraph();
+        AddBilingual(title, text);
         title.Format.Font.Bold = true;
         title.Format.SpaceBefore = Unit.FromMillimeter(3);
         title.Format.SpaceAfter = Unit.FromPoint(3);
@@ -551,9 +569,31 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         return paragraph;
     }
 
+    /// <summary>Thêm chữ của mẫu song ngữ: phần tiếng Anh màu xanh, chữ nghiêng; tiếng Việt giữ màu đen; "\n" thành xuống dòng.</summary>
+    private static void AddBilingual(
+        Paragraph paragraph, string text, TextFormat? format = null, bool upper = false, bool wholeLines = false)
+    {
+        foreach (var segment in BilingualText.Split(text, wholeLines))
+        {
+            if (segment.Text == "\n")
+            {
+                paragraph.AddLineBreak();
+                continue;
+            }
+
+            var content = upper ? segment.Text.ToUpper(Vietnamese) : segment.Text;
+            var run = format is { } f ? paragraph.AddFormattedText(content, f) : paragraph.AddFormattedText(content);
+            if (segment.IsEnglish)
+            {
+                run.Color = English;
+                run.Italic = true;
+            }
+        }
+    }
+
     private static void AddLabelValue(Paragraph paragraph, string label, string? value, bool bold = false)
     {
-        paragraph.AddText(label);
+        AddBilingual(paragraph, label);
         if (string.IsNullOrWhiteSpace(value))
         {
             paragraph.AddText(Blank);

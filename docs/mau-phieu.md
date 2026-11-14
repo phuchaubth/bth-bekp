@@ -24,7 +24,13 @@ hai mã này (13/11/2026).
 - **Ngày tháng và chữ ký** do hệ thống in: người bệnh ký tay trên điện thoại; nhân viên phía bệnh viện đăng nhập bằng tài khoản và cũng ký tay khi xác nhận (quyết định 17). PDF có ảnh chữ ký, họ tên, chức danh và thời điểm của từng người.
   Các dòng "Ngày … tháng … năm …" trên giấy được thay bằng ngày lập và thời điểm ký.
 - **Ô đánh dấu** chuyển thành câu hỏi chọn một hoặc chọn nhiều. Dòng "Có, ghi rõ…" mở thêm ô nhập chỉ khi chọn "Có".
-- **Song ngữ** giữ nguyên: nhãn tiếng Việt kèm tiếng Anh trong ngoặc, như bản giấy.
+- **Song ngữ** giữ nguyên: nhãn tiếng Việt kèm tiếng Anh trong ngoặc, như bản giấy. Trên PDF và trên màn hình, **tiếng Việt
+  màu đen, tiếng Anh màu xanh (`#0070C0`) và chữ nghiêng**. Hệ thống tự nhận phần tiếng Anh:
+  - đoạn trong ngoặc gần như không có chữ có dấu (cho phép tên riêng tiếng Việt trong ngoặc kép “…”);
+  - dòng riêng của tiêu đề/phụ đề không có chữ có dấu nào ("Consent Form").
+
+  Đơn vị viết thường như "(kg)", điểm số, mã mẫu và dữ liệu người dùng nhập giữ màu thường. Khi soạn mẫu mới, cứ ghi tiếng
+  Anh trong ngoặc như hiện nay, không cần đánh dấu gì thêm.
 - **Tự điền từ hồ sơ khi lập phiếu:** số thẻ BHYT (BM02); dân tộc, nghề nghiệp, địa chỉ thường trú, chỗ ở hiện nay
   (phiếu thông tin ngoại trú). Người lập vẫn sửa được trước khi trình ký.
 
