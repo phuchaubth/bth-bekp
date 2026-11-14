@@ -70,6 +70,12 @@ public sealed record TemplateBlock
 
     /// <summary>Khối <c>score</c>: các mức theo tổng điểm, tăng dần theo <see cref="ScoreLevel.Min"/>.</summary>
     public IReadOnlyList<ScoreLevel>? Levels { get; init; }
+
+    /// <summary>Khối <c>computed</c>: công thức (xem <see cref="ComputedFormulas"/>, ví dụ <c>bmi</c>).</summary>
+    public string? Formula { get; init; }
+
+    /// <summary>Khối <c>computed</c>: các trường đầu vào theo thứ tự của công thức (bmi: cân nặng kg, chiều cao cm).</summary>
+    public IReadOnlyList<string>? Inputs { get; init; }
 }
 
 /// <summary>Lựa chọn; <see cref="Score"/> có giá trị khi là câu hỏi tính điểm.</summary>
@@ -133,8 +139,12 @@ public static class BlockTypes
     public const string Repeater = "repeater";
     public const string Score = "score";
 
+    /// <summary>Trường tự tính theo công thức từ các trường khác (ví dụ BMI từ cân nặng và chiều cao); người dùng không nhập.</summary>
+    public const string Computed = "computed";
+
     public static IReadOnlySet<string> All { get; } =
-        new HashSet<string>([Paragraph, List, Text, Date, DateTime, Choice, MultiChoice, Confirm, Repeater, Score], StringComparer.Ordinal);
+        new HashSet<string>(
+            [Paragraph, List, Text, Date, DateTime, Choice, MultiChoice, Confirm, Repeater, Score, Computed], StringComparer.Ordinal);
 
     /// <summary>Khối có tên trường (dữ liệu nhập hoặc giá trị tự tính).</summary>
     public static bool IsInput(string type) => type is not (Paragraph or List);

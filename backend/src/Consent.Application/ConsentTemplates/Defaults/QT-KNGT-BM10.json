@@ -197,13 +197,11 @@
           "patternMessage": "Nhập cân nặng theo kg, ví dụ 58 hoặc 58,5."
         },
         {
-          "type": "text",
+          "type": "computed",
           "key": "bmi",
           "label": "Chỉ số khối cơ thể (Body Mass Index), kg/m²",
-          "required": true,
-          "maxLength": 5,
-          "pattern": "^[0-9]{1,2}([.,][0-9]{1,2})?$",
-          "patternMessage": "Nhập BMI, ví dụ 21,3."
+          "formula": "bmi",
+          "inputs": ["weight", "height"]
         },
         {
           "type": "text",

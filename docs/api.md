@@ -318,6 +318,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | `confirm` | Ô xác nhận (phải đánh dấu nếu `required`) | |
 | `repeater` | Bảng nhiều dòng | `columns` (`key`, `label`, `required`, `maxLength`, `pattern`), `minItems`, `maxItems` |
 | `score` | Tổng điểm tự tính (không nhập) | `sumOf` (câu hỏi tính điểm đứng trước), `levels` (`code`, `label`, `min` tăng dần) |
+| `computed` | Giá trị tự tính theo công thức (không nhập; máy chủ tính lại khi lưu, bỏ qua giá trị gửi lên) | `formula` (hiện có `bmi` = cân nặng kg / [chiều cao m]², làm tròn 1 chữ số, dấu phẩy thập phân), `inputs` (các trường văn bản đứng trước, theo thứ tự công thức; `bmi`: `["weight", "height"]`) |
 
 - Mọi khối nhập liệu có `key` (bắt đầu bằng chữ cái; chữ không dấu, số, `_`; không trùng).
 - `visibleWhen`: `{ "field", "in": [...] }` (giá trị của một trường đứng trước thuộc danh sách; chọn nhiều thì chỉ cần một), hoặc `{ "field", "minLevel" }` (trường điểm đạt tối thiểu mức). Trường bị ẩn thì không bắt buộc, và giá trị của nó không được in hay giữ lại khi trình ký.

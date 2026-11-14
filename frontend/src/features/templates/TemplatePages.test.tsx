@@ -310,6 +310,36 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['nurse', 'screeningStaff'])
   })
 
+  it('xem trước: BMI tự tính ngay khi nhập chiều cao và cân nặng, không nhập tay được', async () => {
+    const withBmi: TemplateDefinition = {
+      title: 'Phiếu thử nghiệm',
+      sections: [
+        {
+          blocks: [
+            { type: 'text', key: 'height', label: 'Chiều cao (Height), cm' },
+            { type: 'text', key: 'weight', label: 'Cân nặng (Weight), kg' },
+            { type: 'computed', key: 'bmi', label: 'Chỉ số khối cơ thể (Body Mass Index), kg/m²', formula: 'bmi', inputs: ['weight', 'height'] },
+          ],
+        },
+      ],
+    }
+    mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'GET /api/v1/consent-templates/t-1/versions/2': () => ({ ...version(2, 'Draft'), definition: withBmi }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    const bmi = await screen.findByLabelText(/Chỉ số khối cơ thể/)
+    expect(bmi).toHaveAttribute('readonly')
+    expect(bmi).toHaveValue('')
+    await user.type(screen.getByLabelText(/Chiều cao/), '165')
+    await user.type(screen.getByLabelText(/Cân nặng/), '58,5')
+    expect(bmi).toHaveValue('21,5')
+    expect(screen.getByText(/Tự tính = cân nặng \(kg\)/)).toBeInTheDocument()
+  })
+
   it('người chỉ được xem: không có nút phát hành hay tạo phiên bản, định nghĩa chỉ đọc', async () => {
     mockApi({ ...baseRoutes(reader()), ...templateServer() })
     renderApp('/mau-phieu/t-1')

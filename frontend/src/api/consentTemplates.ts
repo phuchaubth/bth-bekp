@@ -13,6 +13,7 @@ export type BlockType =
   | 'confirm'
   | 'repeater'
   | 'score'
+  | 'computed'
 
 export interface TemplateOption {
   value: string
@@ -61,6 +62,9 @@ export interface TemplateBlock {
   visibleWhen?: TemplateCondition
   sumOf?: string[]
   levels?: ScoreLevel[]
+  /** Khối `computed`: công thức (hiện có `bmi`) và các trường đầu vào theo thứ tự (bmi: cân nặng kg, chiều cao cm). */
+  formula?: string
+  inputs?: string[]
 }
 
 export interface TemplateSection {

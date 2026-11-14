@@ -53,6 +53,21 @@ public static class FormDataEvaluator
                 continue;
             }
 
+            if (block.Type == BlockTypes.Computed)
+            {
+                // Luôn tự tính từ các trường đầu vào đang hiển thị; bỏ qua giá trị người dùng gửi lên.
+                if (IsVisible(block.VisibleWhen, visibleValues, scores, blocks)
+                    && ComputedFormulas.Compute(
+                        block.Formula!, [.. block.Inputs!.Select(k => visibleValues[k] is JsonValue v && v.TryGetValue<string>(out var s) ? s : null)])
+                        is { } computed)
+                {
+                    visibleValues[key] = computed;
+                    output[key] = computed;
+                }
+
+                continue;
+            }
+
             var value = Normalize(block, input[key], out var typeError);
             if (!IsVisible(block.VisibleWhen, visibleValues, scores, blocks))
             {

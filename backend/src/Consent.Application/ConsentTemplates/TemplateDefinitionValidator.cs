@@ -201,6 +201,9 @@ public static partial class TemplateDefinitionValidator
             case BlockTypes.Score:
                 ValidateScore(block, where, declared, errors);
                 break;
+            case BlockTypes.Computed:
+                ValidateComputed(block, where, declared, errors);
+                break;
         }
 
         if (block.MinItems is < 0 || block.MaxItems is < 1 || (block.MinItems ?? 0) > (block.MaxItems ?? int.MaxValue))
@@ -262,6 +265,29 @@ public static partial class TemplateDefinitionValidator
         if (block.Columns.Select(c => c.Key).Distinct(StringComparer.Ordinal).Count() != block.Columns.Count)
         {
             errors.Add($"{where}: tên cột bị trùng.");
+        }
+    }
+
+    private static void ValidateComputed(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)
+    {
+        if (block.Formula is null || !ComputedFormulas.InputCounts.TryGetValue(block.Formula, out var count))
+        {
+            errors.Add($"{where}: công thức \"{block.Formula}\" không được hỗ trợ (hiện có: {string.Join(", ", ComputedFormulas.InputCounts.Keys)}).");
+            return;
+        }
+
+        if (block.Inputs is null || block.Inputs.Count != count)
+        {
+            errors.Add($"{where}: công thức \"{block.Formula}\" cần đúng {count} trường đầu vào.");
+            return;
+        }
+
+        foreach (var key in block.Inputs)
+        {
+            if (!declared.TryGetValue(key, out var input) || input.Type != BlockTypes.Text)
+            {
+                errors.Add($"{where}: \"{key}\" phải là trường văn bản đứng trước.");
+            }
         }
     }
 

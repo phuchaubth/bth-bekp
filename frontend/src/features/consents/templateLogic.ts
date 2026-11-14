@@ -7,6 +7,28 @@ export interface Evaluation {
   /** Tên các trường đang hiển thị. */
   visible: Set<string>
   scores: Record<string, ScoreResult>
+  /** Giá trị của các trường tự tính (khối `computed`), ví dụ BMI "21,5". */
+  computed: Record<string, string>
+}
+
+const parseNumber = (value: unknown) => {
+  if (typeof value !== 'string' || !/^\s*\d+([.,]\d+)?\s*$/.test(value)) return null
+  return Number(value.trim().replace(',', '.'))
+}
+
+/**
+ * Công thức của trường tự tính, giống ComputedFormulas ở máy chủ (máy chủ tự tính lại khi lưu).
+ * bmi: cân nặng (kg) / [chiều cao (m)]², làm tròn 1 chữ số thập phân, dấu phẩy thập phân.
+ */
+export function computeFormula(formula: string | undefined, inputs: unknown[]): string | null {
+  if (formula === 'bmi' && inputs.length === 2) {
+    const weightKg = parseNumber(inputs[0])
+    const heightCm = parseNumber(inputs[1])
+    if (!weightKg || !heightCm) return null
+    const bmi = (weightKg * 10000) / (heightCm * heightCm)
+    return (Math.round(bmi * 10 + 1e-9) / 10).toFixed(1).replace('.', ',')
+  }
+  return null
 }
 
 const isInput = (block: TemplateBlock) => block.type !== 'paragraph' && block.type !== 'list'
@@ -22,6 +44,7 @@ export function evaluate(definition: TemplateDefinition, values: Values): Evalua
   const visible = new Set<string>()
   const visibleValues: Values = {}
   const scores: Record<string, ScoreResult> = {}
+  const computed: Record<string, string> = {}
   const blocks = new Map<string, TemplateBlock>()
 
   for (const block of definition.sections.flatMap((s) => s.blocks).filter(isInput)) {
@@ -35,12 +58,20 @@ export function evaluate(definition: TemplateDefinition, values: Values): Evalua
       continue
     }
     visible.add(key)
+    if (block.type === 'computed') {
+      const value = computeFormula(block.formula, (block.inputs ?? []).map((k) => visibleValues[k]))
+      if (value) {
+        visibleValues[key] = value
+        computed[key] = value
+      }
+      continue
+    }
     if (hasValue(values[key])) {
       visibleValues[key] = values[key]
     }
   }
 
-  return { visible, scores }
+  return { visible, scores, computed }
 }
 
 function conditionHolds(

@@ -118,6 +118,32 @@ public sealed class HospitalTemplateTests
     }
 
     [Fact]
+    public void Bm10_Bmi_IsComputedFromWeightAndHeight_IgnoringTypedValue()
+    {
+        var data = InitialAssessment();
+        data["bmi"] = "99";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        // 50 kg / (1,60 m)² = 19,53 → 19,5.
+        Assert.Equal("19,5", result.Data["bmi"]!.GetValue<string>());
+        Assert.DoesNotContain("bmi", result.Errors.Keys);
+    }
+
+    [Fact]
+    public void Bm10_Bmi_IsEmptyUntilWeightAndHeightAreEntered()
+    {
+        var data = InitialAssessment();
+        data.Remove("height");
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Null(result.Data["bmi"]);
+        Assert.Contains("height", result.Errors.Keys);
+        Assert.DoesNotContain("bmi", result.Errors.Keys);
+    }
+
+    [Fact]
     public void Bm10_CompleteAdultAssessment_IsValid_AndScoresNutritionRisk()
     {
         var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), InitialAssessment());

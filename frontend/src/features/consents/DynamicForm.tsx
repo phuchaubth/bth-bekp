@@ -27,7 +27,7 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
   // preserve: tính cả giá trị của trường đang ẩn (giữ lại khi lưu nháp, giống máy chủ).
   const watched = Form.useWatch((values: FormData) => values, { form, preserve: true })
   const values = watched ?? initialValues
-  const { visible, scores } = useMemo(() => evaluate(definition, values ?? {}), [definition, values])
+  const { visible, scores, computed } = useMemo(() => evaluate(definition, values ?? {}), [definition, values])
 
   return (
     <Form<FormData>
@@ -71,6 +71,9 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
             }
             if (!visible.has(block.key!)) {
               return null
+            }
+            if (block.type === 'computed') {
+              return <ComputedField key={key} block={block} value={computed[block.key!]} error={errors?.[block.key!]} />
             }
             return <Field key={key} block={block} error={errors?.[block.key!]} />
           })}
@@ -157,6 +160,31 @@ function Field({ block, error }: { block: TemplateBlock; error?: string[] }) {
     default:
       return null
   }
+}
+
+const formulaHints: Record<string, string> = {
+  bmi: 'Tự tính = cân nặng (kg) / [chiều cao (m)]². Nhập chiều cao và cân nặng ở trên.',
+}
+
+/** Trường tự tính (ví dụ BMI): chỉ hiển thị, không nhập; máy chủ tự tính lại khi lưu. */
+function ComputedField({ block, value, error }: { block: TemplateBlock; value?: string; error?: string[] }) {
+  return (
+    <Form.Item
+      label={<Bilingual text={block.label} />}
+      htmlFor={`computed-${block.key}`}
+      extra={block.formula ? formulaHints[block.formula] : undefined}
+      validateStatus={error ? 'error' : undefined}
+      help={error?.join(' ')}
+    >
+      <Input
+        id={`computed-${block.key}`}
+        readOnly
+        value={value ?? ''}
+        placeholder="Chưa đủ dữ liệu để tính"
+        style={{ width: 200, fontVariantNumeric: 'tabular-nums' }}
+      />
+    </Form.Item>
+  )
 }
 
 function optionLabel(option: TemplateOption) {

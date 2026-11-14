@@ -70,7 +70,9 @@ Một phiếu điện tử gồm đủ các phần của bản giấy, theo th�
 2. **Nhân viên hướng dẫn:** 2 câu té ngã, hành động can thiệp; xử trí tầm soát lây nhiễm (chỉ hiện khi người bệnh có
    triệu chứng). Nhân viên hướng dẫn xác nhận phần này bằng tài khoản (bước 1).
 3. **Điều dưỡng:** dấu hiệu sinh tồn và chỉ số đo (mạch, nhiệt độ, huyết áp dạng `120/80`, nhịp thở, chiều cao, cân
-   nặng, BMI bắt buộc; SpO₂, vòng đầu, cân nặng 3 tháng trước, % sụt cân không bắt buộc), có kiểm tra định dạng số.
+   nặng bắt buộc; SpO₂, vòng đầu, cân nặng 3 tháng trước, % sụt cân không bắt buộc), có kiểm tra định dạng số.
+   **BMI tự tính** = cân nặng (kg) / [chiều cao (m)]², làm tròn 1 chữ số thập phân (ví dụ 58,5 kg, 165 cm → 21,5),
+   hiện ngay khi nhập; không nhập tay được, máy chủ tính lại khi lưu (khối `computed`, công thức `bmi`).
    Dấu hiệu cần cấp cứu: chọn "Có" thì ghi rõ và **bỏ qua toàn bộ phần đánh giá** (đúng ghi chú "chỉ thực hiện nếu mục A
    không có dấu hiệu cần cấp cứu").
 4. **Đánh giá:** lý do đến khám, dị ứng, trạng thái tinh thần, 6 trở ngại chăm sóc (mỗi mục "Có" thì giải thích), tình
