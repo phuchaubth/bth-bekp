@@ -191,14 +191,14 @@ describe('Đăng nhập và phiên làm việc', () => {
   })
 
   it('điều hướng tới trang chức năng khi chọn menu', async () => {
-    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/departments': departments })
+    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/consent-templates': [] })
     const user = userEvent.setup()
     const { router } = renderApp('/')
 
-    await user.click(within(await screen.findByRole('navigation')).getByText('Quản trị'))
-    await user.click(await within(screen.getByRole('navigation')).findByText('Khoa/phòng'))
+    // Menu ngang ở thanh trên cùng (menu con của "Quản trị" mở trong khung thả xuống, kiểm tra bằng trình duyệt thật).
+    await user.click(within(await screen.findByRole('navigation', { name: 'Điều hướng chính' })).getByText('Mẫu phiếu'))
 
-    expect(router.state.location.pathname).toBe('/quan-tri/khoa-phong')
-    expect(await screen.findByRole('heading', { name: 'Khoa/phòng' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/mau-phieu')
+    expect(await screen.findByRole('heading', { name: 'Mẫu phiếu' })).toBeInTheDocument()
   })
 })

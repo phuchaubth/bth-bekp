@@ -1,19 +1,21 @@
 import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { filterNavItems, navItems, type NavItem } from '../../app/navigation'
+import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
+import { BRAND } from '../../app/theme'
 import { useAuth } from '../../auth/authContext'
 
-const { Header, Sider, Content, Footer } = Layout
+const { Header, Content, Footer } = Layout
 
-const APP_TITLE = 'Quản lý Phiếu đồng thuận'
+const APP_TITLE = 'Phiếu đồng thuận'
 
-function toMenuItems(items: NavItem[]): MenuProps['items'] {
+/** compact: thanh menu ngang trên máy tính (không biểu tượng, tên ngắn) để đủ chỗ cho mọi mục. */
+function toMenuItems(items: NavItem[], compact = false): MenuProps['items'] {
   return items.map((item) => ({
     key: item.path,
-    icon: item.icon,
-    label: item.label,
+    icon: compact ? undefined : item.icon,
+    label: compact ? (item.shortLabel ?? item.label) : item.label,
     children: item.children ? toMenuItems(item.children) : undefined,
   }))
 }
@@ -24,7 +26,35 @@ function openKeysFor(items: NavItem[], pathname: string): string[] {
     .map((item) => item.path)
 }
 
-/** Bố cục chung: menu trái trên máy tính, menu dạng ngăn kéo trên điện thoại/máy tính bảng. */
+/** Dấu nhận diện: ô vuông xanh ngọc có chữ thập y tế. */
+function BrandMark() {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 10,
+        background: BRAND,
+        display: 'grid',
+        placeItems: 'center',
+        flex: 'none',
+      }}
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round">
+        <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />
+      </svg>
+    </span>
+  )
+}
+
+/** Nội dung căn giữa, rộng tối đa 1280 px (giống nhau giữa thanh trên, nội dung và chân trang). */
+const CONTAINER: CSSProperties = { maxWidth: 1280, margin: '0 auto', width: '100%', boxSizing: 'border-box' }
+
+/**
+ * Bố cục chung: thanh trên cùng có tên ứng dụng, menu ngang và tài khoản (máy tính); điện thoại/máy tính bảng dùng nút
+ * menu mở ngăn kéo. Nội dung căn giữa, rộng tối đa 1280 px.
+ */
 export function AppLayout() {
   const screens = Grid.useBreakpoint()
   const isDesktop = screens.lg ?? true
@@ -34,23 +64,39 @@ export function AppLayout() {
   const { user, hasPermission, logout } = useAuth()
 
   const visibleItems = useMemo(() => filterNavItems(navItems, hasPermission), [hasPermission])
+  // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /phieu-dong-thuan/... → Phiếu đồng thuận).
+  const selectedKey =
+    flattenNavItems(visibleItems)
+      .map((item) => item.path)
+      .filter((path) => (path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)))
+      .sort((a, b) => b.length - a.length)[0] ?? pathname
 
-  const menu = (
-    <Menu
-      theme="dark"
-      mode="inline"
-      selectedKeys={[pathname]}
-      defaultOpenKeys={openKeysFor(visibleItems, pathname)}
-      items={toMenuItems(visibleItems)}
-      onClick={({ key }) => {
-        navigate(key)
-        setDrawerOpen(false)
-      }}
-    />
-  )
+  const onNavigate: MenuProps['onClick'] = ({ key }) => {
+    navigate(key)
+    setDrawerOpen(false)
+  }
 
   const brand = (
-    <div style={{ color: '#fff', fontWeight: 600, padding: '16px 20px', lineHeight: 1.3 }}>{APP_TITLE}</div>
+    <a
+      href="/"
+      onClick={(e) => {
+        e.preventDefault()
+        navigate('/')
+      }}
+      style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'inherit', textDecoration: 'none', flex: 'none' }}
+    >
+      <BrandMark />
+      <span style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+        <Typography.Text strong style={{ fontSize: 15 }}>
+          {APP_TITLE}
+        </Typography.Text>
+        {isDesktop && (
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            {user?.departmentName ?? 'Toàn viện'}
+          </Typography.Text>
+        )}
+      </span>
+    </a>
   )
 
   const userMenu: MenuProps = {
@@ -70,62 +116,74 @@ export function AppLayout() {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {isDesktop ? (
-        <Sider width={248} aria-label="Điều hướng chính">
+      <Header
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          borderBottom: '1px solid #e1eaeb',
+          paddingInline: isDesktop ? 24 : 12,
+        }}
+      >
+        <div style={{ ...CONTAINER, height: '100%', display: 'flex', alignItems: 'center', gap: isDesktop ? 24 : 8 }}>
+          {!isDesktop && (
+            <Button type="text" icon={<MenuOutlined />} aria-label="Mở menu" onClick={() => setDrawerOpen(true)} />
+          )}
           {brand}
-          <nav>{menu}</nav>
-        </Sider>
-      ) : (
-        <Drawer
-          placement="left"
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          size={264}
-          styles={{ body: { padding: 0, background: '#0a2540' }, header: { display: 'none' } }}
-        >
-          {brand}
-          <nav aria-label="Điều hướng chính">{menu}</nav>
-        </Drawer>
-      )}
-      <Layout>
-        <Header
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 12,
-            padding: '0 16px',
-            borderBottom: '1px solid #e5e9f0',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-            {!isDesktop && (
-              <Button type="text" icon={<MenuOutlined />} aria-label="Mở menu" onClick={() => setDrawerOpen(true)} />
-            )}
-            {!isDesktop && (
-              <Typography.Text strong ellipsis style={{ minWidth: 0 }}>
-                {APP_TITLE}
-              </Typography.Text>
-            )}
-          </div>
+          {isDesktop ? (
+            <nav aria-label="Điều hướng chính" style={{ flex: '1 1 auto', minWidth: 0 }}>
+              <Menu
+                mode="horizontal"
+                // Bấm để mở menu con (máy tính bảng cảm ứng không có thao tác di chuột).
+                triggerSubMenuAction="click"
+                selectedKeys={[selectedKey]}
+                items={toMenuItems(visibleItems, true)}
+                onClick={onNavigate}
+                style={{ borderBottom: 0, background: 'transparent' }}
+              />
+            </nav>
+          ) : (
+            <div style={{ flex: 1 }} />
+          )}
           <Dropdown menu={userMenu} trigger={['click']} placement="bottomRight">
             <Button type="text" aria-label="Tài khoản" style={{ flexShrink: 0, height: 'auto', padding: '4px 8px' }}>
               <Space size={8}>
-                <Avatar size="small" icon={<UserOutlined />} />
+                <Avatar size="small" icon={<UserOutlined />} style={{ background: BRAND }} />
                 {isDesktop && <Typography.Text>{user?.fullName}</Typography.Text>}
               </Space>
             </Button>
           </Dropdown>
-        </Header>
-        <Content style={{ padding: isDesktop ? 24 : 16 }}>
-          <main>
-            <Outlet />
-          </main>
-        </Content>
-        <Footer style={{ textAlign: 'center', color: '#8c96a3', fontSize: 12 }}>
-          Dữ liệu minh họa là dữ liệu giả lập. Không nhập thông tin người bệnh thật trên môi trường thử nghiệm.
-        </Footer>
-      </Layout>
+        </div>
+      </Header>
+      {!isDesktop && (
+        <Drawer
+          placement="left"
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          size={280}
+          title={brand}
+          styles={{ body: { padding: 8 } }}
+        >
+          <nav aria-label="Điều hướng chính">
+            <Menu
+              mode="inline"
+              selectedKeys={[selectedKey]}
+              defaultOpenKeys={openKeysFor(visibleItems, pathname)}
+              items={toMenuItems(visibleItems)}
+              onClick={onNavigate}
+              style={{ borderInlineEnd: 0 }}
+            />
+          </nav>
+        </Drawer>
+      )}
+      <Content style={{ padding: isDesktop ? '28px 24px' : 16 }}>
+        <main style={CONTAINER}>
+          <Outlet />
+        </main>
+      </Content>
+      <Footer style={{ textAlign: 'center', color: '#55706d', fontSize: 12 }}>
+        Dữ liệu minh họa là dữ liệu giả lập. Không nhập thông tin người bệnh thật trên môi trường thử nghiệm.
+      </Footer>
     </Layout>
   )
 }

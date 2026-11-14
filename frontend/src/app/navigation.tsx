@@ -14,6 +14,8 @@ import { Permissions } from '../auth/permissions'
 export interface NavItem {
   path: string
   label: string
+  /** Tên ngắn trên thanh menu ngang (máy tính); menu điện thoại dùng tên đầy đủ. */
+  shortLabel?: string
   icon?: ReactNode
   /** Sprint dự kiến hoàn thành chức năng (hiển thị trên trang đang phát triển). */
   sprint?: number
@@ -29,8 +31,8 @@ export const navItems: NavItem[] = [
   { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, permission: Permissions.PatientsRead },
   { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, permission: Permissions.TemplatesRead },
   { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, permission: Permissions.ExportsRun },
-  { path: '/bao-cao', label: 'Báo cáo thống kê', icon: <BarChartOutlined />, permission: Permissions.ReportsRead },
-  { path: '/nhat-ky', label: 'Nhật ký hệ thống', icon: <AuditOutlined />, permission: Permissions.AuditRead },
+  { path: '/bao-cao', label: 'Báo cáo thống kê', shortLabel: 'Báo cáo', icon: <BarChartOutlined />, permission: Permissions.ReportsRead },
+  { path: '/nhat-ky', label: 'Nhật ký hệ thống', shortLabel: 'Nhật ký', icon: <AuditOutlined />, permission: Permissions.AuditRead },
   {
     path: '/quan-tri',
     label: 'Quản trị',

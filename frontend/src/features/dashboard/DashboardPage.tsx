@@ -69,8 +69,8 @@ export function DashboardPage() {
                   title="Số phiếu lập và hoàn tất theo ngày trong 14 ngày gần nhất"
                   labels={data.last14Days.map((d) => dayjs(d.date).format('DD/MM'))}
                   series={[
-                    { name: 'Phiếu lập', color: '#1677ff', values: data.last14Days.map((d) => d.created) },
-                    { name: 'Hoàn tất', color: '#52c41a', values: data.last14Days.map((d) => d.completed) },
+                    { name: 'Phiếu lập', color: '#0d7c74', values: data.last14Days.map((d) => d.created) },
+                    { name: 'Hoàn tất', color: '#d9822b', values: data.last14Days.map((d) => d.completed) },
                   ]}
                 />
               </Card>

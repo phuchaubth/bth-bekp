@@ -9,7 +9,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Descriptions, Flex, Form, Input, Modal, Popconfirm, Radio, Select, Space, Spin, Typography } from 'antd'
+import { Alert, App, Button, Card, Descriptions, Flex, Form, Input, Modal, Popconfirm, Progress, Radio, Select, Space, Spin, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
@@ -34,6 +34,7 @@ import { signerRoleLabel } from '../templates/signerRoles'
 import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
 import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
+import { BRAND } from '../../app/theme'
 
 /**
  * Màn hình 8 (và bước soạn nội dung của màn hình 5): chi tiết phiếu, soạn phiếu nháp, trình ký, chuyển sang chế độ ký
@@ -264,6 +265,26 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
   )
 }
 
+/** Thanh tiến trình chữ ký: người bệnh, các bước xác nhận, xác nhận cuối (ví dụ "Đã có 2/3 chữ ký"). */
+function SignatureProgress({ form }: { form: ConsentFormDetail }) {
+  const total = form.steps.length + 2
+  const done = 1 + form.steps.filter((step) => step.confirmation).length + (form.status === 'Completed' ? 1 : 0)
+  return (
+    <Flex align="center" gap={12} wrap style={{ margin: '2px 0 6px' }}>
+      <Typography.Text strong style={{ fontVariantNumeric: 'tabular-nums' }}>
+        Đã có {done}/{total} chữ ký
+      </Typography.Text>
+      <Progress
+        percent={Math.round((done / total) * 100)}
+        showInfo={false}
+        strokeColor={BRAND}
+        style={{ flex: '1 1 200px', margin: 0, minWidth: 160, maxWidth: 420 }}
+        aria-label={`Đã có ${done} trên ${total} chữ ký`}
+      />
+    </Flex>
+  )
+}
+
 /** Tiến trình các bước xác nhận theo vai trò (mẫu có `signatures.steps`). */
 function StepProgress({ form }: { form: ConsentFormDetail }) {
   return (
@@ -314,6 +335,7 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
         }`}
         description={
           <>
+            <SignatureProgress form={form} />
             {form.steps.length > 0 && <StepProgress form={form} />}
             {pendingStep
               ? form.actions.canConfirmStep
