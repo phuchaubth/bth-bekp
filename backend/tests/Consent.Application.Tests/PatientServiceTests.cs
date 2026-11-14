@@ -147,6 +147,33 @@ public sealed class PatientServiceTests
         Assert.Contains(field, result.Error!.FieldErrors!.Keys);
     }
 
+    [Theory]
+    [InlineData("GD479012345678901")]
+    [InlineData("gd4790000000125")]
+    public async Task Create_AcceptsNewAndLegacyHealthInsuranceNumbers(string number)
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreatePatientService();
+
+        var result = await service.CreateAsync(Request() with { HealthInsuranceNumber = number }, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("7900000001")]
+    [InlineData("079192000002")]
+    [InlineData("GD47900000001250")]
+    public async Task Create_RejectsOtherHealthInsuranceFormats(string number)
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreatePatientService();
+
+        var result = await service.CreateAsync(Request() with { HealthInsuranceNumber = number }, CancellationToken.None);
+
+        Assert.Equal([HealthInsuranceNumber.FormatMessage], result.Error!.FieldErrors!["healthInsuranceNumber"]);
+    }
+
     [Fact]
     public async Task Create_WithFutureBirthDate_IsRejected()
     {

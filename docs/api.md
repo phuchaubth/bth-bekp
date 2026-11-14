@@ -230,7 +230,7 @@ Dữ liệu tạo/cập nhật người bệnh (chỉ `fullName`, `dateOfBirth`,
 | `citizenIdIssueDate` | Sau ngày sinh, không sau hôm nay |
 | `oldIdNumber` | 9 hoặc 12 chữ số |
 | `phoneNumber` | Bắt đầu bằng `0` hoặc `+84`, 9–10 chữ số tiếp theo |
-| `healthInsuranceNumber` | 15 ký tự (2 chữ + 13 số) hoặc mã số BHXH 10 chữ số |
+| `healthInsuranceNumber` | Mã thẻ mới 17 ký tự (2 chữ + 15 số: 5 ký tự đầu như mã cũ + 12 số định danh). Mã thẻ cũ 15 ký tự (2 chữ + 13 số) vẫn được chấp nhận; giao diện cảnh báo nhẹ để cập nhật |
 | `patientCode` | Chữ không dấu, số, `-`, `_`; tối đa 50 ký tự |
 
 Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth", "gender", "phoneNumber", "address" }`. `relationship` ∈ `Father`, `Mother`, `Spouse`, `Child`, `Sibling`, `Guardian`, `Relative`, `Other`.
@@ -353,7 +353,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 - Số phiếu `PDT-<năm>-<6 chữ số>` lấy từ sequence của SQL Server, không trùng kể cả khi nhiều người lập cùng lúc.
 - Nội dung phiếu (`data`) và thông tin đóng băng có dữ liệu cá nhân nên được **mã hóa AES-256-GCM** trong CSDL; nhật ký audit che các giá trị này (`***`).
 - Tên đơn vị in trên PDF lấy từ cấu hình `Hospital:ParentAgency`, `Hospital:Name`, `Hospital:Place` (**đang để giá trị mẫu, chờ bệnh viện cung cấp**).
-- Chi tiết phiếu có thêm `decision` (`Agreed`/`Refused`; `null` khi mẫu chỉ ký xác nhận), `steps` (`key`, `label`, `roleCode`, `roleName`, `isNext`, `confirmation`), `signatures` (`role`: `Patient`/`Representative`/`Staff` (bước trung gian, kèm `stepKey`)/`Hospital`; `method`: `Handwritten`/`AccountConfirmation`; `signerName`, `signerTitle`, `signedAtUtc`; **không kèm ảnh chữ ký**), `signedPdfSha256`, `replacesForm`/`replacedBy` (`{ id, formNo }`) và `actions`: `canEdit`, `canSubmit`, `canReturnToDraft`, `canCancel`, `canStartSigning`, `canConfirmStep`, `canConfirm`, `canRevoke`, `canReplace`.
+- Chi tiết phiếu có thêm `decision` (`Agreed`/`Refused`; `null` khi mẫu chỉ ký xác nhận), `steps` (`key`, `label`, `roleCode`, `roleName`, `isNext`, `confirmation`), `signatures` (`role`: `Patient`/`Representative`/`Staff` (bước trung gian, kèm `stepKey`)/`Hospital`; `method`: `Handwritten`/`AccountConfirmation`; `signerName`, `signerTitle`, `signedAtUtc`; **không kèm ảnh chữ ký**), `signedPdfSha256`, `replacesForm`/`replacedBy` (`{ id, formNo }`) và `actions`: `canEdit`, `canSubmit`, `canReturnToDraft`, `canCancel`, `canStartSigning`, `canConfirmStep`, `canConfirm`, `canRevoke`, `canReplace`; `notices`: danh sách thông báo cho người lập phiếu khi phiếu còn là nháp (ví dụ: hồ sơ người bệnh còn số thẻ BHYT mã cũ 15 ký tự), rỗng khi không có hoặc phiếu đã trình ký.
 
 **Ký tay trên máy tính bảng (quyết định 10, 11)**
 

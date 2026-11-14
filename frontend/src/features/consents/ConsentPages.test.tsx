@@ -172,6 +172,7 @@ const detail = (overrides: Partial<ConsentFormDetail> = {}): ConsentFormDetail =
   signedPdfSha256: null,
   replacesForm: null,
   replacedBy: null,
+  notices: [],
   actions: actions({ canEdit: true, canSubmit: true, canCancel: true }),
   ...overrides,
 })
@@ -236,6 +237,26 @@ describe('Lập phiếu (màn hình 4–5)', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-1'))
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toEqual({ patientId: 'p-1', templateId: 't-ck' })
+  })
+
+  it('hồ sơ còn số thẻ BHYT mã cũ 15 ký tự: báo cho người dùng khi lập phiếu và trên phiếu nháp', async () => {
+    const notice = 'Số thẻ BHYT trong hồ sơ người bệnh là mã cũ 15 ký tự. Mã cũ vẫn được chấp nhận, nhưng nên cập nhật hồ sơ sang mã thẻ mới 17 ký tự.'
+    mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/patients/p-1': patient,
+      'GET /api/v1/consent-templates/available': [
+        { templateId: 't-ck', templateCode: 'CK-01', templateName: 'Giấy cam kết', versionId: 'v-1', versionNo: 1, status: 'Published', definition: commitment, updatedAtUtc: '', publishedAtUtc: '' },
+      ],
+      'POST /api/v1/consent-forms': () => json(detail({ notices: [notice] }), 201),
+      'GET /api/v1/consent-forms/f-1': detail({ notices: [notice] }),
+    })
+    const { router } = renderApp('/phieu-dong-thuan/tao-moi?patientId=p-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Lập phiếu CK-01' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-1'))
+    await waitFor(() => expect(screen.getAllByText(notice).length).toBeGreaterThanOrEqual(2))
   })
 })
 

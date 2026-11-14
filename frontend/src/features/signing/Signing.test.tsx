@@ -67,6 +67,7 @@ const pending = (overrides: Partial<ConsentFormDetail> = {}): ConsentFormDetail 
   signedPdfSha256: null,
   replacesForm: null,
   replacedBy: null,
+  notices: [],
   actions: {
     canEdit: false,
     canSubmit: false,

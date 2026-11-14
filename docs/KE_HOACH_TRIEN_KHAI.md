@@ -606,6 +606,7 @@ Toàn bộ dữ liệu test được sinh giả lập (tên, số CCCD ngẫu nh
 | 15 | Chứng chỉ HTTPS (13/11/2026) | **Chứng chỉ công cộng** cho **`phieudongthuan.bth.org.vn`**, DNS nội bộ trỏ về máy chủ; tự động gia hạn ([hướng dẫn, mục 2a](trien-khai.md)) |
 | 16 | SQL Server (13/11/2026) | **SQL Server 2025 Standard**; không dùng Express cho môi trường chính thức. Kiểm thử tích hợp mặc định chạy trên 2025 ([hướng dẫn, mục 2b](trien-khai.md)) |
 | 17 | Nhân viên ký tay khi xác nhận (14/11/2026) | **Mọi nhân viên xác nhận phiếu đều ký tay** như người bệnh (bước trung gian và xác nhận cuối), ngoài việc đăng nhập bằng tài khoản của mình. Ảnh chữ ký được chuẩn hóa, kiểm tra, lưu mã hóa và in vào ô của nhân viên trên PDF. Phiếu hoàn tất trước đó giữ nguyên |
+| 18 | Số thẻ BHYT 17 ký tự (14/11/2026) | Mã thẻ BHYT mới gồm **17 ký tự**: 5 ký tự đầu giữ như mã cũ (2 chữ + 3 số), tiếp theo 12 số định danh. Chỉ nhận 2 dạng: mã mới 17 ký tự và **mã cũ 15 ký tự** (2 chữ + 13 số, vẫn nhận cho hồ sơ đã có). Nhập mã cũ thì **cảnh báo nhẹ**, vẫn lưu được; lập phiếu mới cho người bệnh còn mã cũ thì báo người dùng (thông báo khi lập và cảnh báo trên phiếu nháp). Mẫu QT-KNGT-BM02 đã có trên máy chủ cần phát hành phiên bản mới để dùng quy tắc này |
 
 **Giả định đang áp dụng**
 - Giai đoạn 1 dùng **tài khoản nội bộ** của ứng dụng, chưa tích hợp AD/SSO.

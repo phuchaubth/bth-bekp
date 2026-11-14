@@ -44,7 +44,7 @@ hai mã này (13/11/2026).
 
 - Toàn văn nội dung tư vấn: trường hợp không BHYT, trường hợp có BHYT với ba ý con.
 - Câu hỏi bắt buộc **chế độ khám chữa bệnh**: Bảo hiểm y tế / Không Bảo hiểm y tế.
-- Chọn BHYT thì bắt buộc **số thẻ BHYT** (15 ký tự hoặc mã BHXH 10 số), tự điền từ hồ sơ.
+- Chọn BHYT thì bắt buộc **số thẻ BHYT** (mã thẻ mới 17 ký tự; mã cũ 15 ký tự vẫn nhận, phiếu nháp hiện cảnh báo nhẹ), tự điền từ hồ sơ.
 - Cam đoan "không khiếu kiện gì về sau" in ngay trước khối chữ ký.
 
 ### 2.2. TTNB-NGOAITRU – Phiếu thông tin người bệnh ngoại trú

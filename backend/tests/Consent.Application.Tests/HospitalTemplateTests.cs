@@ -70,11 +70,15 @@ public sealed class HospitalTemplateTests
 
         var missing = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance" });
         var invalid = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "12-34" });
-        var valid = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
+        var valid = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD479012345678901" });
+        var legacy = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
+        var bhxhOnly = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "7900000001" });
 
         Assert.Contains("insuranceNumber", missing.Errors.Keys);
-        Assert.Contains("Mã thẻ BHYT gồm 15 ký tự", invalid.Errors["insuranceNumber"][0], StringComparison.Ordinal);
+        Assert.Contains("Số thẻ BHYT gồm 17 ký tự", invalid.Errors["insuranceNumber"][0], StringComparison.Ordinal);
         Assert.True(valid.IsValid);
+        Assert.True(legacy.IsValid);
+        Assert.Contains("insuranceNumber", bhxhOnly.Errors.Keys);
     }
 
     [Fact]

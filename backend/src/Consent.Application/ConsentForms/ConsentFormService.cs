@@ -445,7 +445,20 @@ public sealed class ConsentFormService(
                     && currentUser.IsInRole(template.HospitalSignerRoleCode),
                 CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
                 CanReplace: form.Status == ConsentFormStatus.Revoked && replacedBy is null
-                    && currentUser.HasPermission(Permissions.ConsentsCreate)));
+                    && currentUser.HasPermission(Permissions.ConsentsCreate)),
+            await BuildNoticesAsync(form, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>Thông báo cho người lập phiếu khi phiếu còn sửa được (ví dụ: hồ sơ còn số thẻ BHYT mã cũ 15 ký tự).</summary>
+    private async Task<IReadOnlyList<string>> BuildNoticesAsync(ConsentForm form, CancellationToken cancellationToken)
+    {
+        if (!form.CanEdit)
+        {
+            return [];
+        }
+
+        var patient = await patients.GetByIdAsync(form.PatientId, cancellationToken).ConfigureAwait(false);
+        return HealthInsuranceNumber.IsLegacy(patient?.HealthInsuranceNumber) ? [HealthInsuranceNumber.LegacyNotice] : [];
     }
 
     private static ConsentSignatureDto ToSignatureDto(ConsentSignature s) =>

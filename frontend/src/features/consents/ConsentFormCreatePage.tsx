@@ -28,6 +28,7 @@ export function ConsentFormCreatePage() {
     onSuccess: async (form) => {
       await queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       message.success(`Đã lập phiếu nháp ${form.formNo}.`)
+      form.notices.forEach((notice) => message.warning(notice))
       navigate(`/phieu-dong-thuan/${form.id}`)
     },
     onError: (error) => message.error(errorMessage(error)),

@@ -4,6 +4,12 @@ import { useFeatures } from '../../api/features'
 import { citizenIdMismatch, isValidCitizenId } from './cccd'
 import { commonEthnicities } from './labels'
 import type { PatientFormValues } from './patientFormValues'
+import {
+  HEALTH_INSURANCE_LEGACY_WARNING,
+  HEALTH_INSURANCE_MESSAGE,
+  HEALTH_INSURANCE_PATTERN,
+  isLegacyHealthInsurance,
+} from './healthInsurance'
 
 const DATE_FORMAT = 'DD/MM/YYYY'
 const MIN_DATE = dayjs('1900-01-01')
@@ -184,13 +190,15 @@ export function PatientForm({ form, onFinish, disabled = false, initialValues }:
             name="healthInsuranceNumber"
             normalize={(value?: string) => value?.toUpperCase()}
             rules={[
+              { pattern: HEALTH_INSURANCE_PATTERN, message: HEALTH_INSURANCE_MESSAGE },
               {
-                pattern: /^([A-Za-z]{2}[0-9]{13}|[0-9]{10})$/,
-                message: 'Mã BHYT gồm 15 ký tự (2 chữ + 13 số) hoặc mã số BHXH 10 chữ số.',
+                warningOnly: true,
+                validator: (_, value?: string) =>
+                  isLegacyHealthInsurance(value) ? Promise.reject(new Error(HEALTH_INSURANCE_LEGACY_WARNING)) : Promise.resolve(),
               },
             ]}
           >
-            <Input maxLength={15} autoComplete="off" />
+            <Input maxLength={17} autoComplete="off" />
           </Form.Item>
         </Col>
         <Col xs={24} md={8}>

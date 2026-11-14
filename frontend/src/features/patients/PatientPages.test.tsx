@@ -229,6 +229,39 @@ describe('Chưa kết nối HIS (mặc định)', () => {
     expect(screen.queryByText('Đối chiếu HIS')).not.toBeInTheDocument()
   })
 
+  it('số thẻ BHYT: mã mới 17 ký tự lưu bình thường; mã cũ 15 ký tự chỉ cảnh báo nhẹ, vẫn lưu được; dạng khác bị chặn', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(nurse()),
+      'POST /api/v1/patients/lookup': { existingPatient: null, hisStatus: 'Disabled', hisPatient: null },
+      'POST /api/v1/patients': () => json(detail({ healthInsuranceNumber: 'GD4790000000125' }), 201),
+      'GET /api/v1/patients/p-1': detail({ healthInsuranceNumber: 'GD4790000000125' }),
+    })
+    const { router } = renderApp('/nguoi-benh/tiep-nhan')
+    const user = await scan(QR)
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/patients/lookup')).toBe(true))
+    const input = screen.getByLabelText('Mã thẻ BHYT')
+
+    await user.type(input, '7900000001')
+    await user.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+    expect(await screen.findByText(/Số thẻ BHYT gồm 17 ký tự/)).toBeInTheDocument()
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/patients')).toBe(false)
+
+    await user.clear(input)
+    await user.type(input, 'gd479036188000125')
+    await waitFor(() => expect(screen.queryByText(/Số thẻ BHYT gồm 17 ký tự/)).not.toBeInTheDocument())
+    expect(screen.queryByText(/mã thẻ BHYT cũ 15 ký tự/)).not.toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, 'gd4790000000125')
+    expect(await screen.findByText(/Đây là mã thẻ BHYT cũ 15 ký tự/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/nguoi-benh/p-1'))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/patients')!.body).toMatchObject({
+      healthInsuranceNumber: 'GD4790000000125',
+    })
+  })
+
   it('danh sách: không có cột đối chiếu HIS', async () => {
     mockApi({
       ...baseRoutes(nurse()),

@@ -20,9 +20,9 @@
           "key": "insuranceNumber",
           "label": "Số thẻ BHYT",
           "required": true,
-          "maxLength": 15,
-          "pattern": "^([A-Z]{2}[0-9]{13}|[0-9]{10})$",
-          "patternMessage": "Mã BHYT gồm 15 ký tự (2 chữ in hoa + 13 số) hoặc mã số BHXH 10 chữ số.",
+          "maxLength": 17,
+          "pattern": "^[A-Z]{2}([0-9]{15}|[0-9]{13})$",
+          "patternMessage": "Số thẻ BHYT gồm 17 ký tự (2 chữ in hoa + 15 số); mã thẻ cũ 15 ký tự (2 chữ in hoa + 13 số) vẫn được chấp nhận.",
           "prefill": "patient.healthInsuranceNumber",
           "visibleWhen": { "field": "examType", "in": ["bhyt", "bhytWithService"] }
         },

@@ -73,7 +73,7 @@ public sealed class TemplateDefinitionTests
 
         var result = FormDataEvaluator.Evaluate(Default("CK-01"), data);
 
-        Assert.Contains("Mã BHYT gồm 15 ký tự", result.Errors["insuranceNumber"][0], StringComparison.Ordinal);
+        Assert.Contains("Số thẻ BHYT gồm 17 ký tự", result.Errors["insuranceNumber"][0], StringComparison.Ordinal);
         Assert.Contains("insuranceValidFrom", result.Errors.Keys);
         Assert.Contains("primaryCareFacility", result.Errors.Keys);
         Assert.Contains("referralPaper", result.Errors.Keys);

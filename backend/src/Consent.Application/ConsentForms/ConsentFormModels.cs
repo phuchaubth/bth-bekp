@@ -154,7 +154,8 @@ public sealed record ConsentFormDetailDto(
     string? SignedPdfSha256,
     ConsentFormRef? ReplacesForm,
     ConsentFormRef? ReplacedBy,
-    ConsentFormActions Actions);
+    ConsentFormActions Actions,
+    IReadOnlyList<string> Notices);
 
 /// <summary>Lập phiếu. <paramref name="ReplacesFormId"/>: lập phiếu thay thế cho phiếu đã thu hồi (cùng người bệnh, cùng mẫu).</summary>
 public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId, Guid? ReplacesFormId = null);

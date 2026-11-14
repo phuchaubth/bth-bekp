@@ -250,6 +250,9 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
           </Descriptions.Item>
         )}
       </Descriptions>
+      {form.notices.map((notice) => (
+        <Alert key={notice} type="warning" showIcon style={{ marginTop: 12 }} title={notice} />
+      ))}
       <StatusNotice form={form} />
     </Card>
   )

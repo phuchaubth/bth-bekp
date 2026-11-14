@@ -38,6 +38,37 @@ public sealed class ConsentFormServiceTests
     }
 
     [Fact]
+    public async Task Draft_ForPatientWithLegacyInsuranceNumber_CarriesNotice_UntilSubmitted()
+    {
+        var s = Setup();
+        s.LogIn(s.Kkb);
+
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+        await s.Service.UpdateAsync(form.Id, new(CompleteCk01(), ConsentSignerKind.Patient, null), CancellationToken.None);
+        var submitted = await s.Service.SubmitAsync(form.Id, CancellationToken.None);
+
+        Assert.Equal([HealthInsuranceNumber.LegacyNotice], form.Notices);
+        Assert.Empty(submitted.Value.Notices);
+    }
+
+    [Fact]
+    public async Task Draft_ForPatientWithNewInsuranceNumber_HasNoNotice()
+    {
+        var s = Setup();
+        s.Patient.Update(
+            new PatientDetails(
+                "Phạm Thị Dung (giả lập)", new DateOnly(1988, 4, 5), Gender.Female, "036188000125", null, null,
+                "Số 9 Đường Thử Nghiệm", null, "0900000125", "Kinh", null, "Việt Nam", "GD479036188000125", "BN000125"),
+            s.Ctx.Clock.UtcNow);
+        s.LogIn(s.Kkb);
+
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+
+        Assert.Equal("GD479036188000125", form.Data["insuranceNumber"]!.GetValue<string>());
+        Assert.Empty(form.Notices);
+    }
+
+    [Fact]
     public async Task Create_OutpatientInformation_PrefillsEthnicityOccupationAndAddresses()
     {
         var s = Setup();

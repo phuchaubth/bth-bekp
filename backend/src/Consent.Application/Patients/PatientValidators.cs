@@ -8,9 +8,6 @@ internal static class PatientRules
 {
     public const string PhonePattern = @"^(0|\+84)[0-9]{9,10}$";
 
-    /// <summary>Mã thẻ BHYT 15 ký tự (2 chữ + 13 số) hoặc mã số BHXH 10 chữ số.</summary>
-    public const string HealthInsurancePattern = "^([A-Za-z]{2}[0-9]{13}|[0-9]{10})$";
-
     public static readonly DateOnly MinimumDate = new(1900, 1, 1);
 }
 
@@ -62,8 +59,8 @@ public sealed class PatientRequestValidator : AbstractValidator<PatientRequest>
         RuleFor(x => x.Nationality)
             .MaximumLength(Patient.NationalityMaxLength).WithMessage($"Quốc tịch tối đa {Patient.NationalityMaxLength} ký tự.");
         RuleFor(x => x.HealthInsuranceNumber)
-            .Matches(PatientRules.HealthInsurancePattern)
-            .WithMessage("Mã BHYT phải gồm 15 ký tự (2 chữ cái + 13 chữ số) hoặc mã số BHXH 10 chữ số.")
+            .Must(HealthInsuranceNumber.IsValid)
+            .WithMessage(HealthInsuranceNumber.FormatMessage)
             .When(x => !string.IsNullOrWhiteSpace(x.HealthInsuranceNumber));
         RuleFor(x => x.PatientCode)
             .MaximumLength(Patient.PatientCodeMaxLength).WithMessage($"Mã người bệnh tối đa {Patient.PatientCodeMaxLength} ký tự.")

@@ -142,6 +142,8 @@ export interface ConsentFormDetail {
   replacesForm: ConsentFormRef | null
   replacedBy: ConsentFormRef | null
   actions: ConsentFormActions
+  /** Thông báo cho người lập phiếu khi phiếu còn sửa được (ví dụ: hồ sơ còn số thẻ BHYT mã cũ 15 ký tự). */
+  notices: string[]
 }
 
 export interface ConsentFormQuery {

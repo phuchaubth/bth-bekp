@@ -85,7 +85,7 @@ Nhân viên **sửa được** các trường tự điền trước khi trình k
 | Mã | Nội dung | Kiểu | Bắt buộc |
 |---|---|---|---|
 | `examType` | Hình thức khám: ☐ Khám, chữa bệnh BHYT · ☐ Khám, chữa bệnh dịch vụ (tự chi trả toàn bộ) · ☐ BHYT kết hợp sử dụng dịch vụ theo yêu cầu (tự chi trả phần chênh lệch) | Chọn một | Có |
-| `insuranceNumber` | Số thẻ BHYT (lấy từ hồ sơ nếu đã có) | Văn bản, 15 ký tự hoặc mã BHXH 10 số | Khi có BHYT |
+| `insuranceNumber` | Số thẻ BHYT (lấy từ hồ sơ nếu đã có) | Văn bản, mã thẻ 17 ký tự (mã cũ 15 ký tự vẫn nhận) | Khi có BHYT |
 | `insuranceValidFrom`, `insuranceValidTo` | Giá trị sử dụng của thẻ | Ngày | Khi có BHYT |
 | `primaryCareFacility` | Nơi đăng ký khám, chữa bệnh ban đầu | Văn bản | Khi có BHYT |
 | `referralPaper` | Giấy chuyển tuyến / giấy chuyển cơ sở khám, chữa bệnh: ☐ Có · ☐ Không · ☐ Bổ sung sau | Chọn một | Khi có BHYT |
