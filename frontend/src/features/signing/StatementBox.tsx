@@ -50,6 +50,11 @@ export function StatementBox({ config, value, onChange, disabled }: Props) {
           })}
         </Flex>
       )}
+      {suggestions.length > 0 && (
+        <Typography.Text type="secondary">
+          Không đúng ý ông/bà? Ghi nội dung của mình vào ô dưới (có thể sửa câu đã chọn).
+        </Typography.Text>
+      )}
       <Input.TextArea
         id="signer-statement"
         className="signer-statement"
@@ -57,7 +62,7 @@ export function StatementBox({ config, value, onChange, disabled }: Props) {
         onChange={(e) => onChange(e.target.value)}
         maxLength={STATEMENT_MAX_LENGTH}
         autoSize={{ minRows: 2, maxRows: 4 }}
-        placeholder={suggestions.length > 0 ? 'Bấm một câu gợi ý ở trên hoặc tự ghi' : 'Ví dụ: Tôi đã nghe, hiểu và đồng ý'}
+        placeholder={suggestions.length > 0 ? 'Bấm câu gợi ý ở trên hoặc tự ghi nội dung' : 'Ví dụ: Tôi đã nghe, hiểu và đồng ý'}
         disabled={disabled}
         style={{ fontSize: 17 }}
       />

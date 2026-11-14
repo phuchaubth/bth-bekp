@@ -316,6 +316,10 @@ describe('Màn hình ký trên điện thoại (màn hình 6)', () => {
     expect(screen.getByRole('button', { name: 'Xác nhận chữ ký' })).toBeDisabled()
     expect(screen.getByText('Ghi lời xác nhận và ký vào khung trên để xác nhận.')).toBeInTheDocument()
 
+    // Không đúng ý thì tự ghi; bấm câu gợi ý thì thay bằng câu đó.
+    expect(screen.getByText(/Ghi nội dung của mình vào ô dưới/)).toBeInTheDocument()
+    await user.type(box, 'Tôi đã nghe nhưng cần hỏi thêm bác sĩ')
+    expect(box).toHaveValue('Tôi đã nghe nhưng cần hỏi thêm bác sĩ')
     await user.click(screen.getByRole('button', { name: 'Tôi đã nghe, hiểu và đồng ý' }))
     expect(box).toHaveValue('Tôi đã nghe, hiểu và đồng ý')
     expect(screen.getByRole('button', { name: /Tôi đã nghe, hiểu và đồng ý/ })).toHaveAttribute('aria-pressed', 'true')
