@@ -107,6 +107,31 @@ public static partial class TemplateDefinitionValidator
         }
 
         ValidateSteps(signatures.Steps, errors);
+        ValidateStatement(signatures.Statement, errors);
+    }
+
+    private static void ValidateStatement(TemplateStatement? statement, List<string> errors)
+    {
+        if (statement is null)
+        {
+            return;
+        }
+
+        if (statement.Label is { Length: > MaxLabelLength })
+        {
+            errors.Add($"Khối chữ ký, lời xác nhận: nhãn tối đa {MaxLabelLength} ký tự.");
+        }
+
+        var suggestions = statement.Suggestions ?? [];
+        if (suggestions.Count > TemplateStatement.MaxSuggestions)
+        {
+            errors.Add($"Khối chữ ký, lời xác nhận: tối đa {TemplateStatement.MaxSuggestions} câu gợi ý.");
+        }
+
+        if (suggestions.Any(s => string.IsNullOrWhiteSpace(s) || s.Length > TemplateStatement.MaxLength))
+        {
+            errors.Add($"Khối chữ ký, lời xác nhận: câu gợi ý không được trống, tối đa {TemplateStatement.MaxLength} ký tự.");
+        }
     }
 
     private static void ValidateSteps(IReadOnlyList<TemplateConfirmationStep>? steps, List<string> errors)

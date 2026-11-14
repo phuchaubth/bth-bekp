@@ -57,7 +57,7 @@ public sealed class ConfirmationStepTests
         Assert.True(submitted.IsSuccess, string.Join("; ", submitted.Error?.FieldErrors?.Keys ?? []));
         Assert.True((await s.Signing.StartSigningAsync(form.Id, CancellationToken.None)).IsSuccess);
         var back = s.UseSigningToken();
-        var signed = await s.Signing.SignAsPatientAsync(form.Id, new(null, SignaturePng), CancellationToken.None);
+        var signed = await s.Signing.SignAsPatientAsync(form.Id, new(null, SignaturePng, "Tôi đã nghe, hiểu và đồng ý"), CancellationToken.None);
         Assert.True(signed.IsSuccess, signed.Error?.Message);
         back();
         return (s, form.Id);

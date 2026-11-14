@@ -13,6 +13,7 @@ import { relationshipLabels } from '../patients/labels'
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad'
 import { signingSession, type SigningSession } from './signingSession'
 import { Bilingual } from '../consents/Bilingual'
+import { StatementBox } from './StatementBox'
 
 type Stage = 'signing' | 'signed' | 'ended'
 
@@ -50,11 +51,19 @@ function NoSession() {
   )
 }
 
+/** Câu nhắc còn thiếu gì trước khi xác nhận chữ ký, ví dụ "Chọn Đồng ý hoặc Từ chối, ghi lời xác nhận và ký vào khung trên để xác nhận." */
+function readyHint(decisionStep: string | null, needsStatement: boolean) {
+  const steps = [decisionStep, needsStatement ? 'ghi lời xác nhận' : null].filter((step): step is string => !!step)
+  const text = steps.length > 0 ? `${steps.join(', ')} và ký vào khung trên để xác nhận.` : 'ký vào khung trên để xác nhận.'
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 function Kiosk({ session }: { session: SigningSession }) {
   const { form } = session
   const [previewForm] = Form.useForm<FormData>()
   const pad = useRef<SignaturePadHandle>(null)
   const [decision, setDecision] = useState<ConsentDecision>()
+  const [statement, setStatement] = useState('')
   const [hasInk, setHasInk] = useState(false)
   const [stage, setStage] = useState<Stage>(() => (Date.parse(session.expiresAtUtc) <= Date.now() ? 'ended' : 'signing'))
   const [error, setError] = useState<string | null>(null)
@@ -72,7 +81,9 @@ function Kiosk({ session }: { session: SigningSession }) {
   const agreeLabel = labels?.agreeLabel ?? decisionLabels.Agreed
   const refuseLabel = labels?.refuseLabel ?? decisionLabels.Refused
   const decisionQuestion = labels?.decisionLabel ?? `Ý kiến của ${signerLabel}`
-  const ready = (!asksDecision || !!decision) && hasInk
+  const statementConfig = labels?.statement
+  const needsStatement = !!statementConfig?.required
+  const ready = (!asksDecision || !!decision) && hasInk && (!needsStatement || statement.trim().length > 0)
 
   const submit = async () => {
     if (!ready || !pad.current) {
@@ -84,6 +95,7 @@ function Kiosk({ session }: { session: SigningSession }) {
       const result = await consentFormsApi.signAsPatient(form.id, session.token, {
         decision: asksDecision ? decision : undefined,
         image: pad.current.toPngBase64(),
+        statement: statementConfig && statement.trim() ? statement.trim() : undefined,
       })
       setSignedAt(result.signedAtUtc)
       setStage('signed')
@@ -176,6 +188,9 @@ function Kiosk({ session }: { session: SigningSession }) {
                     />
                   </div>
                 )}
+                {statementConfig && (
+                  <StatementBox config={statementConfig} value={statement} onChange={setStatement} disabled={submitting} />
+                )}
                 <SignaturePad ref={pad} onInkChange={setHasInk} disabled={submitting} />
                 {error && <Alert type="error" showIcon title={error} />}
                 <Button
@@ -190,9 +205,7 @@ function Kiosk({ session }: { session: SigningSession }) {
                 </Button>
                 {!ready && (
                   <Typography.Text type="secondary" style={{ textAlign: 'center' }}>
-                    {asksDecision
-                      ? `Chọn ${agreeLabel} hoặc ${refuseLabel} và ký vào khung trên để xác nhận.`
-                      : 'Ký vào khung trên để xác nhận.'}
+                    {readyHint(asksDecision ? `chọn ${agreeLabel} hoặc ${refuseLabel}` : null, needsStatement)}
                   </Typography.Text>
                 )}
               </Flex>

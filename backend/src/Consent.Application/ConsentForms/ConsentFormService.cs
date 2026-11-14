@@ -322,7 +322,7 @@ public sealed class ConsentFormService(
         var department = await departments.GetByIdAsync(form.DepartmentId, cancellationToken).ConfigureAwait(false);
         var documentDate = DateOnly.FromDateTime((form.SubmittedAtUtc ?? form.CreatedAtUtc).ToOffset(VietnamOffset).DateTime);
         var patientSignature = form.PatientSignature is { ImagePng: { } image } signature
-            ? new ConsentPdfSignature(image, signature.SignedAtUtc.ToOffset(VietnamOffset))
+            ? new ConsentPdfSignature(image, signature.SignedAtUtc.ToOffset(VietnamOffset), signature.Statement)
             : null;
         var steps = definition.Signatures?.Steps is { Count: > 0 } stepDefinitions
             ? stepDefinitions.Select(step => form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key) is { } done
@@ -462,7 +462,7 @@ public sealed class ConsentFormService(
     }
 
     private static ConsentSignatureDto ToSignatureDto(ConsentSignature s) =>
-        new(s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc, s.StepKey);
+        new(s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc, s.StepKey, s.Statement);
 
     /// <summary>Các bước xác nhận trung gian của mẫu, kèm xác nhận đã có và bước đang chờ.</summary>
     internal async Task<IReadOnlyList<ConsentFormStepDto>> BuildStepsAsync(

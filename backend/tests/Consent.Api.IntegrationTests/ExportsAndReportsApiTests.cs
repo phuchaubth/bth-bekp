@@ -70,7 +70,7 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
         var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
         var (signed, signedBody) = await _client.SendJsonAsync(
             HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString(),
-            new { decision, image = Convert.ToBase64String(TestPng.Signature()) });
+            new { decision, image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         Assert.True(signed == HttpStatusCode.OK, signedBody.ToString());
         var (completed, completedBody) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
         Assert.True(completed == HttpStatusCode.OK, completedBody.ToString());

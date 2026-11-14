@@ -258,6 +258,10 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     await user.type(screen.getByLabelText('Tên ô ký trên phiếu'), 'Người tư vấn (Consultant)')
     await user.click(screen.getByLabelText('Chỉ ký xác nhận (không hỏi)'))
     await user.type(screen.getByLabelText('Ô xác nhận cuối (để trống: “Nhân viên y tế”)'), 'Điều dưỡng khoa (Ward Nurse)')
+    // Lời xác nhận: bật ô, giữ câu gợi ý mặc định và thêm một câu.
+    await user.click(screen.getByLabelText('Có ô lời xác nhận'))
+    await user.click(screen.getByRole('button', { name: /Thêm câu gợi ý/ }))
+    await user.type(screen.getByLabelText('Câu gợi ý 2'), 'Tôi đã được tư vấn đầy đủ và đồng ý')
     await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
 
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT' && c.path === '/api/v1/consent-templates/t-1/versions/2')).toBe(true))
@@ -270,6 +274,7 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
       hospital: 'Điều dưỡng khoa (Ward Nurse)',
       decision: 'none',
       steps: [{ key: 'step1', roleCode: 'RECEPTIONIST', label: 'Người tư vấn (Consultant)' }],
+      statement: { required: true, suggestions: ['Tôi đã nghe, hiểu và đồng ý', 'Tôi đã được tư vấn đầy đủ và đồng ý'] },
     })
   })
 

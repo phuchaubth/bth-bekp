@@ -1,8 +1,10 @@
 import { ArrowDownOutlined, ArrowUpOutlined, DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Col, Flex, Form, Input, Radio, Row, Select, Typography } from 'antd'
+import { Alert, App, Button, Card, Checkbox, Col, Flex, Form, Input, Radio, Row, Select, Typography } from 'antd'
 import { useState } from 'react'
 import {
+  STATEMENT_MAX_LENGTH,
+  STATEMENT_MAX_SUGGESTIONS,
   consentTemplatesApi,
   templateKeys,
   type ConsentTemplateVersion,
@@ -34,6 +36,10 @@ interface SignatureValues {
   agreeLabel?: string
   refuseLabel?: string
   steps: StepValues[]
+  statementEnabled: boolean
+  statementLabel?: string
+  statementRequired: boolean
+  statementSuggestions: string[]
 }
 
 const clean = (value?: string) => (value?.trim() ? value.trim() : undefined)
@@ -49,6 +55,10 @@ function toValues(signatures: TemplateSignatures | undefined): SignatureValues {
     agreeLabel: signatures?.agreeLabel,
     refuseLabel: signatures?.refuseLabel,
     steps: signatures?.steps?.map((s) => ({ ...s })) ?? [],
+    statementEnabled: !!signatures?.statement,
+    statementLabel: signatures?.statement?.label,
+    statementRequired: signatures?.statement?.required ?? true,
+    statementSuggestions: signatures?.statement?.suggestions ?? ['Tôi đã nghe, hiểu và đồng ý'],
   }
 }
 
@@ -78,6 +88,13 @@ function toSignatures(values: SignatureValues): TemplateSignatures | undefined {
     agreeLabel: asks ? clean(values.agreeLabel) : undefined,
     refuseLabel: asks ? clean(values.refuseLabel) : undefined,
     steps: steps.length > 0 ? steps : undefined,
+    statement: values.statementEnabled
+      ? {
+          ...(clean(values.statementLabel) ? { label: clean(values.statementLabel) } : {}),
+          ...(values.statementRequired ? { required: true } : {}),
+          suggestions: values.statementSuggestions.map((x) => x.trim()).filter(Boolean),
+        }
+      : undefined,
   }
   const entries = Object.entries(signatures).filter(([, v]) => v !== undefined)
   return entries.length > 0 ? (Object.fromEntries(entries) as TemplateSignatures) : undefined
@@ -104,6 +121,7 @@ export function SignatureConfigEditor({
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   const decision = Form.useWatch('decision', form)
+  const statementEnabled = Form.useWatch('statementEnabled', form)
 
   const save = useMutation({
     mutationFn: (values: SignatureValues) => {
@@ -278,6 +296,60 @@ export function SignatureConfigEditor({
                 </Form.Item>
               </Col>
             </Row>
+          )}
+        </Card>
+
+        <Card size="small" title="Lời xác nhận của người ký">
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+            Ô để người bệnh (hoặc người đại diện) ghi lời xác nhận ngay trên khung ký, ví dụ “Tôi đã nghe, hiểu và đồng ý”.
+            Các câu gợi ý hiện thành nút bấm chọn nhanh; lời xác nhận in trên PDF ngay trên chữ ký (chữ nâu đậm, nghiêng).
+          </Typography.Paragraph>
+          <Form.Item name="statementEnabled" valuePropName="checked" style={{ marginBottom: statementEnabled ? 12 : 0 }}>
+            <Checkbox>Có ô lời xác nhận</Checkbox>
+          </Form.Item>
+          {statementEnabled && (
+            <>
+              <Form.Item label="Tiêu đề ô (để trống: “Lời xác nhận của người ký”)" name="statementLabel" rules={labelRules}>
+                <Input placeholder="Ví dụ: Lời xác nhận của người ký (Signer’s statement)" />
+              </Form.Item>
+              <Form.Item name="statementRequired" valuePropName="checked">
+                <Checkbox>Bắt buộc ghi lời xác nhận trước khi ký</Checkbox>
+              </Form.Item>
+              <Form.List name="statementSuggestions">
+                {(fields, { add, remove }) => (
+                  <Flex vertical gap={8}>
+                    <Typography.Text strong>Câu gợi ý (bấm chọn nhanh)</Typography.Text>
+                    {fields.map((field, index) => (
+                      <Flex key={field.key} gap={8} align="start">
+                        <Form.Item
+                          name={field.name}
+                          rules={[
+                            { required: true, whitespace: true, message: 'Nhập câu gợi ý hoặc xóa dòng này.' },
+                            { max: STATEMENT_MAX_LENGTH, message: `Tối đa ${STATEMENT_MAX_LENGTH} ký tự.` },
+                          ]}
+                          style={{ flex: 1, marginBottom: 0 }}
+                        >
+                          <Input aria-label={`Câu gợi ý ${index + 1}`} className="signer-statement" />
+                        </Form.Item>
+                        {editable && (
+                          <Button type="text" danger icon={<DeleteOutlined />} aria-label={`Xóa câu gợi ý ${index + 1}`} onClick={() => remove(field.name)} />
+                        )}
+                      </Flex>
+                    ))}
+                    {editable && (
+                      <Button
+                        icon={<PlusOutlined />}
+                        onClick={() => add('')}
+                        disabled={fields.length >= STATEMENT_MAX_SUGGESTIONS}
+                        style={{ alignSelf: 'flex-start' }}
+                      >
+                        Thêm câu gợi ý{fields.length >= STATEMENT_MAX_SUGGESTIONS ? ` (tối đa ${STATEMENT_MAX_SUGGESTIONS})` : ''}
+                      </Button>
+                    )}
+                  </Flex>
+                )}
+              </Form.List>
+            </>
           )}
         </Card>
 

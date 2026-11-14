@@ -93,7 +93,8 @@ public sealed record ConsentSignatureDto(
     string SignerName,
     string? SignerTitle,
     DateTimeOffset SignedAtUtc,
-    string? StepKey = null);
+    string? StepKey = null,
+    string? Statement = null);
 
 /// <summary>
 /// Một bước xác nhận trung gian theo định nghĩa mẫu và trạng thái của nó. <paramref name="IsNext"/>: bước đang chờ
@@ -172,7 +173,8 @@ public sealed record SigningSessionDto(string Token, DateTimeOffset ExpiresAtUtc
 /// <summary>
 /// Chữ ký tay của người bệnh/người đại diện: quyết định (bắt buộc, trừ mẫu chỉ ký xác nhận) và ảnh PNG của khung ký (Base64).
 /// </summary>
-public sealed record PatientSignatureRequest(ConsentDecision? Decision, string? Image);
+/// <param name="Statement">Lời xác nhận của người ký (khi mẫu có ô này), ví dụ "Tôi đã nghe, hiểu và đồng ý".</param>
+public sealed record PatientSignatureRequest(ConsentDecision? Decision, string? Image, string? Statement = null);
 
 /// <summary>Kết quả ký: <paramref name="Decision"/> rỗng khi mẫu không hỏi Đồng ý/Từ chối.</summary>
 public sealed record PatientSignatureResultDto(ConsentDecision? Decision, DateTimeOffset SignedAtUtc);
@@ -224,6 +226,8 @@ public sealed class PatientSignatureRequestValidator : AbstractValidator<Patient
         // Có bắt buộc chọn hay không tùy mẫu phiếu: kiểm tra ở ConsentSigningService.
         RuleFor(x => x.Decision)
             .IsInEnum().WithMessage("Quyết định không hợp lệ.");
+        RuleFor(x => x.Statement)
+            .MaximumLength(ConsentSignature.StatementMaxLength).WithMessage($"Lời xác nhận tối đa {ConsentSignature.StatementMaxLength} ký tự.");
         RuleFor(x => x.Image)
             .NotEmpty().WithMessage("Chưa có chữ ký.")
             .MaximumLength(MaxImageLength).WithMessage($"Ảnh chữ ký quá lớn (tối đa {SignatureImage.MaxBytes / 1024} KB).");

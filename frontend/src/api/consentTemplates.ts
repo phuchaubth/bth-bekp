@@ -99,7 +99,19 @@ export interface TemplateSignatures {
   refuseLabel?: string
   /** Các bước xác nhận trung gian theo vai trò, làm lần lượt trước bước xác nhận cuối. */
   steps?: { key: string; roleCode: string; label: string; hint?: string }[]
+  /** Ô lời xác nhận của người ký (ví dụ "Tôi đã nghe, hiểu và đồng ý") kèm câu gợi ý bấm chọn nhanh. */
+  statement?: TemplateStatement
 }
+
+export interface TemplateStatement {
+  label?: string
+  required?: boolean
+  suggestions?: string[]
+}
+
+/** Giới hạn của máy chủ (TemplateStatement). */
+export const STATEMENT_MAX_LENGTH = 300
+export const STATEMENT_MAX_SUGGESTIONS = 8
 
 export type TemplateVersionStatus = 'Draft' | 'Published' | 'Retired'
 

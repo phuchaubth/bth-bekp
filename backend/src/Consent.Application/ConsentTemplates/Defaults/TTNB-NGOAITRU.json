@@ -136,6 +136,14 @@
     }
   ],
   "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi xác nhận các thông tin trên là đúng sự thật",
+        "Tôi đã nghe, hiểu và đồng ý"
+      ]
+    },
     "patient": "Người khai (Declarant)",
     "representative": "Người khai – không phải người bệnh (Declarant – not the patient)",
     "hospital": "Nhân viên tiếp nhận (Patient Admission Staff)",

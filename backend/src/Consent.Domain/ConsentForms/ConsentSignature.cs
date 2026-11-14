@@ -45,6 +45,9 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
     public const int DeviceMaxLength = 300;
     public const int StepKeyMaxLength = 50;
 
+    /// <summary>Lời xác nhận của người ký, ví dụ "Tôi đã nghe, hiểu và đồng ý".</summary>
+    public const int StatementMaxLength = 300;
+
     private ConsentSignature(
         Guid id,
         Guid formId,
@@ -98,9 +101,25 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
     /// <summary>Bước xác nhận theo định nghĩa mẫu (chỉ với <see cref="ConsentSignerRole.Staff"/>).</summary>
     public string? StepKey { get; private set; }
 
+    /// <summary>Lời xác nhận người bệnh/người đại diện ghi khi ký (nếu mẫu có ô này), in trên PDF ngay trên chữ ký.</summary>
+    public string? Statement { get; private set; }
+
     internal static ConsentSignature Handwritten(
-        Guid formId, ConsentSignerRole role, string signerName, byte[] imagePng, string? device, Guid? staffUserId, DateTimeOffset nowUtc)
+        Guid formId,
+        ConsentSignerRole role,
+        string signerName,
+        byte[] imagePng,
+        string? device,
+        Guid? staffUserId,
+        DateTimeOffset nowUtc,
+        string? statement = null)
     {
+        var cleanStatement = string.IsNullOrWhiteSpace(statement) ? null : statement.Trim();
+        if (cleanStatement is { Length: > StatementMaxLength })
+        {
+            throw new DomainException($"Lời xác nhận tối đa {StatementMaxLength} ký tự.");
+        }
+
         if (role == ConsentSignerRole.Hospital)
         {
             throw new DomainException("Phía bệnh viện xác nhận bằng tài khoản, không ký tay.");
@@ -121,7 +140,7 @@ public sealed class ConsentSignature : Entity, IAuditableEntity
             staffUserId,
             imagePng,
             Truncate(device, DeviceMaxLength),
-            nowUtc);
+            nowUtc) { Statement = cleanStatement };
     }
 
     internal static ConsentSignature AccountConfirmation(

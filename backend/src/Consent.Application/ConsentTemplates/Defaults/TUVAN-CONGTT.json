@@ -51,6 +51,14 @@
     }
   ],
   "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi đã nghe, hiểu và đồng ý",
+        "Tôi đã nghe, hiểu và không đồng ý"
+      ]
+    },
     "patient": "Người bệnh (Patient)",
     "representative": "Người đại diện của người bệnh (Patient’s Representative)",
     "hospital": "Điều dưỡng khoa (Ward Nurse)",

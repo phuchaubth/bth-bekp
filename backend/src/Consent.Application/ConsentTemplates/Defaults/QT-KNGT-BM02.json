@@ -64,6 +64,15 @@
     }
   ],
   "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi đã nghe, hiểu và đồng ý",
+        "Tôi đã được tư vấn đầy đủ và đồng ý",
+        "Tôi đã đọc, hiểu và đồng ý"
+      ]
+    },
     "patient": "Người thỏa thuận (Declarant)",
     "representative": "Người thỏa thuận – người đại diện (Declarant – representative)",
     "hospital": "Nhân viên hướng dẫn (Counseling Staff)",

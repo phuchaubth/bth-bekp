@@ -43,7 +43,7 @@ public sealed record ConsentPdfDocument(
 }
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
-public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt);
+public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt, string? Statement = null);
 
 /// <summary>
 /// Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam). Với các bước trung gian,

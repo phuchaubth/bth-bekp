@@ -287,6 +287,45 @@ describe('Màn hình ký trên điện thoại (màn hình 6)', () => {
     expect(signature.body).toEqual({ decision: 'Refused', image: 'QU5IX0NIVV9LWQ==' })
   })
 
+  it('lời xác nhận: bấm câu gợi ý để điền nhanh, bắt buộc trước khi ký, gửi kèm chữ ký', async () => {
+    const portal = pending({
+      definition: {
+        ...definition,
+        signatures: {
+          decision: 'none',
+          statement: {
+            label: 'Lời xác nhận của người ký (Signer’s statement)',
+            required: true,
+            suggestions: ['Tôi đã nghe, hiểu và đồng ý', 'Tôi đã đọc, hiểu và đồng ý'],
+          },
+        },
+      },
+    })
+    signingSession.set({ token: 'token-phien-ky', expiresAtUtc: future(), form: portal, staffUserName: 'tiepdon.demo' })
+    const { calls } = mockApi({
+      ...baseRoutes(anonymous),
+      'POST /api/v1/consent-forms/f-1/patient-signature': { decision: null, signedAtUtc: '2026-11-11T02:10:00Z' },
+    })
+    renderApp('/ky-phieu')
+    const user = userEvent.setup()
+
+    const box = await screen.findByLabelText(/Lời xác nhận của người ký/)
+    expect(box).toHaveClass('signer-statement')
+    drawStroke(screen.getByRole('img', { name: /Khung ký tên/ }))
+    // Đã ký nhưng chưa ghi lời xác nhận: chưa xác nhận được.
+    expect(screen.getByRole('button', { name: 'Xác nhận chữ ký' })).toBeDisabled()
+    expect(screen.getByText('Ghi lời xác nhận và ký vào khung trên để xác nhận.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Tôi đã nghe, hiểu và đồng ý' }))
+    expect(box).toHaveValue('Tôi đã nghe, hiểu và đồng ý')
+    expect(screen.getByRole('button', { name: /Tôi đã nghe, hiểu và đồng ý/ })).toHaveAttribute('aria-pressed', 'true')
+    await user.click(screen.getByRole('button', { name: 'Xác nhận chữ ký' }))
+
+    expect(await screen.findByText(/Vui lòng đưa máy lại/)).toBeInTheDocument()
+    const signature = calls.find((c) => c.path === '/api/v1/consent-forms/f-1/patient-signature')!
+    expect(signature.body).toEqual({ image: 'QU5IX0NIVV9LWQ==', statement: 'Tôi đã nghe, hiểu và đồng ý' })
+  })
+
   it('điện thoại cầm dọc (màn hình hẹp): khung ký cao hơn và gợi ý xoay ngang', async () => {
     const original = window.matchMedia
     // Màn hình hẹp hơn mọi mốc của Ant Design (điện thoại cầm dọc).

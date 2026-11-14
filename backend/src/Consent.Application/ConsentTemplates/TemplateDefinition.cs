@@ -109,6 +109,20 @@ public sealed record ScoreLevel(string Code, string Label, int Min);
 /// <see cref="Steps"/>: các bước xác nhận trung gian theo vai trò, làm lần lượt sau khi người bệnh ký và trước bước xác
 /// nhận cuối (vai trò cấu hình trên mẫu, nhãn <see cref="Hospital"/>).
 /// </summary>
+/// <summary>
+/// Ô lời xác nhận của người ký (người bệnh/người đại diện) ở khung ký, ví dụ "Tôi đã nghe, hiểu và đồng ý", kèm các câu gợi
+/// ý bấm chọn nhanh. Không khai báo thì không có ô này.
+/// </summary>
+public sealed record TemplateStatement(string? Label = null, bool Required = false, IReadOnlyList<string>? Suggestions = null)
+{
+    public const int MaxSuggestions = 8;
+
+    /// <summary>Độ dài tối đa của lời xác nhận (trùng với cột lưu chữ ký).</summary>
+    public const int MaxLength = 300;
+
+    public const string DefaultLabel = "Lời xác nhận của người ký";
+}
+
 public sealed record TemplateSignatures(
     string? Patient = null,
     string? Representative = null,
@@ -118,7 +132,8 @@ public sealed record TemplateSignatures(
     string? DecisionLabel = null,
     string? AgreeLabel = null,
     string? RefuseLabel = null,
-    IReadOnlyList<TemplateConfirmationStep>? Steps = null)
+    IReadOnlyList<TemplateConfirmationStep>? Steps = null,
+    TemplateStatement? Statement = null)
 {
     public const int MaxSteps = 5;
 
@@ -182,6 +197,7 @@ public static class TemplateJson
     [
         typeof(TemplateDefinition), typeof(TemplateSection), typeof(TemplateBlock), typeof(TemplateOption),
         typeof(TemplateColumn), typeof(TemplateCondition), typeof(ScoreLevel), typeof(TemplateSignatures), typeof(TemplateConfirmationStep),
+        typeof(TemplateStatement),
     ];
 
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)

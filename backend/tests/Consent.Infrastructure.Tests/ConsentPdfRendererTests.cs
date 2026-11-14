@@ -274,7 +274,8 @@ public sealed class ConsentPdfRendererTests
             Patient, null, new DateOnly(2026, 11, 11), IsFinal: true)
         {
             Decision = decision,
-            PatientSignature = new ConsentPdfSignature(signature.Png!, new DateTimeOffset(2026, 11, 11, 9, 30, 0, vietnam)),
+            PatientSignature = new ConsentPdfSignature(
+                signature.Png!, new DateTimeOffset(2026, 11, 11, 9, 30, 0, vietnam), "Tôi đã nghe, hiểu và đồng ý"),
             HospitalConfirmation = new ConsentPdfConfirmation("Nhân viên giả lập", "Nhân viên", new DateTimeOffset(2026, 11, 11, 9, 32, 0, vietnam)),
         };
 

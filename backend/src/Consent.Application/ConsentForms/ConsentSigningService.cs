@@ -115,6 +115,17 @@ public sealed class ConsentSigningService(
         }
 
         var decision = requiresDecision ? request.Decision : null;
+
+        // Lời xác nhận: chỉ nhận khi mẫu có ô này; mẫu bắt buộc thì phải ghi (bấm câu gợi ý hoặc tự gõ).
+        var statement = signatures?.Statement is not null && !string.IsNullOrWhiteSpace(request.Statement)
+            ? request.Statement.Trim()
+            : null;
+        if (signatures?.Statement is { Required: true } required && statement is null)
+        {
+            var example = required.Suggestions is { Count: > 0 } suggestions ? $", ví dụ: “{suggestions[0]}”" : string.Empty;
+            return Error.ValidationField("statement", $"Vui lòng ghi lời xác nhận{example}.");
+        }
+
         var normalized = NormalizeSignature(request.Image);
         if (normalized.IsFailure)
         {
@@ -129,7 +140,8 @@ public sealed class ConsentSigningService(
             normalized.Value,
             requestContext.UserAgent,
             currentUser.UserId,
-            clock.UtcNow);
+            clock.UtcNow,
+            statement);
         formService.AddAudit(
             AuditActions.ConsentFormPatientSigned,
             form.Id,

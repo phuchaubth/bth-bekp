@@ -67,6 +67,8 @@ export interface ConsentSignature {
   signedAtUtc: string
   /** Bước xác nhận (chỉ với vai trò `Staff`). */
   stepKey?: string | null
+  /** Lời xác nhận người bệnh/người đại diện ghi khi ký, ví dụ "Tôi đã nghe, hiểu và đồng ý". */
+  statement?: string | null
 }
 
 /** Một bước xác nhận trung gian theo vai trò (định nghĩa ở `signatures.steps` của mẫu). */
@@ -186,7 +188,7 @@ export const consentFormsApi = {
   startSigning: (id: string) => apiRequest<SigningSessionToken>(`${base}/${id}/signing-session`, { method: 'POST' }),
   /** Gửi chữ ký của người bệnh bằng token phiên ký (không dùng phiên đăng nhập của nhân viên). */
   /** `decision` bỏ trống khi mẫu không hỏi Đồng ý/Từ chối (`signatures.decision = 'none'`). */
-  signAsPatient: (id: string, signingToken: string, input: { decision?: ConsentDecision; image: string }) =>
+  signAsPatient: (id: string, signingToken: string, input: { decision?: ConsentDecision; image: string; statement?: string }) =>
     apiRequest<{ decision: ConsentDecision | null; signedAtUtc: string }>(`${base}/${id}/patient-signature`, {
       method: 'POST',
       body: input,

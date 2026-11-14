@@ -787,6 +787,14 @@
     }
   ],
   "signatures": {
+    "statement": {
+      "label": "Lời xác nhận của người ký (Signer’s statement)",
+      "required": true,
+      "suggestions": [
+        "Tôi đã nghe, hiểu và đồng ý",
+        "Tôi đã được hướng dẫn đầy đủ"
+      ]
+    },
     "patient": "Người bệnh (Patient)",
     "representative": "Người đại diện của người bệnh (Patient’s Representative)",
     "hospital": "Bác sĩ thực hiện (Physician in charge)",

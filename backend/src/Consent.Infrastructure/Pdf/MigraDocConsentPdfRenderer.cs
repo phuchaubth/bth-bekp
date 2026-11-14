@@ -29,6 +29,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     /// <summary>Màu phần tiếng Anh của mẫu song ngữ (in nghiêng; tiếng Việt giữ màu đen, chữ đứng).</summary>
     internal static readonly Color English = new(0x00, 0x70, 0xC0);
+
+    /// <summary>Màu lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng.</summary>
+    internal static readonly Color Statement = new(0x5C, 0x3A, 0x1E);
     private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
     private static readonly Lock FontGate = new();
 
@@ -387,7 +390,11 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     }
 
     /// <summary>Một ô chữ ký: vai trò, ghi chú, ảnh chữ ký tay (nếu có), họ tên ("tên|phần thêm") và các dòng nhỏ.</summary>
-    private sealed record SignatureSlot(string Role, string Hint, byte[]? ImagePng, string? Name, IReadOnlyList<string> Lines);
+    private sealed record SignatureSlot(string Role, string Hint, byte[]? ImagePng, string? Name, IReadOnlyList<string> Lines)
+    {
+        /// <summary>Lời xác nhận người ký ghi khi ký (ví dụ "Tôi đã nghe, hiểu và đồng ý"), in ngay trên chữ ký.</summary>
+        public string? Statement { get; init; }
+    }
 
     private static SignatureSlot ConfirmationSlot(string role, string? hint, ConsentPdfConfirmation? confirmation)
     {
@@ -462,7 +469,10 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
         var slots = new List<SignatureSlot>
         {
-            new(patientRole, "(Ký, ghi rõ họ tên)", document.PatientSignature?.ImagePng, patientName, patientLines),
+            new(patientRole, "(Ký, ghi rõ họ tên)", document.PatientSignature?.ImagePng, patientName, patientLines)
+            {
+                Statement = document.PatientSignature?.Statement,
+            },
         };
         var steps = labels?.Steps ?? [];
         for (var i = 0; i < steps.Count; i++)
@@ -493,7 +503,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             for (var c = 0; c < pair.Count; c++)
             {
                 var slot = pair[c];
-                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint);
+                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement);
                 if (slot.ImagePng is { } image)
                 {
                     AddSignatureImage(space.Cells[c], image);
@@ -579,7 +589,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         line.Format.SpaceAfter = 0;
     }
 
-    private static void AddSignatureCell(Cell cell, string role, string hint)
+    private static void AddSignatureCell(Cell cell, string role, string hint, string? statement = null)
     {
         var title = cell.AddParagraph();
         title.Format.Alignment = ParagraphAlignment.Center;
@@ -589,6 +599,15 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         help.Format.Alignment = ParagraphAlignment.Center;
         help.Format.Font.Italic = true;
         help.Format.Font.Size = 10;
+        if (statement is not null)
+        {
+            // Lời xác nhận người ký ghi khi ký, như dòng viết tay trên phiếu giấy.
+            var words = cell.AddParagraph();
+            words.Format.Alignment = ParagraphAlignment.Center;
+            words.Format.SpaceBefore = Unit.FromPoint(2);
+            var text = words.AddFormattedText($"“{statement}”", TextFormat.Italic);
+            text.Color = Statement;
+        }
     }
 
     private static void AddFooter(Section section, ConsentPdfDocument document)

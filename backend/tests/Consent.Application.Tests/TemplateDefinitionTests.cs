@@ -44,6 +44,8 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"w\",\"label\":\"W\"},{\"type\":\"computed\",\"key\":\"bmi\",\"label\":\"BMI\",\"formula\":\"bmi\",\"inputs\":[\"w\",\"h\"]},{\"type\":\"text\",\"key\":\"h\",\"label\":\"H\"}]}]}", "\"h\" phải là trường văn bản đứng trước")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"b\",\"label\":\"B\"},{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"valueFrom\":\"b\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]}]}]}", "khoảng giá trị")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"valueFrom\":\"bmi\",\"options\":[{\"value\":\"x\",\"label\":\"X\",\"min\":1}]}]}]}", "trường tự tính đứng trước")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"statement\":{\"suggestions\":[\"A\",\" \"]}}}", "câu gợi ý không được trống")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"statement\":{\"suggestions\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"]}}}", "tối đa 8 câu gợi ý")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);

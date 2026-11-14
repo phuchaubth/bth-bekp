@@ -29,11 +29,15 @@ public sealed class ConsentSigningServiceTests
 
     /// <summary>Mở phiên ký rồi người bệnh ký trên máy tính bảng (dùng token phiên ký).</summary>
     private static async Task<Result<PatientSignatureResultDto>> PatientSigns(
-        ConsentScenario s, Guid formId, ConsentDecision? decision = ConsentDecision.Agreed, string? image = null)
+        ConsentScenario s,
+        Guid formId,
+        ConsentDecision? decision = ConsentDecision.Agreed,
+        string? image = null,
+        string? statement = "Tôi đã nghe, hiểu và đồng ý")
     {
         Assert.True((await s.Signing.StartSigningAsync(formId, CancellationToken.None)).IsSuccess);
         var staffLogsInAgain = s.UseSigningToken();
-        var result = await s.Signing.SignAsPatientAsync(formId, new(decision, image ?? SignaturePng), CancellationToken.None);
+        var result = await s.Signing.SignAsPatientAsync(formId, new(decision, image ?? SignaturePng, statement), CancellationToken.None);
         staffLogsInAgain();
         return result;
     }
@@ -149,13 +153,46 @@ public sealed class ConsentSigningServiceTests
     }
 
     [Fact]
+    public async Task Statement_IsRequiredByHospitalTemplates_SuggestingTheFirstPhrase()
+    {
+        var (s, form) = await PendingHospitalForm("TUVAN-CONGTT", []);
+
+        var missing = await PatientSigns(s, form.Id, statement: "   ");
+        var signed = await PatientSigns(s, form.Id, statement: "  Tôi đã nghe, hiểu và đồng ý  ");
+        var detail = await s.Service.GetAsync(form.Id, CancellationToken.None);
+        await s.Service.GetPdfAsync(form.Id, CancellationToken.None);
+
+        Assert.Equal(["Vui lòng ghi lời xác nhận, ví dụ: “Tôi đã nghe, hiểu và đồng ý”."], missing.Error!.FieldErrors!["statement"]);
+        Assert.True(signed.IsSuccess, signed.Error?.Message);
+        var patientSignature = detail.Value.Signatures.Single(x => x.Method == ConsentSignatureMethod.Handwritten);
+        Assert.Equal("Tôi đã nghe, hiểu và đồng ý", patientSignature.Statement);
+        Assert.Equal("Tôi đã nghe, hiểu và đồng ý", s.Ctx.Pdf.Last!.PatientSignature!.Statement);
+    }
+
+    [Fact]
+    public async Task Statement_IsIgnored_WhenTheTemplateHasNoStatementBox()
+    {
+        var s = ConsentScenario.Create();
+        s.LogIn(s.Kkb);
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+        await s.Service.UpdateAsync(form.Id, new(ConsentScenario.CompleteCk01(), ConsentSignerKind.Patient, null), CancellationToken.None);
+        await s.Service.SubmitAsync(form.Id, CancellationToken.None);
+
+        var signed = await PatientSigns(s, form.Id, statement: "Tôi đã nghe, hiểu và đồng ý");
+
+        Assert.True(signed.IsSuccess, signed.Error?.Message);
+        Assert.Null(s.Ctx.Store.ConsentForms.Single(f => f.Id == form.Id).PatientSignature!.Statement);
+    }
+
+    [Fact]
     public async Task TemplateWithCustomDecisionLabels_StillRequiresADecision_NamingTheLabels()
     {
         var (s, form) = await PendingHospitalForm("TUVAN-CONGTT", []);
 
         var missing = await PatientSigns(s, form.Id, decision: null);
         s.UseSigningToken();
-        var agreed = await s.Signing.SignAsPatientAsync(form.Id, new(ConsentDecision.Agreed, SignaturePng), CancellationToken.None);
+        var agreed = await s.Signing.SignAsPatientAsync(
+            form.Id, new(ConsentDecision.Agreed, SignaturePng, "Tôi đã nghe, hiểu và đồng ý"), CancellationToken.None);
 
         Assert.Equal(
             "Vui lòng chọn Đồng ý (Agree) hoặc Không đồng ý (Disagree).", missing.Error!.FieldErrors!["decision"][0]);

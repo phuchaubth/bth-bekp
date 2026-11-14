@@ -236,7 +236,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         byte[] imagePng,
         string? device,
         Guid? staffUserId,
-        DateTimeOffset nowUtc)
+        DateTimeOffset nowUtc,
+        string? statement = null)
     {
         Ensure(Status == ConsentFormStatus.PendingSignature, "Phiếu không ở trạng thái chờ ký.");
         Ensure(PatientSignature is null, "Người bệnh đã ký phiếu này.");
@@ -247,7 +248,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         }
 
         var role = SignerKind == ConsentSignerKind.Representative ? ConsentSignerRole.Representative : ConsentSignerRole.Patient;
-        var signature = ConsentSignature.Handwritten(Id, role, signerName, imagePng, device, staffUserId, nowUtc);
+        var signature = ConsentSignature.Handwritten(Id, role, signerName, imagePng, device, staffUserId, nowUtc, statement);
         _signatures.Add(signature);
         Decision = decision;
         SigningSessionId = null;

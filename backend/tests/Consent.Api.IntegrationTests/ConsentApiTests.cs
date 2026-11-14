@@ -216,9 +216,15 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.True(submittedStatus == HttpStatusCode.OK, submitted.ToString());
 
         var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
-        var (signedStatus, signed) = await _client.SendJsonAsync(
+        // Mẫu thật bắt buộc lời xác nhận của người ký.
+        var (noStatementStatus, noStatement) = await _client.SendJsonAsync(
             HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
             new { image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.Equal(HttpStatusCode.BadRequest, noStatementStatus);
+        Assert.True(noStatement.GetProperty("errors").TryGetProperty("statement", out _));
+        var (signedStatus, signed) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
+            new { image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
 
         Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
@@ -243,7 +249,7 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
         var (signedStatus, signed) = await _client.SendJsonAsync(
             HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString()!,
-            new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+            new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());
 
         var (completeTooEarly, early) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
@@ -297,18 +303,18 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         var (listWithSigningToken, _) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-forms", signingToken);
         var (pdfWithSigningToken, _) = await _client.SendJsonAsync(HttpMethod.Get, $"{form}/pdf", signingToken);
         var (signWithLoginToken, _) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/patient-signature", nurse, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+            HttpMethod.Post, $"{form}/patient-signature", nurse, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         Assert.Equal(HttpStatusCode.Unauthorized, listWithSigningToken);
         Assert.Equal(HttpStatusCode.Unauthorized, pdfWithSigningToken);
         Assert.Equal(HttpStatusCode.Unauthorized, signWithLoginToken);
 
         // Khung ký trống bị từ chối (422); ký thật thì được nhận đúng một lần.
         var (blankStatus, blank) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Blank()) });
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Blank()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         var (signedStatus, signed) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()) });
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         var (againStatus, _) = await _client.SendJsonAsync(
-            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Refused", image = Convert.ToBase64String(TestPng.Signature()) });
+            HttpMethod.Post, $"{form}/patient-signature", signingToken, new { decision = "Refused", image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         Assert.Equal(HttpStatusCode.UnprocessableEntity, blankStatus);
         Assert.Equal("consent_forms.signature_blank", blank.GetProperty("code").GetString());
         Assert.True(signedStatus == HttpStatusCode.OK, signed.ToString());

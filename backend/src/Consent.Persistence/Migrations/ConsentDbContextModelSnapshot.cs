@@ -262,6 +262,10 @@ namespace Consent.Persistence.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<string>("Statement")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
+
                     b.Property<string>("StepKey")
                         .HasMaxLength(50)
                         .IsUnicode(false)

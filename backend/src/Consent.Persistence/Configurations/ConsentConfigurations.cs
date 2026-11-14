@@ -118,6 +118,7 @@ internal sealed class ConsentSignatureConfiguration : IEntityTypeConfiguration<C
         builder.Property(s => s.SignerTitle).HasMaxLength(ConsentSignature.TitleMaxLength);
         builder.Property(s => s.Device).HasMaxLength(ConsentSignature.DeviceMaxLength);
         builder.Property(s => s.StepKey).HasMaxLength(ConsentSignature.StepKeyMaxLength).IsUnicode(false);
+        builder.Property(s => s.Statement).HasMaxLength(ConsentSignature.StatementMaxLength);
         builder.HasOne<User>().WithMany().HasForeignKey(s => s.UserId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(s => s.FormId);
         // Mỗi bước xác nhận chỉ một lần trên một phiếu, kể cả khi hai người bấm cùng lúc.

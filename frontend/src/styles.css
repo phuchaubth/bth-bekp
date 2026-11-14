@@ -20,3 +20,10 @@ body {
 .ant-radio-button-wrapper-checked .bilingual-en {
   color: inherit;
 }
+
+/* Lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): nâu đậm, chữ nghiêng (giống PDF). */
+.signer-statement,
+.signer-statement textarea {
+  color: #5c3a1e;
+  font-style: italic;
+}

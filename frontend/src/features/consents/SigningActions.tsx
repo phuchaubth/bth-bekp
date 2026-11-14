@@ -162,7 +162,7 @@ export function RevokeFormModal({ form, onClose }: { form: ConsentFormDetail; on
 
 /** Lịch sử trạng thái và các chữ ký của phiếu (màn hình 8). */
 export function FormHistory({ form }: { form: ConsentFormDetail }) {
-  const events: { at: string; color?: string; text: string }[] = [
+  const events: { at: string; color?: string; text: string; statement?: string | null }[] = [
     { at: form.createdAtUtc, text: `Lập phiếu – ${form.createdByName}` },
   ]
   if (form.submittedAtUtc) {
@@ -177,6 +177,7 @@ export function FormHistory({ form }: { form: ConsentFormDetail }) {
             text: `${signature.signerName} (${signerRoleLabels[signature.role].toLowerCase()}) ký tay trên điện thoại${
               form.decision ? ` – ${decisionLabels[form.decision]}` : ''
             }`,
+            statement: signature.statement,
           }
         : {
             at: signature.signedAtUtc,
@@ -206,6 +207,11 @@ export function FormHistory({ form }: { form: ConsentFormDetail }) {
           content: (
             <>
               <Typography.Text>{event.text}</Typography.Text>
+              {event.statement && (
+                <Typography.Text className="signer-statement" style={{ display: 'block' }}>
+                  “{event.statement}”
+                </Typography.Text>
+              )}
               <br />
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {formatDateTime(event.at)}
