@@ -1,10 +1,9 @@
 import { FullscreenOutlined, LockOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, ConfigProvider, Flex, Form, Grid, Input, Radio, Result, Typography } from 'antd'
+import { Alert, Button, Card, ConfigProvider, Flex, Form, Grid, Radio, Result, Typography } from 'antd'
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { consentFormsApi, decisionLabels, type ConsentDecision, type FormData } from '../../api/consentForms'
 import { ApiError } from '../../api/http'
-import { useAuth } from '../../auth/authContext'
 import { LOGIN_PATH } from '../../auth/paths'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDate, formatDateTime } from '../../utils/format'
@@ -14,6 +13,9 @@ import { SignaturePad, type SignaturePadHandle } from './SignaturePad'
 import { signingSession, type SigningSession } from './signingSession'
 import { Bilingual } from '../consents/Bilingual'
 import { StatementBox } from './StatementBox'
+import { BundleKiosk } from './BundleKiosk'
+import { readyHint } from './kioskText'
+import { StaffUnlock } from './StaffUnlock'
 
 type Stage = 'signing' | 'signed' | 'ended'
 
@@ -30,7 +32,7 @@ export function SigningKioskPage() {
 
   return (
     <ConfigProvider theme={{ token: { fontSize: 16 } }}>
-      <Kiosk session={session} />
+      {session.bundle ? <BundleKiosk session={session} bundle={session.bundle} /> : <Kiosk session={session} />}
     </ConfigProvider>
   )
 }
@@ -49,13 +51,6 @@ function NoSession() {
       }
     />
   )
-}
-
-/** Câu nhắc còn thiếu gì trước khi xác nhận chữ ký, ví dụ "Chọn Đồng ý hoặc Từ chối, ghi lời xác nhận và ký vào khung trên để xác nhận." */
-function readyHint(decisionStep: string | null, needsStatement: boolean) {
-  const steps = [decisionStep, needsStatement ? 'ghi lời xác nhận' : null].filter((step): step is string => !!step)
-  const text = steps.length > 0 ? `${steps.join(', ')} và ký vào khung trên để xác nhận.` : 'ký vào khung trên để xác nhận.'
-  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 function Kiosk({ session }: { session: SigningSession }) {
@@ -222,46 +217,5 @@ function Kiosk({ session }: { session: SigningSession }) {
         )}
       </Flex>
     </div>
-  )
-}
-
-/** Thoát chế độ ký: nhân viên đăng nhập lại (máy chủ kiểm tra mật khẩu, khóa tạm nếu sai nhiều lần). */
-function StaffUnlock({ session }: { session: SigningSession }) {
-  const { login } = useAuth()
-  const navigate = useNavigate()
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-
-  const onFinish = async (values: { userName: string; password: string }) => {
-    setBusy(true)
-    setError(null)
-    try {
-      await login(values.userName.trim(), values.password)
-      signingSession.clear()
-      if (document.fullscreenElement) {
-        void document.exitFullscreen().catch(() => {})
-      }
-      navigate(`/phieu-dong-thuan/${session.form.id}`, { replace: true })
-    } catch (e) {
-      setError(errorMessage(e))
-      setBusy(false)
-    }
-  }
-
-  return (
-    <Card title="Nhân viên đăng nhập để thoát chế độ ký" style={{ maxWidth: 480, width: '100%', alignSelf: 'center' }}>
-      <Form layout="vertical" initialValues={{ userName: session.staffUserName }} onFinish={(values) => void onFinish(values)} requiredMark={false}>
-        <Form.Item label="Tên đăng nhập" name="userName" rules={[{ required: true, message: 'Vui lòng nhập tên đăng nhập.' }]}>
-          <Input autoComplete="username" />
-        </Form.Item>
-        <Form.Item label="Mật khẩu" name="password" rules={[{ required: true, message: 'Vui lòng nhập mật khẩu.' }]}>
-          <Input.Password autoComplete="current-password" autoFocus />
-        </Form.Item>
-        {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
-        <Button type="primary" htmlType="submit" block loading={busy}>
-          Đăng nhập và thoát chế độ ký
-        </Button>
-      </Form>
-    </Card>
   )
 }

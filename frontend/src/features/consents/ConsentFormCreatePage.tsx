@@ -17,6 +17,29 @@ import { genderLabels } from '../patients/labels'
 import { QuickPatientModal } from '../patients/QuickPatientModal'
 import { SourceLookup } from '../patients/SourceLookup'
 
+const BUNDLE_SELECTION_KEY = 'consent.bundleTemplates.'
+
+/** Lựa chọn mẫu cho bộ phiếu đã nhớ trên máy này theo khoa (mặc định: chọn hết các mẫu đang phát hành). */
+function rememberedSelection(departmentId: string | null, availableIds: string[]): string[] {
+  try {
+    const stored = JSON.parse(localStorage.getItem(BUNDLE_SELECTION_KEY + (departmentId ?? '')) ?? 'null') as unknown
+    if (Array.isArray(stored)) {
+      return availableIds.filter((id) => stored.includes(id))
+    }
+  } catch {
+    // Trình duyệt chặn lưu trữ: dùng mặc định.
+  }
+  return availableIds
+}
+
+function rememberSelection(departmentId: string | null, ids: string[]) {
+  try {
+    localStorage.setItem(BUNDLE_SELECTION_KEY + (departmentId ?? ''), JSON.stringify(ids))
+  } catch {
+    // Không nhớ được cũng không sao.
+  }
+}
+
 /** Màn hình 4–5 (lập phiếu): chọn người bệnh → chọn mẫu đang phát hành → tạo phiếu nháp rồi chuyển sang soạn nội dung. */
 export function ConsentFormCreatePage() {
   const [params] = useSearchParams()
@@ -41,6 +64,29 @@ export function ConsentFormCreatePage() {
     },
     onError: (error) => message.error(errorMessage(error)),
   })
+
+  // Bộ phiếu (quyết định 23): chọn nhiều mẫu để lập cả bộ một lần, người bệnh ký một lần cho cả bộ.
+  const [picked, setPicked] = useState<{ departmentId: string | null; ids: string[] } | null>(null)
+  const availableIds = templates.data?.map((template) => template.templateId) ?? []
+  const selectedIds =
+    picked && picked.departmentId === departmentId
+      ? picked.ids.filter((templateId) => availableIds.includes(templateId))
+      : rememberedSelection(departmentId, availableIds)
+  const pick = (ids: string[]) => {
+    setPicked({ departmentId, ids })
+    rememberSelection(departmentId, ids)
+  }
+
+  const createBundle = useMutation({
+    mutationFn: (templateIds: string[]) => consentFormsApi.createBundle({ patientId, templateIds, departmentId }),
+    onSuccess: async (bundle) => {
+      await queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      message.success(`Đã lập bộ ${bundle.forms.length} phiếu nháp cho ${bundle.patientName}.`)
+      navigate(`/phieu-dong-thuan/${bundle.forms[0].id}`)
+    },
+    onError: (error) => message.error(errorMessage(error)),
+  })
+  const busy = create.isPending || createBundle.isPending
 
   return (
     <>
@@ -104,44 +150,72 @@ export function ConsentFormCreatePage() {
           ) : templates.data.length === 0 ? (
             <Empty description="Chưa có mẫu phiếu nào đang phát hành cho khoa này." />
           ) : (
-            <Table
-              rowKey="templateId"
-              size="small"
-              dataSource={templates.data}
-              pagination={false}
-              showHeader={false}
-              scroll={{ x: 520 }}
-              columns={[
-                {
-                  key: 'template',
-                  render: (_, template) => (
-                    <Flex vertical>
-                      <Typography.Text strong>{template.templateName}</Typography.Text>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {template.templateCode} · phiên bản {template.versionNo}
-                      </Typography.Text>
-                    </Flex>
-                  ),
-                },
-                {
-                  key: 'create',
-                  width: 140,
-                  align: 'right',
-                  render: (_, template) => (
-                    <Button
-                      type="primary"
-                      icon={<FileAddOutlined />}
-                      loading={create.isPending && create.variables === template.templateId}
-                      disabled={create.isPending}
-                      onClick={() => create.mutate(template.templateId)}
-                      aria-label={`Lập phiếu ${template.templateCode}`}
-                    >
-                      Lập phiếu
-                    </Button>
-                  ),
-                },
-              ]}
-            />
+            <Flex vertical gap={8}>
+              {templates.data.length >= 2 && (
+                <Flex justify="space-between" align="center" gap={12} wrap>
+                  <Typography.Text type="secondary">
+                    Tích chọn các mẫu cần làm cho người bệnh này rồi bấm Lập bộ phiếu: lập cả bộ một lần, người bệnh ký một lần
+                    cho cả bộ.
+                  </Typography.Text>
+                  <Button
+                    type="primary"
+                    icon={<FileAddOutlined />}
+                    disabled={selectedIds.length < 2 || busy}
+                    loading={createBundle.isPending}
+                    onClick={() => createBundle.mutate(selectedIds)}
+                  >
+                    Lập bộ phiếu ({selectedIds.length} mẫu)
+                  </Button>
+                </Flex>
+              )}
+              <Table
+                rowKey="templateId"
+                size="small"
+                dataSource={templates.data}
+                pagination={false}
+                showHeader={false}
+                scroll={{ x: 520 }}
+                rowSelection={
+                  templates.data.length >= 2
+                    ? {
+                        selectedRowKeys: selectedIds,
+                        onChange: (keys) => pick(keys.map(String)),
+                        getCheckboxProps: (template) => ({ 'aria-label': `Chọn mẫu ${template.templateCode}` }),
+                      }
+                    : undefined
+                }
+                columns={[
+                  {
+                    key: 'template',
+                    render: (_, template) => (
+                      <Flex vertical>
+                        <Typography.Text strong>{template.templateName}</Typography.Text>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {template.templateCode} · phiên bản {template.versionNo}
+                        </Typography.Text>
+                      </Flex>
+                    ),
+                  },
+                  {
+                    key: 'create',
+                    width: 140,
+                    align: 'right',
+                    render: (_, template) => (
+                      <Button
+                        type="primary"
+                        icon={<FileAddOutlined />}
+                        loading={create.isPending && create.variables === template.templateId}
+                        disabled={busy}
+                        onClick={() => create.mutate(template.templateId)}
+                        aria-label={`Lập phiếu ${template.templateCode}`}
+                      >
+                        Lập phiếu
+                      </Button>
+                    ),
+                  },
+                ]}
+              />
+            </Flex>
           )}
         </Card>
       </Flex>

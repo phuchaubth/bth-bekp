@@ -115,6 +115,9 @@ public interface IConsentFormRepository
     /// <summary>Phiếu thay thế cho phiếu <paramref name="formId"/> (nếu đã lập).</summary>
     Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken);
 
+    /// <summary>Các phiếu của một bộ phiếu (kèm chữ ký), theo thứ tự lập.</summary>
+    Task<IReadOnlyList<ConsentForm>> ListByBundleAsync(Guid bundleId, CancellationToken cancellationToken);
+
     /// <summary>Số phiếu khớp bộ lọc (bỏ qua phân trang).</summary>
     Task<int> CountAsync(ConsentFormSearch query, CancellationToken cancellationToken);
 

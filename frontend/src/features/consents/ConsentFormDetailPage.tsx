@@ -17,6 +17,8 @@ import {
   consentFormsApi,
   decisionLabels,
   useConsentForm,
+  useConsentFormBundle,
+  type ConsentFormBundle,
   type ConsentFormDetail,
   type FormData,
   type SignerKind,
@@ -34,6 +36,7 @@ import { relationshipLabels } from '../patients/labels'
 import { signerRoleLabel } from '../templates/signerRoles'
 import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
+import { BundleBar } from './BundleBar'
 import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
 import { BRAND } from '../../app/theme'
 
@@ -45,6 +48,7 @@ export function ConsentFormDetailPage() {
   const { id = '' } = useParams()
   const { hasPermission } = useAuth()
   const { data: form, isPending, isError, error } = useConsentForm(id)
+  const bundle = useConsentFormBundle(form?.bundleId)
   const [pdfOpen, setPdfOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [signingOpen, setSigningOpen] = useState(false)
@@ -116,6 +120,8 @@ export function ConsentFormDetailPage() {
   }
 
   const nextStep = form.steps.find((step) => step.isNext)
+  // Bộ phiếu: ký cả bộ một lần thay cho ký lẻ từng phiếu.
+  const signWholeBundle = !!bundle.data?.canStartSigning
 
   return (
     <>
@@ -123,7 +129,7 @@ export function ConsentFormDetailPage() {
         title={form.templateName}
         extra={
           <Space wrap>
-            {form.actions.canStartSigning && (
+            {form.actions.canStartSigning && !signWholeBundle && (
               <Button type="primary" icon={<EditOutlined />} onClick={() => setSigningOpen(true)}>
                 Ký trên điện thoại
               </Button>
@@ -177,8 +183,13 @@ export function ConsentFormDetailPage() {
         }
       />
       <Flex vertical gap={16}>
+        {bundle.data && <BundleBar form={form} bundle={bundle.data} />}
         <FormSummary form={form} />
-        {canManage && form.actions.canEdit ? <DraftEditor form={form} /> : <ReadOnlyContent form={form} />}
+        {canManage && form.actions.canEdit ? (
+          <DraftEditor form={form} nextDraftId={nextDraftInBundle(bundle.data, form.id)} />
+        ) : (
+          <ReadOnlyContent form={form} />
+        )}
         <FormHistory form={form} />
       </Flex>
       <PdfPreviewModal form={form} open={pdfOpen} onClose={() => setPdfOpen(false)} />
@@ -207,6 +218,14 @@ export function ConsentFormDetailPage() {
       )}
     </>
   )
+}
+
+/** Phiếu nháp tiếp theo trong bộ (sau phiếu hiện tại, rồi quay vòng lên đầu), để trình ký xong chuyển sang luôn. */
+function nextDraftInBundle(bundle: ConsentFormBundle | undefined, currentId: string): string | null {
+  const forms = bundle?.forms ?? []
+  const index = forms.findIndex((item) => item.id === currentId)
+  const others = index < 0 ? forms : [...forms.slice(index + 1), ...forms.slice(0, index)]
+  return others.find((item) => item.status === 'Draft')?.id ?? null
 }
 
 function FormSummary({ form }: { form: ConsentFormDetail }) {
@@ -365,13 +384,14 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
   return null
 }
 
-function DraftEditor({ form }: { form: ConsentFormDetail }) {
+function DraftEditor({ form, nextDraftId }: { form: ConsentFormDetail; nextDraftId: string | null }) {
   const [antForm] = Form.useForm<FormData>()
   const [signerKind, setSignerKind] = useState<SignerKind>(form.signerKind)
   const [representativeId, setRepresentativeId] = useState<string | null>(form.representative?.id ?? null)
   const [submitErrors, setSubmitErrors] = useState<Record<string, string[]>>()
   const patient = usePatient(form.patient.id)
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const { message } = App.useApp()
 
   const save = () =>
@@ -404,7 +424,12 @@ function DraftEditor({ form }: { form: ConsentFormDetail }) {
     onSuccess: (updated) => {
       setSubmitErrors(undefined)
       onSaved(updated)
-      message.success('Đã trình ký. Nội dung phiếu đã được khóa.')
+      if (nextDraftId) {
+        message.success('Đã trình ký. Chuyển sang phiếu tiếp theo trong bộ.')
+        navigate(`/phieu-dong-thuan/${nextDraftId}`)
+      } else {
+        message.success('Đã trình ký. Nội dung phiếu đã được khóa.')
+      }
     },
     onError: (e) => {
       if (e instanceof ApiError && e.fieldErrors) {

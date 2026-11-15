@@ -43,6 +43,39 @@ public sealed class ConsentFormsController(ConsentFormService forms, ConsentSign
         return this.ToActionResult(result, dto => CreatedAtAction(nameof(Get), new { id = dto.Id }, dto));
     }
 
+    /// <summary>Lập bộ phiếu (quyết định 23): nhiều mẫu cho cùng một người bệnh trong một lần, các phiếu nháp cùng mã bộ.</summary>
+    [HttpPost("bundle")]
+    [HasPermission(Permissions.ConsentsCreate)]
+    public async Task<IActionResult> CreateBundle(CreateConsentFormBundleRequest request, CancellationToken cancellationToken)
+    {
+        var result = await forms.CreateBundleAsync(request, cancellationToken).ConfigureAwait(false);
+        return this.ToActionResult(result, dto => CreatedAtAction(nameof(GetBundle), new { bundleId = dto.BundleId }, dto));
+    }
+
+    /// <summary>Bộ phiếu: các phiếu, trạng thái và thao tác được làm (ký cả bộ, xác nhận cả bộ).</summary>
+    [HttpGet("bundles/{bundleId:guid}")]
+    [HasPermission(Permissions.ConsentsRead)]
+    public async Task<IActionResult> GetBundle(Guid bundleId, CancellationToken cancellationToken) =>
+        this.ToActionResult(await forms.GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Mở một phiên ký cho mọi phiếu của bộ đang chờ người bệnh ký (cùng một người ký).</summary>
+    [HttpPost("bundles/{bundleId:guid}/signing-session")]
+    [HasPermission(Permissions.ConsentsCreate)]
+    public async Task<IActionResult> StartBundleSigning(Guid bundleId, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.StartBundleSigningAsync(bundleId, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Người bệnh ký một lần cho cả bộ (chỉ nhận token phiên ký của bộ phiếu).</summary>
+    [HttpPost("signing-bundle/patient-signature")]
+    [Authorize(Policy = SigningSession.PolicyName)]
+    public async Task<IActionResult> SignBundleAsPatient(BundlePatientSignatureRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.SignBundleAsPatientAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Nhân viên xác nhận một lần các phiếu trong bộ đang đến lượt mình.</summary>
+    [HttpPost("bundles/{bundleId:guid}/confirm")]
+    [HasPermission(Permissions.ConsentsSign)]
+    public async Task<IActionResult> ConfirmBundle(Guid bundleId, ConfirmBundleRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await signing.ConfirmBundleAsync(bundleId, request, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Lưu nháp (chưa bắt buộc đầy đủ; thiếu sót trả về trong <c>issues</c>).</summary>
     [HttpPut("{id:guid}")]
     [HasPermission(Permissions.ConsentsCreate)]

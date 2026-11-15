@@ -85,6 +85,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("BundleId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("CancelReason")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -186,6 +189,9 @@ namespace Consent.Persistence.Migrations
                         .HasColumnType("datetimeoffset");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BundleId")
+                        .HasFilter("[BundleId] IS NOT NULL");
 
                     b.HasIndex("CompletedAtUtc")
                         .HasFilter("[CompletedAtUtc] IS NOT NULL");

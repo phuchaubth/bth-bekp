@@ -13,10 +13,10 @@ public sealed record AccessTokenClaims(
 public sealed record AccessToken(string Value, DateTimeOffset ExpiresAtUtc);
 
 /// <summary>
-/// Thông tin đưa vào token phiên ký: chỉ dùng để người bệnh ký đúng một phiếu trên điện thoại, không dùng được cho API
-/// khác (đối tượng nhận token riêng).
+/// Thông tin đưa vào token phiên ký: chỉ dùng để người bệnh ký đúng các phiếu đã mở phiên trên điện thoại (một phiếu,
+/// hoặc các phiếu chờ ký của một bộ phiếu), không dùng được cho API khác (đối tượng nhận token riêng).
 /// </summary>
-public sealed record SigningTokenClaims(Guid StaffUserId, string StaffUserName, Guid FormId, Guid SessionId);
+public sealed record SigningTokenClaims(Guid StaffUserId, string StaffUserName, IReadOnlyList<Guid> FormIds, Guid SessionId);
 
 public interface ITokenService
 {

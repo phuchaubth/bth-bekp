@@ -329,6 +329,27 @@ public sealed class ConsentPdfRendererTests
     }
 
     [Fact]
+    public void BundleSignature_PrintsTheSignedTogetherLine()
+    {
+        var at = new DateTimeOffset(2026, 11, 15, 9, 12, 0, TimeSpan.FromHours(7));
+        var signature = new ConsentPdfSignature(SignatureImage.Normalize(TestPng.Signature()).Png!, at, "Tôi đã nghe, hiểu và đồng ý");
+        var alone = Document("CK-01", representative: false, isFinal: true) with { PatientSignature = signature };
+        var together = alone with
+        {
+            PatientSignature = signature with { SignedTogether = "Ký chung một lần cho 4 phiếu: PDT-2026-000101, PDT-2026-000102, PDT-2026-000103, PDT-2026-000104" },
+        };
+        var renderer = new MigraDocConsentPdfRenderer();
+
+        var withLine = renderer.Render(together);
+        var withoutLine = renderer.Render(alone);
+
+        using var stream = new MemoryStream(withLine);
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.InRange(pdf.PageCount, 1, 3);
+        Assert.True(withLine.Length > withoutLine.Length);
+    }
+
+    [Fact]
     public void FinalAndPreview_DifferOnlyByPreviewNotice()
     {
         var renderer = new MigraDocConsentPdfRenderer();

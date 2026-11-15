@@ -149,6 +149,48 @@ export interface ConsentFormDetail {
   actions: ConsentFormActions
   /** Thông báo cho người lập phiếu khi phiếu còn sửa được (ví dụ: hồ sơ còn số thẻ BHYT mã cũ 15 ký tự). */
   notices: string[]
+  /** Bộ phiếu (quyết định 23) mà phiếu thuộc về; rỗng với phiếu lập lẻ. */
+  bundleId?: string | null
+}
+
+/** Một phiếu trong bộ phiếu, kèm thao tác người dùng hiện tại được làm. */
+export interface ConsentFormBundleItem {
+  id: string
+  formNo: string
+  status: ConsentFormStatus
+  templateId: string
+  templateCode: string
+  templateName: string
+  patientSigned: boolean
+  /** Mẫu hỏi Đồng ý/Không đồng ý khi người bệnh ký. */
+  requiresDecision: boolean
+  /** Bước xác nhận đang chờ sau khi người bệnh ký, ví dụ "Điều dưỡng khoa". */
+  nextStepLabel: string | null
+  actions: ConsentFormActions
+}
+
+/** Bộ phiếu của một người bệnh: lập cùng lúc, người bệnh ký một lần cho cả bộ. */
+export interface ConsentFormBundle {
+  bundleId: string
+  patientId: string
+  patientName: string
+  forms: ConsentFormBundleItem[]
+  /** Mở được một phiên ký cho mọi phiếu đang chờ người bệnh ký. */
+  canStartSigning: boolean
+  /** Người dùng hiện tại có phiếu đến lượt xác nhận. */
+  canConfirm: boolean
+  notices: string[]
+}
+
+export interface BundleSigningSession {
+  token: string
+  expiresAtUtc: string
+  formIds: string[]
+}
+
+export interface BundleConfirmResult {
+  confirmed: { id: string; formNo: string; action: 'step' | 'completed'; label: string }[]
+  failed: { id: string; formNo: string; message: string }[]
 }
 
 export interface ConsentFormQuery {
@@ -204,12 +246,32 @@ export const consentFormsApi = {
   complete: (id: string, signature: StaffSignatureInput) =>
     apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: signature }),
   revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
+  /** Lập bộ phiếu: nhiều mẫu cho cùng một người bệnh trong một lần. */
+  createBundle: (input: { patientId: string; templateIds: string[]; departmentId?: string | null }) =>
+    apiRequest<ConsentFormBundle>(`${base}/bundle`, { method: 'POST', body: input }),
+  getBundle: (bundleId: string, signal?: AbortSignal) => apiRequest<ConsentFormBundle>(`${base}/bundles/${bundleId}`, { signal }),
+  /** Một phiên ký cho mọi phiếu của bộ đang chờ người bệnh ký. */
+  startBundleSigning: (bundleId: string) =>
+    apiRequest<BundleSigningSession>(`${base}/bundles/${bundleId}/signing-session`, { method: 'POST' }),
+  /** Người bệnh ký một lần cho cả bộ: một chữ ký, một lời xác nhận; quyết định riêng cho phiếu có hỏi (khóa: mã phiếu). */
+  signBundleAsPatient: (
+    signingToken: string,
+    input: { image: string; statement?: string; decisions: Record<string, ConsentDecision> },
+  ) =>
+    apiRequest<{ signedAtUtc: string; forms: { id: string; formNo: string; decision: ConsentDecision | null }[] }>(
+      `${base}/signing-bundle/patient-signature`,
+      { method: 'POST', body: input, token: signingToken },
+    ),
+  /** Xác nhận một lần các phiếu trong bộ đang đến lượt người dùng hiện tại. */
+  confirmBundle: (bundleId: string, signature: StaffSignatureInput) =>
+    apiRequest<BundleConfirmResult>(`${base}/bundles/${bundleId}/confirm`, { method: 'POST', body: signature }),
 }
 
 export const consentFormKeys = {
   all: ['consent-forms'] as const,
   list: (query: ConsentFormQuery) => ['consent-forms', 'list', query] as const,
   detail: (id: string) => ['consent-forms', 'detail', id] as const,
+  bundle: (bundleId: string) => ['consent-forms', 'bundle', bundleId] as const,
 }
 
 export function useConsentForms(query: ConsentFormQuery, enabled = true) {
@@ -223,6 +285,14 @@ export function useConsentForms(query: ConsentFormQuery, enabled = true) {
 
 export function useConsentForm(id: string) {
   return useQuery({ queryKey: consentFormKeys.detail(id), queryFn: ({ signal }) => consentFormsApi.get(id, signal) })
+}
+
+export function useConsentFormBundle(bundleId: string | null | undefined) {
+  return useQuery({
+    queryKey: consentFormKeys.bundle(bundleId ?? ''),
+    queryFn: ({ signal }) => consentFormsApi.getBundle(bundleId!, signal),
+    enabled: !!bundleId,
+  })
 }
 
 export const formStatusLabels: Record<ConsentFormStatus, string> = {

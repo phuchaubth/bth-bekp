@@ -465,6 +465,10 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         if (document.PatientSignature is { } signed)
         {
             patientLines.Add($"Ký lúc {signed.SignedAt:HH:mm}, {signed.SignedAt:dd/MM/yyyy}");
+            if (signed.SignedTogether is { Length: > 0 } together)
+            {
+                patientLines.Add(together);
+            }
         }
 
         var slots = new List<SignatureSlot>

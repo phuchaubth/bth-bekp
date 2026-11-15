@@ -44,7 +44,12 @@ public sealed class ConsentFormService(
     /// <summary>Bệnh viện ở Việt Nam (UTC+7, không đổi giờ theo mùa): lọc theo ngày dùng giờ địa phương.</summary>
     public static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
 
+    /// <summary>Số mẫu tối đa trong một bộ phiếu.</summary>
+    public const int MaxBundleSize = 10;
+
     private static readonly Error NotFound = Error.NotFound("consent_forms.not_found", "Không tìm thấy phiếu.");
+
+    private static readonly Error BundleNotFound = Error.NotFound("consent_forms.bundle_not_found", "Không tìm thấy bộ phiếu.");
 
     private bool ScopeAll => currentUser.HasPermission(Permissions.ScopeAllDepartments);
 
@@ -152,6 +157,141 @@ public sealed class ConsentFormService(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Lập bộ phiếu (quyết định 23): một lần cho nhiều mẫu của cùng người bệnh, cùng khoa; các phiếu nháp cùng mã bộ, điền
+    /// sẵn thông tin từ hồ sơ. Kiểm tra hết các mẫu trước rồi mới tạo, để không có bộ phiếu dở dang.
+    /// </summary>
+    public async Task<Result<ConsentFormBundleDto>> CreateBundleAsync(
+        CreateConsentFormBundleRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.TemplateIds is not { Count: >= 2 and <= MaxBundleSize } templateIds
+            || templateIds.Distinct().Count() != templateIds.Count)
+        {
+            return Error.ValidationField("templateIds", $"Chọn từ 2 đến {MaxBundleSize} mẫu phiếu khác nhau.");
+        }
+
+        var departmentId = request.DepartmentId ?? currentUser.DepartmentId;
+        if (departmentId is null)
+        {
+            return Error.ValidationField("departmentId", "Vui lòng chọn khoa/phòng lập phiếu.");
+        }
+
+        var department = await departments.GetByIdAsync(departmentId.Value, cancellationToken).ConfigureAwait(false);
+        if (department is not { IsActive: true })
+        {
+            return Error.ValidationField("departmentId", "Khoa/phòng không tồn tại hoặc đã ngừng sử dụng.");
+        }
+
+        var patient = await patients.GetByIdAsync(request.PatientId, cancellationToken).ConfigureAwait(false);
+        if (patient is null)
+        {
+            return Error.ValidationField("patientId", "Không tìm thấy người bệnh.");
+        }
+
+        var prepared = new List<(ConsentTemplate Template, ConsentTemplateVersion Version, TemplateDefinition Definition)>();
+        foreach (var templateId in templateIds)
+        {
+            var template = await templates.GetByIdAsync(templateId, cancellationToken).ConfigureAwait(false);
+            var version = template?.PublishedVersion;
+            if (template is not { IsActive: true } || version is null
+                || (template.DepartmentId is not null && template.DepartmentId != department.Id))
+            {
+                return Error.ValidationField(
+                    "templateIds",
+                    $"Mẫu phiếu {template?.Code ?? templateId.ToString()} chưa phát hành hoặc không dùng cho khoa này.");
+            }
+
+            prepared.Add((template, version, ConsentTemplateService.ReadDefinition(version)));
+        }
+
+        var bundleId = Guid.CreateVersion7();
+        var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        foreach (var (template, version, definition) in prepared)
+        {
+            var formNo = await numbers.NextAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
+            forms.Add(ConsentForm.Create(
+                formNo, patient.Id, template.Id, version.Id, department.Id, Prefill(definition, patient).ToJsonString(),
+                userId, clock.UtcNow, bundleId: bundleId));
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return await GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Bộ phiếu: các phiếu trong phạm vi người dùng, trạng thái và thao tác được làm với từng phiếu; ở cấp bộ, có mở được
+    /// một phiên ký cho cả bộ và có phiếu nào đến lượt người dùng xác nhận không.
+    /// </summary>
+    public async Task<Result<ConsentFormBundleDto>> GetBundleAsync(Guid bundleId, CancellationToken cancellationToken)
+    {
+        var bundle = await LoadBundleInScopeAsync(bundleId, cancellationToken).ConfigureAwait(false);
+        if (bundle.Count == 0)
+        {
+            return BundleNotFound;
+        }
+
+        var items = new List<ConsentFormBundleItemDto>(bundle.Count);
+        foreach (var form in bundle)
+        {
+            var (template, version) = await LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+            var definition = ConsentTemplateService.ReadDefinition(version);
+            var steps = await BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
+            var hasReplacement = form.Status == ConsentFormStatus.Revoked
+                && await forms.FindReplacementAsync(form.Id, cancellationToken).ConfigureAwait(false) is not null;
+            var nextStepLabel = !form.CanComplete
+                ? null
+                : steps.FirstOrDefault(s => s.IsNext)?.Label ?? definition.Signatures?.Hospital ?? "Xác nhận của bệnh viện";
+            items.Add(new ConsentFormBundleItemDto(
+                form.Id,
+                form.FormNo,
+                form.Status,
+                template.Id,
+                template.Code,
+                template.Name,
+                form.PatientSignature is not null,
+                definition.Signatures?.RequiresDecision ?? true,
+                nextStepLabel,
+                BuildActions(form, template, steps, hasReplacement)));
+        }
+
+        var (patient, _) = await ResolvePeopleAsync(bundle[0], cancellationToken).ConfigureAwait(false);
+        var signable = bundle.Where(f => f.CanStartSigning).ToList();
+        var notices = new List<string>();
+        var drafts = bundle.Where(f => f.Status == ConsentFormStatus.Draft).Select(f => f.FormNo).ToList();
+        if (drafts.Count > 0)
+        {
+            notices.Add($"Còn {drafts.Count} phiếu nháp chưa trình ký ({string.Join(", ", drafts)}): phiếu nháp không có trong phiên ký của cả bộ.");
+        }
+
+        var mixedSigners = HasMixedSigners(signable);
+        if (mixedSigners)
+        {
+            notices.Add(MixedSignersMessage);
+        }
+
+        return new ConsentFormBundleDto(
+            bundleId,
+            patient.Id,
+            patient.FullName,
+            items,
+            CanStartSigning: signable.Count > 0 && !mixedSigners && currentUser.HasPermission(Permissions.ConsentsCreate),
+            CanConfirm: items.Any(i => i.Actions.CanConfirmStep || i.Actions.CanConfirm),
+            notices);
+    }
+
+    /// <summary>Các phiếu chờ ký phải cùng một người ký thì mới ký chung một lần được.</summary>
+    internal static bool HasMixedSigners(IReadOnlyCollection<ConsentForm> forms) =>
+        forms.Select(f => (f.SignerKind, f.RepresentativeId)).Distinct().Count() > 1;
+
+    internal const string MixedSignersMessage =
+        "Các phiếu chờ ký trong bộ có người ký khác nhau (người bệnh tự ký và người đại diện, hoặc hai người đại diện): "
+        + "không ký chung một lần được. Hãy trả về nháp để chọn cùng người ký, hoặc ký riêng từng phiếu.";
+
+    /// <summary>Các phiếu của bộ trong phạm vi người dùng (khoa của mình, phiếu mình lập, hoặc toàn viện).</summary>
+    internal async Task<IReadOnlyList<ConsentForm>> LoadBundleInScopeAsync(Guid bundleId, CancellationToken cancellationToken) =>
+        [.. (await forms.ListByBundleAsync(bundleId, cancellationToken).ConfigureAwait(false)).Where(IsInScope)];
 
     /// <summary>Lưu nháp: dữ liệu được chuẩn hóa nhưng chưa bắt buộc đầy đủ (thiếu sót trả về trong <c>issues</c>).</summary>
     public async Task<Result<ConsentFormDetailDto>> UpdateAsync(Guid id, UpdateConsentFormRequest request, CancellationToken cancellationToken)
@@ -323,6 +463,9 @@ public sealed class ConsentFormService(
         var documentDate = DateOnly.FromDateTime((form.SubmittedAtUtc ?? form.CreatedAtUtc).ToOffset(VietnamOffset).DateTime);
         var patientSignature = form.PatientSignature is { ImagePng: { } image } signature
             ? new ConsentPdfSignature(image, signature.SignedAtUtc.ToOffset(VietnamOffset), signature.Statement)
+            {
+                SignedTogether = await SignedTogetherAsync(form, signature, cancellationToken).ConfigureAwait(false),
+            }
             : null;
         var steps = definition.Signatures?.Steps is { Count: > 0 } stepDefinitions
             ? stepDefinitions.Select(step => form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key) is { } done
@@ -352,6 +495,24 @@ public sealed class ConsentFormService(
         };
     }
 
+    /// <summary>
+    /// Phiếu trong bộ được người bệnh ký chung một lần (cùng thời điểm ký): in trên PDF để thấy rõ chữ ký này dùng cho những
+    /// phiếu nào, ví dụ "Ký chung một lần cho 4 phiếu: PDT-2026-000101, …". Phiếu ký riêng: không in.
+    /// </summary>
+    private async Task<string?> SignedTogetherAsync(ConsentForm form, ConsentSignature signature, CancellationToken cancellationToken)
+    {
+        if (form.BundleId is not { } bundleId)
+        {
+            return null;
+        }
+
+        var together = (await forms.ListByBundleAsync(bundleId, cancellationToken).ConfigureAwait(false))
+            .Where(f => f.PatientSignature?.SignedAtUtc == signature.SignedAtUtc)
+            .Select(f => f.FormNo)
+            .ToList();
+        return together.Count > 1 ? $"Ký chung một lần cho {together.Count} phiếu: {string.Join(", ", together)}" : null;
+    }
+
     internal static string Sha256(byte[] content) =>
         Convert.ToHexString(SHA256.HashData(content)).ToLower(CultureInfo.InvariantCulture);
 
@@ -364,10 +525,11 @@ public sealed class ConsentFormService(
     internal async Task<ConsentForm?> LoadInScopeAsync(Guid id, CancellationToken cancellationToken)
     {
         var form = await forms.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        return form is not null && (ScopeAll || form.DepartmentId == currentUser.DepartmentId || form.CreatedByUserId == currentUser.UserId)
-            ? form
-            : null;
+        return form is not null && IsInScope(form) ? form : null;
     }
+
+    internal bool IsInScope(ConsentForm form) =>
+        ScopeAll || form.DepartmentId == currentUser.DepartmentId || form.CreatedByUserId == currentUser.UserId;
 
     internal async Task<(ConsentTemplate Template, ConsentTemplateVersion Version)> LoadTemplateAsync(
         ConsentForm form, CancellationToken cancellationToken)
@@ -395,9 +557,6 @@ public sealed class ConsentFormService(
         var department = await departments.GetByIdAsync(form.DepartmentId, cancellationToken).ConfigureAwait(false);
         var creator = await users.GetByIdAsync(form.CreatedByUserId, cancellationToken).ConfigureAwait(false);
         var steps = await BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
-        var nextStep = steps.FirstOrDefault(s => s.IsNext);
-        var canSign = currentUser.HasPermission(Permissions.ConsentsSign);
-        var alreadyConfirmedStep = form.StepSignatures.Any(s => s.UserId == currentUser.UserId);
 
         return new ConsentFormDetailDto(
             form.Id,
@@ -434,19 +593,30 @@ public sealed class ConsentFormService(
             form.SignedPdfSha256,
             replaces,
             replacedBy,
-            new ConsentFormActions(
-                form.CanEdit,
-                form.CanSubmit,
-                form.CanReturnToDraft,
-                form.CanCancel,
-                CanStartSigning: form.CanStartSigning && currentUser.HasPermission(Permissions.ConsentsCreate),
-                CanConfirmStep: nextStep is not null && canSign && !alreadyConfirmedStep && currentUser.IsInRole(nextStep.RoleCode),
-                CanConfirm: form.CanComplete && canSign && steps.All(s => s.Confirmation is not null) && !alreadyConfirmedStep
-                    && currentUser.IsInRole(template.HospitalSignerRoleCode),
-                CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
-                CanReplace: form.Status == ConsentFormStatus.Revoked && replacedBy is null
-                    && currentUser.HasPermission(Permissions.ConsentsCreate)),
-            await BuildNoticesAsync(form, cancellationToken).ConfigureAwait(false));
+            BuildActions(form, template, steps, hasReplacement: replacedBy is not null),
+            await BuildNoticesAsync(form, cancellationToken).ConfigureAwait(false),
+            form.BundleId);
+    }
+
+    /// <summary>Thao tác người dùng hiện tại được làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại).</summary>
+    internal ConsentFormActions BuildActions(
+        ConsentForm form, ConsentTemplate template, IReadOnlyList<ConsentFormStepDto> steps, bool hasReplacement)
+    {
+        var nextStep = steps.FirstOrDefault(s => s.IsNext);
+        var canSign = currentUser.HasPermission(Permissions.ConsentsSign);
+        var alreadyConfirmedStep = form.StepSignatures.Any(s => s.UserId == currentUser.UserId);
+        return new ConsentFormActions(
+            form.CanEdit,
+            form.CanSubmit,
+            form.CanReturnToDraft,
+            form.CanCancel,
+            CanStartSigning: form.CanStartSigning && currentUser.HasPermission(Permissions.ConsentsCreate),
+            CanConfirmStep: nextStep is not null && canSign && !alreadyConfirmedStep && currentUser.IsInRole(nextStep.RoleCode),
+            CanConfirm: form.CanComplete && canSign && steps.All(s => s.Confirmation is not null) && !alreadyConfirmedStep
+                && currentUser.IsInRole(template.HospitalSignerRoleCode),
+            CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
+            CanReplace: form.Status == ConsentFormStatus.Revoked && !hasReplacement
+                && currentUser.HasPermission(Permissions.ConsentsCreate));
     }
 
     /// <summary>Thông báo cho người lập phiếu khi phiếu còn sửa được (ví dụ: hồ sơ còn số thẻ BHYT mã cũ 15 ký tự).</summary>

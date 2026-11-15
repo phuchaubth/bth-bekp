@@ -22,7 +22,12 @@ internal sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentU
 
     public bool IsInRole(string roleCode) => Principal?.HasClaim(AppClaimTypes.Role, roleCode) == true;
 
-    public Guid? SigningFormId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningForm), out var id) ? id : null;
+    public IReadOnlyList<Guid> SigningFormIds =>
+        Principal?.FindAll(AppClaimTypes.SigningForm)
+            .Select(c => Guid.TryParse(c.Value, out var id) ? id : Guid.Empty)
+            .Where(id => id != Guid.Empty)
+            .Distinct()
+            .ToList() ?? [];
 
     public Guid? SigningSessionId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningSession), out var id) ? id : null;
 }

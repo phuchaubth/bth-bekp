@@ -65,6 +65,11 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options, IClock clock
     public AccessToken CreateSigningToken(SigningTokenClaims claims)
     {
         ArgumentNullException.ThrowIfNull(claims);
+        if (claims.FormIds.Count == 0)
+        {
+            throw new ArgumentException("Token phiên ký phải gắn với ít nhất một phiếu.", nameof(claims));
+        }
+
         var now = clock.UtcNow;
         var expiresAt = now.AddMinutes(_options.SigningTokenMinutes);
         var descriptor = new SecurityTokenDescriptor
@@ -78,7 +83,10 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options, IClock clock
             {
                 [AppClaimTypes.Subject] = claims.StaffUserId.ToString(),
                 [AppClaimTypes.UserName] = claims.StaffUserName,
-                [AppClaimTypes.SigningForm] = claims.FormId.ToString(),
+                // Một phiếu: chuỗi (như trước); bộ phiếu: mảng, mỗi phần tử thành một claim cùng loại khi đọc token.
+                [AppClaimTypes.SigningForm] = claims.FormIds.Count == 1
+                    ? claims.FormIds[0].ToString()
+                    : claims.FormIds.Select(id => id.ToString()).ToArray(),
                 [AppClaimTypes.SigningSession] = claims.SessionId.ToString(),
                 [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString("N"),
             },

@@ -34,7 +34,7 @@ public sealed class SigningTokenTests
         var service = new JwtTokenService(Microsoft.Extensions.Options.Options.Create(Options), new FixedClock());
         var formId = Guid.NewGuid();
         var sessionId = Guid.NewGuid();
-        var token = service.CreateSigningToken(new SigningTokenClaims(Guid.NewGuid(), "tiepdon.demo", formId, sessionId));
+        var token = service.CreateSigningToken(new SigningTokenClaims(Guid.NewGuid(), "tiepdon.demo", [formId], sessionId));
         var handler = new JsonWebTokenHandler();
 
         var asSigning = await handler.ValidateTokenAsync(token.Value, ValidationFor(Options.SigningAudience));
@@ -48,6 +48,30 @@ public sealed class SigningTokenTests
         Assert.Null(claims.FindFirst(AppClaimTypes.Permission));
         Assert.Null(claims.FindFirst(ClaimTypes.Role));
         Assert.InRange(token.ExpiresAtUtc - DateTimeOffset.UtcNow, TimeSpan.FromMinutes(29), TimeSpan.FromMinutes(31));
+    }
+
+    [Fact]
+    public async Task BundleSigningToken_CarriesEveryFormOfTheBundle()
+    {
+        var service = new JwtTokenService(Microsoft.Extensions.Options.Options.Create(Options), new FixedClock());
+        Guid[] formIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
+        var token = service.CreateSigningToken(new SigningTokenClaims(Guid.NewGuid(), "tiepdon.demo", formIds, Guid.NewGuid()));
+
+        var result = await new JsonWebTokenHandler().ValidateTokenAsync(token.Value, ValidationFor(Options.SigningAudience));
+
+        Assert.True(result.IsValid);
+        Assert.Equal(
+            formIds.Select(id => id.ToString()),
+            result.ClaimsIdentity.FindAll(AppClaimTypes.SigningForm).Select(c => c.Value));
+    }
+
+    [Fact]
+    public void SigningToken_WithoutForms_IsRefused()
+    {
+        var service = new JwtTokenService(Microsoft.Extensions.Options.Options.Create(Options), new FixedClock());
+
+        Assert.Throws<ArgumentException>(() =>
+            service.CreateSigningToken(new SigningTokenClaims(Guid.NewGuid(), "tiepdon.demo", [], Guid.NewGuid())));
     }
 
     [Fact]

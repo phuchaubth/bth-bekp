@@ -39,6 +39,8 @@ public sealed class ConsentSigningService(
 {
     private static readonly Error NotFound = Error.NotFound("consent_forms.not_found", "Không tìm thấy phiếu.");
 
+    private static readonly Error BundleNotFound = Error.NotFound("consent_forms.bundle_not_found", "Không tìm thấy bộ phiếu.");
+
     /// <summary>Mở phiên ký cho người bệnh trên điện thoại (phiên mới thay phiên cũ).</summary>
     public async Task<Result<SigningSessionDto>> StartSigningAsync(Guid id, CancellationToken cancellationToken)
     {
@@ -58,7 +60,7 @@ public sealed class ConsentSigningService(
         var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
         var sessionId = Guid.NewGuid();
         form.StartSigning(sessionId, clock.UtcNow);
-        var token = tokens.CreateSigningToken(new SigningTokenClaims(userId, currentUser.UserName ?? string.Empty, form.Id, sessionId));
+        var token = tokens.CreateSigningToken(new SigningTokenClaims(userId, currentUser.UserName ?? string.Empty, [form.Id], sessionId));
         formService.AddAudit(AuditActions.ConsentFormSigningStarted, form.Id);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return new SigningSessionDto(token.Value, token.ExpiresAtUtc);
@@ -72,7 +74,9 @@ public sealed class ConsentSigningService(
         Guid id, PatientSignatureRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        if (currentUser.SigningFormId != id || currentUser.SigningSessionId is not { } sessionId)
+        // Token của bộ phiếu chỉ ký được cả bộ một lần (SignBundleAsPatientAsync), không ký lẻ từng phiếu.
+        if (currentUser.SigningFormIds is not [var tokenFormId] || tokenFormId != id
+            || currentUser.SigningSessionId is not { } sessionId)
         {
             return Error.Forbidden("consent_forms.signing_session_mismatch", "Phiên ký không dùng cho phiếu này.");
         }
@@ -175,6 +179,15 @@ public sealed class ConsentSigningService(
             return NotFound;
         }
 
+        var confirmed = await ConfirmStepCoreAsync(form, request.StepKey, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+        return confirmed.IsFailure
+            ? confirmed.Error!
+            : await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<Result<ConsentFormStepDto>> ConfirmStepCoreAsync(
+        ConsentForm form, string stepKey, StaffSignature signaturePng, CancellationToken cancellationToken)
+    {
         if (!form.CanComplete)
         {
             return InvalidStatus(form.Status == ConsentFormStatus.PendingSignature
@@ -185,7 +198,7 @@ public sealed class ConsentSigningService(
         var (_, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
         var definition = ConsentTemplateService.ReadDefinition(version);
         var steps = await formService.BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
-        var step = steps.FirstOrDefault(s => s.Key == request.StepKey);
+        var step = steps.FirstOrDefault(s => s.Key == stepKey);
         if (step is null)
         {
             return Error.ValidationField("stepKey", "Mẫu phiếu không có bước xác nhận này.");
@@ -212,10 +225,10 @@ public sealed class ConsentSigningService(
 
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
-        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, signaturePng.Value.Png, clock.UtcNow);
-        formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key, signature = signaturePng.Value.Source }));
+        form.ConfirmStep(step.Key, userId, user.FullName, user.Title, signaturePng.Png, clock.UtcNow);
+        formService.AddAudit(AuditActions.ConsentFormStepConfirmed, form.Id, JsonSerializer.Serialize(new { step = step.Key, signature = signaturePng.Source }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+        return step;
     }
 
     /// <summary>
@@ -238,6 +251,14 @@ public sealed class ConsentSigningService(
             return NotFound;
         }
 
+        var completed = await CompleteCoreAsync(form, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+        return completed.IsFailure
+            ? completed.Error!
+            : await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<Result<bool>> CompleteCoreAsync(ConsentForm form, StaffSignature signaturePng, CancellationToken cancellationToken)
+    {
         if (!form.CanComplete)
         {
             return InvalidStatus(form.Status == ConsentFormStatus.PendingSignature
@@ -272,16 +293,234 @@ public sealed class ConsentSigningService(
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
         var now = clock.UtcNow;
         var confirmation = new ConsentPdfConfirmation(
-            user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Value.Png);
+            user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Png);
         var pdf = pdfRenderer.Render(await formService.BuildPdfDocumentAsync(form, confirmation, cancellationToken).ConfigureAwait(false));
         var sha256 = ConsentFormService.Sha256(pdf);
         // Lưu file trước; nếu lưu CSDL thất bại thì chỉ còn một file thừa (không ảnh hưởng dữ liệu).
         var key = await documents.SaveAsync($"{form.FormNo}.pdf", pdf, cancellationToken).ConfigureAwait(false);
 
-        form.Complete(userId, user.FullName, user.Title, signaturePng.Value.Png, key, sha256, pdf.LongLength, now, stepKeys);
-        formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256, signature = signaturePng.Value.Source }));
+        form.Complete(userId, user.FullName, user.Title, signaturePng.Png, key, sha256, pdf.LongLength, now, stepKeys);
+        formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256, signature = signaturePng.Source }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    /// Mở một phiên ký cho cả bộ phiếu (quyết định 23): mọi phiếu trong bộ đang chờ người bệnh ký nhận cùng mã phiên; token
+    /// phiên ký liệt kê đúng các phiếu đó. Các phiếu phải cùng một người ký (người bệnh, hoặc cùng một người đại diện).
+    /// </summary>
+    public async Task<Result<BundleSigningSessionDto>> StartBundleSigningAsync(Guid bundleId, CancellationToken cancellationToken)
+    {
+        var bundle = await formService.LoadBundleInScopeAsync(bundleId, cancellationToken).ConfigureAwait(false);
+        if (bundle.Count == 0)
+        {
+            return BundleNotFound;
+        }
+
+        var signable = bundle.Where(f => f.CanStartSigning).ToList();
+        if (signable.Count == 0)
+        {
+            return InvalidStatus("Không có phiếu nào trong bộ đang chờ người bệnh ký; hãy trình ký các phiếu trước.");
+        }
+
+        if (ConsentFormService.HasMixedSigners(signable))
+        {
+            return Error.BusinessRule("consent_forms.bundle_mixed_signers", ConsentFormService.MixedSignersMessage);
+        }
+
+        var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        var sessionId = Guid.NewGuid();
+        var now = clock.UtcNow;
+        foreach (var form in signable)
+        {
+            form.StartSigning(sessionId, now);
+            formService.AddAudit(
+                AuditActions.ConsentFormSigningStarted, form.Id, JsonSerializer.Serialize(new { bundle = bundleId, forms = signable.Count }));
+        }
+
+        List<Guid> formIds = [.. signable.Select(f => f.Id)];
+        var token = tokens.CreateSigningToken(new SigningTokenClaims(userId, currentUser.UserName ?? string.Empty, formIds, sessionId));
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new BundleSigningSessionDto(token.Value, token.ExpiresAtUtc, formIds);
+    }
+
+    /// <summary>
+    /// Người bệnh (hoặc người đại diện) ký một lần cho cả bộ (phương án b): một ảnh chữ ký và một lời xác nhận áp cho mọi
+    /// phiếu trong phiên ký; phiếu nào hỏi Đồng ý/Không đồng ý thì có quyết định riêng. Kiểm tra hết rồi mới ghi, mọi phiếu
+    /// được ký cùng một thời điểm (in trên PDF là "ký chung một lần").
+    /// </summary>
+    public async Task<Result<BundlePatientSignatureResultDto>> SignBundleAsPatientAsync(
+        BundlePatientSignatureRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (currentUser.SigningFormIds is not { Count: > 0 } formIds || currentUser.SigningSessionId is not { } sessionId)
+        {
+            return Error.Forbidden("consent_forms.signing_session_mismatch", "Phiên ký không dùng cho bộ phiếu này.");
+        }
+
+        if (request.Statement is { Length: > ConsentSignature.StatementMaxLength })
+        {
+            return Error.ValidationField("statement", $"Lời xác nhận tối đa {ConsentSignature.StatementMaxLength} ký tự.");
+        }
+
+        if (request.Decisions?.Values.Any(d => !Enum.IsDefined(d)) == true)
+        {
+            return Error.ValidationField("decisions", "Quyết định không hợp lệ.");
+        }
+
+        var loaded = new List<(ConsentForm Form, TemplateSignatures? Signatures, string TemplateName)>(formIds.Count);
+        foreach (var formId in formIds)
+        {
+            var form = await forms.GetByIdAsync(formId, cancellationToken).ConfigureAwait(false);
+            if (form is null)
+            {
+                return NotFound;
+            }
+
+            if (form.Status != ConsentFormStatus.PendingSignature || form.PatientSignature is not null)
+            {
+                return InvalidStatus($"Phiếu {form.FormNo} không còn chờ người bệnh ký.");
+            }
+
+            if (form.SigningSessionId != sessionId)
+            {
+                return InvalidStatus("Phiên ký đã kết thúc hoặc đã được thay bằng phiên khác.");
+            }
+
+            var (template, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+            loaded.Add((form, ConsentTemplateService.ReadDefinition(version).Signatures, template.Name));
+        }
+
+        if (loaded.Select(x => x.Form.BundleId).Distinct().Count() > 1)
+        {
+            return Error.Forbidden("consent_forms.signing_session_mismatch", "Phiên ký không dùng cho bộ phiếu này.");
+        }
+
+        var decisions = new Dictionary<Guid, ConsentDecision?>();
+        foreach (var (form, signatures, templateName) in loaded)
+        {
+            if (signatures?.RequiresDecision ?? true)
+            {
+                if (request.Decisions?.TryGetValue(form.Id, out var decision) != true)
+                {
+                    return Error.ValidationField(
+                        "decisions",
+                        $"Vui lòng chọn {signatures?.AgreeLabel ?? "Đồng ý"} hoặc {signatures?.RefuseLabel ?? "Từ chối"} cho phiếu “{templateName}”.");
+                }
+
+                decisions[form.Id] = decision;
+            }
+            else
+            {
+                decisions[form.Id] = null;
+            }
+        }
+
+        // Một lời xác nhận cho cả bộ: bắt buộc nếu có phiếu bắt buộc; chỉ lưu vào phiếu có ô lời xác nhận.
+        var statement = string.IsNullOrWhiteSpace(request.Statement) ? null : request.Statement.Trim();
+        if (statement is null && loaded.FirstOrDefault(x => x.Signatures?.Statement is { Required: true }).Signatures?.Statement is { } required)
+        {
+            var example = required.Suggestions is { Count: > 0 } suggestions ? $", ví dụ: “{suggestions[0]}”" : string.Empty;
+            return Error.ValidationField("statement", $"Vui lòng ghi lời xác nhận{example}.");
+        }
+
+        var normalized = NormalizeSignature(request.Image);
+        if (normalized.IsFailure)
+        {
+            return normalized.Error!;
+        }
+
+        var now = clock.UtcNow;
+        List<string> formNos = [.. loaded.Select(x => x.Form.FormNo)];
+        var signed = new List<BundleSignedFormDto>(loaded.Count);
+        foreach (var (form, signatures, _) in loaded)
+        {
+            var (patient, representative) = await formService.ResolvePeopleAsync(form, cancellationToken).ConfigureAwait(false);
+            var decision = decisions[form.Id];
+            var signature = form.SignByPatient(
+                sessionId,
+                decision,
+                representative?.FullName ?? patient.FullName,
+                normalized.Value,
+                requestContext.UserAgent,
+                currentUser.UserId,
+                now,
+                signatures?.Statement is not null ? statement : null);
+            formService.AddAudit(
+                AuditActions.ConsentFormPatientSigned,
+                form.Id,
+                JsonSerializer.Serialize(new
+                {
+                    decision = decision?.ToString(),
+                    signer = signature.Role.ToString(),
+                    bundle = form.BundleId,
+                    signedTogether = formNos,
+                }));
+            signed.Add(new BundleSignedFormDto(form.Id, form.FormNo, decision));
+        }
+
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return new BundlePatientSignatureResultDto(now, signed);
+    }
+
+    /// <summary>
+    /// Nhân viên xác nhận một lần các phiếu trong bộ đang đến lượt mình (bước trung gian đúng vai trò, hoặc xác nhận cuối),
+    /// bằng một chữ ký (chữ ký mẫu hoặc vẽ). Mỗi phiếu xử lý và lưu riêng; phiếu không làm được được báo lại kèm lý do.
+    /// </summary>
+    public async Task<Result<ConfirmBundleResultDto>> ConfirmBundleAsync(
+        Guid bundleId, ConfirmBundleRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        var signaturePng = await StaffSignatureAsync(request.Image, request.UseSpecimen, cancellationToken).ConfigureAwait(false);
+        if (signaturePng.IsFailure)
+        {
+            return signaturePng.Error!;
+        }
+
+        var bundle = await formService.LoadBundleInScopeAsync(bundleId, cancellationToken).ConfigureAwait(false);
+        if (bundle.Count == 0)
+        {
+            return BundleNotFound;
+        }
+
+        var confirmed = new List<BundleConfirmedFormDto>();
+        var failed = new List<BundleConfirmFailureDto>();
+        foreach (var form in bundle.Where(f => f.CanComplete))
+        {
+            var (template, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
+            var definition = ConsentTemplateService.ReadDefinition(version);
+            var steps = await formService.BuildStepsAsync(form, definition, cancellationToken).ConfigureAwait(false);
+            var actions = formService.BuildActions(form, template, steps, hasReplacement: false);
+            if (actions.CanConfirmStep && steps.FirstOrDefault(s => s.IsNext) is { } step)
+            {
+                var result = await ConfirmStepCoreAsync(form, step.Key, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+                Record(form, result.IsSuccess, "step", step.Label, result.Error);
+            }
+            else if (actions.CanConfirm)
+            {
+                var result = await CompleteCoreAsync(form, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+                Record(form, result.IsSuccess, "completed", definition.Signatures?.Hospital ?? "Xác nhận của bệnh viện", result.Error);
+            }
+        }
+
+        if (confirmed.Count == 0 && failed.Count == 0)
+        {
+            return Error.BusinessRule("consent_forms.bundle_nothing_to_confirm", "Không có phiếu nào trong bộ đang chờ bạn xác nhận.");
+        }
+
+        return new ConfirmBundleResultDto(confirmed, failed);
+
+        void Record(ConsentForm form, bool success, string action, string label, Error? error)
+        {
+            if (success)
+            {
+                confirmed.Add(new BundleConfirmedFormDto(form.Id, form.FormNo, action, label));
+            }
+            else
+            {
+                failed.Add(new BundleConfirmFailureDto(form.Id, form.FormNo, error?.Message ?? "Không xác nhận được phiếu."));
+            }
+        }
     }
 
     /// <summary>Thu hồi phiếu đã hoàn tất (bắt buộc lý do). Muốn thay đổi nội dung thì lập phiếu thay thế.</summary>

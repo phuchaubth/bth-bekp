@@ -55,7 +55,7 @@ internal sealed class FakeTokenService(IClock clock) : ITokenService
     public AccessToken CreateSigningToken(SigningTokenClaims claims)
     {
         LastSigningClaims = claims;
-        return new AccessToken($"signing-{claims.FormId:N}-{claims.SessionId:N}", clock.UtcNow.AddMinutes(30));
+        return new AccessToken($"signing-{claims.FormIds.Count}-{claims.SessionId:N}", clock.UtcNow.AddMinutes(30));
     }
 
     public string GenerateRefreshToken() => "refresh-" + Guid.NewGuid().ToString("N");
@@ -87,7 +87,7 @@ internal sealed class FakeCurrentUser : ICurrentUser
 
     public HashSet<string> Roles { get; } = [];
 
-    public Guid? SigningFormId { get; set; }
+    public IReadOnlyList<Guid> SigningFormIds { get; set; } = [];
 
     public Guid? SigningSessionId { get; set; }
 
@@ -286,6 +286,9 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
 {
     public Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         Task.FromResult(store.ConsentForms.FirstOrDefault(f => f.Id == id));
+
+    public Task<IReadOnlyList<ConsentForm>> ListByBundleAsync(Guid bundleId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<ConsentForm>>([.. store.ConsentForms.Where(f => f.BundleId == bundleId).OrderBy(f => f.FormNo, StringComparer.Ordinal)]);
 
     public Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken)
     {

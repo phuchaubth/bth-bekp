@@ -41,7 +41,7 @@ internal sealed class ConsentScenario
         Ctx.CurrentUser.UserId = user.Id;
         Ctx.CurrentUser.UserName = user.UserName;
         Ctx.CurrentUser.DepartmentId = department.Id;
-        Ctx.CurrentUser.SigningFormId = null;
+        Ctx.CurrentUser.SigningFormIds = [];
         Ctx.CurrentUser.SigningSessionId = null;
         Ctx.CurrentUser.Roles.Clear();
         Ctx.CurrentUser.Roles.Add(roleCode);
@@ -60,13 +60,13 @@ internal sealed class ConsentScenario
         var claims = Ctx.Tokens.LastSigningClaims ?? throw new InvalidOperationException("Chưa mở phiên ký.");
         var roles = Ctx.CurrentUser.Roles.ToList();
         var permissions = Ctx.CurrentUser.Permissions.ToList();
-        Ctx.CurrentUser.SigningFormId = claims.FormId;
+        Ctx.CurrentUser.SigningFormIds = claims.FormIds;
         Ctx.CurrentUser.SigningSessionId = claims.SessionId;
         Ctx.CurrentUser.Roles.Clear();
         Ctx.CurrentUser.Permissions.Clear();
         return () =>
         {
-            Ctx.CurrentUser.SigningFormId = null;
+            Ctx.CurrentUser.SigningFormIds = [];
             Ctx.CurrentUser.SigningSessionId = null;
             Ctx.CurrentUser.Roles.UnionWith(roles);
             Ctx.CurrentUser.Permissions.UnionWith(permissions);

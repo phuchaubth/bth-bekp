@@ -43,7 +43,11 @@ public sealed record ConsentPdfDocument(
 }
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
-public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt, string? Statement = null);
+public sealed record ConsentPdfSignature(byte[] ImagePng, DateTimeOffset SignedAt, string? Statement = null)
+{
+    /// <summary>Ký chung một lần cho cả bộ phiếu: dòng ghi số phiếu được ký cùng (in dưới chữ ký).</summary>
+    public string? SignedTogether { get; init; }
+}
 
 /// <summary>
 /// Xác nhận bằng tài khoản phía bệnh viện: họ tên, chức danh, thời điểm (giờ Việt Nam). Với các bước trung gian,

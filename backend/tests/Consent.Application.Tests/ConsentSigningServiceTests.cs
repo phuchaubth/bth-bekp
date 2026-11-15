@@ -53,7 +53,7 @@ public sealed class ConsentSigningServiceTests
 
         Assert.True(session.IsSuccess);
         var claims = s.Ctx.Tokens.LastSigningClaims!;
-        Assert.Equal(pending.Id, claims.FormId);
+        Assert.Equal([pending.Id], claims.FormIds);
         Assert.Equal(s.Ctx.CurrentUser.UserId, claims.StaffUserId);
         Assert.Equal(claims.SessionId, s.Ctx.Store.ConsentForms.Single(f => f.Id == pending.Id).SigningSessionId);
         Assert.Equal(s.Ctx.Clock.UtcNow.AddMinutes(30), session.Value.ExpiresAtUtc);
@@ -73,7 +73,7 @@ public sealed class ConsentSigningServiceTests
 
         // Mở phiên mới: phiên cũ hết hiệu lực.
         await s.Signing.StartSigningAsync(form.Id, CancellationToken.None);
-        s.Ctx.CurrentUser.SigningFormId = firstSession.FormId;
+        s.Ctx.CurrentUser.SigningFormIds = firstSession.FormIds;
         s.Ctx.CurrentUser.SigningSessionId = firstSession.SessionId;
         var oldSession = await s.Signing.SignAsPatientAsync(form.Id, new(ConsentDecision.Agreed, SignaturePng), CancellationToken.None);
 

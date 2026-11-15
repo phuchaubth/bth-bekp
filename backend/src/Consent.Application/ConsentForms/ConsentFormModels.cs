@@ -158,7 +158,8 @@ public sealed record ConsentFormDetailDto(
     ConsentFormRef? ReplacesForm,
     ConsentFormRef? ReplacedBy,
     ConsentFormActions Actions,
-    IReadOnlyList<string> Notices);
+    IReadOnlyList<string> Notices,
+    Guid? BundleId = null);
 
 /// <summary>Lập phiếu. <paramref name="ReplacesFormId"/>: lập phiếu thay thế cho phiếu đã thu hồi (cùng người bệnh, cùng mẫu).</summary>
 public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId, Guid? ReplacesFormId = null);
@@ -180,6 +181,68 @@ public sealed record PatientSignatureRequest(ConsentDecision? Decision, string? 
 
 /// <summary>Kết quả ký: <paramref name="Decision"/> rỗng khi mẫu không hỏi Đồng ý/Từ chối.</summary>
 public sealed record PatientSignatureResultDto(ConsentDecision? Decision, DateTimeOffset SignedAtUtc);
+
+/// <summary>
+/// Lập bộ phiếu (quyết định 23): nhiều mẫu cho cùng một người bệnh trong một lần (2–10 mẫu khác nhau, cùng khoa của phiếu).
+/// </summary>
+public sealed record CreateConsentFormBundleRequest(Guid PatientId, IReadOnlyList<Guid>? TemplateIds, Guid? DepartmentId);
+
+/// <summary>Một phiếu trong bộ phiếu, kèm thao tác người dùng hiện tại được làm với phiếu đó.</summary>
+/// <param name="RequiresDecision">Mẫu hỏi Đồng ý/Không đồng ý khi người bệnh ký.</param>
+/// <param name="NextStepLabel">Bước xác nhận đang chờ (sau khi người bệnh ký), ví dụ "Điều dưỡng khoa".</param>
+public sealed record ConsentFormBundleItemDto(
+    Guid Id,
+    string FormNo,
+    ConsentFormStatus Status,
+    Guid TemplateId,
+    string TemplateCode,
+    string TemplateName,
+    bool PatientSigned,
+    bool RequiresDecision,
+    string? NextStepLabel,
+    ConsentFormActions Actions);
+
+/// <summary>
+/// Bộ phiếu của một người bệnh. <paramref name="CanStartSigning"/>: mở được một phiên ký cho mọi phiếu đang chờ người bệnh
+/// ký; <paramref name="CanConfirm"/>: người dùng hiện tại có phiếu đến lượt xác nhận; <paramref name="Notices"/>: lưu ý
+/// (còn phiếu nháp, người ký khác nhau…).
+/// </summary>
+public sealed record ConsentFormBundleDto(
+    Guid BundleId,
+    Guid PatientId,
+    string PatientName,
+    IReadOnlyList<ConsentFormBundleItemDto> Forms,
+    bool CanStartSigning,
+    bool CanConfirm,
+    IReadOnlyList<string> Notices);
+
+/// <summary>Phiên ký cho cả bộ: một token cho mọi phiếu đang chờ người bệnh ký trong bộ.</summary>
+public sealed record BundleSigningSessionDto(string Token, DateTimeOffset ExpiresAtUtc, IReadOnlyList<Guid> FormIds);
+
+/// <summary>
+/// Người bệnh ký một lần cho cả bộ (phương án b): một ảnh chữ ký và một lời xác nhận dùng cho mọi phiếu trong phiên ký;
+/// quyết định Đồng ý/Không đồng ý riêng cho từng phiếu có hỏi (khóa là mã phiếu).
+/// </summary>
+public sealed record BundlePatientSignatureRequest(
+    string? Image,
+    string? Statement,
+    IReadOnlyDictionary<Guid, ConsentDecision>? Decisions);
+
+public sealed record BundleSignedFormDto(Guid Id, string FormNo, ConsentDecision? Decision);
+
+public sealed record BundlePatientSignatureResultDto(DateTimeOffset SignedAtUtc, IReadOnlyList<BundleSignedFormDto> Forms);
+
+/// <summary>Xác nhận các phiếu trong bộ đang đến lượt người dùng hiện tại, bằng một chữ ký (chữ ký mẫu hoặc vẽ).</summary>
+public sealed record ConfirmBundleRequest(string? Image, bool UseSpecimen = false);
+
+/// <param name="Action"><c>step</c>: xác nhận một bước trung gian; <c>completed</c>: xác nhận cuối, phiếu hoàn tất.</param>
+public sealed record BundleConfirmedFormDto(Guid Id, string FormNo, string Action, string Label);
+
+public sealed record BundleConfirmFailureDto(Guid Id, string FormNo, string Message);
+
+public sealed record ConfirmBundleResultDto(
+    IReadOnlyList<BundleConfirmedFormDto> Confirmed,
+    IReadOnlyList<BundleConfirmFailureDto> Failed);
 
 public sealed class CreateConsentFormRequestValidator : AbstractValidator<CreateConsentFormRequest>
 {

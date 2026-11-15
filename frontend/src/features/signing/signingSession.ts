@@ -8,8 +8,10 @@ export interface SigningSession {
   /** Token phiên ký: chỉ dùng để gửi chữ ký của người bệnh cho đúng phiếu này. */
   token: string
   expiresAtUtc: string
-  /** Nội dung phiếu để hiển thị (đã tải trước khi đóng phiên đăng nhập của nhân viên). */
+  /** Nội dung phiếu để hiển thị (đã tải trước khi đóng phiên đăng nhập của nhân viên); với bộ phiếu là phiếu đầu tiên. */
   form: ConsentFormDetail
+  /** Ký cả bộ (quyết định 23, phương án b): mọi phiếu của phiên ký, người bệnh ký một lần cho tất cả. */
+  bundle?: { bundleId: string; forms: ConsentFormDetail[] }
   /** Nhân viên mở phiên (điền sẵn khi đăng nhập lại để thoát chế độ ký). */
   staffUserName: string
 }

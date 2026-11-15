@@ -115,6 +115,12 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     /// <summary>Phiếu đã thu hồi mà phiếu này thay thế.</summary>
     public Guid? ReplacesFormId { get; private set; }
 
+    /// <summary>
+    /// Bộ phiếu (quyết định 23): các phiếu của cùng một người bệnh lập cùng lúc, người bệnh ký một lần cho cả bộ. Rỗng
+    /// với phiếu lập lẻ.
+    /// </summary>
+    public Guid? BundleId { get; private set; }
+
     /// <summary>Khóa lưu trữ của file PDF đã ký (file được mã hóa khi lưu).</summary>
     public string? SignedPdfKey { get; private set; }
 
@@ -161,7 +167,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         string dataJson,
         Guid createdByUserId,
         DateTimeOffset nowUtc,
-        Guid? replacesFormId = null)
+        Guid? replacesFormId = null,
+        Guid? bundleId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(formNo);
         ArgumentNullException.ThrowIfNull(dataJson);
@@ -169,6 +176,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
             Guid.CreateVersion7(), formNo, patientId, templateId, templateVersionId, departmentId, dataJson, createdByUserId, nowUtc)
         {
             ReplacesFormId = replacesFormId,
+            BundleId = bundleId,
         };
     }
 

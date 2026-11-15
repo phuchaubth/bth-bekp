@@ -61,6 +61,7 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.Property(f => f.SignedPdfSha256).HasMaxLength(64).IsFixedLength().IsUnicode(false);
         builder.HasOne<ConsentForm>().WithMany().HasForeignKey(f => f.ReplacesFormId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(f => f.ReplacesFormId).IsUnique().HasFilter("[ReplacesFormId] IS NOT NULL");
+        builder.HasIndex(f => f.BundleId).HasFilter("[BundleId] IS NOT NULL");
 
         builder.HasMany(f => f.Signatures).WithOne().HasForeignKey(s => s.FormId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(f => f.Signatures).HasField("_signatures").UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -36,6 +36,13 @@ internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormR
     public Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         db.ConsentForms.Include(f => f.Signatures).FirstOrDefaultAsync(f => f.Id == id, cancellationToken);
 
+    public async Task<IReadOnlyList<ConsentForm>> ListByBundleAsync(Guid bundleId, CancellationToken cancellationToken) =>
+        await db.ConsentForms.Include(f => f.Signatures)
+            .Where(f => f.BundleId == bundleId)
+            .OrderBy(f => f.FormNo)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
     public Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken) =>
         db.ConsentForms.AsNoTracking()
             .Where(f => f.ReplacesFormId == formId)

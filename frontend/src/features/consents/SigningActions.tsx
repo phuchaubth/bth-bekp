@@ -77,6 +77,74 @@ export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; 
 }
 
 /**
+ * Ký cả bộ (quyết định 23): mở một phiên ký cho mọi phiếu của bộ đang chờ người bệnh ký, tải nội dung các phiếu rồi chuyển
+ * máy sang chế độ ký. Người bệnh xem các phiếu, ghi một lời xác nhận và ký một lần cho tất cả.
+ */
+export function StartBundleSigningModal({
+  bundleId,
+  count,
+  byRepresentative,
+  onClose,
+}: {
+  bundleId: string
+  count: number
+  byRepresentative: boolean
+  onClose: () => void
+}) {
+  const { user, logout } = useAuth()
+  const { message } = App.useApp()
+  const navigate = useNavigate()
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const start = async () => {
+    void document.documentElement.requestFullscreen?.().catch(() => {})
+    setBusy(true)
+    setError(null)
+    try {
+      const session = await consentFormsApi.startBundleSigning(bundleId)
+      // Tải nội dung các phiếu trước khi đóng phiên đăng nhập (màn hình ký không còn quyền đọc phiếu).
+      const forms = await Promise.all(session.formIds.map((formId) => consentFormsApi.get(formId)))
+      signingSession.set({
+        token: session.token,
+        expiresAtUtc: session.expiresAtUtc,
+        form: forms[0],
+        bundle: { bundleId, forms },
+        staffUserName: user?.userName ?? '',
+      })
+      await logout()
+      message.destroy()
+      navigate(SIGNING_PATH, { replace: true })
+    } catch (e) {
+      setError(errorMessage(e))
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal
+      open
+      title="Ký cả bộ trên điện thoại"
+      okText="Bắt đầu ký"
+      cancelText="Đóng"
+      confirmLoading={busy}
+      onOk={() => void start()}
+      onCancel={onClose}
+    >
+      <Typography.Paragraph>
+        Máy này sẽ chuyển sang màn hình ký {count} phiếu một lần: {byRepresentative ? 'người đại diện' : 'người bệnh'} xem các
+        phiếu, chọn ý kiến ở phiếu có hỏi, ghi một lời xác nhận và ký <Typography.Text strong>một lần cho cả {count} phiếu</Typography.Text>.
+      </Typography.Paragraph>
+      <Typography.Paragraph>
+        <Typography.Text strong>Phiên đăng nhập của bạn trên máy này sẽ được đóng.</Typography.Text> Sau khi ký xong, bạn
+        đăng nhập lại để thoát chế độ ký và xác nhận các phiếu.
+      </Typography.Paragraph>
+      {error && <Alert type="error" showIcon title={error} />}
+    </Modal>
+  )
+}
+
+/**
  * Nhân viên ký tay khi xác nhận (quyết định 17): ký bằng ngón tay, bút hoặc chuột vào khung, rồi bấm xác nhận. Tài khoản
  * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF.
  */
