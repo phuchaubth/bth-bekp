@@ -133,6 +133,49 @@ public sealed class ConsentPdfRendererTests
         Assert.Equal(0, ImageCount(pdf));
     }
 
+    [Fact]
+    public void SignatureFrame_PrintsEachSignatureInsideTheFrame_AndAJpegFrameFallsBackToThePlainSignature()
+    {
+        var signature = SignatureImage.Normalize(TestPng.Signature()).Png!;
+        var at = new DateTimeOffset(2026, 11, 11, 9, 30, 0, TimeSpan.FromHours(7));
+        var signed = Document("CK-01", representative: false, isFinal: true, "bhyt") with
+        {
+            Decision = Consent.Domain.ConsentForms.ConsentDecision.Agreed,
+            PatientSignature = new ConsentPdfSignature(signature, at),
+        };
+
+        // Khung giả lập 400 × 300 (ô "logo" ở góc trên bên trái), không phải khung thật của bệnh viện.
+        var frame = LogoImage.Read(TestPng.Rgba(400, 300, (x, y) => x < 100 && y < 60, whiteBackground: true))!;
+        var jpegFrame = LogoImage.Read(Convert.FromBase64String(TestLogos.Jpeg40x32))!;
+        var renderer = new MigraDocConsentPdfRenderer();
+
+        var plain = renderer.Render(signed);
+        var framed = renderer.Render(signed with { SignatureFrame = frame });
+        var jpeg = renderer.Render(signed with { SignatureFrame = jpegFrame });
+
+        // Một ảnh duy nhất cho chữ ký: khung và chữ ký đã ghép (rộng bằng ảnh khung).
+        Assert.Equal(1, ImageCount(framed));
+        Assert.Matches(@"/Width\s+400\b", Encoding.Latin1.GetString(framed));
+        Assert.DoesNotMatch(@"/Width\s+400\b", Encoding.Latin1.GetString(plain));
+        Assert.Equal(ImageCount(plain), ImageCount(jpeg));
+        Assert.DoesNotMatch(@"/Width\s+400\b", Encoding.Latin1.GetString(jpeg));
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, "CK-01-signed-framed.pdf"), framed);
+
+            // Xem thử với một ảnh khung khác (đường dẫn PNG trong CONSENT_PDF_FRAME), có cả chữ ký mẫu của nhân viên.
+            if (Environment.GetEnvironmentVariable("CONSENT_PDF_FRAME") is { Length: > 0 } framePath)
+            {
+                var sample = signed with
+                {
+                    SignatureFrame = LogoImage.Read(File.ReadAllBytes(framePath)),
+                    HospitalConfirmation = new ConsentPdfConfirmation("Tiếp đón Demo", "Nhân viên tiếp đón", at.AddMinutes(2), signature),
+                };
+                File.WriteAllBytes(Path.Combine(output, "CK-01-signed-framed-sample.pdf"), renderer.Render(sample));
+            }
+        }
+    }
+
     private static int ImageCount(byte[] pdf) => Regex.Matches(Encoding.Latin1.GetString(pdf), @"/Subtype\s*/Image").Count;
 
     /// <summary>
@@ -281,15 +324,29 @@ public sealed class ConsentPdfRendererTests
         };
 
         var bytes = new MigraDocConsentPdfRenderer().Render(document);
+
+        // Có khung chữ ký (quyết định 26): khung giả lập 4:3, hoặc ảnh khung trong CONSENT_PDF_FRAME khi xem thử.
+        var framePng = Environment.GetEnvironmentVariable("CONSENT_PDF_FRAME") is { Length: > 0 } framePath
+            ? File.ReadAllBytes(framePath)
+            : TestPng.Rgba(400, 300, (x, y) => x < 100 && y < 60, whiteBackground: true);
+        var framed = new MigraDocConsentPdfRenderer().Render(document with
+        {
+            SignatureFrame = LogoImage.Read(framePng),
+            HospitalConfirmation = document.HospitalConfirmation! with { ImagePng = signature.Png },
+        });
         if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
         {
             File.WriteAllBytes(Path.Combine(output, $"{code}-signed.pdf"), bytes);
+            File.WriteAllBytes(Path.Combine(output, $"{code}-signed-framed.pdf"), framed);
         }
 
-        using var stream = new MemoryStream(bytes);
-        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
-        Assert.InRange(pdf.PageCount, 1, maxPages);
-        Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(bytes));
+        foreach (var rendered in new[] { bytes, framed })
+        {
+            using var stream = new MemoryStream(rendered);
+            using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+            Assert.InRange(pdf.PageCount, 1, maxPages);
+            Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(rendered));
+        }
     }
 
     [Fact]

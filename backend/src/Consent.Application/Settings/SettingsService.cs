@@ -146,11 +146,14 @@ public sealed class SettingsService(
         ResolveImageAsync(SettingKeys.LogoStorageKey, cancellationToken);
 
     /// <summary>Tải lên hoặc thay logo. Áp dụng cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên.</summary>
-    public Task<Result<SystemSettingsDto>> UploadLogoAsync(UploadLogoRequest request, CancellationToken cancellationToken)
+    public async Task<Result<SystemSettingsDto>> UploadLogoAsync(UploadLogoRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return UploadImageAsync(
-            request.Image, "logo", "logo", SettingKeys.LogoStorageKey, SettingKeys.LogoContentType, cancellationToken);
+        var image = LogoImage.Parse(request.Image);
+        return image.IsFailure
+            ? image.Error!
+            : await SaveImageAsync(image.Value, "logo", SettingKeys.LogoStorageKey, SettingKeys.LogoContentType, cancellationToken)
+                .ConfigureAwait(false);
     }
 
     /// <summary>Bỏ logo: phiếu in sau đó không có logo.</summary>
@@ -158,19 +161,29 @@ public sealed class SettingsService(
         DeleteImageAsync(SettingKeys.LogoStorageKey, SettingKeys.LogoContentType, cancellationToken);
 
     /// <summary>
-    /// Tải lên hoặc thay ảnh khung chữ ký. Có hiệu lực ngay ở mọi màn hình ký mở sau đó; ảnh chữ ký và PDF không đổi.
+    /// Tải lên hoặc thay ảnh khung chữ ký (PNG). Có hiệu lực ngay ở mọi màn hình ký mở sau đó và ở PDF tạo sau khi lưu (mỗi
+    /// chữ ký in trong khung); PDF đã ký giữ nguyên. Phải là PNG đọc được để in lên PDF.
     /// </summary>
-    public Task<Result<SystemSettingsDto>> UploadSignatureFrameAsync(
+    public async Task<Result<SystemSettingsDto>> UploadSignatureFrameAsync(
         UploadSignatureFrameRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return UploadImageAsync(
-            request.Image,
-            "ảnh khung chữ ký",
-            "khung-chu-ky",
-            SettingKeys.SignatureFrameStorageKey,
-            SettingKeys.SignatureFrameContentType,
-            cancellationToken);
+        var image = LogoImage.Parse(request.Image, "ảnh khung chữ ký", pngOnly: true);
+        if (image.IsFailure)
+        {
+            return image.Error!;
+        }
+
+        if (SignatureFramePrint.Prepare(image.Value.Content) is null)
+        {
+            return Error.ValidationField(
+                "image",
+                "Ảnh khung chữ ký dùng kiểu PNG chưa đọc được (cần PNG 8 bit, không xen kẽ). Mở ảnh bằng Paint rồi lưu lại dạng PNG.");
+        }
+
+        return await SaveImageAsync(
+            image.Value, "khung-chu-ky", SettingKeys.SignatureFrameStorageKey, SettingKeys.SignatureFrameContentType, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <summary>Bỏ ảnh khung chữ ký: khung ký trở lại dạng mặc định (nền trắng, viền nét đứt).</summary>
@@ -201,21 +214,16 @@ public sealed class SettingsService(
         }
     }
 
-    private async Task<Result<SystemSettingsDto>> UploadImageAsync(
-        string? base64, string noun, string fileStem, string storageKey, string contentTypeKey, CancellationToken cancellationToken)
+    /// <summary>Lưu ảnh đã kiểm tra vào kho tài liệu và ghi khóa, kiểu ảnh vào cấu hình.</summary>
+    private async Task<SystemSettingsDto> SaveImageAsync(
+        LogoImage image, string fileStem, string storageKey, string contentTypeKey, CancellationToken cancellationToken)
     {
-        var image = LogoImage.Parse(base64, noun);
-        if (image.IsFailure)
-        {
-            return image.Error!;
-        }
-
-        var extension = image.Value.ContentType == LogoImage.Png ? "png" : "jpg";
-        var key = await documents.SaveAsync($"{fileStem}.{extension}", image.Value.Content, cancellationToken).ConfigureAwait(false);
+        var extension = image.ContentType == LogoImage.Png ? "png" : "jpg";
+        var key = await documents.SaveAsync($"{fileStem}.{extension}", image.Content, cancellationToken).ConfigureAwait(false);
         var stored = (await settings.GetAllAsync(cancellationToken).ConfigureAwait(false)).ToList();
         var now = clock.UtcNow;
         UpsertSetting(stored, storageKey, key, now);
-        UpsertSetting(stored, contentTypeKey, image.Value.ContentType, now);
+        UpsertSetting(stored, contentTypeKey, image.ContentType, now);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return await GetAsync(cancellationToken).ConfigureAwait(false);
     }

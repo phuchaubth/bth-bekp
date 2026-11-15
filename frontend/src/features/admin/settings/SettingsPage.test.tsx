@@ -162,13 +162,23 @@ describe('Cấu hình hệ thống (màn hình 19)', () => {
 
       await screen.findByRole('img', { name: 'Khung chữ ký đang dùng' })
       await user.upload(screen.getByLabelText('Chọn file khung chữ ký'), new File(['GIF89a'], 'khung.gif', { type: 'image/gif' }))
-      expect(await screen.findByText('Ảnh khung chữ ký phải là ảnh PNG hoặc JPG.')).toBeInTheDocument()
+      expect(await screen.findByText('Ảnh khung chữ ký cần là ảnh PNG.')).toBeInTheDocument()
       expect(calls.some((c) => c.method === 'PUT')).toBe(false)
 
       await user.click(screen.getByRole('button', { name: /Bỏ khung/ }))
       await user.click(await screen.findByRole('button', { name: 'Bỏ khung' }))
       expect(await screen.findByText(/Chưa có khung/)).toBeInTheDocument()
       expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/settings/signature-frame')).toBe(true)
+    })
+
+    it('khung JPG tải lên từ bản trước: nhắc tải lại PNG để in được lên PDF', async () => {
+      mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': { ...settings, signatureFrame: { ...frame, contentType: 'image/jpeg' } },
+      })
+      renderApp('/quan-tri/cau-hinh')
+
+      expect(await screen.findByText(/chưa in được lên PDF/)).toBeInTheDocument()
     })
   })
 

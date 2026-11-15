@@ -472,7 +472,7 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 | GET | `/api/v1/settings/logo` | `settings.manage` | Ảnh logo đang dùng (`image/png` hoặc `image/jpeg`, `Cache-Control: no-store`); chưa có → `404` |
 | PUT | `/api/v1/settings/logo` | `settings.manage` | `{ image }`: PNG/JPG dạng Base64 (có thể kèm `data:image/...;base64,`), tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; nhận dạng theo nội dung file, không nhận SVG/GIF (`400` ở trường `image`). File lưu trong kho tài liệu (mã hóa), khóa lưu trong `SystemSettings` (`Logo.*`, ghi audit). In ở góc trên bên trái phiếu (khoảng 18 × 18 mm) cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên. File hỏng không đọc được thì phiếu in không có logo |
 | DELETE | `/api/v1/settings/logo` | `settings.manage` | Bỏ logo; trả cấu hình mới (`logo: null`) |
-| PUT | `/api/v1/settings/signature-frame` | `settings.manage` | `{ image }`: ảnh **khung chữ ký** (quyết định 26), cùng quy tắc với logo (PNG/JPG, tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; lỗi ở trường `image`). Lưu riêng với logo (khóa `SignatureFrame.*`, ghi audit). Trả cấu hình mới, có `signatureFrame: { contentType, width, height, updatedAtUtc }`. Chỉ để hiển thị quanh khung ký trên màn hình; ảnh chữ ký và PDF không có khung |
+| PUT | `/api/v1/settings/signature-frame` | `settings.manage` | `{ image }`: ảnh **khung chữ ký** (quyết định 26): **chỉ PNG** 8 bit, không xen kẽ (máy chủ đọc điểm ảnh để in lên PDF), tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; lỗi ở trường `image` ("Ảnh khung chữ ký cần là ảnh PNG.", hoặc PNG kiểu chưa đọc được). Lưu riêng với logo (khóa `SignatureFrame.*`, ghi audit). Trả cấu hình mới, có `signatureFrame: { contentType, width, height, updatedAtUtc }`. Làm nền khung ký trên màn hình, và mỗi chữ ký trên PDF tạo sau khi lưu in trong khung này; ảnh chữ ký lưu lại không có khung |
 | DELETE | `/api/v1/settings/signature-frame` | `settings.manage` | Bỏ khung chữ ký (khung ký trở lại nền trắng, viền nét đứt); trả cấu hình mới (`signatureFrame: null`) |
 | GET | `/api/v1/settings/kiosk` | `settings.manage` | Mẫu dùng trên kiosk theo thứ tự làm: `{ templates: [{ id, code, name, problems[] }], updatedAtUtc }` (`problems`: lý do mẫu đã chọn nay không dùng được, ví dụ đã ngừng) |
 | GET | `/api/v1/settings/encounters` | `settings.manage` | Gắn phiếu với lượt tiếp nhận HIS (quyết định 25): `{ enabled, available, updatedAtUtc }`. `enabled`: đang bắt buộc chọn lượt khi ký hoàn tất; `available`: đã cấu hình API thông tin người bệnh (`PatientSource:Provider = Api`) nên bật được |
@@ -488,7 +488,7 @@ Mọi phản hồi của API có `Cache-Control: no-store` (trừ ảnh khung ch
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/api/v1/branding/signature-frame` | Không cần đăng nhập | Khung chữ ký đang dùng `{ contentType, width, height, updatedAtUtc }` (`Cache-Control: no-cache`); chưa có → `404`, khung ký hiện như mặc định |
-| GET | `/api/v1/branding/signature-frame/image` | Không cần đăng nhập | Ảnh khung (`image/png` hoặc `image/jpeg`). Giao diện gọi kèm `?v=<updatedAtUtc>` nên ảnh được lưu đệm một ngày (`Cache-Control: public, max-age=86400`); chưa có → `404` |
+| GET | `/api/v1/branding/signature-frame/image` | Không cần đăng nhập | Ảnh khung (`image/png`; khung JPG tải lên từ bản trước trả `image/jpeg`). Giao diện gọi kèm `?v=<updatedAtUtc>` nên ảnh được lưu đệm một ngày (`Cache-Control: public, max-age=86400`); chưa có → `404` |
 
 ---
 

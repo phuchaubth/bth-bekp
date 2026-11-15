@@ -549,6 +549,7 @@ public sealed class ConsentFormService(
             steps)
         {
             Logo = await settingsService.ResolveLogoAsync(cancellationToken).ConfigureAwait(false),
+            SignatureFrame = await settingsService.ResolveSignatureFrameAsync(cancellationToken).ConfigureAwait(false),
             Encounter = form is { EncounterNo: { } encounterNo, EncounterReceivedAt: { } receivedAt }
                 ? new ConsentEncounter(encounterNo, receivedAt, form.EncounterPlace, form.EncounterReceivedBy)
                 : null,

@@ -43,6 +43,12 @@ public sealed record ConsentPdfDocument(
 
     /// <summary>Lượt tiếp nhận gắn với phiếu (quyết định 25): in ở chân mỗi trang để đối soát.</summary>
     public ConsentEncounter? Encounter { get; init; }
+
+    /// <summary>
+    /// Khung chữ ký của bệnh viện (quyết định 26): mỗi chữ ký in trong khung này. Không có, hoặc ảnh không in được (JPG), thì
+    /// chữ ký in như cũ.
+    /// </summary>
+    public Settings.LogoImage? SignatureFrame { get; init; }
 }
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>

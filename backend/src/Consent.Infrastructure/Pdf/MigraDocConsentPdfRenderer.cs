@@ -487,6 +487,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
         slots.Add(ConfirmationSlot(labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint, document.HospitalConfirmation));
 
+        // Quyết định 26: chữ ký in trong khung chữ ký của bệnh viện (ảnh PNG quản trị tải lên).
+        var frame = document.SignatureFrame is { } frameImage ? SignatureFramePrint.Prepare(frameImage.Content) : null;
+
         var table = section.AddTable();
         table.AddColumn(Unit.FromMillimeter(83));
         table.AddColumn(Unit.FromMillimeter(84));
@@ -501,7 +504,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             }
 
             var space = table.AddRow();
-            space.Height = Unit.FromMillimeter(14);
+            space.Height = Unit.FromMillimeter(
+                frame is not null && pair.Any(s => s.ImagePng is not null) ? (FramedSignatureWidthMm * frame.Height / frame.Width) + 2 : 14);
             space.VerticalAlignment = VerticalAlignment.Center;
             var names = table.AddRow();
             for (var c = 0; c < pair.Count; c++)
@@ -510,8 +514,15 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement);
                 if (slot.ImagePng is { } image)
                 {
-                    // Ảnh lưu là ảnh xám; in bằng màu mực xanh (cả chữ ký cũ vẽ mực đen).
-                    AddSignatureImage(space.Cells[c], SignatureImage.Colorize(image));
+                    // Ảnh lưu là ảnh xám; in bằng màu mực xanh (cả chữ ký cũ vẽ mực đen), trong khung nếu có.
+                    if (frame?.Compose(image) is { } framed)
+                    {
+                        AddFramedSignature(space.Cells[c], framed, frame);
+                    }
+                    else
+                    {
+                        AddSignatureImage(space.Cells[c], SignatureImage.Colorize(image));
+                    }
                 }
 
                 if (slot.Name is { } fullName)
@@ -571,6 +582,19 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     }
 
     /// <summary>Ảnh chữ ký tay, thu vừa khung 70 × 12 mm, giữ đúng tỉ lệ.</summary>
+    /// <summary>Bề rộng khung chữ ký khi in (mm); chiều cao theo tỉ lệ ảnh khung.</summary>
+    private const double FramedSignatureWidthMm = 48;
+
+    private static void AddFramedSignature(Cell cell, byte[] png, SignatureFramePrint frame)
+    {
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Center;
+        var image = paragraph.AddImage("base64:" + Convert.ToBase64String(png));
+        image.LockAspectRatio = false;
+        image.Width = Unit.FromMillimeter(FramedSignatureWidthMm);
+        image.Height = Unit.FromMillimeter(FramedSignatureWidthMm * frame.Height / frame.Width);
+    }
+
     private static void AddSignatureImage(Cell cell, byte[] png)
     {
         const double MaxWidthMm = 70;

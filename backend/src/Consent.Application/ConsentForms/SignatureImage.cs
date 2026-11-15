@@ -127,6 +127,100 @@ public static class SignatureImage
 
     private static Gray? Decode(byte[] png, out string? error)
     {
+        var data = ReadPng(png, MaxWidth, MaxHeight, allowPalette: false, out error);
+        return data is null ? null : new Gray(data.Width, data.Height, ToGray(data.Pixels, data.Width, data.Height, data.Channels));
+    }
+
+    /// <summary>
+    /// PNG 8 bit đã giải nén, bỏ bộ lọc: <see cref="Channels"/> 1 (xám, hoặc chỉ số bảng màu khi có <see cref="Palette"/>), 2
+    /// (xám + độ trong), 3 (RGB) hay 4 (RGBA).
+    /// </summary>
+    private sealed record PngData(int Width, int Height, int Channels, byte[] Pixels, byte[]? Palette, byte[]? PaletteAlpha);
+
+    /// <summary>Ảnh xám (0 = đen, 255 = trắng) của PNG đọc được; dùng cho ảnh chữ ký đã lưu khi ghép vào khung.</summary>
+    internal static (int Width, int Height, byte[] Pixels)? ReadGray(byte[] png)
+    {
+        try
+        {
+            return Decode(png, out _) is { } gray ? (gray.Width, gray.Height, gray.Pixels) : null;
+        }
+        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Ảnh màu RGB phủ lên nền trắng của PNG 8 bit không xen kẽ (xám, RGB, có độ trong, hoặc bảng màu), mỗi chiều tối đa
+    /// <paramref name="maxSide"/>; dùng cho ảnh khung chữ ký. Không đọc được (JPG, PNG 16 bit hay xen kẽ, file hỏng) thì null.
+    /// </summary>
+    internal static (int Width, int Height, byte[] Rgb)? ReadColorOnWhite(byte[] png, int maxSide)
+    {
+        PngData? data;
+        try
+        {
+            data = ReadPng(png, maxSide, maxSide, allowPalette: true, out _);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException)
+        {
+            return null;
+        }
+
+        if (data is null)
+        {
+            return null;
+        }
+
+        var count = data.Width * data.Height;
+        var rgb = new byte[count * 3];
+        for (var i = 0; i < count; i++)
+        {
+            int r, g, b, a;
+            switch (data.Channels)
+            {
+                case 1 when data.Palette is { } palette:
+                    var index = data.Pixels[i];
+                    if (index * 3 + 2 >= palette.Length)
+                    {
+                        return null;
+                    }
+
+                    (r, g, b) = (palette[index * 3], palette[(index * 3) + 1], palette[(index * 3) + 2]);
+                    a = data.PaletteAlpha is { } alpha && index < alpha.Length ? alpha[index] : 255;
+                    break;
+                case 1:
+                    (r, g, b, a) = (data.Pixels[i], data.Pixels[i], data.Pixels[i], 255);
+                    break;
+                case 2:
+                    (r, g, b, a) = (data.Pixels[i * 2], data.Pixels[i * 2], data.Pixels[i * 2], data.Pixels[(i * 2) + 1]);
+                    break;
+                case 3:
+                    (r, g, b, a) = (data.Pixels[i * 3], data.Pixels[(i * 3) + 1], data.Pixels[(i * 3) + 2], 255);
+                    break;
+                default:
+                    (r, g, b, a) = (data.Pixels[i * 4], data.Pixels[(i * 4) + 1], data.Pixels[(i * 4) + 2], data.Pixels[(i * 4) + 3]);
+                    break;
+            }
+
+            rgb[i * 3] = OnWhite(r, a);
+            rgb[(i * 3) + 1] = OnWhite(g, a);
+            rgb[(i * 3) + 2] = OnWhite(b, a);
+        }
+
+        return (data.Width, data.Height, rgb);
+    }
+
+    private static byte OnWhite(int value, int alpha) => (byte)(((value * alpha) + (255 * (255 - alpha)) + 127) / 255);
+
+    /// <summary>Mã hóa ảnh RGB thành PNG (chỉ có điểm ảnh).</summary>
+    internal static byte[] EncodeRgb(byte[] rgb, int width, int height) =>
+        EncodePng(rgb, width, 0, 0, width, height, colorType: 2, bytesPerPixel: 3);
+
+    /// <summary>Độ sáng (0–255) của màu mực khi đã chuyển sang ảnh xám như lúc lưu chữ ký.</summary>
+    internal static int InkLuminance => Luminance(InkColor.R, InkColor.G, InkColor.B);
+
+    private static PngData? ReadPng(byte[] png, int maxWidth, int maxHeight, bool allowPalette, out string? error)
+    {
         error = "Ảnh chữ ký không đúng định dạng PNG.";
         if (png.Length < PngSignature.Length + 25 || !png.AsSpan(0, PngSignature.Length).SequenceEqual(PngSignature))
         {
@@ -134,6 +228,8 @@ public static class SignatureImage
         }
 
         int width = 0, height = 0, channels = 0;
+        var indexed = false;
+        byte[]? palette = null, paletteAlpha = null;
         var seenHeader = false;
         using var idat = new MemoryStream();
         var offset = PngSignature.Length;
@@ -171,13 +267,14 @@ public static class SignatureImage
                 height = BinaryPrimitives.ReadInt32BigEndian(data[4..]);
                 var bitDepth = data[8];
                 var colorType = data[9];
-                if (width <= 0 || height <= 0 || width > MaxWidth || height > MaxHeight)
+                if (width <= 0 || height <= 0 || width > maxWidth || height > maxHeight)
                 {
-                    error = $"Kích thước ảnh chữ ký không hợp lệ (tối đa {MaxWidth}×{MaxHeight} điểm ảnh).";
+                    error = $"Kích thước ảnh chữ ký không hợp lệ (tối đa {maxWidth}×{maxHeight} điểm ảnh).";
                     return null;
                 }
 
-                channels = colorType switch { 0 => 1, 2 => 3, 4 => 2, 6 => 4, _ => 0 };
+                indexed = colorType == 3 && allowPalette;
+                channels = colorType switch { 0 => 1, 2 => 3, 4 => 2, 6 => 4, 3 when allowPalette => 1, _ => 0 };
                 if (bitDepth != 8 || channels == 0 || data[10] != 0 || data[11] != 0 || data[12] != 0)
                 {
                     error = "Ảnh chữ ký dùng kiểu PNG không được hỗ trợ (cần ảnh 8 bit, không xen kẽ).";
@@ -192,10 +289,23 @@ public static class SignatureImage
             {
                 idat.Write(data);
             }
+            else if (type == "PLTE" && indexed)
+            {
+                palette = data.ToArray();
+            }
+            else if (type == "tRNS" && indexed)
+            {
+                paletteAlpha = data.ToArray();
+            }
             else if (type == "IEND")
             {
                 break;
             }
+        }
+
+        if (indexed && palette is null)
+        {
+            return null;
         }
 
         var stride = width * channels;
@@ -207,7 +317,7 @@ public static class SignatureImage
         }
 
         error = null;
-        return new Gray(width, height, ToGray(Unfilter(raw, height, stride, channels), width, height, channels));
+        return new PngData(width, height, channels, Unfilter(raw, height, stride, channels), palette, paletteAlpha);
     }
 
     /// <summary>Bỏ bộ lọc từng dòng của PNG (None, Sub, Up, Average, Paeth).</summary>

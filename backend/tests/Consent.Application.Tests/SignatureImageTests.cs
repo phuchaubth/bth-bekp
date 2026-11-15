@@ -1,6 +1,3 @@
-using System.Buffers.Binary;
-using System.IO.Compression;
-using System.Text;
 using Consent.Application.ConsentForms;
 using Consent.Application.Tests.Fakes;
 
@@ -117,10 +114,10 @@ public sealed class SignatureImageTests
         var colored = SignatureImage.Colorize(TestPng.Build(Width, Height, 8, 0, raw));
 
         Assert.Equal((Width, Height, (byte)2), TestPng.ReadHeader(colored));
-        var pixels = DecodeRgb(colored, Width, Height);
-        Assert.Equal((ink.R, ink.G, ink.B), Pixel(pixels, Width, 3, 1));
-        Assert.Equal((ink.R, ink.G, ink.B), Pixel(pixels, Width, 15, 2));
-        Assert.Equal(((byte)255, (byte)255, (byte)255), Pixel(pixels, Width, 25, 3));
+        var pixels = TestPng.ReadRgb(colored, Width, Height);
+        Assert.Equal((ink.R, ink.G, ink.B), TestPng.Pixel(pixels, Width, 3, 1));
+        Assert.Equal((ink.R, ink.G, ink.B), TestPng.Pixel(pixels, Width, 15, 2));
+        Assert.Equal(((byte)255, (byte)255, (byte)255), TestPng.Pixel(pixels, Width, 25, 3));
         Assert.DoesNotContain("tEXt"u8.ToArray(), Chunks(colored));
     }
 
@@ -143,45 +140,6 @@ public sealed class SignatureImageTests
 
         Assert.Same(notPng, SignatureImage.Colorize(notPng));
         Assert.Same(corrupt, SignatureImage.Colorize(corrupt));
-    }
-
-    /// <summary>Đọc điểm ảnh RGB của PNG do máy chủ tạo (một khối nén, mọi dòng không dùng bộ lọc).</summary>
-    private static byte[] DecodeRgb(byte[] png, int width, int height)
-    {
-        using var idat = new MemoryStream();
-        for (var offset = 8; offset + 8 <= png.Length;)
-        {
-            var length = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(offset));
-            if (Encoding.ASCII.GetString(png, offset + 4, 4) == "IDAT")
-            {
-                idat.Write(png, offset + 8, length);
-            }
-
-            offset += 12 + length;
-        }
-
-        idat.Position = 0;
-        var stride = width * 3;
-        var raw = new byte[height * (stride + 1)];
-        using (var zlib = new ZLibStream(idat, CompressionMode.Decompress))
-        {
-            zlib.ReadExactly(raw);
-        }
-
-        var pixels = new byte[height * stride];
-        for (var row = 0; row < height; row++)
-        {
-            Assert.Equal(0, raw[row * (stride + 1)]);
-            Array.Copy(raw, (row * (stride + 1)) + 1, pixels, row * stride, stride);
-        }
-
-        return pixels;
-    }
-
-    private static (byte R, byte G, byte B) Pixel(byte[] pixels, int width, int x, int y)
-    {
-        var i = ((y * width) + x) * 3;
-        return (pixels[i], pixels[i + 1], pixels[i + 2]);
     }
 
     private static IEnumerable<byte[]> Chunks(byte[] png)

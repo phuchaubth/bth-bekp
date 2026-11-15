@@ -88,18 +88,18 @@ public sealed class SettingsServiceTests
         await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
 
         var none = await service.GetSignatureFrameInfoAsync(CancellationToken.None);
-        var uploaded = await service.UploadSignatureFrameAsync(new(TestLogos.Jpeg40x32), CancellationToken.None);
+        var uploaded = await service.UploadSignatureFrameAsync(new(TestLogos.Png64), CancellationToken.None);
         var info = await service.GetSignatureFrameInfoAsync(CancellationToken.None);
         var image = await service.ResolveSignatureFrameAsync(CancellationToken.None);
         var removed = await service.DeleteSignatureFrameAsync(CancellationToken.None);
 
         Assert.Null(none);
         Assert.True(uploaded.IsSuccess, uploaded.Error?.Message);
-        Assert.Equal(new LogoInfoDto("image/jpeg", 40, 32, ctx.Clock.UtcNow), uploaded.Value.SignatureFrame);
+        Assert.Equal(new LogoInfoDto("image/png", 64, 64, ctx.Clock.UtcNow), uploaded.Value.SignatureFrame);
         Assert.Equal(uploaded.Value.SignatureFrame, info);
-        Assert.Equal(Convert.FromBase64String(TestLogos.Jpeg40x32), image!.Content);
+        Assert.Equal(Convert.FromBase64String(TestLogos.Png64), image!.Content);
         // Logo không bị ảnh khung thay thế, và bỏ khung không bỏ logo.
-        Assert.Equal("image/png", uploaded.Value.Logo!.ContentType);
+        Assert.Equal(64, uploaded.Value.Logo!.Width);
         Assert.Null(removed.SignatureFrame);
         Assert.NotNull(removed.Logo);
         Assert.Null(await service.GetSignatureFrameInfoAsync(CancellationToken.None));
@@ -107,16 +107,21 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public async Task SignatureFrame_RejectsFilesThatAreNotPngOrJpeg_NamingTheFrameInTheMessage()
+    public async Task SignatureFrame_MustBeAPngThatCanBePrinted_NamingTheFrameInTheMessage()
     {
         var ctx = new AppTestContext();
         var service = ctx.CreateSettingsService();
 
         var svg = await service.UploadSignatureFrameAsync(new("PHN2Zz48L3N2Zz4="), CancellationToken.None);
         var empty = await service.UploadSignatureFrameAsync(new(" "), CancellationToken.None);
+        var jpeg = await service.UploadSignatureFrameAsync(new(TestLogos.Jpeg40x32), CancellationToken.None);
+        var interlaced = TestPng.Build(40, 40, 8, 2, new byte[40 * 121], interlace: 1);
+        var adam7 = await service.UploadSignatureFrameAsync(new(Convert.ToBase64String(interlaced)), CancellationToken.None);
 
-        Assert.Equal("Ảnh khung chữ ký phải là ảnh PNG hoặc JPG.", svg.Error!.FieldErrors!["image"].Single());
+        Assert.Equal("Ảnh khung chữ ký cần là ảnh PNG.", svg.Error!.FieldErrors!["image"].Single());
         Assert.Equal("Vui lòng chọn file ảnh khung chữ ký.", empty.Error!.FieldErrors!["image"].Single());
+        Assert.Equal("Ảnh khung chữ ký cần là ảnh PNG.", jpeg.Error!.FieldErrors!["image"].Single());
+        Assert.Contains("PNG 8 bit, không xen kẽ", adam7.Error!.FieldErrors!["image"].Single(), StringComparison.Ordinal);
         Assert.Empty(ctx.Documents.Files);
         Assert.Null(await service.GetSignatureFrameInfoAsync(CancellationToken.None));
     }

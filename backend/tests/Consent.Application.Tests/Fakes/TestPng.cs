@@ -36,13 +36,15 @@ internal static class TestPng
     public static byte[] Blank(int width = 600, int height = 200) => Rgba(width, height, (_, _) => false);
 
     /// <summary>Ghép file PNG từ dữ liệu thô (đã thêm byte bộ lọc mỗi dòng).</summary>
-    public static byte[] Build(int width, int height, byte bitDepth, byte colorType, byte[] raw, bool corruptCrc = false)
+    public static byte[] Build(
+        int width, int height, byte bitDepth, byte colorType, byte[] raw, bool corruptCrc = false, byte interlace = 0, byte[]? palette = null)
     {
         var header = new byte[13];
         BinaryPrimitives.WriteInt32BigEndian(header, width);
         BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), height);
         header[8] = bitDepth;
         header[9] = colorType;
+        header[12] = interlace;
 
         using var compressed = new MemoryStream();
         using (var zlib = new ZLibStream(compressed, CompressionLevel.Fastest, leaveOpen: true))
@@ -54,9 +56,57 @@ internal static class TestPng
         png.Write([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         WriteChunk(png, "IHDR", header, corruptCrc);
         WriteChunk(png, "tEXt", Encoding.ASCII.GetBytes("Comment\0du lieu kem theo"), false);
+        if (palette is not null)
+        {
+            WriteChunk(png, "PLTE", palette, false);
+        }
+
         WriteChunk(png, "IDAT", compressed.ToArray(), false);
         WriteChunk(png, "IEND", [], false);
         return png.ToArray();
+    }
+
+    /// <summary>Đọc điểm ảnh RGB của PNG do máy chủ tạo (mọi dòng không dùng bộ lọc).</summary>
+    public static byte[] ReadRgb(byte[] png, int width, int height)
+    {
+        using var idat = new MemoryStream();
+        for (var offset = 8; offset + 8 <= png.Length;)
+        {
+            var length = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(offset));
+            if (Encoding.ASCII.GetString(png, offset + 4, 4) == "IDAT")
+            {
+                idat.Write(png, offset + 8, length);
+            }
+
+            offset += 12 + length;
+        }
+
+        idat.Position = 0;
+        var stride = width * 3;
+        var raw = new byte[height * (stride + 1)];
+        using (var zlib = new ZLibStream(idat, CompressionMode.Decompress))
+        {
+            zlib.ReadExactly(raw);
+        }
+
+        var pixels = new byte[height * stride];
+        for (var row = 0; row < height; row++)
+        {
+            if (raw[row * (stride + 1)] != 0)
+            {
+                throw new InvalidDataException("Dòng ảnh có bộ lọc.");
+            }
+
+            Array.Copy(raw, (row * (stride + 1)) + 1, pixels, row * stride, stride);
+        }
+
+        return pixels;
+    }
+
+    public static (byte R, byte G, byte B) Pixel(byte[] rgb, int width, int x, int y)
+    {
+        var i = ((y * width) + x) * 3;
+        return (rgb[i], rgb[i + 1], rgb[i + 2]);
     }
 
     public static (int Width, int Height, byte ColorType) ReadHeader(byte[] png) =>

@@ -8,7 +8,8 @@ import { LOGO_MAX_BYTES, settingsApi, settingsKeys, type SystemSettings } from '
 import { errorMessage } from '../../../utils/formErrors'
 import { formatDateTime } from '../../../utils/format'
 
-const ACCEPTED = ['image/png', 'image/jpeg']
+/** Chỉ PNG: máy chủ ghép ảnh khung với chữ ký để in lên PDF. */
+const ACCEPTED = ['image/png']
 
 function readAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -20,8 +21,8 @@ function readAsDataUrl(file: File): Promise<string> {
 }
 
 /**
- * Khung chữ ký: ảnh thiết kế của bệnh viện (logo, viền màu) làm nền cho khung ký trên điện thoại, kiosk và máy tính, và cho
- * khung hiện chữ ký mẫu của nhân viên. Chỉ để hiển thị: ảnh chữ ký lưu lại và PDF không có khung.
+ * Khung chữ ký (quyết định 26): ảnh thiết kế của bệnh viện (logo, viền màu) làm nền cho khung ký trên điện thoại, kiosk và máy
+ * tính, khung hiện chữ ký mẫu của nhân viên, và khung của mỗi chữ ký in trên PDF.
  */
 export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
   const queryClient = useQueryClient()
@@ -51,11 +52,11 @@ export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
     if (input.current) input.current.value = ''
     if (!file) return
     if (!ACCEPTED.includes(file.type)) {
-      setProblem('Ảnh khung chữ ký phải là ảnh PNG hoặc JPG.')
+      setProblem('Ảnh khung chữ ký cần là ảnh PNG.')
       return
     }
     if (file.size > LOGO_MAX_BYTES) {
-      setProblem('Ảnh khung chữ ký tối đa 1 MB. Ảnh lớn hơn thì lưu lại dạng JPG.')
+      setProblem('Ảnh khung chữ ký tối đa 1 MB. Ảnh lớn hơn thì thu nhỏ (rộng khoảng 1200–1500 điểm ảnh) rồi lưu lại PNG.')
       return
     }
     try {
@@ -69,9 +70,9 @@ export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
     <Card title="Khung chữ ký">
       <Flex vertical gap={10}>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
-          Ảnh thiết kế của bệnh viện (logo, viền màu) làm nền khung ký trên điện thoại, kiosk và máy tính, và khung hiện chữ ký mẫu
-          của nhân viên. Người ký ký vào khoảng trống giữa khung. Ảnh PNG hoặc JPG, tối đa 1 MB, nên ngang tỉ lệ 4:3, rộng từ 1200
-          điểm ảnh. Chỉ để hiển thị: ảnh chữ ký lưu lại và PDF không in khung.
+          Ảnh thiết kế của bệnh viện (logo, viền màu) làm nền khung ký trên điện thoại, kiosk và máy tính; chữ ký mẫu của nhân viên
+          hiện trong khung; trên PDF, mỗi chữ ký (người bệnh, nhân viên) in trong khung này. Người ký ký vào khoảng trống giữa
+          khung. Ảnh PNG, tối đa 1 MB, nên ngang tỉ lệ 4:3, rộng từ 1200 điểm ảnh.
         </Typography.Paragraph>
         {frame ? (
           <div style={{ width: '100%', maxWidth: 360 }}>
@@ -88,11 +89,19 @@ export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
         ) : (
           <Typography.Text type="secondary">Chưa có khung: khung ký là nền trắng, viền nét đứt.</Typography.Text>
         )}
+        {frame?.contentType === 'image/jpeg' && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Ảnh khung đang dùng là JPG: chỉ hiện trên màn hình ký, chưa in được lên PDF."
+            description="Tải lại ảnh khung dạng PNG để chữ ký trên PDF nằm trong khung."
+          />
+        )}
         {problem && <Alert type="error" showIcon title={problem} />}
         <input
           ref={input}
           type="file"
-          accept="image/png,image/jpeg"
+          accept="image/png"
           hidden
           aria-label="Chọn file khung chữ ký"
           onChange={(e) => void onFile(e.target.files?.[0])}
@@ -117,7 +126,8 @@ export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
           )}
         </Flex>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          Có hiệu lực ở mọi màn hình ký mở sau khi lưu. Mọi thay đổi được ghi nhật ký hệ thống.
+          Có hiệu lực ở mọi màn hình ký mở sau khi lưu và ở PDF tạo sau khi lưu; PDF đã ký giữ nguyên. Mọi thay đổi được ghi nhật ký hệ
+          thống.
         </Typography.Text>
       </Flex>
     </Card>

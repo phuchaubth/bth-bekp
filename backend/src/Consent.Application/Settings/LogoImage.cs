@@ -21,8 +21,9 @@ public sealed record LogoImage(byte[] Content, string ContentType, int Width, in
     /// Kiểm tra ảnh tải lên (Base64, có thể kèm tiền tố <c>data:image/...;base64,</c>). Chỉ nhận PNG/JPEG nhận ra được từ
     /// nội dung file (không tin phần mở rộng hay kiểu do trình duyệt gửi); không nhận SVG hay định dạng khác.
     /// <paramref name="noun"/> là tên ảnh trong thông báo lỗi (viết thường), ví dụ "logo", "ảnh khung chữ ký".
+    /// <paramref name="pngOnly"/>: chỉ nhận PNG (ảnh khung chữ ký, vì máy chủ cần đọc điểm ảnh để in lên PDF).
     /// </summary>
-    public static Result<LogoImage> Parse(string? base64, string noun = "logo")
+    public static Result<LogoImage> Parse(string? base64, string noun = "logo", bool pngOnly = false)
     {
         ArgumentException.ThrowIfNullOrEmpty(noun);
         var subject = char.ToUpperInvariant(noun[0]) + noun[1..];
@@ -58,9 +59,9 @@ public sealed record LogoImage(byte[] Content, string ContentType, int Width, in
             return Invalid($"{subject} tối đa 1 MB.");
         }
 
-        if (Read(content) is not { } image)
+        if (Read(content) is not { } image || (pngOnly && image.ContentType != Png))
         {
-            return Invalid($"{subject} phải là ảnh PNG hoặc JPG.");
+            return Invalid(pngOnly ? $"{subject} cần là ảnh PNG." : $"{subject} phải là ảnh PNG hoặc JPG.");
         }
 
         if (image.Width < MinSide || image.Height < MinSide || image.Width > MaxSide || image.Height > MaxSide)
