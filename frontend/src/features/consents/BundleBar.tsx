@@ -13,6 +13,7 @@ import {
 import { errorMessage } from '../../utils/formErrors'
 import { FormStatusTag } from './FormStatusTag'
 import { StaffSignModal, StartBundleSigningModal } from './SigningActions'
+import { KioskTag } from './KioskTag'
 
 /**
  * Thanh bộ phiếu (quyết định 23) trên trang phiếu: các phiếu của bộ và trạng thái, chuyển nhanh giữa các phiếu, ký cả bộ
@@ -45,7 +46,12 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
   return (
     <Card
       size="small"
-      title={`Bộ phiếu của ${bundle.patientName} (${bundle.forms.length} phiếu)`}
+      title={
+        <Space wrap size={8}>
+          {`Bộ phiếu của ${bundle.patientName} (${bundle.forms.length} phiếu)`}
+          <KioskTag method={bundle.kioskIdentity} />
+        </Space>
+      }
       extra={
         <Space wrap>
           {bundle.canStartSigning && (

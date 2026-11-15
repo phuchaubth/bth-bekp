@@ -271,6 +271,12 @@ public sealed class ConsentFormService(
             notices.Add(MixedSignersMessage);
         }
 
+        var kioskIdentity = bundle.Select(f => f.KioskIdentity).FirstOrDefault(m => m is not null);
+        if (bundle.Any(f => f.Status == ConsentFormStatus.PendingSignature) && KioskNotice(kioskIdentity) is { } kioskNotice)
+        {
+            notices.Add(kioskNotice);
+        }
+
         return new ConsentFormBundleDto(
             bundleId,
             patient.Id,
@@ -278,8 +284,24 @@ public sealed class ConsentFormService(
             items,
             CanStartSigning: signable.Count > 0 && !mixedSigners && currentUser.HasPermission(Permissions.ConsentsCreate),
             CanConfirm: items.Any(i => i.Actions.CanConfirmStep || i.Actions.CanConfirm),
-            notices);
+            notices,
+            kioskIdentity);
     }
+
+    /// <summary>
+    /// Nhắc nhân viên khi phiếu do người bệnh tự làm trên kiosk (quyết định 24): đối chiếu CCCD trước khi xác nhận; người
+    /// bệnh tự khai thì phải kiểm tra kỹ giấy tờ và thông tin hành chính.
+    /// </summary>
+    internal static string? KioskNotice(KioskIdentityMethod? method) => method switch
+    {
+        KioskIdentityMethod.CitizenIdCard =>
+            "Người bệnh tự làm phiếu tại kiosk (quét mã QR trên CCCD): đối chiếu CCCD trước khi xác nhận.",
+        KioskIdentityMethod.LookupCode =>
+            "Người bệnh tự làm phiếu tại kiosk (nhập mã y tế/số CCCD và ngày sinh): đối chiếu CCCD trước khi xác nhận.",
+        KioskIdentityMethod.SelfReported =>
+            "Người bệnh tự khai thông tin tại kiosk, chưa đối chiếu với hồ sơ bệnh viện: kiểm tra kỹ giấy tờ tùy thân và thông tin hành chính trước khi xác nhận.",
+        _ => null,
+    };
 
     /// <summary>Các phiếu chờ ký phải cùng một người ký thì mới ký chung một lần được.</summary>
     internal static bool HasMixedSigners(IReadOnlyCollection<ConsentForm> forms) =>
@@ -595,7 +617,8 @@ public sealed class ConsentFormService(
             replacedBy,
             BuildActions(form, template, steps, hasReplacement: replacedBy is not null),
             await BuildNoticesAsync(form, cancellationToken).ConfigureAwait(false),
-            form.BundleId);
+            form.BundleId,
+            form.KioskIdentity);
     }
 
     /// <summary>Thao tác người dùng hiện tại được làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại).</summary>
@@ -619,12 +642,17 @@ public sealed class ConsentFormService(
                 && currentUser.HasPermission(Permissions.ConsentsCreate));
     }
 
-    /// <summary>Thông báo cho người lập phiếu khi phiếu còn sửa được (ví dụ: hồ sơ còn số thẻ BHYT mã cũ 15 ký tự).</summary>
+    /// <summary>
+    /// Thông báo trên phiếu: khi còn sửa được (ví dụ hồ sơ còn số thẻ BHYT mã cũ 15 ký tự); khi chờ xác nhận mà phiếu do
+    /// người bệnh tự làm trên kiosk (nhắc đối chiếu CCCD).
+    /// </summary>
     private async Task<IReadOnlyList<string>> BuildNoticesAsync(ConsentForm form, CancellationToken cancellationToken)
     {
         if (!form.CanEdit)
         {
-            return [];
+            return form.Status == ConsentFormStatus.PendingSignature && KioskNotice(form.KioskIdentity) is { } kioskNotice
+                ? [kioskNotice]
+                : [];
         }
 
         var patient = await patients.GetByIdAsync(form.PatientId, cancellationToken).ConfigureAwait(false);
@@ -685,7 +713,7 @@ public sealed class ConsentFormService(
     }
 
     /// <summary>Điền sẵn các trường có nguồn tự điền từ hồ sơ người bệnh.</summary>
-    private static JsonObject Prefill(TemplateDefinition definition, Patient patient)
+    internal static JsonObject Prefill(TemplateDefinition definition, Patient patient)
     {
         var data = new JsonObject();
         foreach (var block in definition.InputBlocks.Where(b => b.Prefill is not null))
@@ -710,7 +738,7 @@ public sealed class ConsentFormService(
         return data;
     }
 
-    private static ConsentPatientInfo ToPatientInfo(Patient patient) =>
+    internal static ConsentPatientInfo ToPatientInfo(Patient patient) =>
         new(
             patient.Id,
             patient.FullName,

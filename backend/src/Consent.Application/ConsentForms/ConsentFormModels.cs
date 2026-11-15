@@ -159,7 +159,8 @@ public sealed record ConsentFormDetailDto(
     ConsentFormRef? ReplacedBy,
     ConsentFormActions Actions,
     IReadOnlyList<string> Notices,
-    Guid? BundleId = null);
+    Guid? BundleId = null,
+    KioskIdentityMethod? KioskIdentity = null);
 
 /// <summary>Lập phiếu. <paramref name="ReplacesFormId"/>: lập phiếu thay thế cho phiếu đã thu hồi (cùng người bệnh, cùng mẫu).</summary>
 public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId, Guid? ReplacesFormId = null);
@@ -214,7 +215,8 @@ public sealed record ConsentFormBundleDto(
     IReadOnlyList<ConsentFormBundleItemDto> Forms,
     bool CanStartSigning,
     bool CanConfirm,
-    IReadOnlyList<string> Notices);
+    IReadOnlyList<string> Notices,
+    KioskIdentityMethod? KioskIdentity = null);
 
 /// <summary>Phiên ký cho cả bộ: một token cho mọi phiếu đang chờ người bệnh ký trong bộ.</summary>
 public sealed record BundleSigningSessionDto(string Token, DateTimeOffset ExpiresAtUtc, IReadOnlyList<Guid> FormIds);

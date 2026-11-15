@@ -1,5 +1,6 @@
 using Consent.Api.Authorization;
 using Consent.Api.Infrastructure;
+using Consent.Application.Kiosk;
 using Consent.Application.Settings;
 using Consent.Domain.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,8 +11,19 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/settings")]
 [Produces("application/json")]
-public sealed class SettingsController(SettingsService settings) : ControllerBase
+public sealed class SettingsController(SettingsService settings, KioskSettingsService kioskSettings) : ControllerBase
 {
+    /// <summary>Các mẫu người bệnh tự làm trên kiosk (quyết định 24), theo thứ tự làm.</summary>
+    [HttpGet("kiosk")]
+    [HasPermission(Permissions.SettingsManage)]
+    public Task<KioskSettingsDto> GetKiosk(CancellationToken cancellationToken) => kioskSettings.GetAsync(cancellationToken);
+
+    /// <summary>Chọn mẫu cho kiosk: chỉ mẫu đang dùng, đã phát hành, người bệnh tự trả lời được.</summary>
+    [HttpPut("kiosk")]
+    [HasPermission(Permissions.SettingsManage)]
+    public async Task<IActionResult> UpdateKiosk(UpdateKioskSettingsRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await kioskSettings.UpdateAsync(request, cancellationToken).ConfigureAwait(false));
+
     [HttpGet]
     [HasPermission(Permissions.SettingsManage)]
     public Task<SystemSettingsDto> Get(CancellationToken cancellationToken) => settings.GetAsync(cancellationToken);

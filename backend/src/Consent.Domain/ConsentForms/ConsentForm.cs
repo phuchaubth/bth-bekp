@@ -24,6 +24,22 @@ public enum ConsentSignerKind
 }
 
 /// <summary>
+/// Phiếu do người bệnh tự làm trên kiosk (quyết định 24): cách người bệnh tự nhận diện, để nhân viên biết mức độ cần đối
+/// chiếu trước khi xác nhận.
+/// </summary>
+public enum KioskIdentityMethod
+{
+    /// <summary>Quét mã QR trên thẻ CCCD/căn cước.</summary>
+    CitizenIdCard,
+
+    /// <summary>Nhập mã y tế hoặc số CCCD, kèm ngày sinh khớp hồ sơ.</summary>
+    LookupCode,
+
+    /// <summary>Người bệnh tự khai thông tin: nhân viên phải đối chiếu giấy tờ tùy thân trước khi xác nhận.</summary>
+    SelfReported,
+}
+
+/// <summary>
 /// Phiếu đồng thuận/cam kết của một người bệnh, lập theo một phiên bản mẫu cố định. Nội dung điền (<see cref="DataJson"/>)
 /// và ảnh chụp thông tin người bệnh lúc trình ký (<see cref="SnapshotJson"/>) có thể chứa dữ liệu cá nhân nên được mã hóa
 /// khi lưu và luôn bị che trong nhật ký audit.
@@ -121,6 +137,9 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     /// </summary>
     public Guid? BundleId { get; private set; }
 
+    /// <summary>Phiếu do người bệnh tự làm trên kiosk và cách người bệnh nhận diện; rỗng với phiếu nhân viên lập.</summary>
+    public KioskIdentityMethod? KioskIdentity { get; private set; }
+
     /// <summary>Khóa lưu trữ của file PDF đã ký (file được mã hóa khi lưu).</summary>
     public string? SignedPdfKey { get; private set; }
 
@@ -168,15 +187,22 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         Guid createdByUserId,
         DateTimeOffset nowUtc,
         Guid? replacesFormId = null,
-        Guid? bundleId = null)
+        Guid? bundleId = null,
+        KioskIdentityMethod? kioskIdentity = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(formNo);
         ArgumentNullException.ThrowIfNull(dataJson);
+        if (kioskIdentity is { } method && !Enum.IsDefined(method))
+        {
+            throw new DomainException("Cách nhận diện trên kiosk không hợp lệ.");
+        }
+
         return new ConsentForm(
             Guid.CreateVersion7(), formNo, patientId, templateId, templateVersionId, departmentId, dataJson, createdByUserId, nowUtc)
         {
             ReplacesFormId = replacesFormId,
             BundleId = bundleId,
+            KioskIdentity = kioskIdentity,
         };
     }
 

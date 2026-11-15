@@ -12,8 +12,16 @@ public sealed record PermissionDto(string Code, string Name, string Group)
     }
 }
 
+/// <param name="IsLocked">Quyền cố định, không sửa được trên ma trận phân quyền (Quản trị hệ thống, Kiosk).</param>
 public sealed record RoleDto(
-    Guid Id, string Code, string Name, string? Description, bool IsSystem, bool IsAdministrator, IReadOnlyList<string> Permissions)
+    Guid Id,
+    string Code,
+    string Name,
+    string? Description,
+    bool IsSystem,
+    bool IsAdministrator,
+    IReadOnlyList<string> Permissions,
+    bool IsLocked = false)
 {
     public static RoleDto From(Role role)
     {
@@ -21,7 +29,9 @@ public sealed record RoleDto(
         IReadOnlyList<string> permissions = role.IsAdministrator
             ? [.. PermissionCatalog.AllCodes.Order(StringComparer.Ordinal)]
             : [.. role.PermissionCodes.Order(StringComparer.Ordinal)];
-        return new RoleDto(role.Id, role.Code, role.Name, role.Description, role.IsSystem, role.IsAdministrator, permissions);
+        return new RoleDto(
+            role.Id, role.Code, role.Name, role.Description, role.IsSystem, role.IsAdministrator, permissions,
+            role.IsAdministrator || role.IsKiosk);
     }
 }
 

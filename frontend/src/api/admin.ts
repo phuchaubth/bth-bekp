@@ -36,6 +36,8 @@ export interface Role {
   isSystem: boolean
   isAdministrator: boolean
   permissions: string[]
+  /** Quyền cố định, không sửa được trên ma trận (Quản trị hệ thống, Kiosk). */
+  isLocked?: boolean
 }
 
 export interface UserListItem {

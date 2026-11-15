@@ -58,6 +58,15 @@ public sealed class User : Entity, IAuditableEntity
 
     public DateTimeOffset? LastLoginAtUtc { get; private set; }
 
+    /// <summary>
+    /// Số lần tra cứu người bệnh sai liên tiếp trên kiosk (mã y tế/số CCCD không khớp ngày sinh, hoặc không có hồ sơ).
+    /// Tách riêng với đăng nhập sai: khóa tra cứu không làm máy kiosk bị đăng xuất.
+    /// </summary>
+    public int KioskLookupFailures { get; private set; }
+
+    /// <summary>Thời điểm hết khóa tra cứu người bệnh trên kiosk (quyết định 24: sai 5 lần thì khóa 5 phút).</summary>
+    public DateTimeOffset? KioskLookupLockedUntilUtc { get; private set; }
+
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
     public IReadOnlyCollection<UserRole> Roles => _roles;
@@ -166,14 +175,39 @@ public sealed class User : Entity, IAuditableEntity
         LastLoginAtUtc = nowUtc;
     }
 
+    public bool IsKioskLookupLocked(DateTimeOffset nowUtc) => KioskLookupLockedUntilUtc is { } until && until > nowUtc;
+
+    /// <summary>Ghi nhận một lần tra cứu người bệnh sai trên kiosk. Trả về <c>true</c> nếu tra cứu vừa bị khóa tạm thời.</summary>
+    public bool RegisterKioskLookupFailure(DateTimeOffset nowUtc, LockoutPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+        KioskLookupFailures++;
+        if (KioskLookupFailures < policy.MaxFailedAttempts)
+        {
+            return false;
+        }
+
+        KioskLookupLockedUntilUtc = nowUtc + policy.LockoutDuration;
+        KioskLookupFailures = 0;
+        return true;
+    }
+
+    /// <summary>Tra cứu đúng: xóa đếm lần sai và trạng thái khóa tra cứu.</summary>
+    public void ResetKioskLookupFailures()
+    {
+        KioskLookupFailures = 0;
+        KioskLookupLockedUntilUtc = null;
+    }
+
     public void Deactivate() => IsActive = false;
 
-    /// <summary>Mở khóa: cho phép đăng nhập lại và xóa trạng thái khóa tạm thời.</summary>
+    /// <summary>Mở khóa: cho phép đăng nhập lại và xóa trạng thái khóa tạm thời (cả khóa tra cứu trên kiosk).</summary>
     public void Activate()
     {
         IsActive = true;
         FailedLoginCount = 0;
         LockoutEndUtc = null;
+        ResetKioskLookupFailures();
     }
 
     private static string RequireFullName(string fullName)

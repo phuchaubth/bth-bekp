@@ -36,6 +36,9 @@ public sealed class Role : Entity, IAuditableEntity
 
     public bool IsAdministrator => Code == SystemRoles.Administrator;
 
+    /// <summary>Vai trò Kiosk (quyết định 24): quyền cố định, chỉ dùng màn hình kiosk.</summary>
+    public bool IsKiosk => Code == SystemRoles.Kiosk;
+
     public static Role Create(string code, string name, string? description, bool isSystem)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Length > CodeMaxLength)
@@ -51,7 +54,10 @@ public sealed class Role : Entity, IAuditableEntity
         return new Role(Guid.CreateVersion7(), code.Trim().ToUpperInvariant(), name.Trim(), description?.Trim(), isSystem);
     }
 
-    /// <summary>Thay toàn bộ tập quyền. Không áp dụng cho vai trò Quản trị hệ thống.</summary>
+    /// <summary>
+    /// Thay toàn bộ tập quyền. Không áp dụng cho vai trò Quản trị hệ thống; vai trò Kiosk chỉ nhận đúng tập quyền cố định
+    /// của nó (máy kiosk đặt ở nơi công cộng không được thêm quyền xem dữ liệu).
+    /// </summary>
     public void SetPermissions(IEnumerable<string> permissionCodes)
     {
         ArgumentNullException.ThrowIfNull(permissionCodes);
@@ -60,7 +66,13 @@ public sealed class Role : Entity, IAuditableEntity
             throw new DomainException("Không thể thay đổi quyền của vai trò Quản trị hệ thống.");
         }
 
-        ReplacePermissions(permissionCodes);
+        var codes = permissionCodes.ToArray();
+        if (IsKiosk && !codes.ToHashSet(StringComparer.Ordinal).SetEquals(SystemRoles.KioskPermissions))
+        {
+            throw new DomainException("Vai trò Kiosk chỉ có đúng quyền dùng kiosk; không thể thêm hay bớt quyền.");
+        }
+
+        ReplacePermissions(codes);
     }
 
     /// <summary>Bảo đảm vai trò có đủ mọi quyền trong danh mục (dùng cho vai trò Quản trị hệ thống).</summary>

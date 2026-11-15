@@ -379,6 +379,40 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 
 Đã kiểm thử tự động trên iPhone 13 và Pixel 7 giả lập (cầm dọc và ngang): lập phiếu, ký, xác nhận, không tràn ngang. Cần thử trên vài điện thoại thật của bệnh viện trước khi dùng chính thức.
 
+## 9b. Máy kiosk cho người bệnh tự làm phiếu (quyết định 24)
+
+Người bệnh tự nhận diện, trả lời và ký một lần cho cả bộ phiếu trên kiosk; nhân viên tiếp đón kiểm tra rồi **Xác nhận cả bộ** như bình thường. Kiosk là một trang của chính phần mềm (`/kiosk`), không cài thêm gì trên máy chủ.
+
+**Phần cứng**
+
+1. **Màn hình cảm ứng 32 inch đặt dọc** (Full HD 1080×1920 hoặc 4K đặt tỉ lệ hiển thị 200%), máy tính Windows 10/11 chạy Chrome hoặc Edge bản mới. Trong Windows: *Settings → System → Display → Display orientation: Portrait*.
+2. **Máy quét mã 2D (đọc được QR) cổng USB**, gắn bên dưới màn hình, đặt ở **chế độ bàn phím (USB HID Keyboard)**, **thêm phím Enter sau mỗi lần quét**, và **xuất ký tự Unicode/UTF-8** để đọc đúng họ tên có dấu trong mã QR (xem tài liệu máy quét; nhiều máy có mã vạch cấu hình in sẵn). Thử với vài thẻ thật: CCCD gắn chip và thẻ căn cước mẫu mới.
+3. Không cần camera: quét bằng camera để sau, vì trình duyệt chỉ mở camera khi trang chạy HTTPS.
+
+**Tài khoản và mẫu phiếu** (làm một lần)
+
+1. *Quản trị → Người dùng → Thêm*: tên đăng nhập ví dụ `kiosk.kkb`, chọn **khoa đặt máy** (phiếu lập trên kiosk thuộc khoa này) và **chỉ vai trò "Kiosk người bệnh"**. Máy chủ từ chối nếu thêm vai trò khác hoặc không chọn khoa. Vai trò này chỉ có quyền dùng màn hình kiosk, không sửa được trên ma trận quyền.
+2. *Quản trị → Cấu hình hệ thống → Kiosk người bệnh tự làm phiếu*: chọn mẫu **theo thứ tự làm**, đề xuất `QT-KNGT-BM02`, `TTNB-NGOAITRU`, `TUVAN-CONGTT` → **Lưu mẫu kiosk**. Mẫu có bảng nhiều dòng hoặc ngày giờ không chọn được; BM10 (nhiều mục chuyên môn) để điều dưỡng làm.
+3. Nâng cấp từ bản trước: chạy migration như mục 4.2 (bản này thêm 3 cột: `ConsentForms.KioskIdentity`, `Users.KioskLookupFailures`, `Users.KioskLookupLockedUntilUtc`). Vai trò Kiosk tự được tạo khi API khởi động.
+
+**Mở Chrome toàn màn hình khi bật máy**
+
+Tạo lối tắt trong thư mục khởi động (`Win + R` → `shell:startup`), đích:
+
+```text
+"C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk "https://<địa chỉ phần mềm>/kiosk" --no-first-run --disable-pinch --overscroll-history-navigation=0 --disable-features=TranslateUI
+```
+
+Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm>/kiosk" --edge-kiosk-type=fullscreen`.
+
+**Hằng ngày**
+
+1. Mỗi sáng nhân viên bật máy, đăng nhập **tài khoản kiosk** (lần đầu đổi mật khẩu). Phiên đăng nhập giữ trong ngày (12 giờ, `Auth:RefreshTokenLifetimeHours`).
+2. Đăng xuất máy: **giữ biểu tượng bệnh viện ở góc trên bên trái 3 giây** → *Đăng xuất*. Thoát Chrome toàn màn hình: `Alt + F4` bằng bàn phím rời.
+3. **60 giây không chạm** thì màn hình tự xóa thông tin và về trang đầu (10 giây cuối có nhắc).
+4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng → Mở khóa* tài khoản kiosk.
+5. Phiếu từ kiosk có nhãn **"Lập tại kiosk"** trong danh sách bộ phiếu và chi tiết phiếu. Nhân viên **đối chiếu CCCD** rồi bấm *Xác nhận cả bộ*; nhãn **"tự khai"** (màu cam) thì kiểm tra kỹ giấy tờ và thông tin hành chính trước khi xác nhận.
+
 ## 10. Danh sách kiểm tra sau triển khai
 
 1. `https://…/health/ready` trả `Healthy`; `http://` chuyển sang `https://` (hoặc không mở).
@@ -387,10 +421,11 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 4. **Mẫu phiếu**: Phòng KHTH rà soát 4 mẫu phiếu của bệnh viện (được tạo ở trạng thái nháp khi không có dữ liệu demo, xem [mẫu phiếu](mau-phieu.md)) và **phát hành**.
 5. Tạo khoa/phòng và tài khoản thật; đăng nhập thử từng vai trò (menu chỉ hiện đúng chức năng).
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
-7. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
-8. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
-9. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
-10. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+7. Kiosk (mục 9b): quét thử vài thẻ CCCD thật (họ tên có dấu đọc đúng), làm trọn một bộ phiếu với người bệnh giả lập, nhân viên tiếp đón **Xác nhận cả bộ**; nhập sai ngày sinh 5 lần thấy máy tạm khóa tra cứu; để yên 60 giây thấy màn hình tự về trang đầu.
+8. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
+9. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
+10. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
+11. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 
 ## 11. Sự cố thường gặp
 

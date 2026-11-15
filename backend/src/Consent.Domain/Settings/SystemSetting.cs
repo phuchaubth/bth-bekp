@@ -71,8 +71,16 @@ public static class SettingKeys
     /// <summary>Kiểu ảnh của logo: <c>image/png</c> hoặc <c>image/jpeg</c>.</summary>
     public const string LogoContentType = "Logo.ContentType";
 
+    /// <summary>
+    /// Mã các mẫu người bệnh tự làm trên kiosk, theo thứ tự làm, phân tách bằng dấu phẩy (quyết định 24), ví dụ
+    /// "QT-KNGT-BM02,TTNB-NGOAITRU". Chưa đặt thì kiosk chưa có phiếu nào để làm.
+    /// </summary>
+    public const string KioskTemplateCodes = "Kiosk.TemplateCodes";
+
     public static IReadOnlySet<string> All { get; } =
-        new HashSet<string>([HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType], StringComparer.Ordinal);
+        new HashSet<string>(
+            [HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes],
+            StringComparer.Ordinal);
 
     public static bool IsDefined(string key) => key is not null && All.Contains(key);
 }

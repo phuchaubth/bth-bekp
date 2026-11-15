@@ -22,6 +22,9 @@ internal sealed class PatientRepository(ConsentDbContext db, IBlindIndexer blind
     public Task<bool> PatientCodeExistsAsync(string patientCode, Guid? excludeId, CancellationToken cancellationToken) =>
         db.Patients.AnyAsync(p => p.PatientCode == patientCode && p.Id != excludeId, cancellationToken);
 
+    public Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken) =>
+        db.Patients.Include(p => p.Representatives).FirstOrDefaultAsync(p => p.PatientCode == patientCode, cancellationToken);
+
     /// <summary>
     /// Từ khóa là 12 chữ số → tìm chính xác theo số CCCD (qua chỉ mục mù); còn lại → tìm theo mã người bệnh
     /// (chính xác) hoặc họ tên (không phân biệt dấu).

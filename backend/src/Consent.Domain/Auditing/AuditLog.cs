@@ -104,4 +104,16 @@ public static class AuditActions
     public const string ConsentFormCompleted = "ConsentForms.Completed";
     public const string ConsentFormRevoked = "ConsentForms.Revoked";
     public const string ConsentFormsExported = "Exports.ConsentForms";
+
+    /// <summary>Kiosk: người bệnh tự nhận diện thành công (ghi cách nhận diện, không ghi mã hay số CCCD).</summary>
+    public const string KioskIdentified = "Kiosk.Identified";
+
+    /// <summary>Kiosk: tra cứu không khớp (mã/CCCD và ngày sinh) hoặc không có hồ sơ.</summary>
+    public const string KioskLookupFailed = "Kiosk.LookupFailed";
+
+    /// <summary>Kiosk: tra cứu bị tạm khóa do sai nhiều lần.</summary>
+    public const string KioskLookupLocked = "Kiosk.LookupLocked";
+
+    /// <summary>Kiosk: người bệnh nộp và ký bộ phiếu.</summary>
+    public const string KioskSubmitted = "Kiosk.Submitted";
 }

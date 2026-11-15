@@ -109,6 +109,15 @@ export interface SigningSessionToken {
   expiresAtUtc: string
 }
 
+/** Cách người bệnh tự nhận diện trên kiosk (quyết định 24). */
+export type KioskIdentityMethod = 'CitizenIdCard' | 'LookupCode' | 'SelfReported'
+
+export const kioskIdentityLabels: Record<KioskIdentityMethod, string> = {
+  CitizenIdCard: 'Lập tại kiosk · quét CCCD',
+  LookupCode: 'Lập tại kiosk · nhập mã y tế/CCCD',
+  SelfReported: 'Lập tại kiosk · tự khai',
+}
+
 export interface ConsentFormDetail {
   id: string
   formNo: string
@@ -151,6 +160,8 @@ export interface ConsentFormDetail {
   notices: string[]
   /** Bộ phiếu (quyết định 23) mà phiếu thuộc về; rỗng với phiếu lập lẻ. */
   bundleId?: string | null
+  /** Phiếu do người bệnh tự làm trên kiosk và cách người bệnh nhận diện (quyết định 24). */
+  kioskIdentity?: KioskIdentityMethod | null
 }
 
 /** Một phiếu trong bộ phiếu, kèm thao tác người dùng hiện tại được làm. */
@@ -180,6 +191,7 @@ export interface ConsentFormBundle {
   /** Người dùng hiện tại có phiếu đến lượt xác nhận. */
   canConfirm: boolean
   notices: string[]
+  kioskIdentity?: KioskIdentityMethod | null
 }
 
 export interface BundleSigningSession {

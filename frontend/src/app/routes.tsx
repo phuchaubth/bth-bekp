@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import type { RouteObject } from 'react-router'
-import { RequireAuth, RequirePermission } from '../auth/guards'
-import { FORCED_PASSWORD_CHANGE_PATH, LOGIN_PATH } from '../auth/paths'
+import { RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
+import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from '../auth/paths'
 import { AppLayout } from '../components/layout/AppLayout'
 import { PagePlaceholder } from '../components/PagePlaceholder'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
@@ -21,6 +21,7 @@ import {
   ConsentTemplatesPage,
   DepartmentsPage,
   ExportsPage,
+  KioskPage,
   Lazy,
   PatientIntakePage,
   PatientProfilePage,
@@ -74,6 +75,20 @@ export const appRoutes: RouteObject[] = [
     ),
     errorElement: <ErrorPage />,
   },
+  // Kiosk người bệnh tự làm phiếu (quyết định 24): toàn màn hình, không có menu.
+  {
+    path: KIOSK_PATH,
+    element: (
+      <RequireAuth>
+        <RequirePermission permission={Permissions.KioskUse}>
+          <Lazy>
+            <KioskPage />
+          </Lazy>
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <ErrorPage />,
+  },
   {
     path: FORCED_PASSWORD_CHANGE_PATH,
     element: (
@@ -87,7 +102,9 @@ export const appRoutes: RouteObject[] = [
     path: '/',
     element: (
       <RequireAuth>
-        <AppLayout />
+        <RedirectKioskAccount>
+          <AppLayout />
+        </RedirectKioskAccount>
       </RequireAuth>
     ),
     errorElement: <ErrorPage />,

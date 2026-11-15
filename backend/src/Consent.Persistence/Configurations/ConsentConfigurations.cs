@@ -62,6 +62,7 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.HasOne<ConsentForm>().WithMany().HasForeignKey(f => f.ReplacesFormId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(f => f.ReplacesFormId).IsUnique().HasFilter("[ReplacesFormId] IS NOT NULL");
         builder.HasIndex(f => f.BundleId).HasFilter("[BundleId] IS NOT NULL");
+        builder.Property(f => f.KioskIdentity).HasConversion<string>().HasMaxLength(20);
 
         builder.HasMany(f => f.Signatures).WithOne().HasForeignKey(s => s.FormId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(f => f.Signatures).HasField("_signatures").UsePropertyAccessMode(PropertyAccessMode.Field);

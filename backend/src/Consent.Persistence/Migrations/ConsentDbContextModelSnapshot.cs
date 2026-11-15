@@ -123,6 +123,10 @@ namespace Consent.Persistence.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<string>("KioskIdentity")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<Guid>("PatientId")
                         .HasColumnType("uniqueidentifier");
 
@@ -607,6 +611,12 @@ namespace Consent.Persistence.Migrations
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
+
+                    b.Property<int>("KioskLookupFailures")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("KioskLookupLockedUntilUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<DateTimeOffset?>("LastLoginAtUtc")
                         .HasColumnType("datetimeoffset");

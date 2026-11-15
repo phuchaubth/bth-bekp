@@ -193,9 +193,28 @@ public sealed class UserAdminService(
 
         var requestedRoleIds = request.RoleIds.Distinct().ToArray();
         var found = await roles.GetByIdsAsync(requestedRoleIds, cancellationToken).ConfigureAwait(false);
-        return found.Count == requestedRoleIds.Length
-            ? null
-            : Error.ValidationField("roleIds", "Có vai trò không tồn tại.");
+        if (found.Count != requestedRoleIds.Length)
+        {
+            return Error.ValidationField("roleIds", "Có vai trò không tồn tại.");
+        }
+
+        // Quyết định 24: máy kiosk đặt ở nơi công cộng chỉ được làm đúng việc của kiosk, và phiếu lập trên kiosk thuộc khoa
+        // của tài khoản kiosk.
+        if (found.Any(r => r.IsKiosk))
+        {
+            if (found.Count > 1)
+            {
+                return Error.ValidationField("roleIds", "Tài khoản kiosk chỉ có vai trò Kiosk, không gán thêm vai trò khác.");
+            }
+
+            if (request.DepartmentId is null)
+            {
+                return Error.ValidationField(
+                    "departmentId", "Tài khoản kiosk phải thuộc một khoa: phiếu người bệnh làm trên kiosk thuộc khoa này.");
+            }
+        }
+
+        return null;
     }
 
     private async Task<bool> IsAdministratorAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)

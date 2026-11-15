@@ -26,6 +26,7 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
   const { message } = App.useApp()
   const groups = useMemo(() => groupPermissions(catalog), [catalog])
   const dirty = selected.size !== role.permissions.length || role.permissions.some((p) => !selected.has(p))
+  const locked = role.isAdministrator || !!role.isLocked
 
   const save = useMutation({
     mutationFn: () => adminApi.updateRolePermissions(role.id, [...selected]),
@@ -53,7 +54,7 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
     <Card
       title={role.name}
       extra={
-        !role.isAdministrator && (
+        !locked && (
           <Space wrap>
             <Button disabled={!dirty || save.isPending} onClick={() => setSelected(new Set(role.permissions))}>
               Hủy thay đổi
@@ -74,6 +75,14 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
           title="Vai trò Quản trị hệ thống luôn có toàn bộ quyền và không thể thay đổi."
         />
       )}
+      {locked && !role.isAdministrator && (
+        <Alert
+          type="info"
+          showIcon
+          style={{ marginBottom: 16 }}
+          title="Vai trò này có quyền cố định và không thể thay đổi (máy kiosk đặt ở nơi công cộng chỉ dùng được màn hình kiosk)."
+        />
+      )}
       {groups.map(([group, permissions]) => (
         <section key={group} style={{ marginBottom: 16 }}>
           <Typography.Title level={5} style={{ marginTop: 0 }}>
@@ -84,7 +93,7 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
               <Col xs={24} sm={12} key={permission.code}>
                 <Checkbox
                   checked={selected.has(permission.code)}
-                  disabled={role.isAdministrator}
+                  disabled={locked}
                   onChange={(e) => toggle(permission.code, e.target.checked)}
                 >
                   {permission.name}{' '}

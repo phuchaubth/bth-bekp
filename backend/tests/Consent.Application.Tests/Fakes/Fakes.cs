@@ -220,6 +220,9 @@ internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientR
     public Task<bool> PatientCodeExistsAsync(string patientCode, Guid? excludeId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Patients.Exists(p => p.PatientCode == patientCode && p.Id != excludeId));
 
+    public Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Patients.Find(p => p.PatientCode == patientCode));
+
     public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken)
     {
         var items = store.Patients
@@ -229,6 +232,24 @@ internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientR
     }
 
     public void Add(Patient patient) => store.Patients.Add(patient);
+}
+
+/// <summary>Nguồn thông tin người bệnh giả (API thông tin người bệnh): trả kết quả cấu hình sẵn, ghi lại các lần tra cứu.</summary>
+internal sealed class StubPatientSource : IPatientSource
+{
+    public bool IsEnabled { get; set; } = true;
+
+    public PatientSourceResult Result { get; set; } = PatientSourceResult.NotFound;
+
+    public bool Throws { get; set; }
+
+    public List<(string? PatientCode, string? CitizenId)> Calls { get; } = [];
+
+    public Task<PatientSourceResult> FindAsync(string? patientCode, string? citizenId, CancellationToken cancellationToken)
+    {
+        Calls.Add((patientCode, citizenId));
+        return Throws ? throw new HttpRequestException("Không kết nối được.") : Task.FromResult(Result);
+    }
 }
 
 /// <summary>HIS giả cho kiểm thử: trả kết quả cấu hình sẵn, có thể mô phỏng lỗi hoặc treo (để kiểm tra timeout).</summary>

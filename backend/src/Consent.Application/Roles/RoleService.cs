@@ -31,6 +31,13 @@ public sealed class RoleService(IRoleRepository roles, IUnitOfWork unitOfWork)
                 "roles.admin_immutable", "Vai trò Quản trị hệ thống luôn có toàn bộ quyền và không thể thay đổi."));
         }
 
+        if (role.IsKiosk)
+        {
+            return Result<RoleDto>.Failure(Error.BusinessRule(
+                "roles.kiosk_immutable",
+                "Vai trò Kiosk chỉ có quyền dùng màn hình kiosk (máy đặt ở nơi công cộng không được xem dữ liệu khác) và không thể thay đổi."));
+        }
+
         var requested = request.Permissions ?? [];
         var unknown = requested.Where(code => !PermissionCatalog.IsDefined(code)).Distinct(StringComparer.Ordinal).ToArray();
         if (unknown.Length > 0)

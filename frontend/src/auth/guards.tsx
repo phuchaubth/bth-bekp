@@ -4,7 +4,8 @@ import { Navigate, useLocation } from 'react-router'
 import { SIGNING_PATH, signingSession } from '../features/signing/signingSession'
 import { ForbiddenPage } from '../pages/ForbiddenPage'
 import { useAuth } from './authContext'
-import { FORCED_PASSWORD_CHANGE_PATH, LOGIN_PATH } from './paths'
+import { KIOSK_ROLE_CODE } from './permissions'
+import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from './paths'
 
 export function FullPageSpinner({ tip = 'Đang tải…' }: { tip?: string }) {
   return (
@@ -48,6 +49,15 @@ export function RequirePermission({ permission, children }: { permission?: strin
   const { hasPermission } = useAuth()
   if (permission && !hasPermission(permission)) {
     return <ForbiddenPage />
+  }
+  return children
+}
+
+/** Tài khoản kiosk (quyết định 24) chỉ dùng màn hình kiosk: mở trang nào khác cũng được chuyển về kiosk. */
+export function RedirectKioskAccount({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (user?.roles.some((role) => role.code === KIOSK_ROLE_CODE)) {
+    return <Navigate to={KIOSK_PATH} replace />
   }
   return children
 }

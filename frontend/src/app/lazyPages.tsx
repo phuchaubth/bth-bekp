@@ -32,6 +32,7 @@ export const ConsentTemplateDetailPage = lazy(() =>
 export const SigningKioskPage = lazy(() =>
   import('../features/signing/SigningKioskPage').then((m) => ({ default: m.SigningKioskPage })),
 )
+export const KioskPage = lazy(() => import('../features/kiosk/KioskPage').then((m) => ({ default: m.KioskPage })))
 export const ExportsPage = lazy(() => import('../features/exports/ExportsPage').then((m) => ({ default: m.ExportsPage })))
 export const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 export const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })))

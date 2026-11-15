@@ -36,6 +36,7 @@ import { relationshipLabels } from '../patients/labels'
 import { signerRoleLabel } from '../templates/signerRoles'
 import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
+import { KioskTag } from './KioskTag'
 import { BundleBar } from './BundleBar'
 import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
 import { BRAND } from '../../app/theme'
@@ -239,6 +240,7 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
         </Descriptions.Item>
         <Descriptions.Item label="Trạng thái">
           <FormStatusTag status={form.status} />
+          <KioskTag method={form.kioskIdentity} />
         </Descriptions.Item>
         <Descriptions.Item label="Mẫu phiếu">
           {form.templateCode} · phiên bản {form.templateVersionNo}

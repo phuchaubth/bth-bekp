@@ -163,7 +163,7 @@ Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_
 |---|---|---|---|
 | GET | `/api/v1/permissions` | Đã đăng nhập | Danh mục quyền: `[{ code, name, group }]` |
 | GET | `/api/v1/roles` | Đã đăng nhập | Danh sách vai trò kèm mã quyền |
-| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`) |
+| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`); vai trò Kiosk chỉ có `kiosk.use` và không sửa được (`422 roles.kiosk_immutable`). Danh sách vai trò có `isLocked` cho hai vai trò này |
 
 Quyền mới có hiệu lực khi access token được làm mới (tối đa 15 phút).
 
@@ -174,11 +174,11 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 | Hệ thống | `users.read`, `users.manage`, `roles.manage`, `departments.manage`, `audit.read`, `settings.manage` |
 | Người bệnh | `patients.read`, `patients.manage` |
 | Mẫu phiếu | `templates.read`, `templates.manage` |
-| Phiếu đồng thuận | `consents.read`, `consents.create`, `consents.sign`, `consents.revoke` |
+| Phiếu đồng thuận | `consents.read`, `consents.create`, `consents.sign`, `consents.revoke`, `kiosk.use` (dùng màn hình kiosk, quyết định 24) |
 | Báo cáo và xuất dữ liệu | `reports.read`, `exports.run`, `exports.sensitive` |
 | Phạm vi dữ liệu | `scope.all_departments` (xem dữ liệu mọi khoa) |
 
-**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`. Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
+**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`, `KIOSK` (máy kiosk người bệnh: chỉ `kiosk.use`; tài khoản mang vai trò này không được có vai trò khác và phải thuộc một khoa — `400` ở `roleIds`/`departmentId`). Vai trò hệ thống còn thiếu được tự tạo khi khởi động (nâng cấp phiên bản không cần thao tác). Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
 
 ---
 
@@ -462,8 +462,34 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 | GET | `/api/v1/settings/logo` | `settings.manage` | Ảnh logo đang dùng (`image/png` hoặc `image/jpeg`, `Cache-Control: no-store`); chưa có → `404` |
 | PUT | `/api/v1/settings/logo` | `settings.manage` | `{ image }`: PNG/JPG dạng Base64 (có thể kèm `data:image/...;base64,`), tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; nhận dạng theo nội dung file, không nhận SVG/GIF (`400` ở trường `image`). File lưu trong kho tài liệu (mã hóa), khóa lưu trong `SystemSettings` (`Logo.*`, ghi audit). In ở góc trên bên trái phiếu (khoảng 18 × 18 mm) cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên. File hỏng không đọc được thì phiếu in không có logo |
 | DELETE | `/api/v1/settings/logo` | `settings.manage` | Bỏ logo; trả cấu hình mới (`logo: null`) |
+| GET | `/api/v1/settings/kiosk` | `settings.manage` | Mẫu dùng trên kiosk theo thứ tự làm: `{ templates: [{ id, code, name, problems[] }], updatedAtUtc }` (`problems`: lý do mẫu đã chọn nay không dùng được, ví dụ đã ngừng) |
+| PUT | `/api/v1/settings/kiosk` | `settings.manage` | `{ templateIds: [...] }` theo thứ tự làm, tối đa 10, không trùng; chỉ nhận mẫu đang dùng, đã phát hành, không có trường bảng nhiều dòng/ngày giờ (`400` ở `templateIds`). Danh sách rỗng: bỏ cấu hình. Lưu khóa `Kiosk.TemplateCodes` (mã mẫu), ghi audit |
 
 Mọi phản hồi của API có `Cache-Control: no-store`; thân yêu cầu lớn hơn 2 MB bị từ chối.
+
+---
+
+## 6g. Kiosk người bệnh tự làm phiếu (`/api/v1/kiosk`, quyết định 24)
+
+Chỉ tài khoản có quyền `kiosk.use` (vai trò `KIOSK`; quản trị có toàn quyền nên cũng gọi được). Máy chủ **không giữ trạng thái** giữa các bước: lệnh nộp gửi lại thông tin nhận diện và được kiểm tra lại như lần đầu.
+
+| Phương thức | Đường dẫn | Mô tả |
+|---|---|---|
+| GET | `/api/v1/kiosk/config` | `{ departmentName, ready, templates: [{ id, code, name, definition }], statement }`: khoa của tài khoản kiosk, các mẫu kiosk dùng được ở khoa đó (theo thứ tự cấu hình), một ô lời xác nhận gộp từ các mẫu (bắt buộc nếu có mẫu bắt buộc, gộp câu gợi ý). `ready: false` khi chưa có mẫu. Tài khoản chưa có khoa → `422 kiosk.no_department` |
+| POST | `/api/v1/kiosk/identify` | Nhận diện (xem bảng dưới). Trả `{ method, foundRecord, fullName, dateOfBirth, gender, citizenIdMasked, patientCode, permanentAddress, hasAddressOnFile, hasPhoneNumber, missingFields, prefilledSources }`. Chưa ghi gì vào hồ sơ |
+| POST | `/api/v1/kiosk/submit` | `{ identity, phoneNumber, forms: [{ templateId, data, decision }], statement, image }`: nhận diện lại; tạo hoặc bổ sung hồ sơ (chỉ điền ô trống); lập phiếu cho **đúng các mẫu kiosk** (mẫu thiếu/thừa → `400 forms`), trường tự điền luôn lấy theo hồ sơ; trình ký và ghi **một chữ ký người bệnh cho cả bộ** (từ 2 phiếu thì chung `bundleId`), phiếu ở trạng thái `PendingSignature` chờ nhân viên xác nhận. Trả `{ patientName, patientCode, bundleId, forms: [{ id, formNo, templateName, decision }], signedAtUtc }`. Câu chưa trả lời → `400 kiosk.incomplete`, lỗi theo trường dạng `"<mã mẫu>.<trường>"` (ví dụ `TTNB-NGOAITRU.religion`, `TUVAN-CONGTT.decision`). Hồ sơ cần nhân viên xử lý (trùng mã/CCCD với hồ sơ khác, dữ liệu hệ thống bệnh viện sai định dạng) → `422 kiosk.needs_staff` |
+
+**Cách nhận diện** (`identity.method`, luôn có `dateOfBirth` dạng `yyyy-MM-dd`):
+
+| `method` | Thông tin gửi | Kiểm tra |
+|---|---|---|
+| `CitizenIdCard` | `citizenId` và `card: { fullName, gender, permanentAddress, issueDate, oldIdNumber }` tách từ mã QR trên CCCD | Số CCCD khớp năm sinh/giới tính. Có hồ sơ (phần mềm này hoặc hệ thống bệnh viện) thì ngày sinh phải khớp; chưa có thì lập hồ sơ mới từ thẻ |
+| `LookupCode` | Một trong hai: `patientCode` (mã y tế) hoặc `citizenId` | **Ngày sinh phải khớp hồ sơ.** Không có hồ sơ và sai ngày sinh trả **cùng** `422 kiosk.lookup_failed` (kèm `remainingAttempts`); hệ thống bệnh viện không trả lời được → `422 kiosk.source_unavailable` (không tính lần sai). Không trả địa chỉ, số điện thoại của hồ sơ |
+| `SelfReported` | `selfReport: { fullName, gender, phoneNumber, currentAddress }`, `citizenId` nếu có | Có số CCCD trùng hồ sơ thì ngày sinh phải khớp như nhập mã. Phiếu đánh dấu tự khai để nhân viên kiểm tra kỹ giấy tờ |
+
+Sai 5 lần liên tiếp (tính cả khi nộp) thì **tạm khóa tra cứu 5 phút** trên tài khoản kiosk: `422 kiosk.lookup_locked` kèm `lockedUntilUtc`; tự khai không kèm số CCCD vẫn làm được (không tra ai). Khóa tra cứu không làm máy bị đăng xuất; quản trị mở khóa sớm bằng nút Mở khóa tài khoản. Nhật ký ghi cách nhận diện và kết quả (`Kiosk.Identified`, `Kiosk.LookupFailed`, `Kiosk.LookupLocked`, `Kiosk.Submitted`), không ghi mã y tế hay số CCCD.
+
+Phiếu lập trên kiosk có `kioskIdentity` (`CitizenIdCard`/`LookupCode`/`SelfReported`) ở chi tiết phiếu và bộ phiếu (`GET /api/v1/consent-forms/{id}`, `GET /api/v1/consent-forms/bundles/{bundleId}`); khi chờ xác nhận, `notices` có lời nhắc đối chiếu CCCD (tự khai: kiểm tra kỹ giấy tờ và thông tin hành chính).
 
 ---
 

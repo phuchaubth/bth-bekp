@@ -3,6 +3,7 @@ using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
+using Consent.Application.Kiosk;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -222,6 +223,31 @@ internal sealed class AppTestContext
         new InMemoryConsentTemplateRepository(Store),
         Clock,
         CurrentUser);
+
+    public StubPatientSource PatientSource { get; } = new();
+
+    public KioskService CreateKioskService() => new(
+        new InMemoryUserRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryPatientRepository(Store),
+        PatientSource,
+        new InMemoryConsentFormRepository(Store),
+        FormNumbers,
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        Microsoft.Extensions.Options.Options.Create(HisOptions),
+        new PatientRequestValidator(Clock));
+
+    public KioskSettingsService CreateKioskSettingsService() => new(
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryConsentTemplateRepository(Store),
+        Store,
+        Clock);
 
     public RecordingTabularWriter XlsxWriter { get; } = new(ExportFormat.Xlsx);
 

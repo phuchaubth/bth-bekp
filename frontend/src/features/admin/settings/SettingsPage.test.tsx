@@ -133,3 +133,53 @@ describe('Cấu hình hệ thống (màn hình 19)', () => {
     expect(await screen.findByText('Bạn không có quyền truy cập')).toBeInTheDocument()
   })
 })
+
+describe('Kiosk người bệnh tự làm phiếu (quyết định 24)', () => {
+  const template = (id: string, code: string, name: string) => ({
+    id,
+    code,
+    name,
+    hospitalSignerRoleCode: 'RECEPTIONIST',
+    departmentId: null,
+    isActive: true,
+    publishedVersionNo: 1,
+    publishedAtUtc: '2026-11-01T00:00:00Z',
+    draftVersionNo: null,
+    updatedAtUtc: '2026-11-01T00:00:00Z',
+  })
+
+  it('chọn thêm mẫu theo thứ tự làm rồi lưu; báo mẫu đã chọn nhưng không còn dùng được', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'GET /api/v1/settings/kiosk': {
+        templates: [
+          { id: 't-bm02', code: 'QT-KNGT-BM02', name: 'Giấy đồng thuận BHYT', problems: [] },
+          { id: 't-cu', code: 'CU-01', name: 'Mẫu cũ', problems: ['Mẫu đang ngừng sử dụng.'] },
+        ],
+        updatedAtUtc: '2026-11-15T02:00:00Z',
+      },
+      'GET /api/v1/consent-templates': [
+        template('t-bm02', 'QT-KNGT-BM02', 'Giấy đồng thuận BHYT'),
+        template('t-ttnb', 'TTNB-NGOAITRU', 'Phiếu thông tin người bệnh'),
+      ],
+      'PUT /api/v1/settings/kiosk': (call) =>
+        json({
+          templates: (call.body as { templateIds: string[] }).templateIds.map((id) => ({ id, code: id, name: id, problems: [] })),
+          updatedAtUtc: '2026-11-15T03:00:00Z',
+        }),
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('CU-01: Mẫu đang ngừng sử dụng.')).toBeInTheDocument()
+    const save = screen.getByRole('button', { name: 'Lưu mẫu kiosk' })
+    expect(save).toBeDisabled()
+
+    await user.click(screen.getByRole('combobox', { name: 'Mẫu dùng trên kiosk' }))
+    await user.click(await screen.findByTitle('TTNB-NGOAITRU – Phiếu thông tin người bệnh'))
+    await user.click(save)
+
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ templateIds: ['t-bm02', 't-cu', 't-ttnb'] }))
+  })
+})

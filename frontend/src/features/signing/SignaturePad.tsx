@@ -12,6 +12,8 @@ interface Props {
   /** Báo khi khung ký có/không có nét ký đủ dài. */
   onInkChange: (hasInk: boolean) => void
   disabled?: boolean
+  /** Tỉ lệ khung ký (ví dụ "2 / 1" cho kiosk màn hình dọc); mặc định theo cỡ màn hình. */
+  aspectRatio?: string
 }
 
 type Point = { x: number; y: number }
@@ -25,7 +27,7 @@ const INK = '#111827'
  * Khung ký tay dùng Pointer Events: ký được bằng ngón tay, bút cảm ứng hoặc chuột. Nét ký chỉ nằm trong bộ nhớ để vẽ lại
  * khi xoay màn hình; thứ gửi đi chỉ là ảnh PNG (không gửi tọa độ, thời gian từng nét).
  */
-export function SignaturePad({ ref, onInkChange, disabled = false }: Props) {
+export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Điện thoại cầm dọc: khung ký cao hơn (2:1 thay vì 3:1) để đủ chỗ ký bằng ngón tay, và gợi ý xoay ngang.
   const screens = Grid.useBreakpoint()
@@ -156,7 +158,7 @@ export function SignaturePad({ ref, onInkChange, disabled = false }: Props) {
         onPointerLeave={onPointerUp}
         style={{
           width: '100%',
-          aspectRatio: narrow ? '2 / 1' : '3 / 1',
+          aspectRatio: aspectRatio ?? (narrow ? '2 / 1' : '3 / 1'),
           border: '2px dashed #94a3b8',
           borderRadius: 8,
           background: '#ffffff',

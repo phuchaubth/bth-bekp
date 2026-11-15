@@ -4,6 +4,7 @@ using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
+using Consent.Application.Kiosk;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -36,6 +37,8 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<SettingsService>();
         services.AddScoped<PatientSourceService>();
+        services.AddScoped<KioskService>();
+        services.AddScoped<KioskSettingsService>();
 
         RegisterValidators(services);
         return services;

@@ -21,6 +21,12 @@ public static class Permissions
     public const string ConsentsSign = "consents.sign";
     public const string ConsentsRevoke = "consents.revoke";
 
+    /// <summary>
+    /// Dùng màn hình kiosk cho người bệnh tự làm phiếu (quyết định 24): chỉ nhận diện người bệnh, lập và ký bộ phiếu của
+    /// chính người đó; không xem được danh sách hay phiếu khác.
+    /// </summary>
+    public const string KioskUse = "kiosk.use";
+
     public const string ReportsRead = "reports.read";
     public const string ExportsRun = "exports.run";
     public const string ExportsSensitive = "exports.sensitive";
@@ -58,6 +64,7 @@ public static class PermissionCatalog
         new(Permissions.ConsentsCreate, "Lập phiếu", ConsentGroup),
         new(Permissions.ConsentsSign, "Ký phiếu phía bệnh viện", ConsentGroup),
         new(Permissions.ConsentsRevoke, "Thu hồi phiếu", ConsentGroup),
+        new(Permissions.KioskUse, "Dùng kiosk người bệnh tự làm phiếu", ConsentGroup),
         new(Permissions.ReportsRead, "Xem báo cáo thống kê", ReportGroup),
         new(Permissions.ExportsRun, "Xuất dữ liệu", ReportGroup),
         new(Permissions.ExportsSensitive, "Xuất dữ liệu nhạy cảm (CCCD đầy đủ)", ReportGroup),
