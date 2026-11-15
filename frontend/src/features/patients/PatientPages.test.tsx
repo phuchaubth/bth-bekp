@@ -457,7 +457,7 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
       citizenId: '079070000123',
       phoneNumber: '0900000123',
       permanentAddress: 'Số 1 Đường Giả Lập',
-      currentAddress: null,
+      currentAddress: 'Số 2 Đường Hiện Tại',
       ethnicity: 'Kinh',
       occupation: null,
       nationality: null,
@@ -489,6 +489,7 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
       await waitFor(() => expect(screen.getByLabelText('Họ và tên')).toHaveValue('Lê Văn Thử'))
       expect(screen.getByLabelText('Số điện thoại')).toHaveValue('0900000123')
       expect(screen.getByLabelText('Nơi thường trú')).toHaveValue('Số 1 Đường Giả Lập')
+      expect(screen.getByPlaceholderText('Để trống nếu giống nơi thường trú')).toHaveValue('Số 2 Đường Hiện Tại')
       expect(screen.getByLabelText('Ngày cấp')).toHaveValue('01/06/2021')
       // Đủ thông tin bắt buộc: chỉ báo các ô còn trống để bổ sung nếu có (địa chỉ hiện tại để trống là giống nơi thường trú).
       expect(screen.getByText('Đã lấy thông tin từ hệ thống bệnh viện')).toBeInTheDocument()

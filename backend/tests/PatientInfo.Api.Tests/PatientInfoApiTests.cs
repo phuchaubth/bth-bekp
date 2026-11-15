@@ -22,7 +22,8 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
     private const string Query =
         "SELECT MaBN AS PatientCode, HoTen AS FullName, NgaySinh AS DateOfBirth, GioiTinh AS Gender, SoCCCD AS CitizenId, " +
         "NgayCapCCCD AS CitizenIdIssueDate, SoCMND AS OldIdNumber, " +
-        "DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DanToc AS Ethnicity, SoTheBHYT AS HealthInsuranceNumber " +
+        "DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DiaChiHienTai AS CurrentAddress, DanToc AS Ethnicity, " +
+        "SoTheBHYT AS HealthInsuranceNumber " +
         "FROM dbo.BenhNhan WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId";
 
     private static readonly string SqlServerImage =
@@ -52,10 +53,10 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
                 """
                 CREATE TABLE dbo.BenhNhan (MaBN nvarchar(20) PRIMARY KEY, HoTen nvarchar(200), NgaySinh date, GioiTinh nvarchar(5),
                     SoCCCD nvarchar(12), DienThoai nvarchar(15), DiaChi nvarchar(300), DanToc nvarchar(50), SoTheBHYT nvarchar(20),
-                    NgayCapCCCD nvarchar(10), SoCMND nvarchar(12));
+                    NgayCapCCCD nvarchar(10), SoCMND nvarchar(12), DiaChiHienTai nvarchar(300));
                 INSERT INTO dbo.BenhNhan VALUES
-                    (N'BN-GL-001', N'Lê Văn Thử (giả lập)', '1970-02-03', N'Nam', N'079070000123', N'0900000123', N'Số 1 Đường Giả Lập', N'Kinh', N'gd479079070000123', N'01/06/2021', N'070123456'),
-                    (N'BN-GL-002', N'Trần Thị Mẫu (giả lập)', '1985-03-12', N'Nữ', N'001085000009', NULL, NULL, NULL, NULL, NULL, NULL);
+                    (N'BN-GL-001', N'Lê Văn Thử (giả lập)', '1970-02-03', N'Nam', N'079070000123', N'0900000123', N'Số 1 Đường Giả Lập', N'Kinh', N'gd479079070000123', N'01/06/2021', N'070123456', N'Số 2 Đường Hiện Tại'),
+                    (N'BN-GL-002', N'Trần Thị Mẫu (giả lập)', '1985-03-12', N'Nữ', N'001085000009', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
                 """,
                 source);
             await setup.ExecuteNonQueryAsync();
@@ -107,7 +108,9 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
         Assert.Equal("1970-02-03", byCode.GetProperty("dateOfBirth").GetString());
         Assert.Equal("Male", byCode.GetProperty("gender").GetString());
         Assert.Equal("GD479079070000123", byCode.GetProperty("healthInsuranceNumber").GetString());
-        Assert.Equal(JsonValueKind.Null, byCode.GetProperty("currentAddress").ValueKind);
+        Assert.Equal("Số 1 Đường Giả Lập", byCode.GetProperty("permanentAddress").GetString());
+        Assert.Equal("Số 2 Đường Hiện Tại", byCode.GetProperty("currentAddress").GetString());
+        Assert.Equal(JsonValueKind.Null, byId.GetProperty("currentAddress").ValueKind);
         // Ngày cấp CCCD lưu dạng chữ dd/MM/yyyy trong CSDL giả lập: trả về theo chuẩn yyyy-MM-dd.
         Assert.Equal("2021-06-01", byCode.GetProperty("citizenIdIssueDate").GetString());
         Assert.Equal("070123456", byCode.GetProperty("oldIdNumber").GetString());
