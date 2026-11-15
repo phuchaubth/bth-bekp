@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Testcontainers.MsSql;
+using TestSupport;
 
 namespace PatientInfo.Api.Tests;
 
@@ -23,16 +24,20 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
         "DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DanToc AS Ethnicity, SoTheBHYT AS HealthInsuranceNumber " +
         "FROM dbo.BenhNhan WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId";
 
-    private readonly MsSqlContainer _sql = new MsSqlBuilder(
-        Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image ? image : "mcr.microsoft.com/mssql/server:2025-latest").Build();
-    private WebApplication _app = null!;
-    public HttpClient Client { get; private set; } = null!;
+    private static readonly string SqlServerImage =
+        Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image ? image : "mcr.microsoft.com/mssql/server:2025-latest";
+
+    private MsSqlContainer? _sql;
+    private WebApplication? _app;
+    private HttpClient? _client;
+
+    public HttpClient Client => _client ?? throw new InvalidOperationException("API thử nghiệm chưa khởi động.");
 
     public async Task InitializeAsync()
     {
-        await _sql.StartAsync();
-        var connectionString = new SqlConnectionStringBuilder(_sql.GetConnectionString()) { InitialCatalog = "BenhVienGiaLap" }.ConnectionString;
-        await using (var master = new SqlConnection(_sql.GetConnectionString()))
+        var sql = _sql = await SqlServerContainers.StartAsync(() => new MsSqlBuilder(SqlServerImage).Build());
+        var connectionString = new SqlConnectionStringBuilder(sql.GetConnectionString()) { InitialCatalog = "BenhVienGiaLap" }.ConnectionString;
+        await using (var master = new SqlConnection(sql.GetConnectionString()))
         {
             await master.OpenAsync();
             await using var create = new SqlCommand("CREATE DATABASE BenhVienGiaLap", master);
@@ -62,16 +67,24 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
             ["PatientInfo:Query"] = Query,
             ["PatientInfo:ApiKeys:0"] = ApiKey,
         });
-        _app = PatientInfoProgram.Build(builder);
-        await _app.StartAsync();
-        Client = _app.GetTestClient();
+        var app = _app = PatientInfoProgram.Build(builder);
+        await app.StartAsync();
+        _client = app.GetTestClient();
     }
 
     public async Task DisposeAsync()
     {
-        Client.Dispose();
-        await _app.DisposeAsync();
-        await _sql.DisposeAsync();
+        // Khởi tạo có thể dừng giữa chừng (ví dụ SQL Server không khởi động được): chỉ dọn những gì đã tạo.
+        _client?.Dispose();
+        if (_app is not null)
+        {
+            await _app.DisposeAsync();
+        }
+
+        if (_sql is not null)
+        {
+            await _sql.DisposeAsync();
+        }
     }
 }
 
