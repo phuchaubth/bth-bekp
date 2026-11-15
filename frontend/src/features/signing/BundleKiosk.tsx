@@ -218,8 +218,15 @@ function BundleFormItem({
   const question = labels?.decisionLabel ?? `Ý kiến của ${signerLabel}`
 
   return (
-    <Card size="small" title={`${index + 1}. ${form.templateName}`} extra={<Typography.Text type="secondary">{form.formNo}</Typography.Text>}>
+    <Card size="small">
       <Flex vertical gap={12}>
+        {/* Tên phiếu xuống dòng đầy đủ (không cắt bớt) để người bệnh biết đang ký phiếu gì. */}
+        <Flex vertical gap={2}>
+          <Typography.Text strong style={{ fontSize: 17 }}>
+            {index + 1}. {form.templateName}
+          </Typography.Text>
+          <Typography.Text type="secondary">Số phiếu {form.formNo}</Typography.Text>
+        </Flex>
         <Collapse
           size="small"
           items={[
