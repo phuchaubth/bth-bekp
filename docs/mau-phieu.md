@@ -136,7 +136,7 @@ rất cao).
 | Nhập liệu theo từng phần (BM10) | Mỗi người tự ghi phần của mình vào phiếu giấy | Nội dung điền ở bản nháp (nhân viên cùng khoa đều sửa được), khóa khi trình ký; sau khi người bệnh ký, từng người xác nhận phần của mình bằng tài khoản | Khóa riêng từng phần theo vai trò nếu bệnh viện cần |
 | Phạm vi khoa | | Người xác nhận phải thấy được phiếu: cùng khoa với phiếu, hoặc có quyền toàn viện. Nhân viên hướng dẫn, điều dưỡng, bác sĩ cần thuộc cùng khoa (ví dụ Khoa Khám bệnh) | |
 | Mã QR, logo trên phiếu | Có | Logo tải ở *Quản trị → Cấu hình hệ thống* in ở đầu phiếu; mẫu có `documentControl` (BM02) in thêm ô mã tài liệu như bản giấy. Mã QR chưa in | Bổ sung khối hình ảnh nếu cần |
-| Bố cục bảng, ô vuông | Bảng nhiều cột | Danh sách câu hỏi tuần tự; PDF dùng ô ■/□ | |
+| Bố cục bảng, ô vuông | Bảng nhiều cột | Danh sách câu hỏi tuần tự; PDF dùng ô ☐, ô đã chọn có dấu X ☒ như đánh dấu trên giấy (quyết định 30) | |
 | Số trang PDF | BM02, phiếu tư vấn: 1 trang | 2 trang, vì khối chữ ký luôn nằm trọn một trang | Thu gọn bố cục nếu bệnh viện yêu cầu 1 trang |
 
 ## 4. Điểm khác so với bản Word

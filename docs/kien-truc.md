@@ -46,7 +46,7 @@ flowchart LR
 | Kiểm thử backend | xUnit 2.9, `Microsoft.AspNetCore.Mvc.Testing` (integration), Testcontainers (SQL Server thật trong Docker), test kiến trúc bằng reflection |
 | Kiểm thử frontend | Vitest 5, Testing Library, jsdom |
 | Lint frontend | oxlint (mặc định của template Vite hiện tại, cảnh báo bị coi là lỗi) |
-| PDF | PDFsharp-MigraDoc **6.2.4** (MIT; không nâng lên 6.5 trở lên vì đã đổi sang AGPL, ADR-020), font Tinos nhúng sẵn (SIL OFL 1.1) |
+| PDF | PDFsharp-MigraDoc **6.2.4** (MIT; không nâng lên 6.5 trở lên vì đã đổi sang AGPL, ADR-020), font Tinos nhúng sẵn (SIL OFL 1.1); font con DejaVu Sans chỉ gồm ☐ ☒ cho ô đánh dấu (giấy phép Bitstream Vera/Arev) |
 | Hạ tầng | Docker Compose (dev/test), GitHub Actions (CI) |
 
 Nguyên tắc chọn thư viện: chỉ thêm khi cần, ưu tiên giấy phép MIT/Apache. Không dùng MediatR, AutoMapper (đã chuyển sang giấy phép thương mại) và FluentAssertions 8+ (giấy phép thương mại).
@@ -117,7 +117,7 @@ backend/
     Consent.Persistence/       # ConsentDbContext, Configurations, Repositories, Auditing (interceptor),
                                #   Seeding, Migrations
     Consent.Infrastructure/    # Security (băm mật khẩu, JWT, mã hóa AES-GCM, chỉ mục mù), His (HIS giả lập), Time,
-                               #   Pdf (MigraDoc, font Tinos), Storage (lưu PDF đã ký, mã hóa)
+                               #   Pdf (MigraDoc, font Tinos + DejaVu Sans cho ô ☐/☒), Storage (lưu PDF đã ký, mã hóa)
     Consent.Api/               # Controllers, Authorization (HasPermission), Infrastructure (pipeline, lỗi,
                                #   security headers, correlation id, cookie, rate limiting)
   tests/
@@ -553,7 +553,7 @@ Không commit bí mật. File `.env` (Docker Compose) nằm trong `.gitignore`; 
 | ADR-017 | Tạm chưa kết nối HIS và SmartCA (quyết định 11/11/2026): HIS tắt mặc định (`His:Provider=None`), giao diện ẩn theo `GET /api/v1/features`; HIS giả lập bị chặn ở Production; giữ interface để bật lại | Ứng dụng chạy độc lập, không hiển thị hay lưu dữ liệu HIS giả; khi bệnh viện cần, chỉ thêm cài đặt `IHisGateway`/dịch vụ ký số mà không sửa nghiệp vụ |
 | ADR-018 | Khi chưa có SmartCA, phiếu được ký tay trên máy tính bảng. Chỉ lưu ảnh chữ ký (PNG, không lưu dữ liệu nét); ảnh được chèn vào PDF; PDF có mã băm SHA-256 và bị khóa sau khi ký; chế độ ký toàn màn hình phải nhập lại mật khẩu nhân viên mới thoát được | Đáp ứng quyết định của bệnh viện với ít thao tác nhất tại quầy. Không phát sinh dữ liệu sinh trắc học. Phát hiện được sửa file sau khi ký. Người bệnh cầm máy không vào được phần khác. Giới hạn: đây không phải chữ ký số, pháp chế cần xác nhận giá trị pháp lý |
 | ADR-019 | Mẫu phiếu là định nghĩa JSON có phiên bản (Nháp → Đang phát hành → Ngừng dùng), máy chủ kiểm tra; giao diện quản trị soạn JSON kèm xem trước, chưa làm trình thiết kế kéo-thả | Thêm/sửa mẫu không cần sửa code hay triển khai lại; phiếu cũ giữ nguyên phiên bản. Chỉ vài người quản trị soạn mẫu, nên trình kéo-thả tốn công mà ít lợi; làm sau nếu bệnh viện cần |
-| ADR-020 | Sinh PDF bằng PDFsharp-MigraDoc **6.2.4** (MIT, ghim phiên bản); font Tinos (SIL OFL 1.1) nhúng trong mã nguồn | Thư viện .NET thuần, không cần trình duyệt hay dịch vụ ngoài. Từ bản 6.5, thư viện đổi sang giấy phép AGPL nên không nâng cấp. Font nhúng sẵn nên PDF giống nhau trên Windows/Linux/Docker và đủ dấu tiếng Việt. Ô đánh dấu dùng □/■ vì font không có ☐/☒ |
+| ADR-020 | Sinh PDF bằng PDFsharp-MigraDoc **6.2.4** (MIT, ghim phiên bản); font Tinos (SIL OFL 1.1) nhúng trong mã nguồn | Thư viện .NET thuần, không cần trình duyệt hay dịch vụ ngoài. Từ bản 6.5, thư viện đổi sang giấy phép AGPL nên không nâng cấp. Font nhúng sẵn nên PDF giống nhau trên Windows/Linux/Docker và đủ dấu tiếng Việt. Ô đánh dấu: Tinos không có ☐/☒ nên nhúng thêm font con DejaVu Sans chỉ gồm hai ký tự này (quyết định 30); ô đã chọn in ☒ (có dấu X) |
 | ADR-021 | Ghim `System.Security.Cryptography.Pkcs` 10.0.15 | PDFsharp kéo theo bản 8.0.1 có lỗ hổng đã công bố (GHSA-846f-f764-76mx). Ghim bản đã vá thay vì tắt cảnh báo NU1903 |
 | ADR-022 | Đóng băng (mã hóa) thông tin người bệnh và người ký khi trình ký; phiếu ngoài phạm vi khoa trả 404 | Nội dung đem ký không đổi dù hồ sơ được sửa sau đó; không tiết lộ sự tồn tại của phiếu khoa khác |
 | ADR-023 | Chế độ ký dùng token phiên ký riêng (đối tượng nhận riêng, gắn với một phiếu và một phiên, dùng một lần) và đóng phiên đăng nhập của nhân viên trên máy; thoát chế độ ký = đăng nhập lại | Máy chủ chặn được người bệnh cầm máy làm việc khác, không phụ thuộc vào việc giao diện bị vượt qua hay trang bị tải lại. Dùng lại cơ chế đăng nhập sẵn có (khóa tạm khi sai nhiều lần) thay vì thêm API kiểm tra mật khẩu riêng |

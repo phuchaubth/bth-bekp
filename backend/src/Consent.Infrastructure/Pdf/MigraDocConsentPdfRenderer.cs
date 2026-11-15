@@ -21,10 +21,24 @@ namespace Consent.Infrastructure.Pdf;
 /// </summary>
 internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 {
-    private const string Checked = "■";
-    private const string Unchecked = "□";
+    /// <summary>Ô đã chọn có dấu X bên trong, như đánh dấu trên phiếu giấy (bệnh viện yêu cầu 15/11/2026).</summary>
+    internal const string Checked = "☒";
+    internal const string Unchecked = "☐";
 
-    private static string Box(bool selected) => selected ? Checked : Unchecked;
+    /// <summary>
+    /// Ô đánh dấu ☒/☐, in bằng font DejaVu Sans nhúng sẵn (Tinos không có hai ký tự này), không đậm, không nghiêng, màu
+    /// đen; cỡ 10 cho ô cao bằng ô vuông cũ (gần bằng chữ hoa cỡ 12).
+    /// </summary>
+    private static void AddBox(Paragraph paragraph, bool selected)
+    {
+        var box = paragraph.AddFormattedText(selected ? Checked : Unchecked);
+        box.FontName = EmbeddedFontResolver.BoxFamilyName;
+        box.Size = 10;
+        box.Bold = false;
+        box.Italic = false;
+        box.Color = Colors.Black;
+    }
+
     private const string Blank = "……………………";
 
     /// <summary>Khoảng cách giữa các phần in chung một dòng (lựa chọn, trường "sameLine"); khoảng trắng không ngắt để không dính nhau.</summary>
@@ -136,16 +150,17 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         table.AddColumn(Unit.FromMillimeter(logo is null ? 72 : 60));
         table.AddColumn(Unit.FromMillimeter(logo is null ? 95 : 167 - 60 - LogoColumnMm));
         var row = table.AddRow();
-        row.VerticalAlignment = VerticalAlignment.Center;
+        // Canh trên: tên đơn vị, quốc hiệu và logo cùng bắt đầu ở một đường.
+        row.VerticalAlignment = VerticalAlignment.Top;
+        // Có logo thì cột chữ hẹp hơn: chữ nhỏ hơn một cỡ để tên đơn vị và quốc hiệu vẫn nằm trên một dòng.
+        var headSize = logo is null ? 11 : 10;
         var textColumn = 0;
         if (logo is not null)
         {
-            AddLogo(row.Cells[0], logo);
+            AddLogo(row.Cells[0], logo, LogoColumnMm - 2, LogoMaxHeightMm, alignWithTextOfSize: headSize);
             textColumn = 1;
         }
 
-        // Có logo thì cột chữ hẹp hơn: chữ nhỏ hơn một cỡ để tên đơn vị và quốc hiệu vẫn nằm trên một dòng.
-        var headSize = logo is null ? 11 : 10;
         var left = row.Cells[textColumn].AddParagraph();
         left.Format.Alignment = ParagraphAlignment.Center;
         left.Format.Font.Size = headSize;
@@ -199,11 +214,12 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         table.AddColumn(Unit.FromMillimeter(167 - ControlLogoColumnMm - ControlBoxColumnMm));
         table.AddColumn(Unit.FromMillimeter(ControlBoxColumnMm));
         var row = table.AddRow();
-        row.VerticalAlignment = VerticalAlignment.Center;
+        // Canh trên: cạnh trên logo thẳng cạnh trên chữ quốc hiệu (bệnh viện yêu cầu 15/11/2026), ô mã tài liệu cũng từ đó.
+        row.VerticalAlignment = VerticalAlignment.Top;
 
         if (document.Logo is { } logo && CanDecode(logo))
         {
-            AddLogo(row.Cells[0], logo, maxWidthMm: ControlLogoColumnMm - 2, maxHeightMm: 20);
+            AddLogo(row.Cells[0], logo, ControlLogoColumnMm - 2, LogoMaxHeightMm, alignWithTextOfSize: 11);
         }
         else
         {
@@ -348,8 +364,11 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
     }
 
-    /// <summary>Mục thứ hai của dòng thông tin người bệnh bắt đầu gần giữa trang (như bản giấy).</summary>
-    private const double PatientLineSecondItemMm = 84;
+    /// <summary>
+    /// Mục thứ hai của dòng thông tin người bệnh bắt đầu ở 76 mm như bản giấy BM02, đủ chỗ cho "Giới tính/ Gender: ☐ Nam/Male
+    /// ☐ Nữ/Female" trên một dòng.
+    /// </summary>
+    private const double PatientLineSecondItemMm = 76;
 
     /// <summary>Dòng thông tin người bệnh theo bản giấy của mẫu (<c>patientLines</c>), thay cho mục "I. Thông tin người bệnh".</summary>
     private static void AddPatientLines(Section section, ConsentPdfDocument document, IReadOnlyList<IReadOnlyList<PatientLineItem>> lines)
@@ -392,11 +411,14 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 AddLabelValue(line, label, patient.DateOfBirth.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
                 break;
             case PatientLineSources.Gender when item.Options is [var male, var female]:
-                // Như bản giấy: "Giới tính/ Gender: ■ Nam/Male □ Nữ/Female".
+                // Như bản giấy: "Giới tính/ Gender: ☒ Nam/Male ☐ Nữ/Female".
                 AddBilingual(line, label);
-                line.AddText($"{Box(patient.Gender == Gender.Male)} ");
+                AddBox(line, patient.Gender == Gender.Male);
+                line.AddText(" ");
                 AddBilingual(line, male);
-                line.AddText($"{InlineGap}{Box(patient.Gender == Gender.Female)} ");
+                line.AddText(InlineGap);
+                AddBox(line, patient.Gender == Gender.Female);
+                line.AddText(" ");
                 AddBilingual(line, female);
                 break;
             case PatientLineSources.Gender:
@@ -483,7 +505,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 var confirm = section.AddParagraph();
                 confirm.Format.LeftIndent = Unit.FromMillimeter(6);
                 confirm.Format.FirstLineIndent = Unit.FromMillimeter(-6);
-                confirm.AddText($"{(value is JsonValue v && v.TryGetValue<bool>(out var flag) && flag ? Checked : Unchecked)}\t");
+                AddBox(confirm, value is JsonValue v && v.TryGetValue<bool>(out var flag) && flag);
+                confirm.AddTab();
                 confirm.Format.TabStops.AddTabStop(Unit.FromMillimeter(6));
                 AddBilingual(confirm, block.Label ?? string.Empty);
                 return null;
@@ -513,7 +536,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         var options = block.Options ?? [];
         void Mark(Paragraph paragraph, TemplateOption option)
         {
-            paragraph.AddText($"{(selected.Contains(option.Value) ? Checked : Unchecked)} ");
+            AddBox(paragraph, selected.Contains(option.Value));
+            paragraph.AddText(" ");
             AddBilingual(paragraph, option.Label);
             if (option.Score is { } score)
             {
@@ -715,9 +739,12 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 decision.Format.TabStops.AddTabStop(Unit.FromMillimeter(167), TabAlignment.Right);
             }
 
-            decision.AddText($"{Box(document.Decision == ConsentDecision.Agreed)} ");
+            AddBox(decision, document.Decision == ConsentDecision.Agreed);
+            decision.AddText(" ");
             AddBilingual(decision, labels?.AgreeLabel ?? "Đồng ý");
-            decision.AddText($"    {Box(document.Decision == ConsentDecision.Refused)} ");
+            decision.AddText("    ");
+            AddBox(decision, document.Decision == ConsentDecision.Refused);
+            decision.AddText(" ");
             AddBilingual(decision, labels?.RefuseLabel ?? "Từ chối");
         }
 
@@ -861,12 +888,22 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
     }
 
-    /// <summary>Logo bệnh viện, thu vừa ô (mặc định 18 × 18 mm), giữ đúng tỉ lệ.</summary>
-    private static void AddLogo(Cell cell, LogoImage logo, double maxWidthMm = 18, double maxHeightMm = 18)
+    /// <summary>Logo cao tối đa 15 mm (trước đây 18–20 mm; bệnh viện yêu cầu nhỏ lại 15/11/2026).</summary>
+    private const double LogoMaxHeightMm = 15;
+
+    /// <summary>Tinos đậm: đỉnh dòng chữ (ascent 1825) cách đỉnh chữ hoa (1356) 469/2048 cỡ chữ.</summary>
+    private const double CapTopEm = 469.0 / 2048;
+
+    /// <summary>
+    /// Logo bệnh viện, thu vừa ô, giữ đúng tỉ lệ. Đẩy xuống một khoảng bằng từ đỉnh dòng đến đỉnh chữ hoa của chữ cỡ
+    /// <paramref name="alignWithTextOfSize"/> bên cạnh, để cạnh trên logo thẳng cạnh trên chữ quốc hiệu.
+    /// </summary>
+    private static void AddLogo(Cell cell, LogoImage logo, double maxWidthMm, double maxHeightMm, double alignWithTextOfSize)
     {
         var scale = Math.Min(maxWidthMm / logo.Width, maxHeightMm / logo.Height);
         var paragraph = cell.AddParagraph();
         paragraph.Format.Alignment = ParagraphAlignment.Left;
+        paragraph.Format.SpaceBefore = Unit.FromPoint(alignWithTextOfSize * CapTopEm);
         var image = paragraph.AddImage("base64:" + Convert.ToBase64String(logo.Content));
         image.LockAspectRatio = false;
         image.Width = Unit.FromMillimeter(logo.Width * scale);
@@ -1064,14 +1101,22 @@ internal sealed class EmbeddedFontResolver : IFontResolver
 {
     public const string FamilyName = "Tinos";
 
+    /// <summary>
+    /// Font con của DejaVu Sans chỉ gồm ☐ và ☒ (Tinos không có hai ký tự này), dùng in ô đánh dấu; giấy phép ở
+    /// <c>Pdf/Fonts/DejaVu-LICENSE.txt</c>.
+    /// </summary>
+    public const string BoxFamilyName = "DejaVu Sans";
+
     public FontResolverInfo? ResolveTypeface(string familyName, bool isBold, bool isItalic) =>
-        (isBold, isItalic) switch
-        {
-            (true, true) => new FontResolverInfo("Tinos-Bold", false, true),
-            (true, false) => new FontResolverInfo("Tinos-Bold"),
-            (false, true) => new FontResolverInfo("Tinos-Italic"),
-            _ => new FontResolverInfo("Tinos-Regular"),
-        };
+        string.Equals(familyName, BoxFamilyName, StringComparison.Ordinal)
+            ? new FontResolverInfo("DejaVuSans-Ballot")
+            : (isBold, isItalic) switch
+            {
+                (true, true) => new FontResolverInfo("Tinos-Bold", false, true),
+                (true, false) => new FontResolverInfo("Tinos-Bold"),
+                (false, true) => new FontResolverInfo("Tinos-Italic"),
+                _ => new FontResolverInfo("Tinos-Regular"),
+            };
 
     public byte[]? GetFont(string faceName)
     {

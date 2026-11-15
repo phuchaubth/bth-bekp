@@ -287,7 +287,7 @@ public sealed class ConsentPdfRendererTests
         Assert.Equal(
             [
                 "Họ tên người bệnh / Patient’s Full Name: PHẠM THỊ DUNG (GIẢ LẬP)",
-                "Ngày sinh/ Date of birth: 05/04/1988\tGiới tính/ Gender: □ Nam/Male    ■ Nữ/Female",
+                "Ngày sinh/ Date of birth: 05/04/1988\tGiới tính/ Gender: ☐ Nam/Male\u00A0\u00A0\u00A0 ☒ Nữ/Female",
                 "Mã BN (nếu có)/ Patient Identification Number (if applicable): BN000125",
                 "Số thẻ Bảo hiểm y tế/ Health Insurance Card Number: GD4790000000125",
             ],
@@ -297,7 +297,7 @@ public sealed class ConsentPdfRendererTests
 
         // Câu chọn chế độ: chỉ hai ô (đoạn văn trước đã là câu hỏi), không in nhãn câu hỏi.
         Assert.Contains(
-            "■ Bảo hiểm y tế/ Health Insurance        □ Không Bảo hiểm y tế/ Non–Health Insurance", lines);
+            "☒ Bảo hiểm y tế/ Health Insurance\u00A0\u00A0\u00A0 \u00A0\u00A0\u00A0 ☐ Không Bảo hiểm y tế/ Non–Health Insurance", lines);
         Assert.DoesNotContain(lines, l => l.Contains("Chế độ khám chữa bệnh", StringComparison.Ordinal));
     }
 
@@ -316,6 +316,48 @@ public sealed class ConsentPdfRendererTests
         // Mẫu thường: người bệnh bên trái, tên ô ký viết hoa, in đậm.
         Assert.Equal("NGƯỜI KHAI (DECLARANT)", SignatureCell(standard, 0).First());
         Assert.All(SignatureTitleRuns(standard, 0), t => Assert.True(t.Bold));
+    }
+
+    /// <summary>Bệnh viện yêu cầu 15/11/2026: ô đã chọn có dấu X bên trong (☒), ô chưa chọn để trống (☐).</summary>
+    [Fact]
+    public void CheckedBoxes_HaveAnXInside_PrintedWithTheEmbeddedBoxFont()
+    {
+        var document = HospitalDocument("QT-KNGT-BM02");
+
+        var boxes = BodyFormattedTexts(MigraDocConsentPdfRenderer.Build(document))
+            .Where(t => Plain(t) is MigraDocConsentPdfRenderer.Checked or MigraDocConsentPdfRenderer.Unchecked)
+            .ToList();
+        var pdf = Encoding.Latin1.GetString(new MigraDocConsentPdfRenderer().Render(document));
+
+        // Giới tính Nữ và chế độ Bảo hiểm y tế đã chọn: hai ô có dấu X, hai ô trống.
+        Assert.Equal(2, boxes.Count(t => Plain(t) == "☒"));
+        Assert.Equal(2, boxes.Count(t => Plain(t) == "☐"));
+        // Tinos không có hai ký tự này: in bằng font DejaVu Sans nhúng sẵn, chữ thường màu đen kể cả trên dòng in đậm.
+        Assert.All(boxes, t =>
+        {
+            Assert.Equal(EmbeddedFontResolver.BoxFamilyName, t.FontName);
+            Assert.False(t.Bold);
+        });
+        // Font được nhúng (tập con, tên dạng "ABCDEF+DejaVu Sans") nên in đúng trên mọi máy.
+        Assert.Contains("+DejaVu", pdf, StringComparison.Ordinal);
+    }
+
+    /// <summary>Bệnh viện yêu cầu 15/11/2026: logo nhỏ lại, cạnh trên logo thẳng cạnh trên chữ quốc hiệu (cả hai kiểu đầu phiếu).</summary>
+    [Theory]
+    [InlineData("QT-KNGT-BM02")]
+    [InlineData("TTNB-NGOAITRU")]
+    public void Logo_IsAtMost15mmTall_AndTopAlignedWithTheMotto(string code)
+    {
+        var logo = LogoImage.Read(TestPng.Rgba(300, 300, (x, y) => true, whiteBackground: true))!;
+        var head = MigraDocConsentPdfRenderer.Build(HospitalDocument(code) with { Logo = logo })
+            .Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
+        var logoParagraph = head.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single();
+        var image = logoParagraph.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Shapes.Image>().Single();
+
+        Assert.Equal(15, image.Height.Millimeter, 2);
+        Assert.Equal(Mdom.Tables.VerticalAlignment.Top, head.VerticalAlignment);
+        // Logo đẩy xuống từ đỉnh dòng đến đỉnh chữ hoa của quốc hiệu (khoảng 0,8–0,9 mm).
+        Assert.InRange(logoParagraph.Format.SpaceBefore.Millimeter, 0.7, 1.0);
     }
 
     /// <summary>Các đoạn chữ của ô ký thứ <paramref name="column"/> ở hàng đầu bảng chữ ký: tên ô ký, ghi chú, …</summary>
@@ -342,13 +384,13 @@ public sealed class ConsentPdfRendererTests
         Assert.EndsWith("Nghề nghiệp (Occupation): Nhân viên văn phòng", education, StringComparison.Ordinal);
         Assert.DoesNotContain(lines, l => l.StartsWith("Nghề nghiệp", StringComparison.Ordinal));
         var emergency = Assert.Single(lines, l => l.StartsWith("Đây có phải là thông tin của người liên hệ khẩn cấp không?", StringComparison.Ordinal));
-        Assert.Contains("□ Có (Yes)", emergency, StringComparison.Ordinal);
-        Assert.Contains("■ Không, điền thêm thông tin dưới đây", emergency, StringComparison.Ordinal);
+        Assert.Contains("☐ Có (Yes)", emergency, StringComparison.Ordinal);
+        Assert.Contains("☒ Không, điền thêm thông tin dưới đây", emergency, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData("no", new[] { "A: 1    C: 3", "Đoạn văn", "D: 11/11/2026" })]
-    [InlineData("yes", new[] { "A: 1", "B: 2    C: 3", "Đoạn văn", "D: 11/11/2026" })]
+    [InlineData("no", new[] { "A: 1\u00A0\u00A0\u00A0 C: 3", "Đoạn văn", "D: 11/11/2026" })]
+    [InlineData("yes", new[] { "A: 1", "B: 2\u00A0\u00A0\u00A0 C: 3", "Đoạn văn", "D: 11/11/2026" })]
     public void SameLineField_ContinuesTheLineOfThePreviousPrintedField(string showB, string[] expected)
     {
         // B chỉ in khi chọn "Có": ẩn B thì C in tiếp dòng của A. D đứng sau đoạn văn nên xuống dòng mới.
