@@ -16,6 +16,9 @@ const genderLabels: Record<Gender, string> = { Male: 'Nam', Female: 'Nữ' }
 /** Nhóm 4 chữ số cho dễ đọc: 0790 7000 0123. */
 const groupDigits = (value: string) => value.replace(/(\d{4})(?=\d)/g, '$1 ')
 
+/** Mã y tế ở bệnh viện chỉ gồm chữ số: trên kiosk chỉ nhập được số, tối đa bằng độ dài mã của hồ sơ người bệnh. */
+const PATIENT_CODE_MAX_LENGTH = 50
+
 /** Gọi nhận diện, quản lý trạng thái đang gửi và lỗi cho từng màn hình. */
 function useIdentify(onIdentified: (request: KioskIdentityRequest, identity: KioskIdentity) => void) {
   const [busy, setBusy] = useState(false)
@@ -223,7 +226,7 @@ export function ScanScreen({
   )
 }
 
-/** Nhập mã y tế hoặc số CCCD, kèm ngày sinh để đối chiếu (bắt buộc khớp hồ sơ). */
+/** Nhập mã y tế hoặc số CCCD (cả hai chỉ gồm chữ số, bàn phím số), kèm ngày sinh để đối chiếu (bắt buộc khớp hồ sơ). */
 export function LookupScreen({
   onIdentified,
   onBack,
@@ -236,6 +239,7 @@ export function LookupScreen({
   const [dob, setDob] = useState('')
   const [active, setActive] = useState<'code' | 'dob'>('code')
   const { busy, error, setError, identify } = useIdentify(onIdentified)
+  const maxCodeLength = kind === 'citizenId' ? 12 : PATIENT_CODE_MAX_LENGTH
 
   const switchKind = (next: 'patientCode' | 'citizenId') => {
     setKind(next)
@@ -292,9 +296,7 @@ export function LookupScreen({
             autoComplete="off"
             value={kind === 'citizenId' ? groupDigits(code) : code}
             onFocus={() => setActive('code')}
-            onChange={(e) =>
-              setCode(kind === 'citizenId' ? e.target.value.replace(/\D/g, '').slice(0, 12) : e.target.value.toUpperCase().slice(0, 50))
-            }
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, maxCodeLength))}
           />
         </div>
         <div className="kiosk-field">
@@ -316,11 +318,9 @@ export function LookupScreen({
           </div>
         )}
         <div className="kiosk-bottom">
-          {active === 'code' && kind === 'patientCode' ? (
-            <TextKeyboard value={code} onChange={setCode} variant="code" maxLength={50} doneLabel="Ô tiếp ›" onDone={() => setActive('dob')} />
-          ) : active === 'code' ? (
+          {active === 'code' ? (
             <NumberPad
-              onDigit={(digit) => setCode((value) => (value + digit).slice(0, 12))}
+              onDigit={(digit) => setCode((value) => (value + digit).slice(0, maxCodeLength))}
               onBackspace={() => setCode((value) => value.slice(0, -1))}
               extraKey={{ label: 'Ô tiếp', onPress: () => setActive('dob') }}
             />

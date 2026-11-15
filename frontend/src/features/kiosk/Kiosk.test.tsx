@@ -265,6 +265,36 @@ describe('Kiosk người bệnh tự làm phiếu', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Còn 4 lần thử.')
   })
 
+  it('mã y tế chỉ nhập được chữ số: bàn phím số, chữ gõ từ bàn phím rời bị bỏ qua', async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...baseRoutes(kioskAccount()),
+      'GET /api/v1/kiosk/config': config,
+      'POST /api/v1/kiosk/identify': { ...cardIdentity, method: 'LookupCode', foundRecord: true, patientCode: '20240015' },
+    })
+    renderApp('/kiosk')
+
+    await user.click(await screen.findByRole('button', { name: /Nhập mã y tế hoặc số CCCD/ }))
+    await user.click(screen.getByRole('radio', { name: /Mã y tế/ }))
+    expect(screen.queryByRole('group', { name: 'Bàn phím nhập mã' })).not.toBeInTheDocument()
+    const input = screen.getByLabelText('Mã y tế')
+    await user.type(input, 'BN-2024')
+    expect(input).toHaveValue('2024')
+    await pressKeys(user, '0015')
+    expect(input).toHaveValue('20240015')
+    await user.click(screen.getByRole('button', { name: 'Ô tiếp' }))
+    await pressKeys(user, '12031985')
+    await user.click(screen.getByRole('button', { name: 'Lấy thông tin' }))
+
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/kiosk/identify')).toBe(true))
+    expect(calls.find((c) => c.path === '/api/v1/kiosk/identify')!.body).toEqual({
+      method: 'LookupCode',
+      dateOfBirth: '1985-03-12',
+      patientCode: '20240015',
+      citizenId: null,
+    })
+  })
+
   it('60 giây không ai chạm thì xóa thông tin và về trang đầu', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
