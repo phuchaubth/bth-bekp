@@ -190,7 +190,7 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
 ### 5.4. Nâng cấp phiên bản
 
-1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Kiểm tra `/health/ready` và đăng nhập thử.
+1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
 
 ### 5.5. API thông tin người bệnh (tùy chọn, quyết định 22)
 
@@ -350,7 +350,7 @@ Khi quản trị bật (bước 5), người ký hoàn tất phiếu (tiếp nh�
    $r.items | Select-Object -First 1 | ForEach-Object { $_.PSObject.Properties | ForEach-Object { '{0}: {1}' -f $_.Name, ($null -ne $_.Value) } }
    ```
 
-   `(501)`: chưa đặt `PatientInfo__EncounterQuery`. `(400)`, `(503)`: như mục 5.5 bước 5. Số lượt bằng 0 dù người bệnh có lượt hôm nay: kiểm tra điều kiện ngày và cột thời gian trong câu truy vấn.
+   `(404)`: `PatientInfoApi` còn bản cũ, chưa có chức năng tra lượt tiếp nhận (thay thư mục như mục 5.4 bước 5). `(501)`: chưa đặt `PatientInfo__EncounterQuery`. `(400)`, `(503)`: như mục 5.5 bước 5. Số lượt bằng 0 dù người bệnh có lượt hôm nay: kiểm tra điều kiện ngày và cột thời gian trong câu truy vấn.
 5. **Bật**: quản trị vào *Quản trị → Cấu hình hệ thống*, thẻ **Gắn phiếu với lượt tiếp nhận (HIS)**, bật công tắc *Bắt buộc chọn lượt tiếp nhận khi ký hoàn tất phiếu*. Có hiệu lực ngay, không cần khởi động lại; mỗi lần bật/tắt được ghi nhật ký hệ thống. Công tắc chỉ bật được khi `ConsentApi` đã cấu hình API thông tin người bệnh (mục 5.5 bước 6). Từ đó hộp **Ký xác nhận và hoàn tất** và **Xác nhận cả bộ** có bảng lượt tiếp nhận.
    - Hồ sơ người bệnh cần có **mã y tế** (dùng trước) hoặc **số CCCD** để tra lượt tiếp nhận.
    - **HIS hoặc API thông tin người bệnh lỗi:** nhân viên chưa hoàn tất được phiếu (phiếu vẫn chờ xác nhận, giữ chữ ký người bệnh). Quản trị **tắt công tắc** để nhân viên hoàn tất tiếp: trong hộp ký bấm *Thử lại* là ký được, không cần tải lại trang. Phiếu hoàn tất lúc tắt không gắn lượt tiếp nhận. HIS ổn định thì bật lại.
