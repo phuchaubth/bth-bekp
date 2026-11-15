@@ -106,6 +106,29 @@ public sealed class SignatureFramePrintTests
     }
 
     [Fact]
+    public void EmptyFrame_IsTheFrameAlone_ForPlacesNobodyHasSignedYet()
+    {
+        var print = SignatureFramePrint.Prepare(Frame())!;
+
+        var empty = print.EmptyPng;
+
+        Assert.Equal((400, 300, (byte)2), TestPng.ReadHeader(empty));
+        var rgb = TestPng.ReadRgb(empty, 400, 300);
+        Assert.Equal(Red, TestPng.Pixel(rgb, 400, 80, 40));
+        Assert.Equal(White, TestPng.Pixel(rgb, 400, 200, 170));
+        for (var y = 0; y < 300; y++)
+        {
+            for (var x = 0; x < 400; x++)
+            {
+                Assert.False(IsInk(TestPng.Pixel(rgb, 400, x, y)), $"Có mực ở ({x}, {y}).");
+            }
+        }
+
+        // Mã hóa một lần cho mọi ô chưa ký của một phiếu.
+        Assert.Same(empty, print.EmptyPng);
+    }
+
+    [Fact]
     public void UnreadableSignature_GivesNothingToPrint()
     {
         var print = SignatureFramePrint.Prepare(Frame())!;

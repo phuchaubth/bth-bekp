@@ -45,8 +45,8 @@ public sealed record ConsentPdfDocument(
     public ConsentEncounter? Encounter { get; init; }
 
     /// <summary>
-    /// Khung chữ ký của bệnh viện (quyết định 26): mỗi chữ ký in trong khung này. Không có, hoặc ảnh không in được (JPG), thì
-    /// chữ ký in như cũ.
+    /// Khung chữ ký của bệnh viện (quyết định 26): mỗi chỗ ký in khung này, chữ ký nằm giữa khung, chỗ chưa ký là khung trống.
+    /// Không có, hoặc ảnh không in được (JPG), thì chỗ ký in như cũ.
     /// </summary>
     public Settings.LogoImage? SignatureFrame { get; init; }
 }

@@ -22,7 +22,7 @@ function readAsDataUrl(file: File): Promise<string> {
 
 /**
  * Khung chữ ký (quyết định 26): ảnh thiết kế của bệnh viện (logo, viền màu) làm nền cho khung ký trên điện thoại, kiosk và máy
- * tính, khung hiện chữ ký mẫu của nhân viên, và khung của mỗi chữ ký in trên PDF.
+ * tính, khung hiện chữ ký mẫu của nhân viên, và khung ở mỗi chỗ ký trên PDF (chưa ký thì khung trống).
  */
 export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
   const queryClient = useQueryClient()
@@ -71,8 +71,8 @@ export function SignatureFrameCard({ settings }: { settings: SystemSettings }) {
       <Flex vertical gap={10}>
         <Typography.Paragraph style={{ marginBottom: 0 }}>
           Ảnh thiết kế của bệnh viện (logo, viền màu) làm nền khung ký trên điện thoại, kiosk và máy tính; chữ ký mẫu của nhân viên
-          hiện trong khung; trên PDF, mỗi chữ ký (người bệnh, nhân viên) in trong khung này. Người ký ký vào khoảng trống giữa
-          khung. Ảnh PNG, tối đa 1 MB, nên ngang tỉ lệ 4:3, rộng từ 1200 điểm ảnh.
+          hiện trong khung; trên PDF, mỗi chỗ ký (người bệnh, nhân viên) in khung này: đã ký thì chữ ký nằm giữa khung, chưa ký thì
+          khung trống. Người ký ký vào khoảng trống giữa khung. Ảnh PNG, tối đa 1 MB, nên ngang tỉ lệ 4:3, rộng từ 1200 điểm ảnh.
         </Typography.Paragraph>
         {frame ? (
           <div style={{ width: '100%', maxWidth: 360 }}>

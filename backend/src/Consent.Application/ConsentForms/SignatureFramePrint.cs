@@ -3,7 +3,8 @@ namespace Consent.Application.ConsentForms;
 /// <summary>
 /// In chữ ký lên PDF trong khung chữ ký của bệnh viện (quyết định 26): ghép ảnh khung với chữ ký mực xanh thành một ảnh. Chữ ký
 /// đặt giữa vùng trống của khung, tránh phần logo phía trên, giống khung hiện chữ ký mẫu trên màn hình; giữ tỉ lệ chữ ký.
-/// Ảnh khung được thu nhỏ một lần khi chuẩn bị, rồi dùng cho mọi chữ ký của một phiếu.
+/// Chỗ chưa ký in khung trống (<see cref="EmptyPng"/>). Ảnh khung được thu nhỏ một lần khi chuẩn bị, rồi dùng cho mọi ô ký của
+/// một phiếu.
 /// </summary>
 public sealed class SignatureFramePrint
 {
@@ -21,6 +22,8 @@ public sealed class SignatureFramePrint
 
     private readonly byte[] _rgb;
 
+    private byte[]? _emptyPng;
+
     private SignatureFramePrint(int width, int height, byte[] rgb)
     {
         Width = width;
@@ -31,6 +34,9 @@ public sealed class SignatureFramePrint
     public int Width { get; }
 
     public int Height { get; }
+
+    /// <summary>Ảnh PNG của khung trống, in ở chỗ chưa ký (phiếu nháp, người ký chưa ký).</summary>
+    public byte[] EmptyPng => _emptyPng ??= SignatureImage.EncodeRgb(_rgb, Width, Height);
 
     /// <summary>
     /// Đọc ảnh khung (PNG 8 bit không xen kẽ, kể cả PNG bảng màu; vùng trong suốt thành trắng) và thu nhỏ còn

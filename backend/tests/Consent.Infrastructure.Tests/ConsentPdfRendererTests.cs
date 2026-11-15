@@ -153,9 +153,9 @@ public sealed class ConsentPdfRendererTests
         var framed = renderer.Render(signed with { SignatureFrame = frame });
         var jpeg = renderer.Render(signed with { SignatureFrame = jpegFrame });
 
-        // Một ảnh duy nhất cho chữ ký: khung và chữ ký đã ghép (rộng bằng ảnh khung).
-        Assert.Equal(1, ImageCount(framed));
-        Assert.Matches(@"/Width\s+400\b", Encoding.Latin1.GetString(framed));
+        // Mỗi ô ký một ảnh rộng bằng ảnh khung: ô người bệnh là khung đã ghép chữ ký, ô nhân viên chưa ký là khung trống.
+        Assert.Equal(2, ImageCount(framed));
+        Assert.Equal(2, FrameImageCount(framed));
         Assert.DoesNotMatch(@"/Width\s+400\b", Encoding.Latin1.GetString(plain));
         Assert.Equal(ImageCount(plain), ImageCount(jpeg));
         Assert.DoesNotMatch(@"/Width\s+400\b", Encoding.Latin1.GetString(jpeg));
@@ -176,7 +176,52 @@ public sealed class ConsentPdfRendererTests
         }
     }
 
+    [Fact]
+    public void SignatureFrame_IsPrintedEmptyWhereNobodyHasSignedYet_SoThePreviewShowsIt()
+    {
+        var frame = LogoImage.Read(TestPng.Rgba(400, 300, (x, y) => x < 100 && y < 60, whiteBackground: true))!;
+        var preview = Document("CK-01", representative: false, isFinal: false, "bhyt");
+        var renderer = new MigraDocConsentPdfRenderer();
+
+        var withoutFrame = renderer.Render(preview);
+        var withFrame = renderer.Render(preview with { SignatureFrame = frame });
+
+        Assert.Equal(0, ImageCount(withoutFrame));
+        // Ô người bệnh và ô nhân viên đều có khung trống: cùng một ảnh, lưu một lần trong PDF, vẽ ở hai chỗ.
+        Assert.Equal(1, FrameImageCount(withFrame));
+        Assert.Equal(2, ImagePlacements(withFrame));
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, "CK-01-preview-framed.pdf"), withFrame);
+        }
+    }
+
     private static int ImageCount(byte[] pdf) => Regex.Matches(Encoding.Latin1.GetString(pdf), @"/Subtype\s*/Image").Count;
+
+    /// <summary>Số ảnh rộng 400 điểm ảnh (bằng khung giả lập 400 × 300 trong các test).</summary>
+    private static int FrameImageCount(byte[] pdf) => Regex.Matches(Encoding.Latin1.GetString(pdf), @"/Width\s+400\b").Count;
+
+    /// <summary>Số lần vẽ ảnh (toán tử <c>Do</c>) trên mọi trang.</summary>
+    private static int ImagePlacements(byte[] pdf)
+    {
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        return document.Pages.Cast<PdfSharp.Pdf.PdfPage>().Sum(page => CountDo(PdfSharp.Pdf.Content.ContentReader.ReadContent(page)));
+
+        static int CountDo(PdfSharp.Pdf.Content.Objects.CSequence sequence) => sequence.Sum(item => item switch
+        {
+            PdfSharp.Pdf.Content.Objects.COperator { OpCode.Name: "Do" } => 1,
+            PdfSharp.Pdf.Content.Objects.CSequence inner => CountDo(inner),
+            _ => 0,
+        });
+    }
+
+    private static int PageCount(byte[] pdf)
+    {
+        using var stream = new MemoryStream(pdf);
+        using var document = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        return document.PageCount;
+    }
 
     /// <summary>
     /// <paramref name="maxPages"/>: cam kết khám BHYT thông thường (phổ biến nhất) gọn trong một trang; trường hợp nhiều
@@ -334,11 +379,20 @@ public sealed class ConsentPdfRendererTests
             SignatureFrame = LogoImage.Read(framePng),
             HospitalConfirmation = document.HospitalConfirmation! with { ImagePng = signature.Png },
         });
+        // Bản xem trước (chưa ai ký) in khung trống ở các ô ký.
+        var preview = new MigraDocConsentPdfRenderer().Render(document with
+        {
+            IsFinal = false, PatientSignature = null, HospitalConfirmation = null, SignatureFrame = LogoImage.Read(framePng),
+        });
         if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
         {
             File.WriteAllBytes(Path.Combine(output, $"{code}-signed.pdf"), bytes);
             File.WriteAllBytes(Path.Combine(output, $"{code}-signed-framed.pdf"), framed);
+            File.WriteAllBytes(Path.Combine(output, $"{code}-preview-framed.pdf"), preview);
         }
+
+        Assert.Matches(@"/Subtype\s*/Image", Encoding.Latin1.GetString(preview));
+        Assert.Equal(PageCount(framed), PageCount(preview));
 
         foreach (var rendered in new[] { bytes, framed })
         {

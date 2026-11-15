@@ -162,7 +162,7 @@ public sealed class SettingsService(
 
     /// <summary>
     /// Tải lên hoặc thay ảnh khung chữ ký (PNG). Có hiệu lực ngay ở mọi màn hình ký mở sau đó và ở PDF tạo sau khi lưu (mỗi
-    /// chữ ký in trong khung); PDF đã ký giữ nguyên. Phải là PNG đọc được để in lên PDF.
+    /// chỗ ký in khung, chưa ký thì khung trống); PDF đã ký giữ nguyên. Phải là PNG đọc được để in lên PDF.
     /// </summary>
     public async Task<Result<SystemSettingsDto>> UploadSignatureFrameAsync(
         UploadSignatureFrameRequest request, CancellationToken cancellationToken)
