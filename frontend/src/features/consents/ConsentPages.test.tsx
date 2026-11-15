@@ -320,7 +320,7 @@ describe('Lập phiếu: lấy người bệnh từ hệ thống bệnh viện',
   }
   const routes = (lookup: object) => ({
     ...baseRoutes(staff()),
-    'GET /api/v1/features': { his: false, smartCa: false, patientSource: true, encounters: false },
+    'GET /api/v1/features': { his: false, smartCa: false, patientSource: true },
     'GET /api/v1/patients': page([]),
     'GET /api/v1/patients/p-1': patient,
     'GET /api/v1/consent-templates/available': available,

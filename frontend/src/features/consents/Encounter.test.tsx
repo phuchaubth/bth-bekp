@@ -23,7 +23,11 @@ const staff = () =>
     permissions: [Permissions.PatientsRead, Permissions.ConsentsRead, Permissions.ConsentsCreate, Permissions.ConsentsSign],
   })
 
-const withEncounters = { his: false, smartCa: false, patientSource: true, encounters: true }
+// Đã cấu hình API thông tin người bệnh; quản trị bật/tắt gắn lượt tiếp nhận thì máy chủ trả lời ở danh sách lượt.
+const withPatientSource = { his: false, smartCa: false, patientSource: true }
+
+const switchedOff = () =>
+  problem(422, 'Gắn phiếu với lượt tiếp nhận đang tắt (Quản trị → Cấu hình hệ thống).', { code: 'consent_forms.encounters_disabled' })
 
 const definition: TemplateDefinition = {
   title: 'Giấy đồng thuận BHYT',
@@ -157,7 +161,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     let current = form('f-1')
     const { calls } = mockApi({
       ...baseRoutes(staff()),
-      'GET /api/v1/features': withEncounters,
+      'GET /api/v1/features': withPatientSource,
       'GET /api/v1/consent-forms/f-1': () => current,
       'GET /api/v1/consent-forms/f-1/encounters': today,
       'POST /api/v1/consent-forms/f-1/complete': () => (current = completed('f-1')),
@@ -205,7 +209,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
   it('chọn ngày khác: tra từ ngày đến ngày, lượt đã chọn phải chọn lại', async () => {
     const { calls } = mockApi({
       ...baseRoutes(staff()),
-      'GET /api/v1/features': withEncounters,
+      'GET /api/v1/features': withPatientSource,
       'GET /api/v1/consent-forms/f-1': form('f-1'),
       'GET /api/v1/consent-forms/f-1/encounters': (call) =>
         call.search
@@ -246,7 +250,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     let down = true
     mockApi({
       ...baseRoutes(staff()),
-      'GET /api/v1/features': withEncounters,
+      'GET /api/v1/features': withPatientSource,
       'GET /api/v1/consent-forms/f-1': form('f-1'),
       'GET /api/v1/consent-forms/f-1/encounters': () =>
         down
@@ -261,6 +265,8 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     await user.click(await screen.findByRole('button', { name: /Xác nhận và hoàn tất/ }))
     const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
     expect(await within(dialog).findByText('Không lấy được danh sách tiếp nhận từ HIS. Vui lòng thử lại sau ít phút.')).toBeInTheDocument()
+    // Hướng dẫn: quản trị tạm tắt ở Cấu hình hệ thống để hoàn tất tiếp.
+    expect(within(dialog).getByText(/quản trị tạm tắt “Gắn phiếu với lượt tiếp nhận”/)).toBeInTheDocument()
     staffSigns(dialog)
     expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeDisabled()
 
@@ -269,10 +275,47 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     expect(await within(dialog).findByRole('radio', { name: 'Chọn lượt tiếp nhận TN-0002' })).toBeInTheDocument()
   })
 
+  it('HIS lỗi, quản trị tắt gắn lượt tiếp nhận: bấm Thử lại là ký hoàn tất được ngay, không gửi lượt', async () => {
+    let state: 'down' | 'off' = 'down'
+    let current = form('f-1')
+    const { calls } = mockApi({
+      ...baseRoutes(staff()),
+      'GET /api/v1/features': withPatientSource,
+      'GET /api/v1/consent-forms/f-1': () => current,
+      'GET /api/v1/consent-forms/f-1/encounters': () =>
+        state === 'down'
+          ? problem(422, 'Không lấy được danh sách tiếp nhận từ HIS. Vui lòng thử lại sau ít phút.', {
+              code: 'consent_forms.encounters_unavailable',
+            })
+          : switchedOff(),
+      'POST /api/v1/consent-forms/f-1/complete': () => (current = { ...completed('f-1'), encounter: null }),
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Xác nhận và hoàn tất/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
+    await within(dialog).findByRole('button', { name: 'Thử lại' })
+    staffSigns(dialog)
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeDisabled()
+
+    // Quản trị vừa tắt ở Cấu hình hệ thống.
+    state = 'off'
+    await user.click(within(dialog).getByRole('button', { name: 'Thử lại' }))
+    await waitFor(() => expect(within(dialog).queryByRole('region', { name: 'Lượt tiếp nhận' })).not.toBeInTheDocument())
+    expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeEnabled()
+    await user.click(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' }))
+
+    expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')!.body).toEqual({
+      image: 'QU5IX0NIVV9LWQ==',
+    })
+  })
+
   it('lượt đã chọn không còn hợp lệ trên HIS: hiện đúng lý do của máy chủ và tải lại danh sách', async () => {
     const { calls } = mockApi({
       ...baseRoutes(staff()),
-      'GET /api/v1/features': withEncounters,
+      'GET /api/v1/features': withPatientSource,
       'GET /api/v1/consent-forms/f-1': form('f-1'),
       'GET /api/v1/consent-forms/f-1/encounters': today,
       'POST /api/v1/consent-forms/f-1/complete': () =>
@@ -293,7 +336,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     await waitFor(() => expect(calls.filter((c) => c.path === '/api/v1/consent-forms/f-1/encounters').length).toBe(2))
   })
 
-  it('bệnh viện chưa bật: hộp ký không có danh sách lượt tiếp nhận, không gọi tra cứu', async () => {
+  it('chưa cấu hình API thông tin người bệnh: hộp ký không có danh sách lượt tiếp nhận, không gọi tra cứu', async () => {
     const { calls } = mockApi({ ...baseRoutes(staff()), 'GET /api/v1/consent-forms/f-1': form('f-1') })
     renderApp('/phieu-dong-thuan/f-1')
     const user = userEvent.setup()
@@ -305,6 +348,25 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeEnabled()
     expect(within(dialog).queryByRole('region', { name: 'Lượt tiếp nhận' })).not.toBeInTheDocument()
     expect(calls.some((c) => c.path.endsWith('/encounters'))).toBe(false)
+  })
+
+  it('quản trị đang tắt gắn lượt tiếp nhận: hộp ký không có danh sách, ký hoàn tất như thường', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(staff()),
+      'GET /api/v1/features': withPatientSource,
+      'GET /api/v1/consent-forms/f-1': form('f-1'),
+      'GET /api/v1/consent-forms/f-1/encounters': switchedOff,
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Xác nhận và hoàn tất/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
+    staffSigns(dialog)
+
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' })).toBeEnabled())
+    expect(within(dialog).queryByRole('region', { name: 'Lượt tiếp nhận' })).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/api/v1/consent-forms/f-1/encounters')).toBe(true)
   })
 
   describe('xác nhận cả bộ', () => {
@@ -333,7 +395,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     it('có phiếu được hoàn tất: chọn lượt tiếp nhận của bộ, gửi kèm khi xác nhận', async () => {
       const { calls } = mockApi({
         ...baseRoutes(staff()),
-        'GET /api/v1/features': withEncounters,
+        'GET /api/v1/features': withPatientSource,
         'GET /api/v1/consent-forms/f-1': form('f-1', { bundleId: 'b-1' }),
         'GET /api/v1/consent-forms/bundles/b-1': bundle([
           item('f-1', actions({ canConfirm: true })),
@@ -371,7 +433,7 @@ describe('Gắn phiếu với lượt tiếp nhận khi ký hoàn tất (quyết
     it('chỉ xác nhận bước trung gian: không cần chọn lượt tiếp nhận', async () => {
       const { calls } = mockApi({
         ...baseRoutes(staff()),
-        'GET /api/v1/features': withEncounters,
+        'GET /api/v1/features': withPatientSource,
         'GET /api/v1/consent-forms/f-2': form('f-2', { bundleId: 'b-1', actions: actions({ canConfirmStep: true }) }),
         'GET /api/v1/consent-forms/bundles/b-1': bundle([item('f-2', actions({ canConfirmStep: true }))]),
       })

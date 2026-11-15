@@ -40,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<PatientSourceService>();
         services.AddScoped<KioskService>();
         services.AddScoped<KioskSettingsService>();
+        services.AddScoped<EncounterSettingsService>();
 
         RegisterValidators(services);
         return services;

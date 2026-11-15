@@ -10,7 +10,7 @@ public enum EncounterSourceStatus
     /// <summary>Không lấy được (lỗi mạng, quá thời gian, CSDL bệnh viện lỗi, chưa cấu hình truy vấn ở API thông tin người bệnh).</summary>
     Unavailable,
 
-    /// <summary>Chưa bật gắn lượt tiếp nhận (<c>PatientSource:EncountersEnabled</c> = false).</summary>
+    /// <summary>Chưa cấu hình API thông tin người bệnh (<c>PatientSource:Provider</c> khác <c>Api</c>).</summary>
     Disabled,
 }
 
@@ -23,10 +23,11 @@ public sealed record EncounterSourceResult(EncounterSourceStatus Status, IReadOn
 
 /// <summary>
 /// Lượt tiếp nhận của người bệnh trên HIS, lấy qua API thông tin người bệnh (quyết định 25): tra theo mã người bệnh hoặc số
-/// CCCD (một trong hai) từ ngày đến ngày. Khi bật, phiếu phải gắn một lượt tiếp nhận lúc hoàn tất.
+/// CCCD (một trong hai) từ ngày đến ngày. Bắt buộc gắn lượt khi hoàn tất hay không do quản trị bật/tắt ở Cấu hình hệ thống.
 /// </summary>
 public interface IEncounterSource
 {
+    /// <summary>Đã cấu hình API thông tin người bệnh, tức là tra được lượt tiếp nhận (điều kiện để quản trị bật).</summary>
     bool IsEnabled { get; }
 
     Task<EncounterSourceResult> FindAsync(string? patientCode, string? citizenId, DateOnly from, DateOnly to, CancellationToken cancellationToken);

@@ -12,6 +12,7 @@ using Consent.Application.Users;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
+using Consent.Domain.Settings;
 using Microsoft.Extensions.Options;
 
 namespace Consent.Application.Tests.Fakes;
@@ -204,8 +205,19 @@ internal sealed class AppTestContext
         new InMemoryConsentFormRepository(Store),
         new InMemoryPatientRepository(Store),
         EncounterSource,
+        CreateEncounterSettingsService(),
         Clock,
         Microsoft.Extensions.Options.Options.Create(HisOptions));
+
+    public EncounterSettingsService CreateEncounterSettingsService() => new(
+        new InMemorySystemSettingRepository(Store), EncounterSource, Store, Clock);
+
+    /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
+    public void TurnOnEncounters()
+    {
+        EncounterSource.IsEnabled = true;
+        Store.SystemSettings.Add(SystemSetting.Create(SettingKeys.EncountersEnabled, "true", Clock.UtcNow));
+    }
 
     public ConsentFormExportService CreateConsentFormExportService() => new(
         new InMemoryConsentFormRepository(Store),

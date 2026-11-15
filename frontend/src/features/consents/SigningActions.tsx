@@ -6,9 +6,12 @@ import {
   consentFormKeys,
   consentFormsApi,
   decisionLabels,
+  encountersSwitchedOff,
   signerRoleLabels,
+  useEncounterList,
   type ConsentFormDetail,
   type EncounterChoice,
+  type EncounterRange,
   type EncounterSource,
   type StaffSignatureInput,
 } from '../../api/consentForms'
@@ -149,8 +152,8 @@ export function StartBundleSigningModal({
 
 /**
  * Nhân viên ký tay khi xác nhận (quyết định 17): ký bằng ngón tay, bút hoặc chuột vào khung, rồi bấm xác nhận. Tài khoản
- * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF. Khi ký hoàn tất mà
- * bệnh viện bật gắn lượt tiếp nhận (quyết định 25), phải chọn lượt tiếp nhận của người bệnh trước khi ký.
+ * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF. Khi ký hoàn tất mà quản
+ * trị đang bật gắn lượt tiếp nhận (quyết định 25), phải chọn lượt tiếp nhận của người bệnh trước khi ký.
  */
 export function StaffSignModal({
   title,
@@ -158,6 +161,7 @@ export function StaffSignModal({
   okText,
   loading,
   encounterSource,
+  encounterHint,
   onSign,
   onClose,
 }: {
@@ -165,8 +169,13 @@ export function StaffSignModal({
   description: string
   okText: string
   loading: boolean
-  /** Danh sách lượt tiếp nhận để chọn (phiếu hoặc bộ phiếu); bỏ trống khi không cần gắn lượt tiếp nhận. */
+  /**
+   * Người bệnh (của phiếu hoặc bộ phiếu) để tra lượt tiếp nhận khi ký hoàn tất; bỏ trống khi không hoàn tất phiếu nào hoặc
+   * chưa cấu hình API thông tin người bệnh. Bật/tắt bắt buộc do máy chủ trả lời mỗi lần mở hộp.
+   */
   encounterSource?: EncounterSource | null
+  /** Câu giải thích riêng ở phần chọn lượt tiếp nhận (ví dụ các phiếu được gắn khi xác nhận cả bộ). */
+  encounterHint?: string
   onSign: (signature: StaffSignatureInput, encounter: EncounterChoice | null) => void
   onClose: () => void
 }) {
@@ -177,7 +186,13 @@ export function StaffSignModal({
   const [drawInstead, setDrawInstead] = useState(false)
   const useSpecimen = !!specimen.data && !drawInstead
   const [encounter, setEncounter] = useState<EncounterChoice | null>(null)
-  const missingEncounter = !!encounterSource && !encounter
+  const [encounterRange, setEncounterRange] = useState<EncounterRange | null>(null)
+  const encounters = useEncounterList(encounterSource ?? null, encounterRange)
+  // Quản trị tắt gắn lượt tiếp nhận (Cấu hình hệ thống, ví dụ khi HIS lỗi): ký hoàn tất không cần chọn lượt. Có hiệu lực
+  // ngay cả khi hộp đang mở: bấm "Thử lại" là máy chủ trả lời đang tắt.
+  const encounterOff = !encounterSource || encountersSwitchedOff(encounters.error)
+  const missingEncounter = !encounterOff && !encounter
+  const chosenEncounter = encounterOff ? null : encounter
 
   return (
     <Modal
@@ -192,15 +207,33 @@ export function StaffSignModal({
           return
         }
         if (useSpecimen) {
-          onSign({ useSpecimen: true }, encounter)
+          onSign({ useSpecimen: true }, chosenEncounter)
         } else if (pad.current) {
-          onSign({ image: pad.current.toPngBase64() }, encounter)
+          onSign({ image: pad.current.toPngBase64() }, chosenEncounter)
         }
       }}
       onCancel={onClose}
     >
       <Typography.Paragraph>{description}</Typography.Paragraph>
-      {encounterSource && <EncounterPicker source={encounterSource} value={encounter} onChange={setEncounter} />}
+      {!encounterOff &&
+        (encounters.isPending ? (
+          <Typography.Paragraph type="secondary">
+            <Spin size="small" /> Đang kiểm tra lượt tiếp nhận…
+          </Typography.Paragraph>
+        ) : (
+          <EncounterPicker
+            list={encounters}
+            range={encounterRange}
+            onRangeChange={(next) => {
+              setEncounterRange(next)
+              // Lượt đã chọn có thể không còn trong danh sách mới: chọn lại cho chắc.
+              setEncounter(null)
+            }}
+            value={encounter}
+            onChange={setEncounter}
+            hint={encounterHint}
+          />
+        ))}
       {specimen.isPending ? (
         <Spin />
       ) : useSpecimen ? (

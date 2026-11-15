@@ -45,8 +45,27 @@ export const settingsApi = {
   logo: (signal?: AbortSignal) => apiBlob('/api/v1/settings/logo', signal),
 }
 
-export const settingsKeys = { all: ['settings'] as const }
+export const settingsKeys = { all: ['settings'] as const, encounters: ['settings', 'encounters'] as const }
 
 export function useSystemSettings() {
   return useQuery({ queryKey: settingsKeys.all, queryFn: ({ signal }) => settingsApi.get(signal) })
+}
+
+/** Gắn phiếu với lượt tiếp nhận HIS khi ký hoàn tất (quyết định 25), bật/tắt ở Cấu hình hệ thống. */
+export interface EncounterSettings {
+  /** Đang bắt buộc chọn lượt tiếp nhận khi ký hoàn tất. */
+  enabled: boolean
+  /** Đã cấu hình API thông tin người bệnh nên bật được. */
+  available: boolean
+  updatedAtUtc: string | null
+}
+
+export const encounterSettingsApi = {
+  get: (signal?: AbortSignal) => apiRequest<EncounterSettings>('/api/v1/settings/encounters', { signal }),
+  update: (enabled: boolean) =>
+    apiRequest<EncounterSettings>('/api/v1/settings/encounters', { method: 'PUT', body: { enabled } }),
+}
+
+export function useEncounterSettings() {
+  return useQuery({ queryKey: settingsKeys.encounters, queryFn: ({ signal }) => encounterSettingsApi.get(signal) })
 }

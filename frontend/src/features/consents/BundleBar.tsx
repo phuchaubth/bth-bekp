@@ -31,7 +31,8 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
   const myTurn = bundle.forms.filter((item) => item.actions.canConfirmStep || item.actions.canConfirm)
   // Như máy chủ: phiếu còn bước trung gian đến lượt thì xác nhận bước, không thì xác nhận cuối (hoàn tất).
   const completing = myTurn.filter((item) => !item.actions.canConfirmStep && item.actions.canConfirm)
-  const needsEncounter = features.encounters && completing.length > 0
+  // Lượt tiếp nhận chỉ gắn vào phiếu được hoàn tất; bắt buộc hay không do quản trị bật/tắt (máy chủ trả lời).
+  const offerEncounter = features.patientSource && completing.length > 0
 
   const confirm = useMutation({
     mutationFn: ({ signature, encounter }: { signature: StaffSignatureInput; encounter: EncounterChoice | null }) =>
@@ -117,14 +118,13 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
           title="Xác nhận cả bộ phiếu"
           description={`Bạn sẽ ký xác nhận ${myTurn.length} phiếu đang đến lượt mình: ${myTurn
             .map((item) => `${item.templateName} (${item.formNo})`)
-            .join('; ')}. Chữ ký được in vào ô của bạn trên từng phiếu.${
-            needsEncounter
-              ? ` ${completing.length === myTurn.length ? 'Các phiếu' : `${completing.length} phiếu`} hoàn tất lần này được gắn vào lượt tiếp nhận bạn chọn; số tiếp nhận và người tiếp nhận in ở chân phiếu.`
-              : ''
-          }`}
+            .join('; ')}. Chữ ký được in vào ô của bạn trên từng phiếu.`}
           okText="Ký và xác nhận cả bộ"
           loading={confirm.isPending}
-          encounterSource={needsEncounter ? { bundleId: bundle.bundleId } : null}
+          encounterSource={offerEncounter ? { bundleId: bundle.bundleId } : null}
+          encounterHint={`${
+            completing.length === myTurn.length ? 'Các phiếu' : `${completing.length} phiếu`
+          } hoàn tất lần này được gắn vào lượt tiếp nhận bạn chọn; số tiếp nhận và người tiếp nhận in ở chân phiếu.`}
           onSign={(signature, encounter) => confirm.mutate({ signature, encounter })}
           onClose={() => setConfirmOpen(false)}
         />

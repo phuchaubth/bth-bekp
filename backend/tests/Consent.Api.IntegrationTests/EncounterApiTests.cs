@@ -12,7 +12,7 @@ namespace Consent.Api.IntegrationTests;
 
 /// <summary>
 /// Gắn phiếu với lượt tiếp nhận trên HIS khi ký hoàn tất (quyết định 25), qua API thông tin người bệnh giả lập theo đúng
-/// hợp đồng <c>POST api/v1/encounters/search</c> (dữ liệu giả lập), với SQL Server thật.
+/// hợp đồng <c>POST api/v1/encounters/search</c> (dữ liệu giả lập), với SQL Server thật. Quản trị bật/tắt ở Cấu hình hệ thống.
 /// </summary>
 [Collection(SqlServerCollection.Name)]
 public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
@@ -31,7 +31,6 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
                 ["PatientSource:Provider"] = "Api",
                 ["PatientSource:BaseUrl"] = "https://thongtinbn.gia-lap.local/",
                 ["PatientSource:ApiKey"] = ApiKey,
-                ["PatientSource:EncountersEnabled"] = "true",
             },
             services => services.Replace(ServiceDescriptor.Singleton(new PatientSourceHttp(_api))));
         _client = _factory.CreateHttpsClient();
@@ -45,6 +44,16 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     private static string Image() => Convert.ToBase64String(TestPng.Signature());
+
+    /// <summary>Quản trị bật/tắt gắn lượt tiếp nhận ở Cấu hình hệ thống.</summary>
+    private async Task<JsonElement> SwitchAsync(bool enabled)
+    {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var (status, body) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/encounters", admin, new { enabled });
+        Assert.True(status == HttpStatusCode.OK, body.ToString());
+        Assert.Equal(enabled, body.GetProperty("enabled").GetBoolean());
+        return body;
+    }
 
     /// <summary>Tiếp đón lập phiếu BM02 cho người bệnh demo (CCCD giả lập 001085000001), người bệnh đã ký; trả về đường dẫn phiếu.</summary>
     private async Task<string> PatientSignedBm02Async(string receptionist)
@@ -71,14 +80,22 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
     [Fact]
     public async Task Completing_RequiresPickingAnEncounterOfThePatient_ThenTheFormShowsIt()
     {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var (_, initially) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/settings/encounters", admin);
         var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
-        var (_, features) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/features", receptionist);
         var form = await PatientSignedBm02Async(receptionist);
+
+        // Đã cấu hình API thông tin người bệnh nhưng quản trị chưa bật: chưa có danh sách lượt.
+        Assert.False(initially.GetProperty("enabled").GetBoolean());
+        Assert.True(initially.GetProperty("available").GetBoolean());
+        var (offStatus, off) = await _client.SendJsonAsync(HttpMethod.Get, $"{form}/encounters", receptionist);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, offStatus);
+        Assert.Equal("consent_forms.encounters_disabled", off.GetProperty("code").GetString());
+        await SwitchAsync(true);
 
         // Mặc định: các lượt trong ngày (giờ bệnh viện), mới nhất trước.
         var (listStatus, list) = await _client.SendJsonAsync(HttpMethod.Get, $"{form}/encounters", receptionist);
         Assert.True(listStatus == HttpStatusCode.OK, list.ToString());
-        Assert.True(features.GetProperty("encounters").GetBoolean());
         var today = list.GetProperty("from").GetString()!;
         Assert.Equal(today, list.GetProperty("to").GetString());
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow.AddHours(7)), DateOnly.Parse(today, CultureInfo.InvariantCulture), new DateOnlyNear());
@@ -116,6 +133,12 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
         await using var reader = await command.ExecuteReaderAsync();
         Assert.True(await reader.ReadAsync());
         Assert.Equal((chosen, "Người tiếp đón B (giả lập)"), (reader.GetString(0), reader.GetString(1)));
+        await reader.DisposeAsync();
+
+        // Bật/tắt được ghi nhật ký hệ thống như mọi cấu hình khác.
+        await using var audit = new SqlCommand(
+            "SELECT COUNT(*) FROM AuditLogs WHERE EntityType = 'SystemSetting' AND UserName = 'admin'", connection);
+        Assert.True((int)(await audit.ExecuteScalarAsync())! >= 1);
 
         // Khóa API đi trong header, CCCD đi trong thân (không nằm trên URL).
         Assert.All(_api.Requests, r =>
@@ -129,6 +152,7 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
     [Fact]
     public async Task EncounterList_TakesADateRange_ValidatesIt_AndNeedsTheSigningPermission()
     {
+        await SwitchAsync(true);
         var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
         var auditor = (await _client.LoginAsync("kiemtra.demo", TestSettings.DemoPassword)).AccessToken!;
         var form = await PatientSignedBm02Async(receptionist);
@@ -150,6 +174,33 @@ public sealed class EncounterApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, auditorStatus);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, downStatus);
         Assert.Equal("consent_forms.encounters_unavailable", down.GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task HisDown_AdminSwitchesItOffInSettings_AndStaffCompleteRightAway()
+    {
+        await SwitchAsync(true);
+        var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
+        var form = await PatientSignedBm02Async(receptionist);
+        _api.Down = true;
+
+        // HIS lỗi: không có danh sách lượt, chưa chọn lượt thì không hoàn tất được.
+        var (blockedStatus, blocked) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Image() });
+        Assert.Equal(HttpStatusCode.BadRequest, blockedStatus);
+        Assert.True(blocked.GetProperty("errors").TryGetProperty("encounterNo", out _), blocked.ToString());
+        // Nhân viên không tự tắt được.
+        var (forbiddenStatus, _) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/encounters", receptionist, new { enabled = false });
+        Assert.Equal(HttpStatusCode.Forbidden, forbiddenStatus);
+
+        // Quản trị tắt: có hiệu lực ngay, không cần khởi động lại.
+        await SwitchAsync(false);
+        var (completedStatus, completed) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Image() });
+
+        Assert.True(completedStatus == HttpStatusCode.OK, completed.ToString());
+        Assert.Equal("Completed", completed.GetProperty("status").GetString());
+        Assert.True(
+            !completed.TryGetProperty("encounter", out var encounter) || encounter.ValueKind == JsonValueKind.Null,
+            completed.ToString());
     }
 
     /// <summary>Ngày "hôm nay" giờ bệnh viện có thể lệch một ngày nếu test chạy đúng lúc nửa đêm.</summary>

@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import type { PagedResult } from './admin'
 import type { TemplateDefinition } from './consentTemplates'
-import { apiBlob, apiRequest } from './http'
+import { ApiError, apiBlob, apiRequest } from './http'
 import type { Gender, Relationship } from './patients'
 
 export type ConsentFormStatus = 'Draft' | 'PendingSignature' | 'Completed' | 'Cancelled' | 'Revoked'
@@ -341,7 +341,7 @@ export const consentFormKeys = {
   list: (query: ConsentFormQuery) => ['consent-forms', 'list', query] as const,
   detail: (id: string) => ['consent-forms', 'detail', id] as const,
   bundle: (bundleId: string) => ['consent-forms', 'bundle', bundleId] as const,
-  encounters: (source: EncounterSource, range: EncounterRange | null) => ['consent-forms', 'encounters', source, range] as const,
+  encounters: (source: EncounterSource | null, range: EncounterRange | null) => ['consent-forms', 'encounters', source, range] as const,
 }
 
 export function useConsentForms(query: ConsentFormQuery, enabled = true) {
@@ -355,6 +355,26 @@ export function useConsentForms(query: ConsentFormQuery, enabled = true) {
 
 export function useConsentForm(id: string) {
   return useQuery({ queryKey: consentFormKeys.detail(id), queryFn: ({ signal }) => consentFormsApi.get(id, signal) })
+}
+
+/**
+ * Lượt tiếp nhận để chọn khi ký hoàn tất (quyết định 25). Mỗi lần mở hộp ký đều tải mới: quản trị có thể vừa bật/tắt gắn lượt
+ * tiếp nhận, HIS có thể vừa có lượt mới.
+ */
+export function useEncounterList(source: EncounterSource | null, range: EncounterRange | null) {
+  return useQuery({
+    queryKey: consentFormKeys.encounters(source, range),
+    queryFn: ({ signal }) => consentFormsApi.encounters(source!, range, signal),
+    enabled: source !== null,
+    staleTime: 0,
+    retry: false,
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** Máy chủ báo quản trị đang tắt gắn lượt tiếp nhận: ký hoàn tất không cần chọn lượt. */
+export function encountersSwitchedOff(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'consent_forms.encounters_disabled'
 }
 
 export function useConsentFormBundle(bundleId: string | null | undefined) {

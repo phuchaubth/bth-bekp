@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 
 namespace Consent.Infrastructure.PatientSource;
 
-/// <summary>Chưa bật gắn lượt tiếp nhận (<c>PatientSource:EncountersEnabled</c> = false).</summary>
+/// <summary>Chưa cấu hình API thông tin người bệnh: không tra được lượt tiếp nhận.</summary>
 internal sealed class DisabledEncounterSource : IEncounterSource
 {
     public bool IsEnabled => false;

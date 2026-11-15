@@ -1,10 +1,12 @@
 using System.Text.Json.Nodes;
 using Consent.Application.ConsentForms;
+using Consent.Application.Settings;
 using Consent.Application.Tests.Fakes;
 using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
+using Consent.Domain.Settings;
 
 namespace Consent.Application.Tests;
 
@@ -28,7 +30,7 @@ public sealed class ConsentEncounterTests
     private static ConsentScenario Scenario()
     {
         var s = ConsentScenario.Create();
-        s.Ctx.EncounterSource.IsEnabled = true;
+        s.Ctx.TurnOnEncounters();
         s.Ctx.EncounterSource.Add("BN000125", "TN-0001", At(Today, 7, 30), "Phòng khám 1", "Nguyễn Tiếp Đón (giả lập)");
         s.Ctx.EncounterSource.Add("BN000125", "TN-0002", At(Today, 10, 45), "Phòng khám 3", "Trần Tiếp Đón (giả lập)");
         s.Ctx.EncounterSource.Add("BN000125", "TN-0000", At(Today.AddDays(-1), 9, 0), "Khoa Cấp cứu", null);
@@ -192,6 +194,70 @@ public sealed class ConsentEncounterTests
         Assert.Equal(
             "consent_forms.encounters_disabled",
             (await s.Ctx.CreateConsentEncounterService().ListForFormAsync(formId, null, null, Ct)).Error!.Code);
+    }
+
+    [Fact]
+    public async Task Complete_WhenTheApiIsConfiguredButTheAdminHasNotSwitchedItOn_NeedsNoEncounter()
+    {
+        var s = ConsentScenario.Create();
+        s.Ctx.EncounterSource.IsEnabled = true;
+        var formId = await PatientSignedCk01(s);
+
+        var completed = await s.Signing.CompleteAsync(formId, new(SignaturePng), Ct);
+
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        Assert.Empty(s.Ctx.EncounterSource.Calls);
+        Assert.Equal(new EncounterSettingsDto(false, true, null), await s.Ctx.CreateEncounterSettingsService().GetAsync(Ct));
+    }
+
+    [Fact]
+    public async Task HisDown_AdminSwitchesItOff_StaffCompleteWithoutAnEncounter_AndSwitchingBackOnRequiresItAgain()
+    {
+        var s = Scenario();
+        var first = await PatientSignedCk01(s);
+        s.Ctx.EncounterSource.Unavailable = true;
+        var settings = s.Ctx.CreateEncounterSettingsService();
+
+        // HIS lỗi: không lấy được danh sách lượt, và đang bật thì chưa chọn lượt không hoàn tất được.
+        var list = await s.Ctx.CreateConsentEncounterService().ListForFormAsync(first, null, null, Ct);
+        var blocked = await s.Signing.CompleteAsync(first, new(SignaturePng), Ct);
+        Assert.Equal("consent_forms.encounters_unavailable", list.Error!.Code);
+        Assert.True(blocked.Error!.FieldErrors!.ContainsKey("encounterNo"));
+
+        // Quản trị tắt ở Cấu hình hệ thống: có hiệu lực ngay, nhân viên hoàn tất tiếp (phiếu không gắn lượt).
+        var off = await settings.UpdateAsync(new(false), Ct);
+        var completed = await s.Signing.CompleteAsync(first, new(SignaturePng), Ct);
+        var listWhileOff = await s.Ctx.CreateConsentEncounterService().ListForFormAsync(first, null, null, Ct);
+
+        Assert.False(off.Value.Enabled);
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        Assert.Null(completed.Value.Encounter);
+        Assert.Equal("consent_forms.encounters_disabled", listWhileOff.Error!.Code);
+        // Dòng cấu hình được giữ (đổi sang false) để nhật ký có giá trị cũ/mới.
+        Assert.Equal("false", s.Ctx.Store.SystemSettings.Single(x => x.Key == SettingKeys.EncountersEnabled).Value);
+
+        // HIS ổn định, bật lại: phiếu sau lại bắt buộc chọn lượt.
+        s.Ctx.EncounterSource.Unavailable = false;
+        var on = await settings.UpdateAsync(new(true), Ct);
+        var second = await PatientSignedCk01(s);
+        var again = await s.Signing.CompleteAsync(second, new(SignaturePng), Ct);
+
+        Assert.True(on.Value.Enabled);
+        Assert.True(again.Error!.FieldErrors!.ContainsKey("encounterNo"));
+    }
+
+    [Fact]
+    public async Task Settings_CanOnlyBeSwitchedOn_WhenThePatientInfoApiIsConfigured()
+    {
+        var s = ConsentScenario.Create();
+        var settings = s.Ctx.CreateEncounterSettingsService();
+
+        var refused = await settings.UpdateAsync(new(true), Ct);
+        var offIsFine = await settings.UpdateAsync(new(false), Ct);
+
+        Assert.Equal("settings.encounters_unavailable", refused.Error!.Code);
+        Assert.Equal(new EncounterSettingsDto(false, false, null), offIsFine.Value);
+        Assert.Empty(s.Ctx.Store.SystemSettings);
     }
 
     [Fact]

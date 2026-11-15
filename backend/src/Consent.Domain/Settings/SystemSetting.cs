@@ -77,9 +77,15 @@ public static class SettingKeys
     /// </summary>
     public const string KioskTemplateCodes = "Kiosk.TemplateCodes";
 
+    /// <summary>
+    /// Bắt buộc chọn lượt tiếp nhận HIS khi ký hoàn tất phiếu (quyết định 25): <c>true</c> hoặc <c>false</c>. Quản trị bật/tắt
+    /// ở màn hình Cấu hình hệ thống; chưa đặt là tắt.
+    /// </summary>
+    public const string EncountersEnabled = "Encounters.Enabled";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
-            [HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes],
+            [HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled],
             StringComparer.Ordinal);
 
     public static bool IsDefined(string key) => key is not null && All.Contains(key);

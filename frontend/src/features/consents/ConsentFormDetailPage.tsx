@@ -223,14 +223,11 @@ export function ConsentFormDetailPage() {
       {staffSign === 'complete' && (
         <StaffSignModal
           title="Ký xác nhận và hoàn tất phiếu"
-          description={
-            features.encounters
-              ? 'Chọn lượt tiếp nhận mà phiếu thuộc về rồi ký vào khung bên dưới. Số tiếp nhận và người tiếp nhận được in ở chân phiếu để đối soát; sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm.'
-              : 'Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm.'
-          }
+          description="Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm."
           okText="Ký và hoàn tất"
           loading={complete.isPending}
-          encounterSource={features.encounters ? { formId: form.id } : null}
+          // Lượt tiếp nhận lấy qua API thông tin người bệnh; bắt buộc hay không do quản trị bật/tắt (máy chủ trả lời).
+          encounterSource={features.patientSource ? { formId: form.id } : null}
           onSign={(signature, encounter) => complete.mutate({ signature, encounter })}
           onClose={() => setStaffSign(null)}
         />

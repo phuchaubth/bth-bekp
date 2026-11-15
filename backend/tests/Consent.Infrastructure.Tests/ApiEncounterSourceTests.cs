@@ -15,7 +15,6 @@ public sealed class ApiEncounterSourceTests
         Provider = "Api",
         BaseUrl = "https://thongtinbn.gia-lap.local/goc/",
         ApiKey = "khoa-api-gia-lap-chi-dung-trong-kiem-thu-0001",
-        EncountersEnabled = true,
     };
 
     private static readonly DateOnly Day = new(2026, 11, 11);

@@ -11,8 +11,20 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/settings")]
 [Produces("application/json")]
-public sealed class SettingsController(SettingsService settings, KioskSettingsService kioskSettings) : ControllerBase
+public sealed class SettingsController(
+    SettingsService settings, KioskSettingsService kioskSettings, EncounterSettingsService encounterSettings) : ControllerBase
 {
+    /// <summary>Gắn phiếu với lượt tiếp nhận HIS khi ký hoàn tất (quyết định 25): đang bật hay tắt, bật được không.</summary>
+    [HttpGet("encounters")]
+    [HasPermission(Permissions.SettingsManage)]
+    public Task<EncounterSettingsDto> GetEncounters(CancellationToken cancellationToken) => encounterSettings.GetAsync(cancellationToken);
+
+    /// <summary>Bật/tắt bắt buộc chọn lượt tiếp nhận, có hiệu lực ngay (HIS lỗi thì tắt để nhân viên hoàn tất tiếp).</summary>
+    [HttpPut("encounters")]
+    [HasPermission(Permissions.SettingsManage)]
+    public async Task<IActionResult> UpdateEncounters(UpdateEncounterSettingsRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await encounterSettings.UpdateAsync(request, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Các mẫu người bệnh tự làm trên kiosk (quyết định 24), theo thứ tự làm.</summary>
     [HttpGet("kiosk")]
     [HasPermission(Permissions.SettingsManage)]

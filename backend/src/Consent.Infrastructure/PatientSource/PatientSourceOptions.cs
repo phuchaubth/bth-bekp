@@ -23,12 +23,6 @@ public sealed class PatientSourceOptions
     /// <summary>Khóa API gửi trong header <c>X-Api-Key</c>: chỉ đặt bằng biến môi trường <c>PatientSource__ApiKey</c>.</summary>
     public string? ApiKey { get; set; }
 
-    /// <summary>
-    /// Quyết định 25: bắt buộc gắn phiếu với một lượt tiếp nhận trên HIS khi ký hoàn tất (danh sách lượt lấy qua API thông tin
-    /// người bệnh, cần đặt <c>PatientInfo__EncounterQuery</c> ở dịch vụ đó). Mặc định tắt; chỉ bật được khi <c>Provider</c> = <c>Api</c>.
-    /// </summary>
-    public bool EncountersEnabled { get; set; }
-
     public bool IsApi => string.Equals(Provider, ApiProvider, StringComparison.OrdinalIgnoreCase);
 
     public bool IsKnownProvider => IsApi || string.Equals(Provider, NoneProvider, StringComparison.OrdinalIgnoreCase);

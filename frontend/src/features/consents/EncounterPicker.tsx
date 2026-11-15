@@ -1,17 +1,15 @@
 import { ReloadOutlined } from '@ant-design/icons'
-import { useQuery } from '@tanstack/react-query'
+import type { UseQueryResult } from '@tanstack/react-query'
 import { Alert, Button, DatePicker, Flex, Table, Typography, type TableColumnsType } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useState } from 'react'
 import {
-  consentFormKeys,
-  consentFormsApi,
   encounterDate,
   type ConsentFormEncounter,
   type EncounterChoice,
+  type EncounterList,
   type EncounterOption,
   type EncounterRange,
-  type EncounterSource,
 } from '../../api/consentForms'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDate, formatDateTime } from '../../utils/format'
@@ -77,38 +75,30 @@ const columns: TableColumnsType<EncounterOption> = [
 ]
 
 /**
- * Chọn lượt tiếp nhận trên HIS mà phiếu thuộc về khi ký hoàn tất (quyết định 25). Mặc định các lượt trong ngày, mới nhất
- * trước; "Chọn ngày khác" để tra từ ngày đến ngày. Mỗi lượt kèm các phiếu đã gắn vào, để nhân viên không gắn nhầm lượt.
+ * Chọn lượt tiếp nhận trên HIS mà phiếu thuộc về khi ký hoàn tất (quyết định 25, quản trị đang bật nên bắt buộc chọn). Mặc
+ * định các lượt trong ngày, mới nhất trước; "Chọn ngày khác" để tra từ ngày đến ngày. Mỗi lượt kèm các phiếu đã gắn vào, để
+ * nhân viên không gắn nhầm lượt. Danh sách do hộp ký tải (<paramref name="list"/>), khoảng ngày rỗng là hôm nay.
  */
 export function EncounterPicker({
-  source,
+  list,
+  range,
+  onRangeChange,
   value,
   onChange,
+  hint,
 }: {
-  source: EncounterSource
+  list: UseQueryResult<EncounterList>
+  range: EncounterRange | null
+  onRangeChange: (range: EncounterRange | null) => void
   value: EncounterChoice | null
   onChange: (choice: EncounterChoice | null) => void
+  hint?: string
 }) {
-  // Rỗng: hôm nay (ngày của bệnh viện, máy chủ quyết định).
-  const [range, setRange] = useState<EncounterRange | null>(null)
   const [pickingDates, setPickingDates] = useState(false)
-  const list = useQuery({
-    queryKey: consentFormKeys.encounters(source, range),
-    queryFn: ({ signal }) => consentFormsApi.encounters(source, range, signal),
-    // HIS có thể vừa tiếp nhận thêm lượt: mỗi lần mở hộp ký đều tải lại.
-    staleTime: 0,
-    retry: false,
-  })
-
-  const changeRange = (next: EncounterRange | null) => {
-    setRange(next)
-    // Lượt đã chọn có thể không còn trong danh sách mới: chọn lại cho chắc.
-    onChange(null)
-  }
 
   return (
     <section aria-label="Lượt tiếp nhận" style={{ marginBottom: 16 }}>
-      <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 8 }}>
+      <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 4 }}>
         <Typography.Text strong>
           Lượt tiếp nhận {range ? `từ ${formatDate(range.from)} đến ${formatDate(range.to)}` : 'hôm nay'}{' '}
           <Typography.Text type="danger">(bắt buộc)</Typography.Text>
@@ -123,7 +113,7 @@ export function EncounterPicker({
               onChange={(dates) => {
                 const [from, to] = (dates ?? []) as (Dayjs | null)[]
                 if (from && to) {
-                  changeRange({ from: from.format('YYYY-MM-DD'), to: to.format('YYYY-MM-DD') })
+                  onRangeChange({ from: from.format('YYYY-MM-DD'), to: to.format('YYYY-MM-DD') })
                 }
               }}
             />
@@ -134,7 +124,7 @@ export function EncounterPicker({
             <Button
               onClick={() => {
                 setPickingDates(false)
-                changeRange(null)
+                onRangeChange(null)
               }}
             >
               Hôm nay
@@ -148,11 +138,15 @@ export function EncounterPicker({
           />
         </Flex>
       </Flex>
+      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+        {hint ?? 'Chọn lượt tiếp nhận mà phiếu thuộc về. Số tiếp nhận và người tiếp nhận được in ở chân phiếu để đối soát.'}
+      </Typography.Paragraph>
       {list.isError ? (
         <Alert
           type="error"
           showIcon
           title={errorMessage(list.error)}
+          description="Nếu chưa khắc phục ngay được, quản trị tạm tắt “Gắn phiếu với lượt tiếp nhận” ở Quản trị → Cấu hình hệ thống, rồi bấm Thử lại để ký hoàn tất tiếp."
           action={
             <Button size="small" onClick={() => void list.refetch()}>
               Thử lại
@@ -165,7 +159,7 @@ export function EncounterPicker({
           rowKey="encounterNo"
           columns={columns}
           dataSource={list.data?.items}
-          loading={list.isPending}
+          loading={list.isFetching}
           pagination={false}
           scroll={{ y: 240 }}
           rowSelection={{

@@ -22,7 +22,6 @@ public sealed class FeaturesApiTests
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         Assert.False(body.RootElement.GetProperty("his").GetBoolean());
         Assert.False(body.RootElement.GetProperty("smartCa").GetBoolean());
-        Assert.False(body.RootElement.GetProperty("encounters").GetBoolean());
     }
 
     [Fact]
@@ -69,18 +68,7 @@ public sealed class FeaturesApiTests
         Assert.Contains("His:Provider chỉ nhận", error.ToString(), StringComparison.Ordinal);
     }
 
-    [Fact]
-    public async Task Encounters_WithoutThePatientInfoApi_AreRefusedAtStartup()
-    {
-        await using var factory = new HisFactory(provider: null, extra: new() { ["PatientSource:EncountersEnabled"] = "true" });
-
-        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
-
-        Assert.Contains("PatientSource:EncountersEnabled chỉ bật được khi PatientSource:Provider = 'Api'", error.ToString(), StringComparison.Ordinal);
-    }
-
-    private sealed class HisFactory(string? provider, string environment = "Testing", Dictionary<string, string?>? extra = null)
-        : ConsentApiFactory
+    private sealed class HisFactory(string? provider, string environment = "Testing") : ConsentApiFactory
     {
         protected override IReadOnlyDictionary<string, string?> Settings
         {
@@ -90,11 +78,6 @@ public sealed class FeaturesApiTests
                 if (provider is not null)
                 {
                     settings["His:Provider"] = provider;
-                }
-
-                foreach (var (key, value) in extra ?? [])
-                {
-                    settings[key] = value;
                 }
 
                 return settings;

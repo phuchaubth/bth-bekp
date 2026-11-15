@@ -183,3 +183,51 @@ describe('Kiosk người bệnh tự làm phiếu (quyết định 24)', () => {
     await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ templateIds: ['t-bm02', 't-cu', 't-ttnb'] }))
   })
 })
+
+describe('Gắn phiếu với lượt tiếp nhận (quyết định 25)', () => {
+  const name = 'Bắt buộc chọn lượt tiếp nhận khi ký hoàn tất phiếu'
+  const routes = {
+    ...baseRoutes(adminSession()),
+    'GET /api/v1/settings': settings,
+    'GET /api/v1/settings/kiosk': { templates: [], updatedAtUtc: null },
+    'GET /api/v1/consent-templates': [],
+  }
+
+  it('quản trị bật/tắt ngay trên trang (HIS lỗi thì tắt để nhân viên hoàn tất tiếp)', async () => {
+    let enabled = false
+    const { calls } = mockApi({
+      ...routes,
+      'GET /api/v1/settings/encounters': () => ({ enabled, available: true, updatedAtUtc: null }),
+      'PUT /api/v1/settings/encounters': (call) => {
+        enabled = (call.body as { enabled: boolean }).enabled
+        return { enabled, available: true, updatedAtUtc: '2026-11-15T03:00:00Z' }
+      },
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('switch', { name })
+    expect(toggle).not.toBeChecked()
+    expect(screen.getByText(/HIS lỗi thì tắt/)).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(await screen.findByText('Đã bật: ký hoàn tất phiếu phải chọn lượt tiếp nhận.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('switch', { name })).toBeChecked())
+    expect(screen.getByText(/Đổi lần cuối/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('switch', { name }))
+    expect(await screen.findByText('Đã tắt: ký hoàn tất phiếu không cần chọn lượt tiếp nhận.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'PUT' && c.path === '/api/v1/settings/encounters').map((c) => c.body)).toEqual([
+      { enabled: true },
+      { enabled: false },
+    ])
+  })
+
+  it('chưa cấu hình API thông tin người bệnh: công tắc bị khóa, có hướng dẫn', async () => {
+    mockApi({ ...routes, 'GET /api/v1/settings/encounters': { enabled: false, available: false, updatedAtUtc: null } })
+    renderApp('/quan-tri/cau-hinh')
+
+    expect(await screen.findByRole('switch', { name })).toBeDisabled()
+    expect(screen.getByText('Chưa cấu hình API thông tin người bệnh nên chưa bật được.')).toBeInTheDocument()
+  })
+})

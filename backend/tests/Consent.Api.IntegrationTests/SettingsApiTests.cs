@@ -73,6 +73,25 @@ public sealed class SettingsApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task EncounterSwitch_NeedsThePatientInfoApi_AndOnlyAdministrators()
+    {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
+
+        var (getStatus, current) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/settings/encounters", admin);
+        var (onStatus, on) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/encounters", admin, new { enabled = true });
+        var (staffStatus, _) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/settings/encounters", receptionist);
+
+        // Chưa cấu hình API thông tin người bệnh (PatientSource:Provider = None): chưa bật được.
+        Assert.Equal(HttpStatusCode.OK, getStatus);
+        Assert.False(current.GetProperty("enabled").GetBoolean());
+        Assert.False(current.GetProperty("available").GetBoolean());
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, onStatus);
+        Assert.Equal("settings.encounters_unavailable", on.GetProperty("code").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, staffStatus);
+    }
+
+    [Fact]
     public async Task Logo_IsManagedByAdministrators_ServedAsImage_AndPrintedOnPdfs()
     {
         var admin = await _client.LoginAsAdministratorAsync();

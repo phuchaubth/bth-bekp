@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Col, Descriptions, Form, Input, Row, Tag, Typography } from 'antd'
 import { settingsApi, settingsKeys, useSystemSettings, type HospitalSettingsInput } from '../../../api/settings'
 import { PageHeader } from '../../../components/PageHeader'
+import { EncounterSettingsCard } from './EncounterSettingsCard'
 import { KioskSettingsCard } from './KioskSettingsCard'
 import { LogoCard } from './LogoCard'
 import { applyServerFieldErrors, errorMessage } from '../../../utils/formErrors'
@@ -85,6 +86,9 @@ export function SettingsPage() {
         )}
         <Col xs={24} xl={12}>
           <KioskSettingsCard />
+        </Col>
+        <Col xs={24} xl={12}>
+          <EncounterSettingsCard />
         </Col>
         <Col xs={24} xl={12}>
           <Card title="Cấu hình triển khai (chỉ đọc)" loading={settings.isPending}>

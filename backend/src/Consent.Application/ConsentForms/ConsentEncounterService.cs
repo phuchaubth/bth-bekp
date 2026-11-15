@@ -1,5 +1,6 @@
 using Consent.Application.Abstractions;
 using Consent.Application.Patients;
+using Consent.Application.Settings;
 using Consent.Domain.ConsentForms;
 using Consent.Shared;
 using Microsoft.Extensions.Options;
@@ -7,15 +8,17 @@ using Microsoft.Extensions.Options;
 namespace Consent.Application.ConsentForms;
 
 /// <summary>
-/// Gắn phiếu với lượt tiếp nhận trên HIS (quyết định 25): khi bệnh viện bật, người ký hoàn tất phiếu (tiếp nhận, bác sĩ…)
-/// chọn một lượt tiếp nhận của người bệnh — mặc định các lượt trong ngày, mới nhất trước, hoặc từ ngày đến ngày — kèm các
-/// phiếu đã gắn vào từng lượt. Lượt chọn được máy chủ tra lại HIS (đúng người bệnh, đúng ngày) rồi mới gắn.
+/// Gắn phiếu với lượt tiếp nhận trên HIS (quyết định 25): khi quản trị bật (Cấu hình hệ thống), người ký hoàn tất phiếu (tiếp
+/// nhận, bác sĩ…) bắt buộc chọn một lượt tiếp nhận của người bệnh — mặc định các lượt trong ngày, mới nhất trước, hoặc từ
+/// ngày đến ngày — kèm các phiếu đã gắn vào từng lượt. Lượt chọn được máy chủ tra lại HIS (đúng người bệnh, đúng ngày) rồi mới
+/// gắn. Trạng thái bật/tắt được đọc lại ở mỗi yêu cầu nên tắt là có hiệu lực ngay (HIS lỗi thì tắt để hoàn tất tiếp).
 /// </summary>
 public sealed class ConsentEncounterService(
     ConsentFormService formService,
     IConsentFormRepository forms,
     IPatientRepository patients,
     IEncounterSource source,
+    EncounterSettingsService encounterSettings,
     IClock clock,
     IOptions<HisOptions> timeouts)
 {
@@ -27,7 +30,7 @@ public sealed class ConsentEncounterService(
     private static readonly Error BundleNotFound = Error.NotFound("consent_forms.bundle_not_found", "Không tìm thấy bộ phiếu.");
 
     private static readonly Error Disabled = Error.BusinessRule(
-        "consent_forms.encounters_disabled", "Bệnh viện chưa bật gắn phiếu với lượt tiếp nhận.");
+        "consent_forms.encounters_disabled", "Gắn phiếu với lượt tiếp nhận đang tắt (Quản trị → Cấu hình hệ thống).");
 
     private static readonly Error Unavailable = Error.BusinessRule(
         "consent_forms.encounters_unavailable", "Không lấy được danh sách tiếp nhận từ HIS. Vui lòng thử lại sau ít phút.");
@@ -35,8 +38,6 @@ public sealed class ConsentEncounterService(
     private static readonly Error NoPatientKey = Error.BusinessRule(
         "consent_forms.encounters_no_patient_key",
         "Hồ sơ người bệnh chưa có mã y tế hay số CCCD nên chưa tìm được lượt tiếp nhận. Hãy bổ sung hồ sơ rồi thử lại.");
-
-    public bool IsEnabled => source.IsEnabled;
 
     private DateOnly Today => DateOnly.FromDateTime(clock.UtcNow.ToOffset(ConsentFormService.VietnamOffset).DateTime);
 
@@ -53,13 +54,13 @@ public sealed class ConsentEncounterService(
     }
 
     /// <summary>
-    /// Lượt tiếp nhận gắn khi hoàn tất: chưa bật thì không gắn (null); đã bật thì bắt buộc chọn, và lượt phải có trên HIS
+    /// Lượt tiếp nhận gắn khi hoàn tất: đang tắt thì không gắn (null); đang bật thì bắt buộc chọn, và lượt phải có trên HIS
     /// trong ngày đã chọn của đúng người bệnh.
     /// </summary>
     internal async Task<Result<ConsentEncounter?>> ResolveAsync(
         Guid patientId, string? encounterNo, DateOnly? encounterDate, CancellationToken cancellationToken)
     {
-        if (!source.IsEnabled)
+        if (!await encounterSettings.IsActiveAsync(cancellationToken).ConfigureAwait(false))
         {
             return (ConsentEncounter?)null;
         }
@@ -84,7 +85,7 @@ public sealed class ConsentEncounterService(
 
     private async Task<Result<EncounterListDto>> ListAsync(Guid patientId, DateOnly? from, DateOnly? to, CancellationToken cancellationToken)
     {
-        if (!source.IsEnabled)
+        if (!await encounterSettings.IsActiveAsync(cancellationToken).ConfigureAwait(false))
         {
             return Disabled;
         }
