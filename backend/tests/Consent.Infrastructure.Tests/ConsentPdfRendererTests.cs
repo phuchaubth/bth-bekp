@@ -173,9 +173,13 @@ public sealed class ConsentPdfRendererTests
             .Select(p => TextOf(p.Elements)));
     }
 
+    /// <summary>Các đoạn trong thân phiếu (ngoài bảng), theo thứ tự in.</summary>
+    private static IEnumerable<Mdom.Paragraph> BodyParagraphs(Mdom.Document layout) =>
+        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>();
+
     /// <summary>Chữ của từng đoạn trong thân phiếu (ngoài bảng), theo thứ tự in; tab là "\t", xuống dòng là "\n".</summary>
     private static List<string> BodyLines(Mdom.Document layout) =>
-        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements)).ToList();
+        BodyParagraphs(layout).Select(p => TextOf(p.Elements)).ToList();
 
     private static string TextOf(Mdom.ParagraphElements elements) =>
         string.Concat(elements.Cast<Mdom.DocumentObject>().Select(element => element switch
@@ -189,8 +193,7 @@ public sealed class ConsentPdfRendererTests
 
     /// <summary>Mọi đoạn chữ có định dạng trong thân phiếu (ngoài bảng).</summary>
     private static IEnumerable<Mdom.FormattedText> BodyFormattedTexts(Mdom.Document layout) =>
-        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>()
-            .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>());
+        BodyParagraphs(layout).SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>());
 
     [Theory]
     [InlineData("QT-KNGT-BM02", false)]
@@ -340,6 +343,52 @@ public sealed class ConsentPdfRendererTests
         });
         // Font được nhúng (tập con, tên dạng "ABCDEF+DejaVu Sans") nên in đúng trên mọi máy.
         Assert.Contains("+DejaVu", pdf, StringComparison.Ordinal);
+    }
+
+    /// <summary>Ô Đồng ý/Không đồng ý: chỉ ô của ý kiến đã ghi nhận có dấu X; bản xem trước (chưa có ý kiến) để trống cả hai ô.</summary>
+    [Theory]
+    [InlineData(Consent.Domain.ConsentForms.ConsentDecision.Agreed, "☒", "☐")]
+    [InlineData(Consent.Domain.ConsentForms.ConsentDecision.Refused, "☐", "☒")]
+    [InlineData(null, "☐", "☐")]
+    public void DecisionBoxes_MarkOnlyTheRecordedDecision(Consent.Domain.ConsentForms.ConsentDecision? decision, string agree, string refuse)
+    {
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("TUVAN-CONGTT") with { Decision = decision });
+
+        var line = Assert.Single(BodyParagraphs(layout), p => TextOf(p.Elements).EndsWith("Không đồng ý (Disagree)", StringComparison.Ordinal));
+        Assert.Equal($"{agree} Đồng ý (Agree)    {refuse} Không đồng ý (Disagree)", TextOf(line.Elements));
+        Assert.Equal([agree, refuse], Boxes(line));
+    }
+
+    /// <summary>Ô xác nhận ("Tôi đã được giải thích…"): có dấu X khi đã đánh dấu, để trống khi chưa.</summary>
+    [Theory]
+    [InlineData(true, "☒")]
+    [InlineData(false, "☐")]
+    public void ConfirmBox_HasAnXOnlyWhenConfirmed(bool acknowledged, string box)
+    {
+        const string Label = "Tôi đã được giải thích, đọc và hiểu nội dung cam kết trên.";
+        var document = Document("CK-01", representative: false, isFinal: true);
+        var data = document.Data.DeepClone().AsObject();
+        data["acknowledged"] = acknowledged;
+
+        var layout = MigraDocConsentPdfRenderer.Build(document with { Data = data });
+
+        var line = Assert.Single(BodyParagraphs(layout), p => TextOf(p.Elements).EndsWith(Label, StringComparison.Ordinal));
+        Assert.Equal($"{box}\t{Label}", TextOf(line.Elements));
+        Assert.Equal([box], Boxes(line));
+    }
+
+    /// <summary>Các ô (☒/☐) trong đoạn, theo thứ tự in; mỗi ô phải in bằng font ô nhúng sẵn, không đậm.</summary>
+    private static List<string> Boxes(Mdom.Paragraph paragraph)
+    {
+        var boxes = paragraph.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>()
+            .Where(t => Plain(t) is MigraDocConsentPdfRenderer.Checked or MigraDocConsentPdfRenderer.Unchecked)
+            .ToList();
+        Assert.All(boxes, t =>
+        {
+            Assert.Equal(EmbeddedFontResolver.BoxFamilyName, t.FontName);
+            Assert.False(t.Bold);
+        });
+        return boxes.Select(Plain).ToList();
     }
 
     /// <summary>Bệnh viện yêu cầu 15/11/2026: logo nhỏ lại, cạnh trên logo thẳng cạnh trên chữ quốc hiệu (cả hai kiểu đầu phiếu).</summary>
