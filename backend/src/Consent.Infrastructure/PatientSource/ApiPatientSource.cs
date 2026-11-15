@@ -90,11 +90,14 @@ internal sealed partial class ApiPatientSource(PatientSourceHttp http, IOptions<
         string? Ethnicity,
         string? Occupation,
         string? Nationality,
-        string? HealthInsuranceNumber)
+        string? HealthInsuranceNumber,
+        DateOnly? CitizenIdIssueDate = null,
+        string? OldIdNumber = null)
     {
         public ExternalPatient ToPatient() => new(
             PatientCode, FullName, DateOfBirth,
             Enum.TryParse<Gender>(Gender, ignoreCase: true, out var gender) && Enum.IsDefined(gender) ? gender : null,
-            CitizenId, PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity, Occupation, Nationality, HealthInsuranceNumber);
+            CitizenId, PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity, Occupation, Nationality, HealthInsuranceNumber,
+            CitizenIdIssueDate, OldIdNumber);
     }
 }

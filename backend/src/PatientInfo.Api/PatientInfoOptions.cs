@@ -17,8 +17,8 @@ public sealed class PatientInfoOptions
     /// <summary>
     /// Câu SELECT trả về <b>một dòng</b> người bệnh, nhận tham số <c>@PatientCode</c> và <c>@CitizenId</c> (tham số không
     /// dùng thì là NULL). Tên cột kết quả đặt bằng <c>AS</c>: PatientCode, FullName, DateOfBirth, Gender, CitizenId,
-    /// PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity, Occupation, Nationality, HealthInsuranceNumber (thiếu cột
-    /// nào thì trường đó để trống).
+    /// CitizenIdIssueDate (ngày cấp CCCD), OldIdNumber (số CMND cũ), PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity,
+    /// Occupation, Nationality, HealthInsuranceNumber (thiếu cột nào thì trường đó để trống).
     /// </summary>
     public string? Query { get; set; }
 

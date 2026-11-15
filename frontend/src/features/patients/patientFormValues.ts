@@ -63,6 +63,8 @@ export function sourceToFormValues(patient: SourcePatient): Partial<PatientFormV
     dateOfBirth: toDayjs(patient.dateOfBirth),
     gender: patient.gender ?? undefined,
     citizenId: text(patient.citizenId),
+    citizenIdIssueDate: toDayjs(patient.citizenIdIssueDate),
+    oldIdNumber: text(patient.oldIdNumber),
     permanentAddress: text(patient.permanentAddress),
     currentAddress: text(patient.currentAddress),
     phoneNumber: text(patient.phoneNumber),
@@ -94,14 +96,17 @@ export function formValuesToInput(values: PatientFormValues): PatientInput {
   }
 }
 
-/** Tên hiển thị các trường của form, để báo những ô còn trống sau khi lấy thông tin tự động. */
+/**
+ * Tên hiển thị các trường của form, để báo những ô còn trống sau khi lấy thông tin tự động. Không báo "Địa chỉ hiện tại"
+ * (để trống nghĩa là giống nơi thường trú) và số CMND cũ (người có CCCD mới thường không có).
+ */
 const fieldLabels: [keyof PatientFormValues, string, boolean][] = [
   ['fullName', 'Họ và tên', true],
   ['dateOfBirth', 'Ngày sinh', true],
   ['gender', 'Giới tính', true],
   ['citizenId', 'Số CCCD', false],
+  ['citizenIdIssueDate', 'Ngày cấp CCCD', false],
   ['permanentAddress', 'Nơi thường trú', false],
-  ['currentAddress', 'Địa chỉ hiện tại', false],
   ['phoneNumber', 'Số điện thoại', false],
   ['ethnicity', 'Dân tộc', false],
   ['nationality', 'Quốc tịch', false],

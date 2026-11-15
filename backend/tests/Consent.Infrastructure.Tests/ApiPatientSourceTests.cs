@@ -21,7 +21,7 @@ public sealed class ApiPatientSourceTests
     public async Task Found_MapsResponse_AndSendsKeyInHeaderAndIdentifiersInBody()
     {
         var handler = new StubHandler(HttpStatusCode.OK,
-            """{"patientCode":"BN-GL-001","fullName":"Lê Văn Thử (giả lập)","dateOfBirth":"1970-02-03","gender":"female","citizenId":"079070000123"}""");
+            """{"patientCode":"BN-GL-001","fullName":"Lê Văn Thử (giả lập)","dateOfBirth":"1970-02-03","gender":"female","citizenId":"079070000123","citizenIdIssueDate":"2021-06-01","oldIdNumber":"070123456"}""");
 
         var result = await Create(handler).FindAsync("BN-GL-001", null, CancellationToken.None);
 
@@ -29,6 +29,8 @@ public sealed class ApiPatientSourceTests
         Assert.Equal("Lê Văn Thử (giả lập)", result.Patient!.FullName);
         Assert.Equal(new DateOnly(1970, 2, 3), result.Patient.DateOfBirth);
         Assert.Equal(Gender.Female, result.Patient.Gender);
+        Assert.Equal(new DateOnly(2021, 6, 1), result.Patient.CitizenIdIssueDate);
+        Assert.Equal("070123456", result.Patient.OldIdNumber);
         Assert.Equal("https://thongtinbn.gia-lap.local/goc/api/v1/patients/lookup", handler.Url);
         Assert.Equal(Settings.ApiKey, handler.ApiKey);
         Assert.Contains("\"patientCode\":\"BN-GL-001\"", handler.Body, StringComparison.Ordinal);

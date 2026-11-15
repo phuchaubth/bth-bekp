@@ -27,7 +27,9 @@ public sealed record ExternalPatient(
     string? Ethnicity,
     string? Occupation,
     string? Nationality,
-    string? HealthInsuranceNumber);
+    string? HealthInsuranceNumber,
+    DateOnly? CitizenIdIssueDate = null,
+    string? OldIdNumber = null);
 
 public sealed record PatientSourceResult(PatientSourceStatus Status, ExternalPatient? Patient)
 {

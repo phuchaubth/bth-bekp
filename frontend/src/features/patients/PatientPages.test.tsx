@@ -462,6 +462,8 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
       occupation: null,
       nationality: null,
       healthInsuranceNumber: null,
+      citizenIdIssueDate: '2021-06-01',
+      oldIdNumber: null,
     }
 
     it('ẩn khi chưa cấu hình', async () => {
@@ -486,9 +488,11 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
 
       await waitFor(() => expect(screen.getByLabelText('Họ và tên')).toHaveValue('Lê Văn Thử'))
       expect(screen.getByLabelText('Số điện thoại')).toHaveValue('0900000123')
-      // Đủ thông tin bắt buộc: chỉ báo các ô còn trống để bổ sung nếu có.
+      expect(screen.getByLabelText('Nơi thường trú')).toHaveValue('Số 1 Đường Giả Lập')
+      expect(screen.getByLabelText('Ngày cấp')).toHaveValue('01/06/2021')
+      // Đủ thông tin bắt buộc: chỉ báo các ô còn trống để bổ sung nếu có (địa chỉ hiện tại để trống là giống nơi thường trú).
       expect(screen.getByText('Đã lấy thông tin từ hệ thống bệnh viện')).toBeInTheDocument()
-      expect(screen.getByText(/Chỉ cần bổ sung nếu có: Địa chỉ hiện tại, .*Mã thẻ BHYT\./)).toBeInTheDocument()
+      expect(screen.getByText(/Chỉ cần bổ sung nếu có: Nghề nghiệp, Mã thẻ BHYT\./)).toBeInTheDocument()
       expect(calls.find((c) => c.path === '/api/v1/patients/lookup-source')!.body).toEqual({ patientCode: 'BN-GL-001' })
     })
 

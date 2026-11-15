@@ -281,7 +281,8 @@ Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của
 ```json
 { "patientCode": "BN-GL-001", "fullName": "Lê Văn Thử (giả lập)", "dateOfBirth": "1970-02-03", "gender": "Male",
   "citizenId": "079070000123", "phoneNumber": null, "permanentAddress": null, "currentAddress": null,
-  "ethnicity": null, "occupation": null, "nationality": null, "healthInsuranceNumber": null }
+  "ethnicity": null, "occupation": null, "nationality": null, "healthInsuranceNumber": null,
+  "citizenIdIssueDate": "2021-06-01", "oldIdNumber": null }
 ```
 
 - `gender`: `Male` / `Female` / `null` (giá trị cột giới tính được đổi theo `PatientInfo:MaleValues`, `PatientInfo:FemaleValues`; đặt thì thay hẳn mặc định, một giá trị không được vừa là Nam vừa là Nữ).

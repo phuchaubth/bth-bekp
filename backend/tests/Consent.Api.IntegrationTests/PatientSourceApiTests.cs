@@ -64,6 +64,8 @@ public sealed class PatientSourceApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal("1970-02-03", patient.GetProperty("dateOfBirth").GetString());
         Assert.Equal("Male", patient.GetProperty("gender").GetString());
         Assert.Equal("079070000123", patient.GetProperty("citizenId").GetString());
+        Assert.Equal("2021-06-01", patient.GetProperty("citizenIdIssueDate").GetString());
+        Assert.Equal("070123456", patient.GetProperty("oldIdNumber").GetString());
         Assert.Equal(JsonValueKind.Null, byCode.GetProperty("existingPatient").ValueKind);
 
         // Người bệnh đã có hồ sơ trong hệ thống (cùng CCCD): trả kèm hồ sơ để mở thay vì tạo trùng.
@@ -114,7 +116,7 @@ public sealed class PatientSourceApiTests(SqlServerFixture sql) : IAsyncLifetime
             var citizenId = body.RootElement.TryGetProperty("citizenId", out var id) ? id.GetString() : null;
             string? json = (code, citizenId) switch
             {
-                ("BN-GL-001", _) => """{"patientCode":"BN-GL-001","fullName":"Lê Văn Thử (giả lập)","dateOfBirth":"1970-02-03","gender":"Male","citizenId":"079070000123","phoneNumber":"0900000123","permanentAddress":"Số 1 Đường Giả Lập","currentAddress":null,"ethnicity":"Kinh","occupation":null,"nationality":null,"healthInsuranceNumber":null}""",
+                ("BN-GL-001", _) => """{"patientCode":"BN-GL-001","fullName":"Lê Văn Thử (giả lập)","dateOfBirth":"1970-02-03","gender":"Male","citizenId":"079070000123","phoneNumber":"0900000123","permanentAddress":"Số 1 Đường Giả Lập","currentAddress":null,"ethnicity":"Kinh","occupation":null,"nationality":null,"healthInsuranceNumber":null,"citizenIdIssueDate":"2021-06-01","oldIdNumber":"070123456"}""",
                 (_, "001085000001") => """{"patientCode":"BN-GL-002","fullName":"Nguyễn Văn An (giả lập)","dateOfBirth":"1985-03-12","gender":"Female","citizenId":"001085000001","phoneNumber":null,"permanentAddress":null,"currentAddress":null,"ethnicity":null,"occupation":null,"nationality":null,"healthInsuranceNumber":null}""",
                 _ => null,
             };

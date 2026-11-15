@@ -71,6 +71,8 @@ public sealed class PatientRepositoryMappingTests
                 ["PhoneNumber"] = "   ",
                 ["HealthInsuranceNumber"] = "gd479079070000123",
                 ["DateOfBirth"] = new DateTime(1970, 2, 3),
+                ["CitizenIdIssueDate"] = "01/06/2021",
+                ["OldIdNumber"] = " 070123456 ",
             },
             Settings);
 
@@ -78,6 +80,8 @@ public sealed class PatientRepositoryMappingTests
         Assert.Null(patient.PhoneNumber);
         Assert.Equal("GD479079070000123", patient.HealthInsuranceNumber);
         Assert.Equal(new DateOnly(1970, 2, 3), patient.DateOfBirth);
+        Assert.Equal(new DateOnly(2021, 6, 1), patient.CitizenIdIssueDate);
+        Assert.Equal("070123456", patient.OldIdNumber);
     }
 
     [Theory]

@@ -197,13 +197,47 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL của bệnh viện (HIS) theo mã người bệnh hoặc CCCD. Phần mềm phiếu đồng thuận **chỉ gọi API này**, không giữ chuỗi kết nối CSDL bệnh viện. Không cài thì phần mềm vẫn chạy bình thường (nhập tay/quét CCCD).
 
 1. **Tài khoản SQL chỉ đọc** trên CSDL bệnh viện: sửa rồi chạy `sql\04-patientinfo-reader.sql` (tên CSDL, bảng/view, mật khẩu). Chỉ cấp `SELECT` trên đúng bảng/view cần dùng.
-2. **Câu truy vấn**: một câu `SELECT` trả **một dòng**, dùng tham số `@PatientCode` và/hoặc `@CitizenId` (tham số không dùng là NULL), đặt tên cột bằng `AS`: `PatientCode, FullName, DateOfBirth, Gender, CitizenId, PhoneNumber, PermanentAddress, CurrentAddress, Ethnicity, Occupation, Nationality, HealthInsuranceNumber` (thiếu cột nào thì trường đó để trống). Ví dụ (tên bảng/cột thay theo CSDL thật):
+2. **Câu truy vấn**: một câu `SELECT` trả **một dòng**, dùng tham số `@PatientCode` và/hoặc `@CitizenId` (tham số không dùng là NULL). Đặt tên cột bằng `AS`; cột nào không có thì trường đó để trống.
+
+   | Tên sau `AS` | Điền vào ô |
+   |---|---|
+   | `PatientCode` | Mã người bệnh |
+   | `FullName` | Họ và tên |
+   | `DateOfBirth` | Ngày sinh |
+   | `Gender` | Giới tính |
+   | `CitizenId` | Số CCCD |
+   | `CitizenIdIssueDate` | Ngày cấp (CCCD) |
+   | `OldIdNumber` | Số CMND cũ |
+   | `PermanentAddress` | Nơi thường trú |
+   | `CurrentAddress` | Địa chỉ hiện tại (để trống nghĩa là giống nơi thường trú) |
+   | `PhoneNumber` | Số điện thoại |
+   | `Ethnicity` | Dân tộc |
+   | `Occupation` | Nghề nghiệp |
+   | `Nationality` | Quốc tịch |
+   | `HealthInsuranceNumber` | Mã thẻ BHYT |
+
+   Ngày nhận kiểu `date`/`datetime` hoặc chữ `dd/MM/yyyy`, `yyyy-MM-dd`, `yyyyMMdd`. Ví dụ (tên bảng/cột thay theo CSDL thật):
 
    ```sql
    SELECT TOP 1 MaBN AS PatientCode, HoTen AS FullName, NgaySinh AS DateOfBirth, GioiTinh AS Gender, SoCCCD AS CitizenId,
-          DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DanToc AS Ethnicity, SoTheBHYT AS HealthInsuranceNumber
+          NgayCapCCCD AS CitizenIdIssueDate, DienThoai AS PhoneNumber, DiaChi AS PermanentAddress, DanToc AS Ethnicity,
+          SoTheBHYT AS HealthInsuranceNumber
    FROM dbo.BenhNhan
    WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId
+   ```
+
+   Nếu CSDL tách địa chỉ thành nhiều cột (số nhà, phường/xã, quận/huyện, tỉnh/thành) hoặc lưu mã tra bảng danh mục, thì ghép ngay trong câu truy vấn:
+   - Dùng `CONCAT_WS` (có từ SQL Server 2017); bọc từng phần bằng `NULLIF(…, N'')` để bỏ phần trống.
+   - Cấp `SELECT` cho các bảng danh mục (xem cuối `04-patientinfo-reader.sql`).
+
+   ```sql
+   SELECT TOP 1 bn.MaBN AS PatientCode, …,
+          CONCAT_WS(N', ', NULLIF(bn.SoNha, N''), NULLIF(x.TenXa, N''), NULLIF(h.TenHuyen, N''), NULLIF(t.TenTinh, N'')) AS PermanentAddress
+   FROM dbo.BenhNhan bn
+   LEFT JOIN dbo.DM_Xa x ON x.MaXa = bn.MaXa
+   LEFT JOIN dbo.DM_Huyen h ON h.MaHuyen = bn.MaHuyen
+   LEFT JOIN dbo.DM_Tinh t ON t.MaTinh = bn.MaTinh
+   WHERE bn.MaBN = @PatientCode OR bn.SoCCCD = @CitizenId
    ```
 
    Chạy thử trong SSMS (khai báo `DECLARE @PatientCode nvarchar(50) = N'…', @CitizenId nvarchar(20) = NULL;`) trước khi cấu hình. Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, bị từ chối khi khởi động.

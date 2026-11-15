@@ -18,7 +18,9 @@ public sealed record PatientInfoDto(
     string? Ethnicity,
     string? Occupation,
     string? Nationality,
-    string? HealthInsuranceNumber);
+    string? HealthInsuranceNumber,
+    DateOnly? CitizenIdIssueDate,
+    string? OldIdNumber);
 
 /// <summary>Đọc người bệnh bằng câu truy vấn cấu hình được; giá trị luôn truyền qua tham số (không ghép chuỗi).</summary>
 public sealed class PatientRepository(IOptions<PatientInfoOptions> options)
@@ -63,7 +65,9 @@ public sealed class PatientRepository(IOptions<PatientInfoOptions> options)
             Text(row, "Ethnicity"),
             Text(row, "Occupation"),
             Text(row, "Nationality"),
-            Text(row, "HealthInsuranceNumber")?.ToUpperInvariant());
+            Text(row, "HealthInsuranceNumber")?.ToUpperInvariant(),
+            Date(row, "CitizenIdIssueDate"),
+            Text(row, "OldIdNumber"));
     }
 
     private static string? Text(IReadOnlyDictionary<string, object?> row, string column) =>

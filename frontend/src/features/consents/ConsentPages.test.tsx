@@ -315,6 +315,8 @@ describe('Lập phiếu: lấy người bệnh từ hệ thống bệnh viện',
     occupation: null,
     nationality: null,
     healthInsuranceNumber: null,
+    citizenIdIssueDate: '2021-06-01',
+    oldIdNumber: null,
   }
   const routes = (lookup: object) => ({
     ...baseRoutes(staff()),
@@ -356,6 +358,8 @@ describe('Lập phiếu: lấy người bệnh từ hệ thống bệnh viện',
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/patients')!.body).toMatchObject({
       fullName: 'Phạm Thị Dung',
       citizenId: '036188000125',
+      citizenIdIssueDate: '2021-06-01',
+      permanentAddress: 'Số 9 Đường Thử Nghiệm',
       phoneNumber: '0900000125',
       patientCode: 'BN000125',
     })

@@ -114,6 +114,10 @@ export interface SourcePatient {
   occupation: string | null
   nationality: string | null
   healthInsuranceNumber: string | null
+  /** Ngày cấp CCCD (yyyy-MM-dd). */
+  citizenIdIssueDate?: string | null
+  /** Số CMND cũ. */
+  oldIdNumber?: string | null
 }
 
 export interface PatientSourceLookupResult {
