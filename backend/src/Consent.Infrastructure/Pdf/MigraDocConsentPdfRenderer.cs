@@ -39,6 +39,16 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     public byte[] Render(ConsentPdfDocument document)
     {
+        var renderer = new PdfDocumentRenderer { Document = Build(document) };
+        renderer.RenderDocument();
+        using var stream = new MemoryStream();
+        renderer.PdfDocument.Save(stream, false);
+        return stream.ToArray();
+    }
+
+    /// <summary>Dựng bố cục phiếu (MigraDoc) trước khi in ra PDF; test xem được định dạng từng phần.</summary>
+    internal static Document Build(ConsentPdfDocument document)
+    {
         ArgumentNullException.ThrowIfNull(document);
         var pdf = new Document();
         pdf.Info.Title = $"{document.TemplateCode} – {document.FormNo}";
@@ -65,12 +75,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
         AddSignatures(section, document);
         AddFooter(section, document);
-
-        var renderer = new PdfDocumentRenderer { Document = pdf };
-        renderer.RenderDocument();
-        using var stream = new MemoryStream();
-        renderer.PdfDocument.Save(stream, false);
-        return stream.ToArray();
+        return pdf;
     }
 
     private static void EnsureFontResolver()
@@ -136,8 +141,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         left.Format.Font.Size = headSize;
         left.AddText(document.Hospital.ParentAgency.ToUpper(Vietnamese));
         left.AddLineBreak();
-        var hospital = left.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
-        hospital.Underline = Underline.Single;
+        // Tên bệnh viện in đậm, không gạch dưới (yêu cầu của bệnh viện 15/11/2026); quốc hiệu bên phải vẫn gạch dưới.
+        left.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
         if (!string.IsNullOrWhiteSpace(document.DepartmentName))
         {
             left.AddLineBreak();

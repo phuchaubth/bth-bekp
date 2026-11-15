@@ -8,6 +8,7 @@ using Consent.Domain.ConsentForms;
 using Consent.Domain.Patients;
 using Consent.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
+using Mdom = MigraDoc.DocumentObjectModel;
 using Consent.Tests.Samples;
 
 namespace Consent.Infrastructure.Tests;
@@ -118,6 +119,39 @@ public sealed class ConsentPdfRendererTests
             File.WriteAllBytes(Path.Combine(output, $"CK-01-logo-{kind}.pdf"), with);
         }
     }
+
+    [Fact]
+    public void HospitalName_IsBoldWithoutUnderline_WhileTheMottoKeepsItsUnderline()
+    {
+        // Có và không có logo (hai bố cục đầu phiếu khác nhau).
+        foreach (var logo in new[] { null, LogoImage.Read(Convert.FromBase64String(TestLogos.Png64)) })
+        {
+            var document = Document("CK-01", representative: false, isFinal: true) with { Logo = logo };
+
+            var texts = HeadTexts(MigraDocConsentPdfRenderer.Build(document));
+
+            var hospital = Assert.Single(texts, t => Plain(t) == document.Hospital.Name.ToUpper(new System.Globalization.CultureInfo("vi-VN")));
+            Assert.True(hospital.Bold);
+            Assert.Equal(Mdom.Underline.None, hospital.Underline);
+            Assert.Equal(
+                ["Độc lập - Tự do - Hạnh phúc"],
+                texts.Where(t => t.Underline != Mdom.Underline.None).Select(Plain).ToArray());
+        }
+    }
+
+    /// <summary>Các đoạn chữ có định dạng ở đầu phiếu (bảng đầu tiên: tên đơn vị, quốc hiệu).</summary>
+    private static List<Mdom.FormattedText> HeadTexts(Mdom.Document layout)
+    {
+        var head = layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First();
+        var row = head.Rows[0];
+        return Enumerable.Range(0, row.Cells.Count)
+            .SelectMany(i => row.Cells[i].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>())
+            .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>())
+            .ToList();
+    }
+
+    private static string Plain(Mdom.FormattedText text) =>
+        string.Concat(text.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Text>().Select(t => t.Content));
 
     [Fact]
     public void Logo_ThatCannotBeDecoded_IsSkipped_AndThePdfStillRenders()
