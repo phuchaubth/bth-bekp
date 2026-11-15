@@ -218,8 +218,45 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
    | `PatientInfo__ApiKeys__0` | Khóa API ngẫu nhiên ≥ 32 ký tự, tạo như `Jwt__SigningKey` ở mục 3 (bộ sinh số ngẫu nhiên an toàn, không dùng `Get-Random`) |
    | `PatientInfo__MaleValues__0`…, `PatientInfo__FemaleValues__0`… | (Tùy chọn) khi cột giới tính không theo mặc định (`Nam/M/Male/1` là Nam, `Nữ/F/Female/0/2` là Nữ). Đặt **cả hai** danh sách, danh sách đặt thay hẳn mặc định. Ví dụ CSDL lưu 0 = Nam, 1 = Nữ: `PatientInfo__MaleValues__0 = 0`, `PatientInfo__FemaleValues__0 = 1`. Cũng có thể đổi ngay trong câu truy vấn: `CASE GioiTinh WHEN 0 THEN N'Nam' WHEN 1 THEN N'Nữ' END AS Gender` |
 
-5. Kiểm tra: `curl http://127.0.0.1:5081/health` → `Healthy`; tra thử:
-   `curl -X POST http://127.0.0.1:5081/api/v1/patients/lookup -H "X-Api-Key: …" -H "Content-Type: application/json" -d "{\"patientCode\":\"…\"}"`.
+   Đặt bằng PowerShell (Run as administrator). Hàm `Set-PoolEnv` xóa biến cũ cùng tên rồi thêm lại, nên chạy lại nhiều lần không sao:
+
+   ```powershell
+   Import-Module WebAdministration
+   function Set-PoolEnv([string]$Pool, [string]$Name, [string]$Value) {
+     $f = "system.applicationHost/applicationPools/add[@name='$Pool']/environmentVariables"
+     try { Remove-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter $f -Name '.' -AtElement @{name=$Name} -ErrorAction Stop } catch { }
+     Add-WebConfigurationProperty -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter $f -Name '.' -Value @{name=$Name; value=$Value}
+   }
+   $b = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); $key = [Convert]::ToBase64String($b)
+   $pw = [System.Net.NetworkCredential]::new('', (Read-Host 'Mat khau patientinfo_reader' -AsSecureString)).Password
+   # Câu ở bước 2, bỏ dòng DECLARE, dán nguyên văn (giữ dấu '); không dùng chú thích --. Dòng '@ phải ở đầu dòng.
+   $query = @'
+   SELECT TOP 1 MaBN AS PatientCode, HoTen AS FullName, NgaySinh AS DateOfBirth, GioiTinh AS Gender, SoCCCD AS CitizenId
+   FROM dbo.BenhNhan
+   WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId
+   '@
+   $query = ($query -replace '\s+', ' ').Trim()
+
+   Set-PoolEnv PatientInfoApi 'PatientInfo__ConnectionString' "Server=tcp:SQLHIS,1433;Database=…;User Id=patientinfo_reader;Password=$pw;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly"
+   Set-PoolEnv PatientInfoApi 'PatientInfo__Query' $query
+   Set-PoolEnv PatientInfoApi 'PatientInfo__ApiKeys__0' $key
+   Restart-WebAppPool PatientInfoApi
+   ```
+
+   Khi dán vào PowerShell, dòng `'@` phải sát lề trái. Nên đặt câu truy vấn bằng here-string `@' … '@` như trên. Nếu viết trong cặp `'…'` thông thường thì dấu `'` trong câu (ví dụ `N'Nam'`) làm hỏng lệnh: biến `PatientInfo__Query` không được đặt, và API dừng khi khởi động (HTTP 500.30, xem mục 11).
+
+5. Kiểm tra (trong Windows PowerShell, `curl` là tên tắt của `Invoke-WebRequest`, không nhận `-X`/`-H`/`-d`):
+
+   ```powershell
+   (Invoke-WebRequest http://127.0.0.1:5081/health -UseBasicParsing).Content     # {"status":"Healthy"}
+   Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5081/api/v1/patients/lookup -Headers @{ 'X-Api-Key' = $key } `
+     -ContentType 'application/json; charset=utf-8' -Body (@{ patientCode = '<mã người bệnh có thật>' } | ConvertTo-Json)
+   ```
+
+   Kết quả là dữ liệu thật của người bệnh: chỉ xem đúng/sai, không chép ra ngoài.
+   - `(404)`: không tìm thấy người bệnh.
+   - `(400)`: dữ liệu gửi lên không hợp lệ. Ví dụ còn để chữ mẫu, hoặc thiếu `charset=utf-8` nên Windows PowerShell gửi sai chữ có dấu.
+   - `(503)`: không truy vấn được CSDL. Mã lỗi SQL ghi trong Event Log, xem mục 11.
 6. **Bật trong phần mềm phiếu**: thêm biến môi trường cho Application Pool `ConsentApi` rồi khởi động lại:
    `PatientSource__Provider = Api`, `PatientSource__BaseUrl = http://127.0.0.1:5081/` (dùng IP như mục 5.3: `localhost` có thể thành IPv6 `::1` mà site chỉ nhận `127.0.0.1`, IIS trả 400 *Invalid Hostname*; nếu API ở máy khác thì dùng `https://…/`, ngoài máy này bắt buộc https), `PatientSource__ApiKey = <khóa ở bước 4>`. Đăng nhập lại: màn hình lập phiếu có ô **Lấy thông tin**. Nếu báo "Chưa kết nối được hệ thống thông tin người bệnh", xem nhật ký của `ConsentApi`: dòng *API thông tin người bệnh trả mã 401* là sai khóa, *Không gọi được…* là sai địa chỉ hoặc site `PatientInfoApi` chưa chạy.
 
@@ -331,6 +368,8 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 | `Bad Request - Invalid Hostname` (400) khi gọi `/api` hoặc `/health` qua site `ConsentWeb` | Rule *API proxy* chuyển tới `http://localhost:5080`; Windows có thể hiểu `localhost` là IPv6 `::1`, trong khi site `ConsentApi` chỉ nhận `127.0.0.1` | Sửa `web.config` của `ConsentWeb` thành `http://127.0.0.1:5080/{R:1}` (gói từ ngày 14/11/2026 đã sửa sẵn) |
 | HTTP 500.19, file `D:\Apps\ConsentWeb\web.config` | Chưa cài URL Rewrite | Cài URL Rewrite và ARR, rồi `iisreset` |
 | HTTP 500.30, nhật ký *.NET Runtime* ghi `Seed:AdminPassword … chưa đủ mạnh` | Mật khẩu tạm của `admin` không đạt quy tắc (10–128 ký tự, có chữ thường, chữ hoa, chữ số, ký tự đặc biệt, **không chứa `admin`**) | Đặt lại biến `Seed__AdminPassword`, rồi `Restart-WebAppPool ConsentApi`. Xem lỗi: `$e = Get-WinEvent -LogName Application -MaxEvents 50 \| Where-Object ProviderName -eq '.NET Runtime' \| Select-Object -First 1; ($e.Message -split "`r?`n")[0..14]` |
+| HTTP 500.30 ở `http://127.0.0.1:5081/health`, Event Log (*IIS AspNetCore Module V2*) ghi `failed to load coreclr … CLR worker thread exited prematurely` | API thông tin người bệnh dừng khi khởi động vì thiếu hoặc sai biến môi trường, thường là thiếu `PatientInfo__Query` | Xem tên các biến đã đặt (không in giá trị): `(Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add").name`. Đặt lại biến còn thiếu như mục 5.5 bước 4, rồi `Restart-WebAppPool PatientInfoApi` |
+| Tra cứu trả 503, hoặc màn hình báo "Chưa kết nối được hệ thống thông tin người bệnh" | API không truy vấn được CSDL bệnh viện, hoặc phần mềm phiếu không gọi được API | Xem Event Log: `Get-WinEvent -LogName Application -MaxEvents 100 \| Where-Object { $_.Message -like '*PatientInfo.Lookup*' -or $_.Message -like '*ApiPatientSource*' } \| Select-Object -First 3 \| Format-List TimeCreated, Message`. Mã lỗi SQL: `18456` sai tài khoản/mật khẩu, `208` sai tên bảng, `207` sai tên cột, `229` thiếu quyền `SELECT`, `53`/`-1` không tới được máy chủ SQL. *API thông tin người bệnh trả mã 401*: khóa của `ConsentApi` khác khóa của `PatientInfoApi` |
 | `/health/ready` trả 503 | Không kết nối được SQL Server | Kiểm tra chuỗi kết nối, tường lửa cổng 1433, chứng chỉ SQL (`TrustServerCertificate`) |
 | `Named Pipes Provider, error: 40` / `The network path was not found` (khi chạy `efbundle.exe` hoặc API) | Không tới được SQL Server: sai tên máy, bản cài theo tên riêng, TCP/IP tắt, tường lửa chặn 1433, dịch vụ SQL chưa chạy | Dùng `Server=tcp:<máy>,1433` (hoặc `<máy>\<TÊN>` + SQL Server Browser); `Get-Service *SQL*`; bật TCP/IP, cổng 1433 trong SQL Server Configuration Manager; `Test-NetConnection <máy-SQL> -Port 1433` |
 | `Process should have elevated status to access IIS configuration data`, rồi `Cannot find drive 'IIS'` và `No mapping between account names and security IDs` | PowerShell không chạy bằng quyền quản trị nên không tạo được Application Pool; `icacls` lỗi theo vì tài khoản `IIS AppPool\…` chưa tồn tại | Mở PowerShell bằng *Run as administrator*, chạy lại nguyên khối lệnh |
