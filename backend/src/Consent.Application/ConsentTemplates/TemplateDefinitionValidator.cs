@@ -77,8 +77,89 @@ public static partial class TemplateDefinitionValidator
             }
         }
 
+        ValidateDocumentControl(definition.DocumentControl, errors);
+        ValidatePatientLines(definition.PatientLines, declared, errors);
         ValidateSignatures(definition.Signatures, errors);
         return errors;
+    }
+
+    private static void ValidateDocumentControl(TemplateDocumentControl? control, List<string> errors)
+    {
+        if (control is not null
+            && new[] { control.Code, control.IssueNo, control.EffectiveDate }.Any(v => v is { Length: > TemplateDocumentControl.MaxLength }))
+        {
+            errors.Add($"Mã tài liệu (\"documentControl\"): mã số, lần ban hành, ngày hiệu lực mỗi mục tối đa {TemplateDocumentControl.MaxLength} ký tự.");
+        }
+    }
+
+    /// <summary>Dòng thông tin người bệnh: mỗi mục là đúng một thông tin hồ sơ hoặc một trường "nhãn: giá trị" của mẫu.</summary>
+    private static void ValidatePatientLines(
+        IReadOnlyList<IReadOnlyList<PatientLineItem>>? lines, Dictionary<string, TemplateBlock> declared, List<string> errors)
+    {
+        if (lines is null)
+        {
+            return;
+        }
+
+        if (lines.Count is 0 or > PatientLineSources.MaxLines)
+        {
+            errors.Add($"Dòng thông tin người bệnh (\"patientLines\"): từ 1 đến {PatientLineSources.MaxLines} dòng.");
+            return;
+        }
+
+        var fields = new HashSet<string>(StringComparer.Ordinal);
+        for (var l = 0; l < lines.Count; l++)
+        {
+            var where = $"Dòng thông tin người bệnh {l + 1}";
+            if (lines[l] is not { Count: > 0 and <= PatientLineSources.MaxItemsPerLine } items)
+            {
+                errors.Add($"{where}: có 1 hoặc {PatientLineSources.MaxItemsPerLine} mục.");
+                continue;
+            }
+
+            foreach (var item in items)
+            {
+                ValidatePatientLineItem(item, where, declared, fields, errors);
+            }
+        }
+    }
+
+    private static void ValidatePatientLineItem(
+        PatientLineItem? item, string where, Dictionary<string, TemplateBlock> declared, HashSet<string> fields, List<string> errors)
+    {
+        if (item is null || (item.Patient is null) == (item.Field is null))
+        {
+            errors.Add($"{where}: mỗi mục ghi đúng một trong hai: \"patient\" (thông tin trong hồ sơ) hoặc \"field\" (trường của phiếu).");
+            return;
+        }
+
+        if (item.Patient is { } source && !PatientLineSources.DefaultLabels.ContainsKey(source))
+        {
+            errors.Add($"{where}: \"{source}\" không in được (chỉ có: {string.Join(", ", PatientLineSources.DefaultLabels.Keys)}).");
+        }
+
+        if (item.Field is { } key)
+        {
+            if (!declared.TryGetValue(key, out var block) || !BlockTypes.CanShareLine(block.Type))
+            {
+                errors.Add($"{where}: \"{key}\" phải là trường văn bản, ngày, ngày giờ hoặc trường tự tính của mẫu.");
+            }
+            else if (!fields.Add(key))
+            {
+                errors.Add($"{where}: trường \"{key}\" đã in ở dòng khác.");
+            }
+        }
+
+        if (item.Label is { Length: > MaxLabelLength })
+        {
+            errors.Add($"{where}: nhãn tối đa {MaxLabelLength} ký tự.");
+        }
+
+        if (item.Options is { } options
+            && (item.Patient != PatientLineSources.Gender || options.Count != 2 || options.Any(o => string.IsNullOrWhiteSpace(o) || o.Length > 100)))
+        {
+            errors.Add($"{where}: \"options\" chỉ dùng cho giới tính, gồm đúng hai nhãn (Nam, Nữ), mỗi nhãn tối đa 100 ký tự.");
+        }
     }
 
     private static void ValidateSignatures(TemplateSignatures? signatures, List<string> errors)
@@ -186,6 +267,11 @@ public static partial class TemplateDefinitionValidator
         if (block.SameLine && !BlockTypes.CanShareLine(block.Type))
         {
             errors.Add($"{where}: \"sameLine\" (in cùng dòng với trường đứng trước) chỉ dùng cho trường văn bản, ngày, ngày giờ hoặc trường tự tính.");
+        }
+
+        if (block.PrintOptionsOnly && block.Type is not (BlockTypes.Choice or BlockTypes.MultiChoice))
+        {
+            errors.Add($"{where}: \"printOptionsOnly\" (chỉ in các ô lựa chọn) chỉ dùng cho câu hỏi chọn một hoặc chọn nhiều.");
         }
 
         switch (block.Type)

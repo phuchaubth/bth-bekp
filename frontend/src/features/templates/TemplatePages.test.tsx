@@ -315,6 +315,35 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['nurse', 'screeningStaff'])
   })
 
+  it('cấu hình ký: lưu giữ nguyên cách in ô ký trên PDF đặt trong JSON (nhân viên bên trái, tên ô ký như đã ghi)', async () => {
+    const paperStyle: TemplateDefinition = {
+      ...definition,
+      signatures: { hospital: 'Nhân viên hướng dẫn/ Counseling Staff', hospitalFirst: true, plainTitles: true },
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'GET /api/v1/consent-templates/t-1/versions/2': () => ({ ...version(2, 'Draft'), definition: paperStyle }),
+      'PUT /api/v1/consent-templates/t-1/versions/2': (request) => ({
+        ...version(2, 'Draft'),
+        definition: (request.body as { definition: TemplateDefinition }).definition,
+      }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: 'Cấu hình ký' }))
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
+    const saved = calls.find((c) => c.method === 'PUT')!.body as { definition: TemplateDefinition }
+    expect(saved.definition.signatures).toEqual({
+      hospital: 'Nhân viên hướng dẫn/ Counseling Staff',
+      hospitalFirst: true,
+      plainTitles: true,
+    })
+  })
+
   it('xem trước: BMI tự tính ngay khi nhập chiều cao và cân nặng; mức BMI tự chọn theo BMI', async () => {
     const withBmi: TemplateDefinition = {
       title: 'Phiếu thử nghiệm',

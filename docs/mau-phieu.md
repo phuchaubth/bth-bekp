@@ -28,9 +28,12 @@ hai mã này (13/11/2026).
 - **Ngày tháng và chữ ký** do hệ thống in: người bệnh ký tay trên điện thoại; nhân viên phía bệnh viện đăng nhập bằng tài khoản và cũng ký tay khi xác nhận (quyết định 17). PDF có ảnh chữ ký, họ tên, chức danh và thời điểm của từng người.
   Các dòng "Ngày … tháng … năm …" trên giấy được thay bằng ngày lập và thời điểm ký.
 - **Ô đánh dấu** chuyển thành câu hỏi chọn một hoặc chọn nhiều. Dòng "Có, ghi rõ…" mở thêm ô nhập chỉ khi chọn "Có".
-- **Song ngữ** giữ nguyên: nhãn tiếng Việt kèm tiếng Anh trong ngoặc, như bản giấy. Trên PDF và trên màn hình, **tiếng Việt
-  màu đen, tiếng Anh màu xanh (`#0070C0`) và chữ nghiêng**. Hệ thống tự nhận phần tiếng Anh:
+- **Song ngữ** giữ nguyên: nhãn tiếng Việt kèm tiếng Anh trong ngoặc, hoặc sau dấu "/" như bản giấy BM02
+  ("Ngày sinh/ Date of birth"). Trên PDF và trên màn hình, **tiếng Việt màu đen, tiếng Anh màu xanh (`#0070C0`) và chữ
+  nghiêng**. Hệ thống tự nhận phần tiếng Anh:
   - đoạn trong ngoặc gần như không có chữ có dấu (cho phép tên riêng tiếng Việt trong ngoặc kép “…”);
+  - phần sau dấu "/" đến hết dòng, khi sau dấu "/" là khoảng trắng hoặc chữ hoa không dấu và phần đó là tiếng Anh
+    ("Nam/Male"); dấu "/" giữa hai chữ tiếng Việt ("người bệnh/người nhà") hay trong mã ("QT-KNGT/BM02") không tách;
   - dòng riêng của tiêu đề/phụ đề không có chữ có dấu nào ("Consent Form").
 
   Đơn vị viết thường như "(kg)", điểm số, mã mẫu và dữ liệu người dùng nhập giữ màu thường. Khi soạn mẫu mới, cứ ghi tiếng
@@ -60,6 +63,21 @@ hai mã này (13/11/2026).
 - Câu hỏi bắt buộc **chế độ khám chữa bệnh**: Bảo hiểm y tế / Không Bảo hiểm y tế.
 - Chọn BHYT thì bắt buộc **số thẻ BHYT** (mã thẻ mới 17 ký tự; mã cũ 15 ký tự vẫn nhận, phiếu nháp hiện cảnh báo nhẹ), tự điền từ hồ sơ.
 - Cam đoan "không khiếu kiện gì về sau" in ngay trước khối chữ ký.
+- **PDF in theo bản giấy bệnh viện gửi 15/11/2026** (quyết định 29):
+  - đầu phiếu: logo bên trái, quốc hiệu ở giữa, ô "Mã số (Code No): QT-KNGT/BM02 / Lần ban hành (Issue No): 09 / Ngày hiệu
+    lực (Effective Date):" bên phải (`documentControl`; ngày hiệu lực bản giấy để trống);
+  - tiêu đề 4 dòng: "GIẤY ĐỒNG THUẬN", "(Về chế độ … Bảo hiểm y tế)", "CONSENT FORM", "(Regarding …)";
+  - thông tin người bệnh như bản giấy (`patientLines`): họ tên; ngày sinh và giới tính có ô Nam/Male, Nữ/Female; mã BN;
+    số thẻ BHYT (trường của phiếu, in ở đầu phiếu, không BHYT thì để chấm trống);
+  - không còn tiêu đề phần; câu chọn chế độ chỉ in hai ô, chữ đậm (`printOptionsOnly`);
+  - song ngữ kiểu "Tiếng Việt/ English"; dòng ngày tháng và ghi chú ô ký kèm tiếng Anh (`bilingual`);
+  - ô ký: "Nhân viên hướng dẫn/ Counseling Staff" bên trái, "Người thỏa thuận/ Declarant" bên phải, tên ô ký giữ chữ thường
+    (`hospitalFirst`, `plainTitles`).
+  - Khác bản giấy: sửa "chênh lệnh" thành "chênh lệch" (điểm 4 mục 4), bỏ dấu ")" thừa ở cuối câu "… as follows):"; giữ
+    "Độc lập - Tự do - Hạnh phúc" theo thể thức. Dòng ngày tháng in ngày lập phiếu; phiếu đã ký có ảnh chữ ký, họ tên,
+    thời điểm ký, số phiếu ở chân trang.
+  - Địa danh ở dòng ngày tháng lấy từ *Cấu hình hệ thống*; muốn in "TP. Hồ Chí Minh (Ho Chi Minh city)" như bản giấy thì
+    ghi đúng như vậy ở ô địa danh.
 
 ### 2.2. TTNB-NGOAITRU – Phiếu thông tin người bệnh ngoại trú
 
@@ -117,7 +135,7 @@ rất cao).
 |---|---|---|---|
 | Nhập liệu theo từng phần (BM10) | Mỗi người tự ghi phần của mình vào phiếu giấy | Nội dung điền ở bản nháp (nhân viên cùng khoa đều sửa được), khóa khi trình ký; sau khi người bệnh ký, từng người xác nhận phần của mình bằng tài khoản | Khóa riêng từng phần theo vai trò nếu bệnh viện cần |
 | Phạm vi khoa | | Người xác nhận phải thấy được phiếu: cùng khoa với phiếu, hoặc có quyền toàn viện. Nhân viên hướng dẫn, điều dưỡng, bác sĩ cần thuộc cùng khoa (ví dụ Khoa Khám bệnh) | |
-| Mã QR, logo trên phiếu | Có | Không in. Đầu trang dùng tên đơn vị cấu hình ở *Quản trị → Cấu hình hệ thống* | Bổ sung khối hình ảnh nếu cần |
+| Mã QR, logo trên phiếu | Có | Logo tải ở *Quản trị → Cấu hình hệ thống* in ở đầu phiếu; mẫu có `documentControl` (BM02) in thêm ô mã tài liệu như bản giấy. Mã QR chưa in | Bổ sung khối hình ảnh nếu cần |
 | Bố cục bảng, ô vuông | Bảng nhiều cột | Danh sách câu hỏi tuần tự; PDF dùng ô ■/□ | |
 | Số trang PDF | BM02, phiếu tư vấn: 1 trang | 2 trang, vì khối chữ ký luôn nằm trọn một trang | Thu gọn bố cục nếu bệnh viện yêu cầu 1 trang |
 
@@ -134,6 +152,7 @@ rất cao).
 5. **BM10, trạng thái tinh thần:** bản giấy ghi "Đáp ứng phù hợp: ☐ Không ☐ Có, ghi rõ". Ứng dụng giữ nguyên (chọn "Có"
    thì ghi rõ). Nếu ý đúng là "Không thì ghi rõ", cần sửa mẫu.
 6. Mã chính thức cho hai phiếu chưa có mã (`TTNB-NGOAITRU`, `TUVAN-CONGTT`), và lần ban hành, ngày hiệu lực in trên PDF.
+   BM02 đã in mã số, lần ban hành theo bản giấy (`documentControl`); mẫu khác in được khi bệnh viện gửi bản giấy.
 
 ## 5. Khi bệnh viện muốn sửa
 

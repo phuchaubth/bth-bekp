@@ -49,6 +49,8 @@ describe('splitBilingual', () => {
     ['Giấy đồng thuận\nConsent Form', true],
     ['Tôi đồng ý (I agree), (I accept) và ký (sign here).', false],
     ['((Yes))', false],
+    ['Họ tên người bệnh / Patient’s Full Name: ', false],
+    ['Mã BN (nếu có)/ Patient Identification Number (if applicable): ', false],
   ])('giữ nguyên toàn bộ chữ: %s', (text, wholeLines) => {
     expect(
       splitBilingual(text, wholeLines)
@@ -56,4 +58,27 @@ describe('splitBilingual', () => {
         .join(''),
     ).toBe(text)
   })
+
+  // Kiểu của bản giấy (BM02): tiếng Anh sau dấu "/" đến hết dòng; dấu hai chấm cuối giữ màu thường.
+  it.each([
+    ['Ngày sinh/ Date of birth', ' Date of birth'],
+    ['Họ tên người bệnh / Patient’s Full Name: ', ' Patient’s Full Name'],
+    ['Nam/Male', 'Male'],
+    ['Bảo hiểm y tế/ Health Insurance', ' Health Insurance'],
+    ['Mã BN (nếu có)/ Patient Identification Number (if applicable)', ' Patient Identification Number (if applicable)'],
+    [
+      'Chi phí chênh lệch (là khoảng chênh lệch so với đơn giá)/ The patient shall pay (representing the difference).',
+      ' The patient shall pay (representing the difference).',
+    ],
+    ['Các dịch vụ do người bệnh/người nhà yêu cầu/ Services requested by the family', ' Services requested by the family'],
+  ])('tiếng Anh sau dấu "/": %s', (text, expected) => {
+    expect(english(text)).toBe(expected)
+  })
+
+  it.each(['Người bệnh/người đại diện chọn ý kiến', 'Website bệnh viện: https://bth.org.vn', 'Mã số: QT-KNGT/BM02', 'Quan hệ: Vợ/Chồng', 'Mạch, lần/phút'])(
+    'dấu "/" giữa chữ tiếng Việt hoặc trong mã giữ màu thường: %s',
+    (text) => {
+      expect(english(text)).toBe('')
+    },
+  )
 })

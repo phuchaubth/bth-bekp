@@ -63,9 +63,12 @@ public sealed class HospitalTemplateTests
         }
     }
 
-    /// <summary>Bệnh viện yêu cầu 15/11/2026: hai phiếu không in dòng khoa; phiếu tư vấn in phần I song ngữ.</summary>
+    /// <summary>
+    /// Bệnh viện yêu cầu 15/11/2026: TTNB, TUVAN không in dòng khoa; phiếu tư vấn in phần I song ngữ; BM02 in như bản giấy
+    /// (đầu phiếu có mã tài liệu, song ngữ).
+    /// </summary>
     [Theory]
-    [InlineData("QT-KNGT-BM02", false, false)]
+    [InlineData("QT-KNGT-BM02", false, true)]
     [InlineData("TTNB-NGOAITRU", true, false)]
     [InlineData("QT-KNGT-BM10", false, false)]
     [InlineData("TUVAN-CONGTT", true, true)]
@@ -75,6 +78,38 @@ public sealed class HospitalTemplateTests
 
         Assert.Equal(hideDepartment, definition.HideDepartment);
         Assert.Equal(bilingual, definition.Bilingual);
+    }
+
+    /// <summary>BM02 theo bản giấy bệnh viện gửi 15/11/2026 (mã QT-KNGT/BM02, lần ban hành 09).</summary>
+    [Fact]
+    public void Bm02_FollowsThePaperLayout()
+    {
+        var definition = Definition("QT-KNGT-BM02");
+        var blocks = definition.Sections.SelectMany(s => s.Blocks).ToList();
+
+        Assert.Equal(new TemplateDocumentControl("QT-KNGT/BM02", "09", string.Empty), definition.DocumentControl);
+        // Tiêu đề 4 dòng như bản giấy; dòng trong ngoặc là dòng phụ (PDF không viết hoa).
+        Assert.Equal(
+            [
+                "Giấy đồng thuận",
+                "(Về chế độ thanh toán và quyền lợi khám chữa bệnh Bảo hiểm y tế)",
+                "Consent Form",
+                "(Regarding Payment Policy and Health Insurance Benefits for Medical Examination and Treatment)",
+            ],
+            definition.Title.Split('\n'));
+        Assert.Null(definition.Subtitle);
+        // Thông tin người bệnh như bản giấy: họ tên; ngày sinh, giới tính; mã BN; số thẻ BHYT (trường của phiếu, in ở đầu).
+        Assert.Equal(
+            ["fullName", "dateOfBirth+gender", "patientCode", "field:insuranceNumber"],
+            definition.PatientLines!.Select(line => string.Join('+', line.Select(i => i.Patient ?? $"field:{i.Field}"))));
+        Assert.Equal(["Nam/Male", "Nữ/Female"], definition.PatientLines![1][1].Options!);
+        // Không còn tiêu đề phần; câu chọn chế độ chỉ in hai ô; nhân viên hướng dẫn ký bên trái, tên ô ký giữ chữ thường.
+        Assert.All(definition.Sections, s => Assert.Null(s.Title));
+        Assert.True(blocks.Single(b => b.Key == "careScheme").PrintOptionsOnly);
+        Assert.True(definition.Signatures!.HospitalFirst);
+        Assert.True(definition.Signatures.PlainTitles);
+        Assert.Equal("Nhân viên hướng dẫn/ Counseling Staff", definition.Signatures.Hospital);
+        Assert.Equal("Người thỏa thuận/ Declarant", definition.Signatures.Patient);
     }
 
     [Fact]

@@ -17,8 +17,25 @@ public sealed record TemplateDefinition(
     /// <summary>Không in dòng "Khoa/phòng: …" dưới tên bệnh viện ở đầu phiếu (bản giấy của mẫu không có dòng này).</summary>
     public bool HideDepartment { get; init; }
 
-    /// <summary>Mẫu song ngữ: mục "I. Thông tin người bệnh" do hệ thống in cũng kèm tiếng Anh, ví dụ "Họ và tên (Full name)".</summary>
+    /// <summary>
+    /// Mẫu song ngữ: phần hệ thống tự in cũng kèm tiếng Anh: mục "I. Thông tin người bệnh" ("Họ và tên (Full name)"), dòng
+    /// ngày tháng ("ngày (day) … tháng (month) … năm (year)") và ghi chú dưới tên ô ký ("(Signature and full name)").
+    /// </summary>
     public bool Bilingual { get; init; }
+
+    /// <summary>
+    /// Mã tài liệu của bệnh viện (mã số, lần ban hành, ngày hiệu lực). Có thì đầu phiếu in như bản giấy: logo bên trái, quốc
+    /// hiệu ở giữa, ô mã tài liệu bên phải; không in tên đơn vị (trừ khi chưa tải logo), dòng khoa và dòng "MS … Số phiếu"
+    /// (số phiếu vẫn in ở chân trang).
+    /// </summary>
+    public TemplateDocumentControl? DocumentControl { get; init; }
+
+    /// <summary>
+    /// Các dòng thông tin người bệnh in như bản giấy, thay cho mục "I. Thông tin người bệnh": mỗi dòng 1–2 mục, mỗi mục là một
+    /// thông tin trong hồ sơ (<see cref="PatientLineItem.Patient"/>) hoặc một trường của phiếu (<see cref="PatientLineItem.Field"/>;
+    /// trường đó không in lại ở thân phiếu).
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<PatientLineItem>>? PatientLines { get; init; }
 
     /// <summary>
     /// Mọi khối nhập liệu (có <see cref="TemplateBlock.Key"/>), theo thứ tự xuất hiện. Chỉ để tính toán: không ghi vào JSON
@@ -74,6 +91,12 @@ public sealed record TemplateBlock
     /// </summary>
     public bool SameLine { get; init; }
 
+    /// <summary>
+    /// Câu hỏi chọn: PDF chỉ in các ô lựa chọn (chữ đậm, một dòng riêng), không in câu hỏi, vì đoạn văn đứng trước đã là câu
+    /// hỏi (như bản giấy). Màn hình nhập liệu vẫn hiện câu hỏi.
+    /// </summary>
+    public bool PrintOptionsOnly { get; init; }
+
     public IReadOnlyList<TemplateOption>? Options { get; init; }
 
     /// <summary>Các cột của bảng nhiều dòng (khối <c>repeater</c>).</summary>
@@ -125,6 +148,30 @@ public sealed record ScoreLevel(string Code, string Label, int Min);
 /// <see cref="Steps"/>: các bước xác nhận trung gian theo vai trò, làm lần lượt sau khi người bệnh ký và trước bước xác
 /// nhận cuối (vai trò cấu hình trên mẫu, nhãn <see cref="Hospital"/>).
 /// </summary>
+/// <param name="HospitalFirst">PDF in các ô ký phía bệnh viện trước (bên trái), ô của người bệnh/người đại diện sau cùng.</param>
+/// <param name="PlainTitles">PDF in tên ô ký đúng như đã ghi (không viết hoa toàn bộ, không in đậm), như bản giấy.</param>
+public sealed record TemplateSignatures(
+    string? Patient = null,
+    string? Representative = null,
+    string? Hospital = null,
+    string? HospitalHint = null,
+    string? Decision = null,
+    string? DecisionLabel = null,
+    string? AgreeLabel = null,
+    string? RefuseLabel = null,
+    IReadOnlyList<TemplateConfirmationStep>? Steps = null,
+    TemplateStatement? Statement = null,
+    bool HospitalFirst = false,
+    bool PlainTitles = false)
+{
+    public const int MaxSteps = 5;
+
+    public const string DecisionRequired = "required";
+    public const string DecisionNone = "none";
+
+    public bool RequiresDecision => !string.Equals(Decision, DecisionNone, StringComparison.Ordinal);
+}
+
 /// <summary>
 /// Ô lời xác nhận của người ký (người bệnh/người đại diện) ở khung ký, ví dụ "Tôi đã nghe, hiểu và đồng ý", kèm các câu gợi
 /// ý bấm chọn nhanh. Không khai báo thì không có ô này.
@@ -139,31 +186,50 @@ public sealed record TemplateStatement(string? Label = null, bool Required = fal
     public const string DefaultLabel = "Lời xác nhận của người ký";
 }
 
-public sealed record TemplateSignatures(
-    string? Patient = null,
-    string? Representative = null,
-    string? Hospital = null,
-    string? HospitalHint = null,
-    string? Decision = null,
-    string? DecisionLabel = null,
-    string? AgreeLabel = null,
-    string? RefuseLabel = null,
-    IReadOnlyList<TemplateConfirmationStep>? Steps = null,
-    TemplateStatement? Statement = null)
-{
-    public const int MaxSteps = 5;
-
-    public const string DecisionRequired = "required";
-    public const string DecisionNone = "none";
-
-    public bool RequiresDecision => !string.Equals(Decision, DecisionNone, StringComparison.Ordinal);
-}
-
 /// <summary>
 /// Một bước xác nhận trung gian: nhân viên có vai trò <see cref="RoleCode"/> xác nhận bằng tài khoản. <see cref="Label"/>
 /// là nhãn ô chữ ký trên PDF, ví dụ "Điều dưỡng thực hiện (Nurse in charge)".
 /// </summary>
 public sealed record TemplateConfirmationStep(string Key, string RoleCode, string Label, string? Hint = null);
+
+/// <summary>Mã tài liệu in ở góc phải đầu phiếu, ví dụ mã số "QT-KNGT/BM02", lần ban hành "09"; mục để trống thì chỉ in nhãn.</summary>
+public sealed record TemplateDocumentControl(string? Code = null, string? IssueNo = null, string? EffectiveDate = null)
+{
+    public const int MaxLength = 50;
+}
+
+/// <summary>
+/// Một mục trên dòng thông tin người bệnh: thông tin trong hồ sơ (<see cref="Patient"/>, xem <see cref="PatientLineSources"/>)
+/// hoặc trường của phiếu (<see cref="Field"/>), kèm nhãn (bỏ trống thì dùng nhãn mặc định). Giới tính có <see cref="Options"/>
+/// (nhãn Nam, nhãn Nữ) thì in hai ô đánh dấu như bản giấy.
+/// </summary>
+public sealed record PatientLineItem(string? Patient = null, string? Field = null, string? Label = null, IReadOnlyList<string>? Options = null);
+
+/// <summary>Thông tin hồ sơ in được trên dòng thông tin người bệnh, kèm nhãn mặc định.</summary>
+public static class PatientLineSources
+{
+    public const string FullName = "fullName";
+    public const string DateOfBirth = "dateOfBirth";
+    public const string Gender = "gender";
+    public const string PatientCode = "patientCode";
+    public const string CitizenId = "citizenId";
+    public const string PhoneNumber = "phoneNumber";
+    public const string Address = "address";
+
+    public const int MaxLines = 8;
+    public const int MaxItemsPerLine = 2;
+
+    public static IReadOnlyDictionary<string, string> DefaultLabels { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [FullName] = "Họ và tên",
+        [DateOfBirth] = "Ngày sinh",
+        [Gender] = "Giới tính",
+        [PatientCode] = "Mã người bệnh",
+        [CitizenId] = "Số CCCD",
+        [PhoneNumber] = "Điện thoại",
+        [Address] = "Địa chỉ",
+    };
+}
 
 public static class BlockTypes
 {
@@ -216,7 +282,7 @@ public static class TemplateJson
     [
         typeof(TemplateDefinition), typeof(TemplateSection), typeof(TemplateBlock), typeof(TemplateOption),
         typeof(TemplateColumn), typeof(TemplateCondition), typeof(ScoreLevel), typeof(TemplateSignatures), typeof(TemplateConfirmationStep),
-        typeof(TemplateStatement),
+        typeof(TemplateStatement), typeof(TemplateDocumentControl), typeof(PatientLineItem),
     ];
 
     public static JsonSerializerOptions Options { get; } = new(JsonSerializerDefaults.Web)

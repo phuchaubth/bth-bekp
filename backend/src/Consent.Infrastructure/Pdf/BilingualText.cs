@@ -7,8 +7,9 @@ namespace Consent.Infrastructure.Pdf;
 internal readonly record struct TextSegment(string Text, bool IsEnglish);
 
 /// <summary>
-/// Tách chữ của mẫu phiếu song ngữ thành phần tiếng Việt và tiếng Anh. Mẫu ghi tiếng Anh theo hai cách:
-/// trong ngoặc sau tiếng Việt ("Có (Yes)") hoặc thành dòng riêng ở tiêu đề/phụ đề ("Giấy đồng thuận\nConsent Form").
+/// Tách chữ của mẫu phiếu song ngữ thành phần tiếng Việt và tiếng Anh. Mẫu ghi tiếng Anh theo ba cách:
+/// trong ngoặc sau tiếng Việt ("Có (Yes)"), sau dấu "/" đến hết dòng như bản giấy ("Ngày sinh/ Date of birth", "Nam/Male"),
+/// hoặc thành dòng riêng ở tiêu đề/phụ đề ("Giấy đồng thuận\nConsent Form").
 /// Một đoạn được coi là tiếng Anh khi có chữ thường không dấu và tối đa 1/4 số từ có dấu tiếng Việt (cho phép tên riêng
 /// trong ngoặc kép như “BV Truyền máu Huyết học”). Trong ngoặc ghép "tiếng Việt – tiếng Anh" thì xét từng phần.
 /// Cùng quy tắc với frontend/src/features/consents/bilingual.ts.
@@ -16,6 +17,9 @@ internal readonly record struct TextSegment(string Text, bool IsEnglish);
 internal static partial class BilingualText
 {
     private const string PartSeparator = " – ";
+
+    /// <summary>Dấu hai chấm, khoảng trắng cuối phần tiếng Anh sau dấu "/" giữ màu chữ thường (như phần sau dấu ngoặc).</summary>
+    private static readonly char[] TrailingMarks = [':', ' '];
 
     /// <param name="wholeLines">Cho phép cả dòng là tiếng Anh (chỉ dùng cho tiêu đề, phụ đề).</param>
     public static IReadOnlyList<TextSegment> Split(string text, bool wholeLines = false)
@@ -48,6 +52,16 @@ internal static partial class BilingualText
         var i = 0;
         while (i < line.Length)
         {
+            if (line[i] == '/' && EnglishAfterSlash(line, i) is { } english)
+            {
+                plain.Append('/');
+                Add(segments, plain.ToString(), false);
+                var core = english.TrimEnd(TrailingMarks);
+                Add(segments, core, true);
+                Add(segments, english[core.Length..], false);
+                return;
+            }
+
             var close = line[i] == '(' ? MatchingClose(line, i) : -1;
             if (close < 0)
             {
@@ -97,6 +111,22 @@ internal static partial class BilingualText
         }
 
         Add(segments, plain.ToString(), false);
+    }
+
+    /// <summary>
+    /// Phần còn lại của dòng sau dấu "/" nếu là tiếng Anh: dấu "/" phải theo sau là khoảng trắng hoặc chữ hoa không dấu
+    /// ("Ngày sinh/ Date of birth", "Nam/Male"). Dấu "/" giữa hai chữ tiếng Việt ("người bệnh/người nhà"), trong đường dẫn
+    /// ("https://") hay mã ("QT-KNGT/BM02") thì không tách.
+    /// </summary>
+    private static string? EnglishAfterSlash(string line, int slash)
+    {
+        var rest = line[(slash + 1)..];
+        if (rest.Length == 0 || !(rest[0] == ' ' || char.IsAsciiLetterUpper(rest[0])))
+        {
+            return null;
+        }
+
+        return IsEnglish(rest) ? rest : null;
     }
 
     private static int MatchingClose(string line, int open)

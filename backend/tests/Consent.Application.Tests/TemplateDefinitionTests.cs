@@ -8,6 +8,9 @@ public sealed class TemplateDefinitionTests
 {
     public static TheoryData<string> SampleCodes => new() { "CK-01", "TT-01", "TN-01" };
 
+    /// <summary>Dài hơn giới hạn 50 ký tự của mã tài liệu.</summary>
+    private const string LongText = "QT-KNGT/BM02-QT-KNGT/BM02-QT-KNGT/BM02-QT-KNGT/BM02";
+
     private static TemplateDefinition Default(string code) =>
         TemplateDefinitionValidator.Parse(SampleConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
 
@@ -48,6 +51,15 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"statement\":{\"suggestions\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"]}}}", "tối đa 8 câu gợi ý")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"choice\",\"key\":\"b\",\"label\":\"B\",\"sameLine\":true,\"options\":[{\"value\":\"x\",\"label\":\"X\"}]}]}]}", "\"sameLine\"")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"paragraph\",\"text\":\"P\",\"sameLine\":true}]}]}", "\"sameLine\"")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\",\"printOptionsOnly\":true}]}]}", "\"printOptionsOnly\"")]
+    [InlineData("{\"title\":\"T\",\"documentControl\":{\"code\":\"" + LongText + "\"},\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"documentControl\"")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "từ 1 đến 8 dòng")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\"},{\"patient\":\"gender\"},{\"patient\":\"address\"}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "có 1 hoặc 2 mục")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"religion\"}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"religion\" không in được")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\",\"field\":\"a\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "đúng một trong hai")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"c\"}]],\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]}]}]}", "\"c\" phải là trường văn bản")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"a\"}],[{\"field\":\"a\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "đã in ở dòng khác")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\",\"options\":[\"A\",\"B\"]}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"options\" chỉ dùng cho giới tính")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);
@@ -252,5 +264,33 @@ public sealed class TemplateDefinitionTests
         Assert.DoesNotContain("hideDepartment", plain, StringComparison.Ordinal);
         Assert.DoesNotContain("bilingual", plain, StringComparison.Ordinal);
         Assert.DoesNotContain("sameLine", plain, StringComparison.Ordinal);
+        foreach (var option in new[] { "documentControl", "patientLines", "printOptionsOnly", "hospitalFirst", "plainTitles" })
+        {
+            Assert.DoesNotContain(option, plain, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void PaperLayoutOptions_AreKeptWhenSaved()
+    {
+        const string json = """
+            {"title":"T","documentControl":{"code":"QT-01","issueNo":"02"},
+             "patientLines":[[{"patient":"fullName","label":"Họ tên/ Full name"}],[{"patient":"gender","options":["Nam/Male","Nữ/Female"]},{"field":"card"}]],
+             "sections":[{"blocks":[
+               {"type":"choice","key":"plan","label":"P","printOptionsOnly":true,"options":[{"value":"a","label":"A"}]},
+               {"type":"text","key":"card","label":"Số thẻ"}]}],
+             "signatures":{"hospitalFirst":true,"plainTitles":true}}
+            """;
+
+        var (definition, errors) = TemplateDefinitionValidator.Parse(json);
+        var saved = TemplateDefinitionValidator.Parse(TemplateJson.Serialize(definition!)).Definition!;
+
+        Assert.Empty(errors);
+        Assert.Equal(new TemplateDocumentControl("QT-01", "02"), saved.DocumentControl);
+        Assert.Equal("card", saved.PatientLines![1][1].Field);
+        Assert.Equal(["Nam/Male", "Nữ/Female"], saved.PatientLines[1][0].Options!);
+        Assert.True(saved.InputBlocks.First().PrintOptionsOnly);
+        Assert.True(saved.Signatures!.HospitalFirst);
+        Assert.True(saved.Signatures.PlainTitles);
     }
 }

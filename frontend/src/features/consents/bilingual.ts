@@ -1,6 +1,7 @@
 /**
  * Tách chữ của mẫu phiếu song ngữ thành phần tiếng Việt (giữ màu chữ thường) và tiếng Anh (màu xanh).
- * Mẫu ghi tiếng Anh trong ngoặc sau tiếng Việt ("Có (Yes)") hoặc thành dòng riêng ở tiêu đề/phụ đề.
+ * Mẫu ghi tiếng Anh trong ngoặc sau tiếng Việt ("Có (Yes)"), sau dấu "/" đến hết dòng như bản giấy
+ * ("Ngày sinh/ Date of birth", "Nam/Male"), hoặc thành dòng riêng ở tiêu đề/phụ đề.
  * Cùng quy tắc với backend/src/Consent.Infrastructure/Pdf/BilingualText.cs (PDF).
  */
 export interface TextSegment {
@@ -47,10 +48,29 @@ function matchingClose(line: string, open: number): number {
   return -1
 }
 
+/**
+ * Phần còn lại của dòng sau dấu "/" nếu là tiếng Anh: sau dấu "/" phải là khoảng trắng hoặc chữ hoa không dấu. Dấu "/"
+ * giữa hai chữ tiếng Việt ("người bệnh/người nhà"), trong đường dẫn ("https://") hay mã ("QT-KNGT/BM02") thì không tách.
+ */
+function englishAfterSlash(line: string, slash: number): string | null {
+  const rest = line.slice(slash + 1)
+  if (!/^[ A-Z]/.test(rest)) return null
+  return isEnglish(rest) ? rest : null
+}
+
 function splitParentheses(segments: TextSegment[], line: string) {
   let plain = ''
   let i = 0
   while (i < line.length) {
+    const english = line[i] === '/' ? englishAfterSlash(line, i) : null
+    if (english !== null) {
+      push(segments, `${plain}/`, false)
+      // Dấu hai chấm, khoảng trắng cuối câu giữ màu chữ thường (như phần sau dấu ngoặc).
+      const core = english.replace(/[: ]+$/, '')
+      push(segments, core, true)
+      push(segments, english.slice(core.length), false)
+      return
+    }
     const close = line[i] === '(' ? matchingClose(line, i) : -1
     if (close < 0) {
       plain += line[i]

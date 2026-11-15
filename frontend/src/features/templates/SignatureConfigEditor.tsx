@@ -62,8 +62,11 @@ function toValues(signatures: TemplateSignatures | undefined): SignatureValues {
   }
 }
 
-/** Dựng lại khối `signatures`: bỏ ô trống (dùng nhãn mặc định), giữ mã bước cũ, tạo mã cho bước mới. */
-function toSignatures(values: SignatureValues): TemplateSignatures | undefined {
+/**
+ * Dựng lại khối `signatures`: bỏ ô trống (dùng nhãn mặc định), giữ mã bước cũ, tạo mã cho bước mới. Cách in ô ký trên PDF
+ * (`hospitalFirst`, `plainTitles`, sửa trong JSON) không có trên biểu mẫu này nên giữ nguyên như trước khi lưu.
+ */
+function toSignatures(values: SignatureValues, previous?: TemplateSignatures): TemplateSignatures | undefined {
   const used = new Set(values.steps.map((s) => s.key).filter(Boolean))
   const nextKey = () => {
     let n = 1
@@ -95,6 +98,8 @@ function toSignatures(values: SignatureValues): TemplateSignatures | undefined {
           suggestions: values.statementSuggestions.map((x) => x.trim()).filter(Boolean),
         }
       : undefined,
+    hospitalFirst: previous?.hospitalFirst || undefined,
+    plainTitles: previous?.plainTitles || undefined,
   }
   const entries = Object.entries(signatures).filter(([, v]) => v !== undefined)
   return entries.length > 0 ? (Object.fromEntries(entries) as TemplateSignatures) : undefined
@@ -125,8 +130,8 @@ export function SignatureConfigEditor({
 
   const save = useMutation({
     mutationFn: (values: SignatureValues) => {
-      const { signatures: _old, ...rest } = version.definition
-      const signatures = toSignatures(values)
+      const { signatures: previous, ...rest } = version.definition
+      const signatures = toSignatures(values, previous)
       const definition: TemplateDefinition = signatures ? { ...rest, signatures } : rest
       return consentTemplatesApi.updateDraft(version.templateId, version.versionNo, definition)
     },

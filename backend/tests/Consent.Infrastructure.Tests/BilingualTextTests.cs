@@ -56,5 +56,28 @@ public class BilingualTextTests
     [InlineData("Giấy đồng thuận\nConsent Form", true)]
     [InlineData("Tôi đồng ý (I agree), (I accept) và ký (sign here).", false)]
     [InlineData("((Yes))", false)]
+    [InlineData("Họ tên người bệnh / Patient’s Full Name: ", false)]
+    [InlineData("Mã BN (nếu có)/ Patient Identification Number (if applicable): ", false)]
     public void Split_KeepsAllText(string text, bool wholeLines) => Assert.Equal(text, Joined(text, wholeLines));
+
+    /// <summary>Kiểu của bản giấy (BM02): tiếng Anh sau dấu "/" đến hết dòng; dấu hai chấm cuối giữ màu thường.</summary>
+    [Theory]
+    [InlineData("Ngày sinh/ Date of birth", " Date of birth")]
+    [InlineData("Họ tên người bệnh / Patient’s Full Name: ", " Patient’s Full Name")]
+    [InlineData("Nam/Male", "Male")]
+    [InlineData("Bảo hiểm y tế/ Health Insurance", " Health Insurance")]
+    [InlineData("Mã BN (nếu có)/ Patient Identification Number (if applicable)", " Patient Identification Number (if applicable)")]
+    [InlineData(
+        "Chi phí chênh lệch (là khoảng chênh lệch so với đơn giá)/ The patient shall pay (representing the difference).",
+        " The patient shall pay (representing the difference).")]
+    [InlineData("Các dịch vụ do người bệnh/người nhà yêu cầu/ Services requested by the family", " Services requested by the family")]
+    public void TextAfterSlash_InEnglish_IsEnglish(string text, string expected) => Assert.Equal(expected, English(text));
+
+    [Theory]
+    [InlineData("Người bệnh/người đại diện chọn ý kiến")]
+    [InlineData("Website bệnh viện: https://bth.org.vn")]
+    [InlineData("Mã số: QT-KNGT/BM02")]
+    [InlineData("Quan hệ: Vợ/Chồng")]
+    [InlineData("Mạch, lần/phút")]
+    public void SlashBetweenVietnameseWordsOrCodes_StaysBlack(string text) => Assert.Equal(string.Empty, English(text));
 }

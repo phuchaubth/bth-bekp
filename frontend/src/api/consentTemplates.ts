@@ -62,6 +62,8 @@ export interface TemplateBlock {
   layout?: 'inline' | 'ordered'
   /** PDF in trường này tiếp trên dòng của trường đứng trước (trường "nhãn: giá trị"); màn hình nhập liệu không đổi. */
   sameLine?: boolean
+  /** Câu hỏi chọn: PDF chỉ in các ô lựa chọn (chữ đậm, dòng riêng), không in câu hỏi; màn hình vẫn hiện câu hỏi. */
+  printOptionsOnly?: boolean
   options?: TemplateOption[]
   columns?: TemplateColumn[]
   visibleWhen?: TemplateCondition
@@ -84,10 +86,23 @@ export interface TemplateDefinition {
   subtitle?: string
   /** PDF không in dòng "Khoa/phòng: …" dưới tên bệnh viện. */
   hideDepartment?: boolean
-  /** Mẫu song ngữ: mục "I. Thông tin người bệnh" trên PDF in kèm tiếng Anh. */
+  /** Mẫu song ngữ: phần hệ thống in trên PDF (mục I, dòng ngày tháng, ghi chú ô ký) kèm tiếng Anh. */
   bilingual?: boolean
+  /** Mã tài liệu: đầu PDF in như bản giấy (logo, quốc hiệu ở giữa, ô mã số – lần ban hành – ngày hiệu lực). */
+  documentControl?: { code?: string; issueNo?: string; effectiveDate?: string }
+  /** Dòng thông tin người bệnh in như bản giấy, thay cho mục "I. Thông tin người bệnh"; mỗi dòng 1–2 mục. */
+  patientLines?: PatientLineItem[][]
   sections: TemplateSection[]
   signatures?: TemplateSignatures
+}
+
+/** Một mục trên dòng thông tin người bệnh: thông tin hồ sơ (`patient`) hoặc trường của phiếu (`field`). */
+export interface PatientLineItem {
+  patient?: 'fullName' | 'dateOfBirth' | 'gender' | 'patientCode' | 'citizenId' | 'phoneNumber' | 'address'
+  field?: string
+  label?: string
+  /** Giới tính: nhãn ô Nam, ô Nữ (ví dụ "Nam/Male", "Nữ/Female"). */
+  options?: string[]
 }
 
 /**
@@ -107,6 +122,10 @@ export interface TemplateSignatures {
   steps?: { key: string; roleCode: string; label: string; hint?: string }[]
   /** Ô lời xác nhận của người ký (ví dụ "Tôi đã nghe, hiểu và đồng ý") kèm câu gợi ý bấm chọn nhanh. */
   statement?: TemplateStatement
+  /** PDF in các ô ký phía bệnh viện trước (bên trái), ô của người bệnh sau cùng. */
+  hospitalFirst?: boolean
+  /** PDF in tên ô ký đúng như đã ghi (không viết hoa toàn bộ, không in đậm). */
+  plainTitles?: boolean
 }
 
 export interface TemplateStatement {

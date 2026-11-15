@@ -193,7 +193,7 @@ public sealed class ConsentPdfRendererTests
             .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>());
 
     [Theory]
-    [InlineData("QT-KNGT-BM02", true)]
+    [InlineData("QT-KNGT-BM02", false)]
     [InlineData("QT-KNGT-BM10", true)]
     [InlineData("TTNB-NGOAITRU", false)]
     [InlineData("TUVAN-CONGTT", false)]
@@ -238,6 +238,96 @@ public sealed class ConsentPdfRendererTests
         Assert.True(english.Italic);
         Assert.Equal(MigraDocConsentPdfRenderer.English, english.Color);
     }
+
+    /// <summary>Bản giấy BM02 (mã QT-KNGT/BM02): logo bên trái, quốc hiệu ở giữa, ô mã tài liệu bên phải.</summary>
+    [Fact]
+    public void DocumentControlHeader_PrintsLogoMottoAndDocumentCode_LikeThePaperForm()
+    {
+        var logo = LogoImage.Read(Convert.FromBase64String(TestLogos.Png64))!;
+        var withLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02") with { Logo = logo });
+        var withoutLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
+        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+
+        var head = withLogo.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
+        Assert.Equal(3, head.Cells.Count);
+        Assert.Single(head.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>()
+            .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Shapes.Image>()));
+        var text = HeadText(withLogo);
+        Assert.Contains("CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM\nĐộc lập - Tự do - Hạnh phúc", text, StringComparison.Ordinal);
+        Assert.EndsWith(
+            "Mã số (Code No): QT-KNGT/BM02\nLần ban hành (Issue No): 09\nNgày hiệu lực (Effective Date): ", text, StringComparison.Ordinal);
+        // Có logo thì không in tên đơn vị (logo đã là nhận diện); chưa tải logo thì ô trái in tên đơn vị.
+        Assert.DoesNotContain("BỆNH VIỆN", text, StringComparison.Ordinal);
+        Assert.Contains("BỆNH VIỆN", HeadText(withoutLogo), StringComparison.Ordinal);
+        // Dòng "MS … Số phiếu" dưới đầu phiếu chỉ còn ở mẫu thường (số phiếu vẫn in ở chân trang).
+        Assert.DoesNotContain(BodyLines(withLogo), l => l.StartsWith("MS:", StringComparison.Ordinal));
+        Assert.Contains(BodyLines(standard), l => l.StartsWith("MS: TTNB-NGOAITRU", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Bm02_PrintsTitlePatientLinesAndSchemeLikeThePaperForm()
+    {
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
+        var lines = BodyLines(layout);
+
+        // Tiêu đề 4 dòng: dòng trong ngoặc không viết hoa, nghiêng; tiếng Việt đậm, tiếng Anh xanh không đậm.
+        Assert.Contains(
+            "GIẤY ĐỒNG THUẬN\n(Về chế độ thanh toán và quyền lợi khám chữa bệnh Bảo hiểm y tế)\nCONSENT FORM\n"
+            + "(Regarding Payment Policy and Health Insurance Benefits for Medical Examination and Treatment)",
+            lines);
+        var texts = BodyFormattedTexts(layout).ToList();
+        var vietnameseSubLine = Assert.Single(texts, t => Plain(t).StartsWith("(Về chế độ", StringComparison.Ordinal));
+        Assert.True(vietnameseSubLine.Bold);
+        Assert.True(vietnameseSubLine.Italic);
+        var englishSubLine = Assert.Single(texts, t => Plain(t).StartsWith("(Regarding", StringComparison.Ordinal));
+        Assert.False(englishSubLine.Bold);
+        Assert.Equal(MigraDocConsentPdfRenderer.English, englishSubLine.Color);
+
+        // Thông tin người bệnh theo dòng của bản giấy; số thẻ BHYT (trường của phiếu) in ở đây, không in lại bên dưới.
+        Assert.Equal(
+            [
+                "Họ tên người bệnh / Patient’s Full Name: PHẠM THỊ DUNG (GIẢ LẬP)",
+                "Ngày sinh/ Date of birth: 05/04/1988\tGiới tính/ Gender: □ Nam/Male    ■ Nữ/Female",
+                "Mã BN (nếu có)/ Patient Identification Number (if applicable): BN000125",
+                "Số thẻ Bảo hiểm y tế/ Health Insurance Card Number: GD4790000000125",
+            ],
+            lines.SkipWhile(l => !l.StartsWith("Họ tên người bệnh", StringComparison.Ordinal)).Take(4));
+        Assert.DoesNotContain(lines, l => l.StartsWith("I. Thông tin người bệnh", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.Contains("Health Insurance Card Number", StringComparison.Ordinal));
+
+        // Câu chọn chế độ: chỉ hai ô (đoạn văn trước đã là câu hỏi), không in nhãn câu hỏi.
+        Assert.Contains(
+            "■ Bảo hiểm y tế/ Health Insurance        □ Không Bảo hiểm y tế/ Non–Health Insurance", lines);
+        Assert.DoesNotContain(lines, l => l.Contains("Chế độ khám chữa bệnh", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Bm02_StaffSignsOnTheLeft_WithTitlesAsWritten_AndABilingualDateLine()
+    {
+        var bm02 = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
+        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+
+        Assert.Contains(BodyLines(bm02), l => l.EndsWith(", ngày (day) 11 tháng (month) 11 năm (year) 2026", StringComparison.Ordinal));
+        Assert.Contains(BodyLines(standard), l => l.EndsWith(", ngày 11 tháng 11 năm 2026", StringComparison.Ordinal));
+        Assert.Equal(
+            ["Nhân viên hướng dẫn/ Counseling Staff", "(Ký, ghi rõ họ tên)\n(Signature and full name)"], SignatureCell(bm02, 0).Take(2));
+        Assert.Equal(["Người thỏa thuận/ Declarant", "(Ký, ghi rõ họ tên)\n(Signature and full name)"], SignatureCell(bm02, 1).Take(2));
+        Assert.DoesNotContain(SignatureTitleRuns(bm02, 0), t => t.Bold);
+        // Mẫu thường: người bệnh bên trái, tên ô ký viết hoa, in đậm.
+        Assert.Equal("NGƯỜI KHAI (DECLARANT)", SignatureCell(standard, 0).First());
+        Assert.All(SignatureTitleRuns(standard, 0), t => Assert.True(t.Bold));
+    }
+
+    /// <summary>Các đoạn chữ của ô ký thứ <paramref name="column"/> ở hàng đầu bảng chữ ký: tên ô ký, ghi chú, …</summary>
+    private static IEnumerable<string> SignatureCell(Mdom.Document layout, int column) =>
+        SignatureRoles(layout).Cells[column].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements));
+
+    private static IEnumerable<Mdom.FormattedText> SignatureTitleRuns(Mdom.Document layout, int column) =>
+        SignatureRoles(layout).Cells[column].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().First()
+            .Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>();
+
+    private static Mdom.Tables.Row SignatureRoles(Mdom.Document layout) =>
+        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().Last().Rows[0];
 
     /// <summary>Năm dòng của mục "I. Thông tin người bệnh": tiêu đề, ba dòng hai cột, địa chỉ.</summary>
     private static IEnumerable<string> PatientSection(Mdom.Document layout) =>
