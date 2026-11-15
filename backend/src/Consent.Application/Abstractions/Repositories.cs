@@ -121,6 +121,13 @@ public interface IConsentFormRepository
     /// <summary>Các phiếu của một bộ phiếu (kèm chữ ký), theo thứ tự lập.</summary>
     Task<IReadOnlyList<ConsentForm>> ListByBundleAsync(Guid bundleId, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Các phiếu của người bệnh đã gắn vào một trong các lượt tiếp nhận <paramref name="encounterNos"/> (quyết định 25), theo
+    /// số phiếu. Chỉ đọc số phiếu, tên mẫu, trạng thái: không đọc (giải mã) nội dung phiếu.
+    /// </summary>
+    Task<IReadOnlyList<EncounterFormRecord>> ListByEncountersAsync(
+        Guid patientId, IReadOnlyCollection<string> encounterNos, CancellationToken cancellationToken);
+
     /// <summary>Số phiếu khớp bộ lọc (bỏ qua phân trang).</summary>
     Task<int> CountAsync(ConsentFormSearch query, CancellationToken cancellationToken);
 

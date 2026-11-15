@@ -514,6 +514,9 @@ public sealed class ConsentFormService(
             steps)
         {
             Logo = await settingsService.ResolveLogoAsync(cancellationToken).ConfigureAwait(false),
+            Encounter = form is { EncounterNo: { } encounterNo, EncounterReceivedAt: { } receivedAt }
+                ? new ConsentEncounter(encounterNo, receivedAt, form.EncounterPlace, form.EncounterReceivedBy)
+                : null,
         };
     }
 
@@ -618,7 +621,10 @@ public sealed class ConsentFormService(
             BuildActions(form, template, steps, hasReplacement: replacedBy is not null),
             await BuildNoticesAsync(form, cancellationToken).ConfigureAwait(false),
             form.BundleId,
-            form.KioskIdentity);
+            form.KioskIdentity,
+            form is { EncounterNo: { } encounterNo, EncounterReceivedAt: { } receivedAt }
+                ? new ConsentFormEncounterDto(encounterNo, receivedAt, form.EncounterPlace, form.EncounterReceivedBy)
+                : null);
     }
 
     /// <summary>Thao tác người dùng hiện tại được làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại).</summary>

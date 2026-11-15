@@ -23,6 +23,15 @@ public sealed class PatientInfoOptions
     public string? Query { get; set; }
 
     /// <summary>
+    /// Tùy chọn (quyết định 25): câu SELECT trả về <b>các lượt tiếp nhận</b> của một người bệnh trong khoảng thời gian, nhận
+    /// tham số <c>@PatientCode</c>, <c>@CitizenId</c> (tham số không dùng thì là NULL), <c>@From</c> (đầu ngày bắt đầu) và
+    /// <c>@To</c> (đầu ngày <b>sau</b> ngày kết thúc: lọc <c>ThoiGian &gt;= @From AND ThoiGian &lt; @To</c>). Tên cột kết quả:
+    /// EncounterNo (số tiếp nhận), ReceivedAt (thời gian tiếp nhận, giờ bệnh viện), Place (nơi tiếp nhận), ReceivedBy (người
+    /// tiếp nhận). Để trống thì API không có chức năng tra lượt tiếp nhận.
+    /// </summary>
+    public string? EncounterQuery { get; set; }
+
+    /// <summary>
     /// Các khóa API được phép gọi (mỗi phần mềm một khóa, đổi khóa không gián đoạn bằng cách thêm khóa mới rồi bỏ khóa cũ):
     /// biến môi trường <c>PatientInfo__ApiKeys__0</c>, <c>PatientInfo__ApiKeys__1</c>…
     /// </summary>
@@ -53,6 +62,23 @@ public sealed class PatientInfoOptions
         !EffectiveMaleValues.Intersect(EffectiveFemaleValues, StringComparer.OrdinalIgnoreCase).Any();
 
     public bool HasValidApiKeys => ApiKeys.Length > 0 && ApiKeys.All(k => k is { Length: >= MinimumApiKeyLength });
+
+    public bool HasEncounterQuery => !string.IsNullOrWhiteSpace(EncounterQuery);
+
+    /// <summary>Câu truy vấn lượt tiếp nhận (nếu đặt): một câu SELECT, dùng @From, @To và @PatientCode/@CitizenId.</summary>
+    public bool HasValidEncounterQuery =>
+        !HasEncounterQuery
+        || (IsSingleSelect(EncounterQuery, out var query)
+            && query.Contains("@From", StringComparison.OrdinalIgnoreCase)
+            && query.Contains("@To", StringComparison.OrdinalIgnoreCase)
+            && (query.Contains("@PatientCode", StringComparison.OrdinalIgnoreCase) || query.Contains("@CitizenId", StringComparison.OrdinalIgnoreCase)));
+
+    private static bool IsSingleSelect(string? value, out string query)
+    {
+        query = value?.Trim().TrimEnd(';').Trim() ?? string.Empty;
+        return query.Length > 0 && !query.Contains(';', StringComparison.Ordinal)
+            && (query.StartsWith("SELECT", StringComparison.OrdinalIgnoreCase) || query.StartsWith("WITH", StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Chỉ chấp nhận một câu SELECT (hoặc WITH … SELECT) có dùng tham số, không có dấu chấm phẩy giữa câu. Đây là lớp kiểm

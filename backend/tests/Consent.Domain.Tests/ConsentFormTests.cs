@@ -317,4 +317,40 @@ public sealed class ConsentFormTests
         form.UpdateDraft("{}", ConsentSignerKind.Patient, representativeId, Now);
         Assert.Null(form.RepresentativeId);
     }
+
+    [Fact]
+    public void Complete_WithAnEncounter_RecordsWhichHisEncounterTheFormBelongsTo()
+    {
+        var form = FormIn(Stage.AwaitingHospital);
+        var receivedAt = new DateTimeOffset(2026, 11, 11, 7, 30, 0, TimeSpan.FromHours(7));
+
+        form.Complete(
+            Guid.NewGuid(), "Nhân viên giả lập", null, Png, "k", new string('a', 64), 1, Now,
+            encounter: new ConsentEncounter(" TN-0001 ", receivedAt, "Phòng khám 1", "Người tiếp đón giả lập"));
+
+        Assert.Equal(ConsentFormStatus.Completed, form.Status);
+        Assert.Equal(("TN-0001", (DateTimeOffset?)receivedAt), (form.EncounterNo, form.EncounterReceivedAt));
+        Assert.Equal(("Phòng khám 1", "Người tiếp đón giả lập"), (form.EncounterPlace, form.EncounterReceivedBy));
+        Assert.Null(FormIn(Stage.Completed).EncounterNo);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void Encounter_NeedsANumber(string? number)
+    {
+        Assert.Throws<DomainException>(() => new ConsentEncounter(number!, Now, null, null));
+        Assert.Throws<DomainException>(() => new ConsentEncounter(new string('9', ConsentEncounter.NumberMaxLength + 1), Now, null, null));
+    }
+
+    [Fact]
+    public void Encounter_TrimsText_DropsBlanks_AndClipsLongPlaceOrReceiver()
+    {
+        var encounter = new ConsentEncounter("TN-1", Now, "  ", new string('x', ConsentEncounter.TextMaxLength + 20));
+
+        Assert.Null(encounter.Place);
+        Assert.Equal(ConsentEncounter.TextMaxLength, encounter.ReceivedBy!.Length);
+        Assert.Equal(new string('9', ConsentEncounter.NumberMaxLength), new ConsentEncounter(new string('9', ConsentEncounter.NumberMaxLength), Now, null, null).Number);
+    }
 }

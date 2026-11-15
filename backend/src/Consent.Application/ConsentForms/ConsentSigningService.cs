@@ -35,7 +35,8 @@ public sealed class ConsentSigningService(
     ICurrentUser currentUser,
     IRequestContext requestContext,
     IValidator<PatientSignatureRequest> signatureValidator,
-    IValidator<RevokeConsentFormRequest> revokeValidator)
+    IValidator<RevokeConsentFormRequest> revokeValidator,
+    ConsentEncounterService encounters)
 {
     private static readonly Error NotFound = Error.NotFound("consent_forms.not_found", "Không tìm thấy phiếu.");
 
@@ -251,13 +252,26 @@ public sealed class ConsentSigningService(
             return NotFound;
         }
 
-        var completed = await CompleteCoreAsync(form, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+        var completed = await CompleteCoreAsync(
+                form,
+                signaturePng.Value,
+                token => encounters.ResolveAsync(form.PatientId, request.EncounterNo, request.EncounterDate, token),
+                cancellationToken)
+            .ConfigureAwait(false);
         return completed.IsFailure
             ? completed.Error!
             : await formService.BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<Result<bool>> CompleteCoreAsync(ConsentForm form, StaffSignature signaturePng, CancellationToken cancellationToken)
+    /// <param name="resolveEncounter">
+    /// Lượt tiếp nhận gắn vào phiếu (quyết định 25); chỉ gọi sau khi đã kiểm tra người xác nhận đúng vai trò và đủ bước, để
+    /// không tra HIS khi không cần.
+    /// </param>
+    private async Task<Result<bool>> CompleteCoreAsync(
+        ConsentForm form,
+        StaffSignature signaturePng,
+        Func<CancellationToken, Task<Result<ConsentEncounter?>>> resolveEncounter,
+        CancellationToken cancellationToken)
     {
         if (!form.CanComplete)
         {
@@ -289,18 +303,28 @@ public sealed class ConsentSigningService(
             return SameConfirmer;
         }
 
+        var encounter = await resolveEncounter(cancellationToken).ConfigureAwait(false);
+        if (encounter.IsFailure)
+        {
+            return encounter.Error!;
+        }
+
         var user = await users.GetByIdAsync(userId, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Không tìm thấy tài khoản người xác nhận.");
         var now = clock.UtcNow;
         var confirmation = new ConsentPdfConfirmation(
             user.FullName, user.Title, now.ToOffset(ConsentFormService.VietnamOffset), signaturePng.Png);
-        var pdf = pdfRenderer.Render(await formService.BuildPdfDocumentAsync(form, confirmation, cancellationToken).ConfigureAwait(false));
+        var document = await formService.BuildPdfDocumentAsync(form, confirmation, cancellationToken).ConfigureAwait(false);
+        var pdf = pdfRenderer.Render(document with { Encounter = encounter.Value ?? document.Encounter });
         var sha256 = ConsentFormService.Sha256(pdf);
         // Lưu file trước; nếu lưu CSDL thất bại thì chỉ còn một file thừa (không ảnh hưởng dữ liệu).
         var key = await documents.SaveAsync($"{form.FormNo}.pdf", pdf, cancellationToken).ConfigureAwait(false);
 
-        form.Complete(userId, user.FullName, user.Title, signaturePng.Png, key, sha256, pdf.LongLength, now, stepKeys);
-        formService.AddAudit(AuditActions.ConsentFormCompleted, form.Id, JsonSerializer.Serialize(new { sha256, signature = signaturePng.Source }));
+        form.Complete(userId, user.FullName, user.Title, signaturePng.Png, key, sha256, pdf.LongLength, now, stepKeys, encounter.Value);
+        formService.AddAudit(
+            AuditActions.ConsentFormCompleted,
+            form.Id,
+            JsonSerializer.Serialize(new { sha256, signature = signaturePng.Source, encounter = encounter.Value?.Number }));
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return true;
     }
@@ -483,8 +507,9 @@ public sealed class ConsentSigningService(
             return BundleNotFound;
         }
 
-        var confirmed = new List<BundleConfirmedFormDto>();
-        var failed = new List<BundleConfirmFailureDto>();
+        // Xem trước các phiếu sẽ xác nhận bước hay hoàn tất: có phiếu hoàn tất thì lượt tiếp nhận (quyết định 25) được kiểm tra
+        // một lần cho cả bộ trước khi ghi gì, chọn sai thì không phiếu nào bị đổi.
+        var plan = new List<(ConsentForm Form, TemplateDefinition Definition, ConsentFormStepDto? Step, bool Complete)>();
         foreach (var form in bundle.Where(f => f.CanComplete))
         {
             var (template, version) = await formService.LoadTemplateAsync(form, cancellationToken).ConfigureAwait(false);
@@ -493,12 +518,38 @@ public sealed class ConsentSigningService(
             var actions = formService.BuildActions(form, template, steps, hasReplacement: false);
             if (actions.CanConfirmStep && steps.FirstOrDefault(s => s.IsNext) is { } step)
             {
-                var result = await ConfirmStepCoreAsync(form, step.Key, signaturePng.Value, cancellationToken).ConfigureAwait(false);
-                Record(form, result.IsSuccess, "step", step.Label, result.Error);
+                plan.Add((form, definition, step, false));
             }
             else if (actions.CanConfirm)
             {
-                var result = await CompleteCoreAsync(form, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+                plan.Add((form, definition, null, true));
+            }
+        }
+
+        Result<ConsentEncounter?> encounter = (ConsentEncounter?)null;
+        if (plan.Exists(p => p.Complete))
+        {
+            encounter = await encounters.ResolveAsync(bundle[0].PatientId, request.EncounterNo, request.EncounterDate, cancellationToken)
+                .ConfigureAwait(false);
+            if (encounter.IsFailure)
+            {
+                return encounter.Error!;
+            }
+        }
+
+        var confirmed = new List<BundleConfirmedFormDto>();
+        var failed = new List<BundleConfirmFailureDto>();
+        foreach (var (form, definition, step, complete) in plan)
+        {
+            if (step is not null)
+            {
+                var result = await ConfirmStepCoreAsync(form, step.Key, signaturePng.Value, cancellationToken).ConfigureAwait(false);
+                Record(form, result.IsSuccess, "step", step.Label, result.Error);
+            }
+            else if (complete)
+            {
+                var result = await CompleteCoreAsync(form, signaturePng.Value, _ => Task.FromResult(encounter), cancellationToken)
+                    .ConfigureAwait(false);
                 Record(form, result.IsSuccess, "completed", definition.Signatures?.Hospital ?? "Xác nhận của bệnh viện", result.Error);
             }
         }

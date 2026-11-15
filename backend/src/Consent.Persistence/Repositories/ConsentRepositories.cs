@@ -43,6 +43,24 @@ internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormR
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
+    public async Task<IReadOnlyList<EncounterFormRecord>> ListByEncountersAsync(
+        Guid patientId, IReadOnlyCollection<string> encounterNos, CancellationToken cancellationToken)
+    {
+        if (encounterNos.Count == 0)
+        {
+            return [];
+        }
+
+        return await (
+                from f in db.ConsentForms.AsNoTracking()
+                join t in db.ConsentTemplates.AsNoTracking() on f.TemplateId equals t.Id
+                where f.PatientId == patientId && f.EncounterNo != null && encounterNos.Contains(f.EncounterNo)
+                orderby f.FormNo
+                select new EncounterFormRecord(f.EncounterNo!, f.Id, f.FormNo, t.Name, f.Status))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken) =>
         db.ConsentForms.AsNoTracking()
             .Where(f => f.ReplacesFormId == formId)

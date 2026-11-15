@@ -72,11 +72,16 @@ public static class DependencyInjection
                 "PatientSource:BaseUrl phải là địa chỉ HTTPS của API thông tin người bệnh (chỉ cho phép HTTP khi cùng máy: localhost).")
             .Validate(o => !o.IsApi || o.HasValidApiKey,
                 $"Thiếu khóa API: đặt biến môi trường PatientSource__ApiKey (≥ {PatientSourceOptions.MinimumApiKeyLength} ký tự).")
+            .Validate(o => !o.EncountersEnabled || o.IsApi,
+                "PatientSource:EncountersEnabled chỉ bật được khi PatientSource:Provider = 'Api' (lượt tiếp nhận lấy qua API thông tin người bệnh).")
             .ValidateOnStart();
         services.TryAddSingleton(_ => new PatientSourceHttp(new SocketsHttpHandler { PooledConnectionLifetime = TimeSpan.FromMinutes(5) }));
         services.AddSingleton<IPatientSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
             ? ActivatorUtilities.CreateInstance<ApiPatientSource>(sp)
             : new DisabledPatientSource());
+        services.AddSingleton<IEncounterSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value is { IsApi: true, EncountersEnabled: true }
+            ? ActivatorUtilities.CreateInstance<ApiEncounterSource>(sp)
+            : new DisabledEncounterSource());
 
         return services;
     }

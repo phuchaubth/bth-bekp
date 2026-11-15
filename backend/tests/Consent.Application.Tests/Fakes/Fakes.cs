@@ -252,6 +252,58 @@ internal sealed class StubPatientSource : IPatientSource
     }
 }
 
+/// <summary>
+/// Nguồn lượt tiếp nhận giả (quyết định 25): lượt của từng người bệnh theo mã y tế hoặc số CCCD, lọc theo khoảng ngày như
+/// API thật (từ đầu ngày bắt đầu đến hết ngày kết thúc). Mặc định tắt, như cấu hình mặc định của bệnh viện.
+/// </summary>
+internal sealed class StubEncounterSource : IEncounterSource
+{
+    public bool IsEnabled { get; set; }
+
+    public bool Unavailable { get; set; }
+
+    public bool Throws { get; set; }
+
+    public Dictionary<string, List<ExternalEncounter>> ByPatientKey { get; } = new(StringComparer.Ordinal);
+
+    public List<(string? PatientCode, string? CitizenId, DateOnly From, DateOnly To)> Calls { get; } = [];
+
+    public ExternalEncounter Add(string patientKey, string encounterNo, DateTime receivedAt, string? place = null, string? receivedBy = null)
+    {
+        var encounter = new ExternalEncounter(encounterNo, receivedAt, place, receivedBy);
+        if (!ByPatientKey.TryGetValue(patientKey, out var list))
+        {
+            ByPatientKey[patientKey] = list = [];
+        }
+
+        list.Add(encounter);
+        return encounter;
+    }
+
+    public Task<EncounterSourceResult> FindAsync(
+        string? patientCode, string? citizenId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
+    {
+        Calls.Add((patientCode, citizenId, from, to));
+        if (Throws)
+        {
+            throw new HttpRequestException("Không kết nối được (giả lập).");
+        }
+
+        if (Unavailable)
+        {
+            return Task.FromResult(EncounterSourceResult.Unavailable);
+        }
+
+        var start = from.ToDateTime(TimeOnly.MinValue);
+        var end = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var key = patientCode ?? citizenId ?? string.Empty;
+        List<ExternalEncounter> found = ByPatientKey.TryGetValue(key, out var list)
+            ? [.. list.Where(e => e.ReceivedAt >= start && e.ReceivedAt < end)]
+            : [];
+        return Task.FromResult(new EncounterSourceResult(EncounterSourceStatus.Found, found));
+    }
+}
+
 /// <summary>HIS giả cho kiểm thử: trả kết quả cấu hình sẵn, có thể mô phỏng lỗi hoặc treo (để kiểm tra timeout).</summary>
 internal sealed class StubHisGateway : IHisGateway
 {
@@ -310,6 +362,17 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
 
     public Task<IReadOnlyList<ConsentForm>> ListByBundleAsync(Guid bundleId, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ConsentForm>>([.. store.ConsentForms.Where(f => f.BundleId == bundleId).OrderBy(f => f.FormNo, StringComparer.Ordinal)]);
+
+    public Task<IReadOnlyList<EncounterFormRecord>> ListByEncountersAsync(
+        Guid patientId, IReadOnlyCollection<string> encounterNos, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<EncounterFormRecord>>(
+        [
+            .. store.ConsentForms
+                .Where(f => f.PatientId == patientId && f.EncounterNo is { } no && encounterNos.Contains(no, StringComparer.OrdinalIgnoreCase))
+                .OrderBy(f => f.FormNo, StringComparer.Ordinal)
+                .Select(f => new EncounterFormRecord(
+                    f.EncounterNo!, f.Id, f.FormNo, store.ConsentTemplates.Single(t => t.Id == f.TemplateId).Name, f.Status)),
+        ]);
 
     public Task<PagedResult<ConsentFormListItemDto>> SearchAsync(ConsentFormSearch query, CancellationToken cancellationToken)
     {

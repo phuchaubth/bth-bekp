@@ -117,6 +117,21 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("EncounterNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("EncounterPlace")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("EncounterReceivedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EncounterReceivedBy")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<string>("FormNo")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -227,6 +242,9 @@ namespace Consent.Persistence.Migrations
                     b.HasIndex("TemplateVersionId");
 
                     b.HasIndex("CreatedByUserId", "Status");
+
+                    b.HasIndex("PatientId", "EncounterNo")
+                        .HasFilter("[EncounterNo] IS NOT NULL");
 
                     b.HasIndex("Status", "DepartmentId", "CreatedAtUtc");
 

@@ -75,6 +75,7 @@ Tất cả bí mật đặt bằng **biến môi trường** (IIS: biến môi t
 | `Jwt__AccessTokenMinutes`, `Jwt__SigningTokenMinutes`, `Auth__*`, `RateLimiting__*` | Tùy chọn; mặc định hợp lý (xem [kiến trúc, mục 9](kien-truc.md#9-cấu-hình-và-bí-mật)) | — |
 | `His__Provider` | `None` (chưa kết nối HIS) | — |
 | `PatientSource__Provider`, `PatientSource__BaseUrl`, `PatientSource__ApiKey` | Tùy chọn: lấy thông tin người bệnh qua API thông tin người bệnh (mục 5.5). Mặc định `None` (tắt) | Khóa API giống khóa đặt ở `PatientInfo__ApiKeys__0` |
+| `PatientSource__EncountersEnabled` | Tùy chọn: `true` thì bắt buộc gắn phiếu với lượt tiếp nhận HIS khi ký hoàn tất (mục 5.6). Mặc định `false`; chỉ bật được khi `PatientSource__Provider = Api` | — |
 
 **Lưu khóa:** in hoặc ghi 3 khóa (`Jwt__SigningKey`, hai khóa `DataProtection__*`) vào kho mật khẩu của phòng CNTT và một bản niêm phong, **tách khỏi bản sao lưu CSDL**. Không có khóa thì bản sao lưu CSDL và thư mục PDF không đọc được.
 
@@ -294,6 +295,67 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
 6. **Bật trong phần mềm phiếu**: thêm biến môi trường cho Application Pool `ConsentApi` rồi khởi động lại:
    `PatientSource__Provider = Api`, `PatientSource__BaseUrl = http://127.0.0.1:5081/` (dùng IP như mục 5.3: `localhost` có thể thành IPv6 `::1` mà site chỉ nhận `127.0.0.1`, IIS trả 400 *Invalid Hostname*; nếu API ở máy khác thì dùng `https://…/`, ngoài máy này bắt buộc https), `PatientSource__ApiKey = <khóa ở bước 4>`. Đăng nhập lại: màn hình lập phiếu có ô **Lấy thông tin**. Nếu báo "Chưa kết nối được hệ thống thông tin người bệnh", xem nhật ký của `ConsentApi`: dòng *API thông tin người bệnh trả mã 401* là sai khóa, *Không gọi được…* là sai địa chỉ hoặc site `PatientInfoApi` chưa chạy.
 
+### 5.6. Gắn phiếu với lượt tiếp nhận (tùy chọn, quyết định 25)
+
+Khi bật, người ký hoàn tất phiếu (tiếp nhận, bác sĩ…) **bắt buộc chọn lượt tiếp nhận** của người bệnh trên HIS; số tiếp nhận, thời gian, nơi tiếp nhận và người tiếp nhận được in ở **chân mỗi trang PDF** để đối soát. Cần API thông tin người bệnh (mục 5.5) đang chạy. Bản phát hành có tính năng này kèm migration `AddConsentFormEncounter` (thêm 4 cột, 1 chỉ mục vào bảng phiếu): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`.
+
+1. **Quyền đọc**: cấp thêm `SELECT` cho `patientinfo_reader` trên bảng/view tiếp nhận và các bảng câu truy vấn nối thêm (phòng khám, nhân viên): xem phần *lượt tiếp nhận* cuối `deploy\sql\04-patientinfo-reader.sql`.
+2. **Câu truy vấn lượt tiếp nhận**: một câu `SELECT` trả **các lượt** của một người bệnh trong khoảng thời gian. Tham số: `@PatientCode` và/hoặc `@CitizenId` (như mục 5.5), `@From` (đầu ngày bắt đầu) và `@To` (đầu ngày **sau** ngày kết thúc). Lọc thời gian bằng `>= @From AND < @To`.
+
+   | Tên sau `AS` | Ý nghĩa |
+   |---|---|
+   | `EncounterNo` | Số tiếp nhận (bắt buộc, tối đa 50 ký tự; dòng thiếu thì bỏ qua) |
+   | `ReceivedAt` | Thời gian tiếp nhận, giờ bệnh viện (bắt buộc). Nhận `datetime` hoặc chữ `dd/MM/yyyy HH:mm[:ss]`, `yyyy-MM-dd HH:mm[:ss]`, `yyyyMMddHHmmss` |
+   | `Place` | Nơi tiếp nhận (phòng khám, quầy, khoa) |
+   | `ReceivedBy` | Người tiếp nhận: nhân viên đã tiếp nhận lượt đó trên HIS |
+
+   Ví dụ (tên bảng/cột thay theo CSDL thật):
+
+   ```sql
+   SELECT TOP 200 tn.SoTiepNhan AS EncounterNo, tn.ThoiGianTiepNhan AS ReceivedAt, pk.TenPhong AS Place, nv.HoTen AS ReceivedBy
+   FROM dbo.TiepNhan tn
+   JOIN dbo.BenhNhan bn ON bn.MaBN = tn.MaBN
+   LEFT JOIN dbo.DM_PhongKham pk ON pk.MaPhong = tn.MaPhong
+   LEFT JOIN dbo.NhanVien nv ON nv.MaNV = tn.MaNVTiepNhan
+   WHERE (bn.MaBN = @PatientCode OR bn.SoCCCD = @CitizenId)
+     AND tn.ThoiGianTiepNhan >= @From AND tn.ThoiGianTiepNhan < @To
+   ORDER BY tn.ThoiGianTiepNhan DESC
+   ```
+
+   Chạy thử trong SSMS với `DECLARE @PatientCode nvarchar(50) = N'…', @CitizenId nvarchar(20) = NULL, @From datetime2 = '2026-11-15', @To datetime2 = '2026-11-16';`. Câu thiếu `@From`, `@To` hoặc cả hai tham số người bệnh, có `;` giữa câu, hoặc không phải `SELECT`/`WITH` thì API dừng khi khởi động (HTTP 500.30). API trả tối đa 200 lượt, mới nhất trước.
+3. **Đặt biến** cho Application Pool `PatientInfoApi` (PowerShell Run as administrator; định nghĩa lại hàm `Set-PoolEnv` ở mục 5.5 bước 4 nếu mở cửa sổ mới):
+
+   ```powershell
+   $encounterQuery = @'
+   SELECT TOP 200 tn.SoTiepNhan AS EncounterNo, tn.ThoiGianTiepNhan AS ReceivedAt, pk.TenPhong AS Place, nv.HoTen AS ReceivedBy
+   FROM dbo.TiepNhan tn
+   JOIN dbo.BenhNhan bn ON bn.MaBN = tn.MaBN
+   LEFT JOIN dbo.DM_PhongKham pk ON pk.MaPhong = tn.MaPhong
+   LEFT JOIN dbo.NhanVien nv ON nv.MaNV = tn.MaNVTiepNhan
+   WHERE (bn.MaBN = @PatientCode OR bn.SoCCCD = @CitizenId) AND tn.ThoiGianTiepNhan >= @From AND tn.ThoiGianTiepNhan < @To
+   ORDER BY tn.ThoiGianTiepNhan DESC
+   '@
+   $encounterQuery = ($encounterQuery -replace '\s+', ' ').Trim()
+   Set-PoolEnv PatientInfoApi 'PatientInfo__EncounterQuery' $encounterQuery
+   Restart-WebAppPool PatientInfoApi
+   ```
+
+4. **Kiểm tra** (chỉ in số lượt và tên cột có giá trị, không in dữ liệu):
+
+   ```powershell
+   $key = (Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add[@name='PatientInfo__ApiKeys__0']").value
+   $today = (Get-Date).ToString('yyyy-MM-dd')
+   $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5081/api/v1/encounters/search -Headers @{ 'X-Api-Key' = $key } `
+     -ContentType 'application/json; charset=utf-8' -Body (@{ patientCode = '<mã người bệnh có lượt hôm nay>'; from = $today; to = $today } | ConvertTo-Json)
+   $r.items.Count
+   $r.items | Select-Object -First 1 | ForEach-Object { $_.PSObject.Properties | ForEach-Object { '{0}: {1}' -f $_.Name, ($null -ne $_.Value) } }
+   ```
+
+   `(501)`: chưa đặt `PatientInfo__EncounterQuery`. `(400)`, `(503)`: như mục 5.5 bước 5. Số lượt bằng 0 dù người bệnh có lượt hôm nay: kiểm tra điều kiện ngày và cột thời gian trong câu truy vấn.
+5. **Bật trong phần mềm phiếu**: thêm `PatientSource__EncountersEnabled = true` vào Application Pool `ConsentApi` (giữ các biến `PatientSource__*` ở mục 5.5 bước 6), rồi `Restart-WebAppPool ConsentApi`. Đăng nhập lại: hộp **Ký xác nhận và hoàn tất** và **Xác nhận cả bộ** có bảng lượt tiếp nhận.
+   - Hồ sơ người bệnh cần có **mã y tế** (dùng trước) hoặc **số CCCD** để tra lượt tiếp nhận.
+   - Khi API thông tin người bệnh hoặc CSDL HIS lỗi, nhân viên **chưa hoàn tất được phiếu**: phiếu vẫn chờ xác nhận, chữ ký người bệnh giữ nguyên; sửa xong bấm *Thử lại* trong hộp ký. Nếu cần hoàn tất gấp mà chưa sửa kịp, tạm đặt `PatientSource__EncountersEnabled = false` rồi khởi động lại `ConsentApi` (các phiếu hoàn tất trong lúc đó không có lượt tiếp nhận).
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).
@@ -422,10 +484,11 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 5. Tạo khoa/phòng và tài khoản thật; đăng nhập thử từng vai trò (menu chỉ hiện đúng chức năng).
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
 7. Kiosk (mục 9b): quét thử vài thẻ CCCD thật (họ tên có dấu đọc đúng), làm trọn một bộ phiếu với người bệnh giả lập, nhân viên tiếp đón **Xác nhận cả bộ**; nhập sai ngày sinh 5 lần thấy máy tạm khóa tra cứu; để yên 60 giây thấy màn hình tự về trang đầu.
-8. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
-9. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
-10. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
-11. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+8. Lượt tiếp nhận (mục 5.6, nếu bật): hoàn tất một phiếu thử của người bệnh có lượt tiếp nhận hôm nay trên HIS; danh sách đúng thời gian, nơi tiếp nhận; chân PDF có số tiếp nhận và người tiếp nhận; mở lại hộp ký phiếu khác của người bệnh đó thấy phiếu vừa gắn ở cột *Các phiếu đã gắn vào*. Thu hồi phiếu thử.
+9. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
+10. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
+11. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
+12. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 
 ## 11. Sự cố thường gặp
 
@@ -438,6 +501,8 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 | HTTP 500.19, file `D:\Apps\ConsentWeb\web.config` | Chưa cài URL Rewrite | Cài URL Rewrite và ARR, rồi `iisreset` |
 | HTTP 500.30, nhật ký *.NET Runtime* ghi `Seed:AdminPassword … chưa đủ mạnh` | Mật khẩu tạm của `admin` không đạt quy tắc (10–128 ký tự, có chữ thường, chữ hoa, chữ số, ký tự đặc biệt, **không chứa `admin`**) | Đặt lại biến `Seed__AdminPassword`, rồi `Restart-WebAppPool ConsentApi`. Xem lỗi: `$e = Get-WinEvent -LogName Application -MaxEvents 50 \| Where-Object ProviderName -eq '.NET Runtime' \| Select-Object -First 1; ($e.Message -split "`r?`n")[0..14]` |
 | HTTP 500.30 ở `http://127.0.0.1:5081/health`, Event Log (*IIS AspNetCore Module V2*) ghi `failed to load coreclr … CLR worker thread exited prematurely` | API thông tin người bệnh dừng khi khởi động vì thiếu hoặc sai biến môi trường, thường là thiếu `PatientInfo__Query` | Xem tên các biến đã đặt (không in giá trị): `(Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add").name`. Đặt lại biến còn thiếu như mục 5.5 bước 4, rồi `Restart-WebAppPool PatientInfoApi` |
+| Hộp ký báo *Không lấy được danh sách tiếp nhận từ HIS* | Site `PatientInfoApi` không chạy; chưa đặt `PatientInfo__EncounterQuery` (nhật ký `ConsentApi`: *trả mã 501 khi tra lượt tiếp nhận*); câu truy vấn lỗi hoặc CSDL HIS không truy cập được (mã 503, mã lỗi SQL trong Event Log) | Kiểm tra như mục 5.6 bước 4; sửa câu truy vấn hoặc quyền `SELECT`, `Restart-WebAppPool PatientInfoApi`. Phiếu chờ xác nhận không mất gì, bấm *Thử lại* |
+| `ConsentApi` không khởi động, nhật ký ghi *PatientSource:EncountersEnabled chỉ bật được khi PatientSource:Provider = 'Api'* | Bật gắn lượt tiếp nhận mà chưa cấu hình API thông tin người bệnh | Đặt đủ `PatientSource__Provider`, `PatientSource__BaseUrl`, `PatientSource__ApiKey` (mục 5.5 bước 6), hoặc đặt `PatientSource__EncountersEnabled = false` |
 | Tra cứu trả 503, hoặc màn hình báo "Chưa kết nối được hệ thống thông tin người bệnh" | API không truy vấn được CSDL bệnh viện, hoặc phần mềm phiếu không gọi được API | Xem Event Log: `Get-WinEvent -LogName Application -MaxEvents 100 \| Where-Object { $_.Message -like '*PatientInfo.Lookup*' -or $_.Message -like '*ApiPatientSource*' } \| Select-Object -First 3 \| Format-List TimeCreated, Message`. Mã lỗi SQL: `18456` sai tài khoản/mật khẩu, `208` sai tên bảng, `207` sai tên cột, `229` thiếu quyền `SELECT`, `53`/`-1` không tới được máy chủ SQL. *API thông tin người bệnh trả mã 401*: khóa của `ConsentApi` khác khóa của `PatientInfoApi` |
 | `/health/ready` trả 503 | Không kết nối được SQL Server | Kiểm tra chuỗi kết nối, tường lửa cổng 1433, chứng chỉ SQL (`TrustServerCertificate`) |
 | `Named Pipes Provider, error: 40` / `The network path was not found` (khi chạy `efbundle.exe` hoặc API) | Không tới được SQL Server: sai tên máy, bản cài theo tên riêng, TCP/IP tắt, tường lửa chặn 1433, dịch vụ SQL chưa chạy | Dùng `Server=tcp:<máy>,1433` (hoặc `<máy>\<TÊN>` + SQL Server Browser); `Get-Service *SQL*`; bật TCP/IP, cổng 1433 trong SQL Server Configuration Manager; `Test-NetConnection <máy-SQL> -Port 1433` |

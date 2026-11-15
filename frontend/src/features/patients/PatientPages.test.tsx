@@ -42,7 +42,7 @@ const detail = (overrides: Partial<PatientDetail> = {}): PatientDetail => ({
 })
 
 // Máy chủ mặc định chưa kết nối HIS (baseRoutes); các kịch bản HIS bật cờ này.
-const withHis = { 'GET /api/v1/features': { his: true, smartCa: false, patientSource: false } }
+const withHis = { 'GET /api/v1/features': { his: true, smartCa: false, patientSource: false, encounters: false } }
 
 const hisFound: PatientLookupResult = {
   existingPatient: null,
@@ -448,7 +448,7 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
   })
 
   describe('lấy thông tin từ hệ thống bệnh viện', () => {
-    const withSource = { 'GET /api/v1/features': { his: false, smartCa: false, patientSource: true } }
+    const withSource = { 'GET /api/v1/features': { his: false, smartCa: false, patientSource: true, encounters: false } }
     const sourcePatient = {
       patientCode: 'BN-GL-001',
       fullName: 'Lê Văn Thử',

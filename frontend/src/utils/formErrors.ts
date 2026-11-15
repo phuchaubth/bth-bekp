@@ -20,3 +20,9 @@ export function applyServerFieldErrors(form: FormInstance, error: unknown): bool
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Đã xảy ra lỗi không xác định.'
 }
+
+/** Lỗi máy chủ trả cho trường <paramref name="field"/> (nếu có), nếu không thì thông báo chung của lỗi. */
+export function fieldErrorMessage(error: unknown, field: string): string {
+  const messages = error instanceof ApiError ? error.fieldErrors?.[field] : undefined
+  return messages?.length ? messages.join(' ') : errorMessage(error)
+}

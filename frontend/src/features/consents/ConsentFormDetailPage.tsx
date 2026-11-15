@@ -20,16 +20,18 @@ import {
   useConsentFormBundle,
   type ConsentFormBundle,
   type ConsentFormDetail,
+  type EncounterChoice,
   type FormData,
   type SignerKind,
   type StaffSignatureInput,
 } from '../../api/consentForms'
+import { useFeatures } from '../../api/features'
 import { ApiError } from '../../api/http'
 import { usePatient } from '../../api/patients'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
-import { errorMessage } from '../../utils/formErrors'
+import { errorMessage, fieldErrorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { maskCitizenId } from '../patients/cccd'
 import { relationshipLabels } from '../patients/labels'
@@ -38,6 +40,7 @@ import { DynamicForm } from './DynamicForm'
 import { FormStatusTag } from './FormStatusTag'
 import { KioskTag } from './KioskTag'
 import { BundleBar } from './BundleBar'
+import { EncounterSummary } from './EncounterPicker'
 import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
 import { BRAND } from '../../app/theme'
 
@@ -58,6 +61,7 @@ export function ConsentFormDetailPage() {
   const navigate = useNavigate()
   const { message } = App.useApp()
   const canManage = hasPermission(Permissions.ConsentsCreate)
+  const features = useFeatures()
 
   const returnToDraft = useMutation({
     mutationFn: () => consentFormsApi.returnToDraft(id),
@@ -73,14 +77,23 @@ export function ConsentFormDetailPage() {
   const [staffSign, setStaffSign] = useState<'step' | 'complete' | null>(null)
 
   const complete = useMutation({
-    mutationFn: (signature: StaffSignatureInput) => consentFormsApi.complete(id, signature),
+    mutationFn: ({ signature, encounter }: { signature: StaffSignatureInput; encounter: EncounterChoice | null }) =>
+      consentFormsApi.complete(id, signature, encounter),
     onSuccess: (updated) => {
       queryClient.setQueryData(consentFormKeys.detail(id), updated)
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       setStaffSign(null)
-      message.success('Đã xác nhận và hoàn tất phiếu. PDF đã ký được lưu.')
+      message.success(
+        updated.encounter
+          ? `Đã xác nhận và hoàn tất phiếu, gắn vào lượt tiếp nhận ${updated.encounter.encounterNo}. PDF đã ký được lưu.`
+          : 'Đã xác nhận và hoàn tất phiếu. PDF đã ký được lưu.',
+      )
     },
-    onError: (e) => message.error(errorMessage(e)),
+    onError: (e) => {
+      // Lượt đã chọn có thể vừa đổi trên HIS: tải lại danh sách để chọn lại.
+      void queryClient.invalidateQueries({ queryKey: ['consent-forms', 'encounters'] })
+      message.error(fieldErrorMessage(e, 'encounterNo'))
+    },
   })
 
   const confirmStep = useMutation({
@@ -210,10 +223,15 @@ export function ConsentFormDetailPage() {
       {staffSign === 'complete' && (
         <StaffSignModal
           title="Ký xác nhận và hoàn tất phiếu"
-          description="Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm."
+          description={
+            features.encounters
+              ? 'Chọn lượt tiếp nhận mà phiếu thuộc về rồi ký vào khung bên dưới. Số tiếp nhận và người tiếp nhận được in ở chân phiếu để đối soát; sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm.'
+              : 'Ký vào khung bên dưới để xác nhận. Sau khi xác nhận, phiếu bị khóa và PDF đã ký được lưu kèm mã băm.'
+          }
           okText="Ký và hoàn tất"
           loading={complete.isPending}
-          onSign={(signature) => complete.mutate(signature)}
+          encounterSource={features.encounters ? { formId: form.id } : null}
+          onSign={(signature, encounter) => complete.mutate({ signature, encounter })}
           onClose={() => setStaffSign(null)}
         />
       )}
@@ -259,6 +277,11 @@ function FormSummary({ form }: { form: ConsentFormDetail }) {
         <Descriptions.Item label="Lập lúc">{formatDateTime(form.createdAtUtc)}</Descriptions.Item>
         {form.submittedAtUtc && <Descriptions.Item label="Trình ký lúc">{formatDateTime(form.submittedAtUtc)}</Descriptions.Item>}
         {form.decision && <Descriptions.Item label="Ý kiến người bệnh">{decisionLabels[form.decision]}</Descriptions.Item>}
+        {form.encounter && (
+          <Descriptions.Item label="Lượt tiếp nhận" span="filled">
+            <EncounterSummary encounter={form.encounter} />
+          </Descriptions.Item>
+        )}
         {form.replacesForm && (
           <Descriptions.Item label="Thay thế cho phiếu">
             <Link to={`/phieu-dong-thuan/${form.replacesForm.id}`}>{form.replacesForm.formNo}</Link>

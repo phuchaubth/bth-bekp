@@ -22,6 +22,11 @@ GO
 GRANT SELECT ON [dbo].[BANG_BENH_NHAN] TO [patientinfo_reader];
 -- Nếu câu truy vấn nối thêm bảng (dân tộc, nghề nghiệp…), cấp SELECT từng bảng đó:
 -- GRANT SELECT ON [dbo].[DM_DAN_TOC] TO [patientinfo_reader];
+-- Gắn phiếu với lượt tiếp nhận (quyết định 25, tùy chọn): cấp SELECT bảng/view tiếp nhận và các bảng câu truy vấn
+-- PatientInfo__EncounterQuery nối thêm (phòng khám, nhân viên…):
+-- GRANT SELECT ON [dbo].[BANG_TIEP_NHAN] TO [patientinfo_reader];
+-- GRANT SELECT ON [dbo].[DM_PHONG_KHAM] TO [patientinfo_reader];
+-- GRANT SELECT ON [dbo].[DM_NHAN_VIEN] TO [patientinfo_reader];
 GO
 
 -- Chặn ghi tuyệt đối (phòng khi tài khoản lỡ được thêm vào nhóm có quyền ghi).

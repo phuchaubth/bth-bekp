@@ -56,7 +56,7 @@ export const baseRoutes = (refresh: object | (() => Response)) => ({
   'POST /api/v1/auth/logout': () => noContent(),
   'GET /health': healthy,
   // Mặc định như máy chủ: chưa kết nối HIS, chưa tích hợp SmartCA.
-  'GET /api/v1/features': { his: false, smartCa: false, patientSource: false },
+  'GET /api/v1/features': { his: false, smartCa: false, patientSource: false, encounters: false },
 })
 
 export const departments: Department[] = [

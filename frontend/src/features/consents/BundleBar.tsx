@@ -8,9 +8,11 @@ import {
   consentFormsApi,
   type ConsentFormBundle,
   type ConsentFormDetail,
+  type EncounterChoice,
   type StaffSignatureInput,
 } from '../../api/consentForms'
-import { errorMessage } from '../../utils/formErrors'
+import { useFeatures } from '../../api/features'
+import { fieldErrorMessage } from '../../utils/formErrors'
 import { FormStatusTag } from './FormStatusTag'
 import { StaffSignModal, StartBundleSigningModal } from './SigningActions'
 import { KioskTag } from './KioskTag'
@@ -24,11 +26,16 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
   const [confirmOpen, setConfirmOpen] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
+  const features = useFeatures()
   const toSign = bundle.forms.filter((item) => item.actions.canStartSigning)
   const myTurn = bundle.forms.filter((item) => item.actions.canConfirmStep || item.actions.canConfirm)
+  // Như máy chủ: phiếu còn bước trung gian đến lượt thì xác nhận bước, không thì xác nhận cuối (hoàn tất).
+  const completing = myTurn.filter((item) => !item.actions.canConfirmStep && item.actions.canConfirm)
+  const needsEncounter = features.encounters && completing.length > 0
 
   const confirm = useMutation({
-    mutationFn: (signature: StaffSignatureInput) => consentFormsApi.confirmBundle(bundle.bundleId, signature),
+    mutationFn: ({ signature, encounter }: { signature: StaffSignatureInput; encounter: EncounterChoice | null }) =>
+      consentFormsApi.confirmBundle(bundle.bundleId, signature, encounter),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       setConfirmOpen(false)
@@ -40,7 +47,10 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
       )
       result.failed.forEach((item) => message.warning(`${item.formNo}: ${item.message}`))
     },
-    onError: (e) => message.error(errorMessage(e)),
+    onError: (e) => {
+      void queryClient.invalidateQueries({ queryKey: ['consent-forms', 'encounters'] })
+      message.error(fieldErrorMessage(e, 'encounterNo'))
+    },
   })
 
   return (
@@ -107,10 +117,15 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
           title="Xác nhận cả bộ phiếu"
           description={`Bạn sẽ ký xác nhận ${myTurn.length} phiếu đang đến lượt mình: ${myTurn
             .map((item) => `${item.templateName} (${item.formNo})`)
-            .join('; ')}. Chữ ký được in vào ô của bạn trên từng phiếu.`}
+            .join('; ')}. Chữ ký được in vào ô của bạn trên từng phiếu.${
+            needsEncounter
+              ? ` ${completing.length === myTurn.length ? 'Các phiếu' : `${completing.length} phiếu`} hoàn tất lần này được gắn vào lượt tiếp nhận bạn chọn; số tiếp nhận và người tiếp nhận in ở chân phiếu.`
+              : ''
+          }`}
           okText="Ký và xác nhận cả bộ"
           loading={confirm.isPending}
-          onSign={(signature) => confirm.mutate(signature)}
+          encounterSource={needsEncounter ? { bundleId: bundle.bundleId } : null}
+          onSign={(signature, encounter) => confirm.mutate({ signature, encounter })}
           onClose={() => setConfirmOpen(false)}
         />
       )}

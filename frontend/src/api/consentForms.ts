@@ -62,6 +62,49 @@ export type ConsentSignatureMethod = 'Handwritten' | 'AccountConfirmation'
 /** Chữ ký của nhân viên khi xác nhận: dùng chữ ký mẫu đã lưu, hoặc ảnh vẽ trong khung ký (PNG Base64). */
 export type StaffSignatureInput = { useSpecimen: true } | { image: string }
 
+/**
+ * Lượt tiếp nhận (HIS) chọn khi ký hoàn tất (quyết định 25): số tiếp nhận và ngày tiếp nhận (yyyy-MM-dd, giờ bệnh viện) để
+ * máy chủ tra lại HIS trước khi gắn.
+ */
+export interface EncounterChoice {
+  encounterNo: string
+  encounterDate: string
+}
+
+/** Lượt tiếp nhận đã gắn với phiếu; thời gian là giờ bệnh viện (UTC+7). */
+export interface ConsentFormEncounter {
+  encounterNo: string
+  receivedAt: string
+  place: string | null
+  receivedBy: string | null
+}
+
+/** Một lượt tiếp nhận để chọn, kèm các phiếu đã gắn vào lượt đó. */
+export interface EncounterOption extends ConsentFormEncounter {
+  forms: { id: string; formNo: string; templateName: string; status: ConsentFormStatus }[]
+}
+
+/** Danh sách lượt tiếp nhận của người bệnh từ ngày đến ngày (yyyy-MM-dd), mới nhất trước. */
+export interface EncounterList {
+  from: string
+  to: string
+  items: EncounterOption[]
+}
+
+/** Khoảng ngày tra lượt tiếp nhận; bỏ trống là hôm nay (theo máy chủ). */
+export interface EncounterRange {
+  from: string
+  to: string
+}
+
+/** Nguồn danh sách lượt tiếp nhận: người bệnh của một phiếu, hoặc của một bộ phiếu. */
+export type EncounterSource = { formId: string } | { bundleId: string }
+
+/** Ngày tiếp nhận (giờ bệnh viện) của một lượt: máy chủ luôn trả thời gian kèm múi giờ +07:00. */
+export function encounterDate(receivedAt: string): string {
+  return receivedAt.slice(0, 10)
+}
+
 export interface ConsentSignature {
   role: ConsentSignerRole
   method: ConsentSignatureMethod
@@ -162,6 +205,8 @@ export interface ConsentFormDetail {
   bundleId?: string | null
   /** Phiếu do người bệnh tự làm trên kiosk và cách người bệnh nhận diện (quyết định 24). */
   kioskIdentity?: KioskIdentityMethod | null
+  /** Lượt tiếp nhận trên HIS mà phiếu thuộc về, gắn khi ký hoàn tất (quyết định 25). */
+  encounter?: ConsentFormEncounter | null
 }
 
 /** Một phiếu trong bộ phiếu, kèm thao tác người dùng hiện tại được làm. */
@@ -254,9 +299,18 @@ export const consentFormsApi = {
   /** Xác nhận bước trung gian, kèm ảnh chữ ký tay của nhân viên (PNG Base64, quyết định 17). */
   confirmStep: (id: string, stepKey: string, signature: StaffSignatureInput) =>
     apiRequest<ConsentFormDetail>(`${base}/${id}/confirm-step`, { method: 'POST', body: { stepKey, ...signature } }),
-  /** Xác nhận cuối và hoàn tất phiếu, kèm ảnh chữ ký tay của nhân viên. */
-  complete: (id: string, signature: StaffSignatureInput) =>
-    apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: signature }),
+  /**
+   * Xác nhận cuối và hoàn tất phiếu, kèm ảnh chữ ký tay của nhân viên; khi bệnh viện bật gắn lượt tiếp nhận thì kèm lượt
+   * tiếp nhận đã chọn (quyết định 25).
+   */
+  complete: (id: string, signature: StaffSignatureInput, encounter?: EncounterChoice | null) =>
+    apiRequest<ConsentFormDetail>(`${base}/${id}/complete`, { method: 'POST', body: { ...signature, ...encounter } }),
+  /** Lượt tiếp nhận (HIS) của người bệnh để chọn khi ký hoàn tất: mặc định hôm nay, hoặc từ ngày đến ngày. */
+  encounters: (source: EncounterSource, range: EncounterRange | null, signal?: AbortSignal) => {
+    const path = 'formId' in source ? `${base}/${source.formId}/encounters` : `${base}/bundles/${source.bundleId}/encounters`
+    const query = range ? `?${new URLSearchParams({ from: range.from, to: range.to })}` : ''
+    return apiRequest<EncounterList>(`${path}${query}`, { signal })
+  },
   revoke: (id: string, reason: string) => apiRequest<ConsentFormDetail>(`${base}/${id}/revoke`, { method: 'POST', body: { reason } }),
   /** Lập bộ phiếu: nhiều mẫu cho cùng một người bệnh trong một lần. */
   createBundle: (input: { patientId: string; templateIds: string[]; departmentId?: string | null }) =>
@@ -274,9 +328,12 @@ export const consentFormsApi = {
       `${base}/signing-bundle/patient-signature`,
       { method: 'POST', body: input, token: signingToken },
     ),
-  /** Xác nhận một lần các phiếu trong bộ đang đến lượt người dùng hiện tại. */
-  confirmBundle: (bundleId: string, signature: StaffSignatureInput) =>
-    apiRequest<BundleConfirmResult>(`${base}/bundles/${bundleId}/confirm`, { method: 'POST', body: signature }),
+  /**
+   * Xác nhận một lần các phiếu trong bộ đang đến lượt người dùng hiện tại; lượt tiếp nhận (nếu bật) gắn vào các phiếu được
+   * hoàn tất trong lần này.
+   */
+  confirmBundle: (bundleId: string, signature: StaffSignatureInput, encounter?: EncounterChoice | null) =>
+    apiRequest<BundleConfirmResult>(`${base}/bundles/${bundleId}/confirm`, { method: 'POST', body: { ...signature, ...encounter } }),
 }
 
 export const consentFormKeys = {
@@ -284,6 +341,7 @@ export const consentFormKeys = {
   list: (query: ConsentFormQuery) => ['consent-forms', 'list', query] as const,
   detail: (id: string) => ['consent-forms', 'detail', id] as const,
   bundle: (bundleId: string) => ['consent-forms', 'bundle', bundleId] as const,
+  encounters: (source: EncounterSource, range: EncounterRange | null) => ['consent-forms', 'encounters', source, range] as const,
 }
 
 export function useConsentForms(query: ConsentFormQuery, enabled = true) {

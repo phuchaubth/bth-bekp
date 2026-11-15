@@ -194,7 +194,18 @@ internal sealed class AppTestContext
         CurrentUser,
         new FakeRequestContext(),
         new PatientSignatureRequestValidator(),
-        new RevokeConsentFormRequestValidator());
+        new RevokeConsentFormRequestValidator(),
+        CreateConsentEncounterService());
+
+    public StubEncounterSource EncounterSource { get; } = new();
+
+    public ConsentEncounterService CreateConsentEncounterService() => new(
+        CreateConsentFormService(),
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryPatientRepository(Store),
+        EncounterSource,
+        Clock,
+        Microsoft.Extensions.Options.Options.Create(HisOptions));
 
     public ConsentFormExportService CreateConsentFormExportService() => new(
         new InMemoryConsentFormRepository(Store),

@@ -12,7 +12,8 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/consent-forms")]
 [Produces("application/json")]
-public sealed class ConsentFormsController(ConsentFormService forms, ConsentSigningService signing) : ControllerBase
+public sealed class ConsentFormsController(ConsentFormService forms, ConsentSigningService signing, ConsentEncounterService encounters)
+    : ControllerBase
 {
     [HttpGet]
     [HasPermission(Permissions.ConsentsRead)]
@@ -57,6 +58,23 @@ public sealed class ConsentFormsController(ConsentFormService forms, ConsentSign
     [HasPermission(Permissions.ConsentsRead)]
     public async Task<IActionResult> GetBundle(Guid bundleId, CancellationToken cancellationToken) =>
         this.ToActionResult(await forms.GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>
+    /// Lượt tiếp nhận (HIS) của người bệnh của bộ phiếu, để chọn khi ký hoàn tất (quyết định 25): mặc định trong ngày, hoặc
+    /// <paramref name="from"/>–<paramref name="to"/> (yyyy-MM-dd); mới nhất trước, kèm các phiếu đã gắn vào từng lượt.
+    /// </summary>
+    [HttpGet("bundles/{bundleId:guid}/encounters")]
+    [HasPermission(Permissions.ConsentsSign)]
+    public async Task<IActionResult> BundleEncounters(
+        Guid bundleId, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken cancellationToken) =>
+        this.ToActionResult(await encounters.ListForBundleAsync(bundleId, from, to, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Lượt tiếp nhận (HIS) của người bệnh của phiếu, để chọn khi ký hoàn tất (quyết định 25).</summary>
+    [HttpGet("{id:guid}/encounters")]
+    [HasPermission(Permissions.ConsentsSign)]
+    public async Task<IActionResult> Encounters(
+        Guid id, [FromQuery] DateOnly? from, [FromQuery] DateOnly? to, CancellationToken cancellationToken) =>
+        this.ToActionResult(await encounters.ListForFormAsync(id, from, to, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Mở một phiên ký cho mọi phiếu của bộ đang chờ người bệnh ký (cùng một người ký).</summary>
     [HttpPost("bundles/{bundleId:guid}/signing-session")]

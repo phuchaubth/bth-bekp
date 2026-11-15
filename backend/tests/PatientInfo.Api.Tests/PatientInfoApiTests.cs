@@ -26,6 +26,12 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
         "SoTheBHYT AS HealthInsuranceNumber " +
         "FROM dbo.BenhNhan WHERE MaBN = @PatientCode OR SoCCCD = @CitizenId";
 
+    /// <summary>Lượt tiếp nhận (quyết định 25): bảng tiếp nhận nối bảng người bệnh để tra được theo cả mã y tế lẫn CCCD.</summary>
+    private const string EncounterQuery =
+        "SELECT t.SoTiepNhan AS EncounterNo, t.ThoiGian AS ReceivedAt, t.NoiTiepNhan AS Place, t.NguoiTiepNhan AS ReceivedBy " +
+        "FROM dbo.TiepNhan t JOIN dbo.BenhNhan b ON b.MaBN = t.MaBN " +
+        "WHERE (b.MaBN = @PatientCode OR b.SoCCCD = @CitizenId) AND t.ThoiGian >= @From AND t.ThoiGian < @To";
+
     private static readonly string SqlServerImage =
         Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image ? image : "mcr.microsoft.com/mssql/server:2025-latest";
 
@@ -57,6 +63,14 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
                 INSERT INTO dbo.BenhNhan VALUES
                     (N'BN-GL-001', N'Lê Văn Thử (giả lập)', '1970-02-03', N'Nam', N'079070000123', N'0900000123', N'Số 1 Đường Giả Lập', N'Kinh', N'gd479079070000123', N'01/06/2021', N'070123456', N'Số 2 Đường Hiện Tại'),
                     (N'BN-GL-002', N'Trần Thị Mẫu (giả lập)', '1985-03-12', N'Nữ', N'001085000009', NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+                CREATE TABLE dbo.TiepNhan (SoTiepNhan nvarchar(30) PRIMARY KEY, MaBN nvarchar(20), ThoiGian datetime,
+                    NoiTiepNhan nvarchar(200), NguoiTiepNhan nvarchar(200));
+                INSERT INTO dbo.TiepNhan VALUES
+                    (N'TN-GL-0001', N'BN-GL-001', '2026-11-10T09:00:00', N'Khoa Cấp cứu', N'Người tiếp đón A (giả lập)'),
+                    (N'TN-GL-0002', N'BN-GL-001', '2026-11-11T07:30:00', N'Phòng khám 1', N'Người tiếp đón B (giả lập)'),
+                    (N'TN-GL-0003', N'BN-GL-001', '2026-11-11T23:59:00', N'Phòng khám 3', NULL),
+                    (N'TN-GL-0004', N'BN-GL-001', '2026-11-12T00:00:00', N'Phòng khám 2', NULL),
+                    (N'TN-GL-0005', N'BN-GL-002', '2026-11-11T08:00:00', N'Phòng khám 1', N'Người tiếp đón B (giả lập)');
                 """,
                 source);
             await setup.ExecuteNonQueryAsync();
@@ -68,6 +82,7 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
         {
             ["PatientInfo:ConnectionString"] = connectionString,
             ["PatientInfo:Query"] = Query,
+            ["PatientInfo:EncounterQuery"] = EncounterQuery,
             ["PatientInfo:ApiKeys:0"] = ApiKey,
         });
         var app = _app = PatientInfoProgram.Build(builder);
@@ -157,6 +172,103 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
         using var response = await _client.GetAsync(new Uri("/health", UriKind.Relative));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Encounters_ByPatientCode_ReturnTheDayNewestFirst_EndOfDayIncluded_NextMidnightExcluded()
+    {
+        var (status, body) = await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = "2026-11-11", to = "2026-11-11" });
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        var items = body.GetProperty("items").EnumerateArray().ToList();
+        Assert.Equal(["TN-GL-0003", "TN-GL-0002"], items.Select(i => i.GetProperty("encounterNo").GetString()).ToList());
+        Assert.Equal("2026-11-11T07:30:00", items[1].GetProperty("receivedAt").GetString());
+        Assert.Equal("Phòng khám 1", items[1].GetProperty("place").GetString());
+        Assert.Equal("Người tiếp đón B (giả lập)", items[1].GetProperty("receivedBy").GetString());
+        Assert.Equal(JsonValueKind.Null, items[0].GetProperty("receivedBy").ValueKind);
+    }
+
+    [Fact]
+    public async Task Encounters_ByCitizenId_OrOverSeveralDays()
+    {
+        var (byIdStatus, byId) = await SearchEncountersAsync(new { citizenId = "001085000009", from = "2026-11-11", to = "2026-11-11" });
+        var (rangeStatus, range) = await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = "2026-11-10", to = "2026-11-12" });
+
+        Assert.Equal(HttpStatusCode.OK, byIdStatus);
+        Assert.Equal(["TN-GL-0005"], byId.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("encounterNo").GetString()).ToList());
+        Assert.Equal(HttpStatusCode.OK, rangeStatus);
+        Assert.Equal(
+            ["TN-GL-0004", "TN-GL-0003", "TN-GL-0002", "TN-GL-0001"],
+            range.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("encounterNo").GetString()).ToList());
+    }
+
+    [Fact]
+    public async Task Encounters_ValidateInput_AndTreatValuesAsParametersOnly()
+    {
+        var day = "2026-11-11";
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", citizenId = "079070000123", from = day, to = day })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { from = day, to = day })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { citizenId = "123", from = day, to = day })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", to = day })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = "2026-11-12", to = day })).Status);
+        Assert.Equal(HttpStatusCode.BadRequest, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = "2025-11-10", to = day })).Status);
+        Assert.Equal(HttpStatusCode.OK, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = "2025-11-11", to = day })).Status);
+
+        // Giá trị như câu lệnh SQL chỉ là tham số: không có lượt nào, bảng vẫn còn.
+        var (status, body) = await SearchEncountersAsync(new { patientCode = "x' OR 1=1; DROP TABLE dbo.TiepNhan --", from = day, to = day });
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Empty(body.GetProperty("items").EnumerateArray());
+        Assert.Equal(2, (await SearchEncountersAsync(new { patientCode = "BN-GL-001", from = day, to = day })).Body.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task Encounters_RequireAValidApiKey()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters/search")
+        {
+            Content = JsonContent.Create(new { patientCode = "BN-GL-001", from = "2026-11-11", to = "2026-11-11" }),
+        };
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.DoesNotContain("TN-GL", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Encounters_WithoutAConfiguredQuery_AreNotImplemented()
+    {
+        // Bệnh viện chưa đặt PatientInfo__EncounterQuery: tra người bệnh vẫn chạy, tra lượt tiếp nhận báo 501.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PatientInfo:ConnectionString"] = "Server=khong-dung.gia-lap.local;Database=BenhVienGiaLap",
+            ["PatientInfo:Query"] = "SELECT MaBN AS PatientCode FROM dbo.BenhNhan WHERE MaBN = @PatientCode",
+            ["PatientInfo:ApiKeys:0"] = ApiKey,
+        });
+        await using var app = PatientInfoProgram.Build(builder);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters/search")
+        {
+            Content = JsonContent.Create(new { patientCode = "BN-GL-001", from = "2026-11-11", to = "2026-11-11" }),
+        };
+        request.Headers.Add("X-Api-Key", ApiKey);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
+        await app.StopAsync();
+    }
+
+    private async Task<(HttpStatusCode Status, JsonElement Body)> SearchEncountersAsync(object body)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters/search") { Content = JsonContent.Create(body) };
+        request.Headers.Add("X-Api-Key", ApiKey);
+        using var response = await _client.SendAsync(request);
+        var text = await response.Content.ReadAsStringAsync();
+        return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
     }
 
     private async Task<(HttpStatusCode Status, JsonElement Body)> LookupAsync(object body)

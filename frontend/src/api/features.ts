@@ -7,10 +7,13 @@ export interface Features {
   smartCa: boolean
   /** Đã cấu hình API thông tin người bệnh: lấy thông tin hành chính theo mã người bệnh hoặc CCCD. */
   patientSource: boolean
+  /** Bắt buộc gắn phiếu với lượt tiếp nhận trên HIS khi ký hoàn tất (quyết định 25). */
+  encounters: boolean
 }
 
-// Trong lúc chờ (hoặc lỗi) coi như chưa kết nối: không hiển thị thông tin HIS.
-const notConnected: Features = { his: false, smartCa: false, patientSource: false }
+// Trong lúc chờ (hoặc lỗi) coi như chưa kết nối: không hiển thị thông tin HIS. Máy chủ vẫn tự kiểm tra lượt tiếp nhận khi
+// ký hoàn tất, nên nếu cờ chưa tải xong mà bệnh viện đã bật thì người dùng nhận lỗi rõ ràng chứ phiếu không thiếu lượt.
+const notConnected: Features = { his: false, smartCa: false, patientSource: false, encounters: false }
 
 export const featuresApi = {
   get: (signal?: AbortSignal) => apiRequest<Features>('/api/v1/features', { signal }),

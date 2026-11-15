@@ -117,7 +117,25 @@ public sealed record ConfirmStepRequest(string? StepKey, string? Image = null, b
 
 /// <summary>Xác nhận cuối và hoàn tất phiếu, kèm chữ ký tay của nhân viên (ảnh PNG Base64).</summary>
 /// <param name="UseSpecimen">Ký bằng chữ ký mẫu đã lưu của tài khoản (không cần vẽ); khi đó bỏ qua <paramref name="Image"/>.</param>
-public sealed record CompleteConsentFormRequest(string? Image, bool UseSpecimen = false);
+/// <param name="EncounterNo">Số tiếp nhận (HIS) của lượt khám mà phiếu thuộc về: bắt buộc khi bệnh viện bật gắn lượt tiếp nhận (quyết định 25).</param>
+/// <param name="EncounterDate">Ngày tiếp nhận của lượt đã chọn (máy chủ tra lại HIS theo ngày này để kiểm tra).</param>
+public sealed record CompleteConsentFormRequest(string? Image, bool UseSpecimen = false, string? EncounterNo = null, DateOnly? EncounterDate = null);
+
+/// <summary>Lượt tiếp nhận đã gắn với phiếu (quyết định 25).</summary>
+public sealed record ConsentFormEncounterDto(string EncounterNo, DateTimeOffset ReceivedAt, string? Place, string? ReceivedBy);
+
+/// <summary>Một phiếu đã gắn vào lượt tiếp nhận.</summary>
+public sealed record EncounterFormDto(Guid Id, string FormNo, string TemplateName, ConsentFormStatus Status);
+
+/// <summary>Dòng đọc từ CSDL: phiếu đã gắn vào lượt tiếp nhận <paramref name="EncounterNo"/>.</summary>
+public sealed record EncounterFormRecord(string EncounterNo, Guid Id, string FormNo, string TemplateName, ConsentFormStatus Status);
+
+/// <summary>Một lượt tiếp nhận để chọn khi ký hoàn tất, kèm các phiếu đã gắn vào lượt đó.</summary>
+public sealed record EncounterOptionDto(
+    string EncounterNo, DateTimeOffset ReceivedAt, string? Place, string? ReceivedBy, IReadOnlyList<EncounterFormDto> Forms);
+
+/// <summary>Danh sách lượt tiếp nhận của người bệnh trong khoảng ngày, mới nhất trước.</summary>
+public sealed record EncounterListDto(DateOnly From, DateOnly To, IReadOnlyList<EncounterOptionDto> Items);
 
 /// <summary>Tham chiếu tới một phiếu khác (phiếu bị thay thế / phiếu thay thế).</summary>
 public sealed record ConsentFormRef(Guid Id, string FormNo);
@@ -160,7 +178,8 @@ public sealed record ConsentFormDetailDto(
     ConsentFormActions Actions,
     IReadOnlyList<string> Notices,
     Guid? BundleId = null,
-    KioskIdentityMethod? KioskIdentity = null);
+    KioskIdentityMethod? KioskIdentity = null,
+    ConsentFormEncounterDto? Encounter = null);
 
 /// <summary>Lập phiếu. <paramref name="ReplacesFormId"/>: lập phiếu thay thế cho phiếu đã thu hồi (cùng người bệnh, cùng mẫu).</summary>
 public sealed record CreateConsentFormRequest(Guid PatientId, Guid TemplateId, Guid? DepartmentId, Guid? ReplacesFormId = null);
@@ -235,7 +254,8 @@ public sealed record BundleSignedFormDto(Guid Id, string FormNo, ConsentDecision
 public sealed record BundlePatientSignatureResultDto(DateTimeOffset SignedAtUtc, IReadOnlyList<BundleSignedFormDto> Forms);
 
 /// <summary>Xác nhận các phiếu trong bộ đang đến lượt người dùng hiện tại, bằng một chữ ký (chữ ký mẫu hoặc vẽ).</summary>
-public sealed record ConfirmBundleRequest(string? Image, bool UseSpecimen = false);
+/// <param name="EncounterNo">Lượt tiếp nhận gắn vào các phiếu được hoàn tất trong lần xác nhận này (xem <see cref="CompleteConsentFormRequest"/>).</param>
+public sealed record ConfirmBundleRequest(string? Image, bool UseSpecimen = false, string? EncounterNo = null, DateOnly? EncounterDate = null);
 
 /// <param name="Action"><c>step</c>: xác nhận một bước trung gian; <c>completed</c>: xác nhận cuối, phiếu hoàn tất.</param>
 public sealed record BundleConfirmedFormDto(Guid Id, string FormNo, string Action, string Label);

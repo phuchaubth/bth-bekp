@@ -8,6 +8,8 @@ import {
   decisionLabels,
   signerRoleLabels,
   type ConsentFormDetail,
+  type EncounterChoice,
+  type EncounterSource,
   type StaffSignatureInput,
 } from '../../api/consentForms'
 import { useAuth } from '../../auth/authContext'
@@ -17,6 +19,7 @@ import { useSignatureSpecimen } from '../../api/account'
 import { SpecimenImage } from '../account/SignatureSpecimen'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
+import { EncounterPicker } from './EncounterPicker'
 
 /**
  * Chuyển máy sang chế độ ký: lấy token phiên ký, đóng phiên đăng nhập của nhân viên trên máy này rồi mở màn hình ký.
@@ -146,13 +149,15 @@ export function StartBundleSigningModal({
 
 /**
  * Nhân viên ký tay khi xác nhận (quyết định 17): ký bằng ngón tay, bút hoặc chuột vào khung, rồi bấm xác nhận. Tài khoản
- * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF.
+ * đang đăng nhập vẫn là căn cứ xác định người ký; ảnh chữ ký được in vào ô của nhân viên trên PDF. Khi ký hoàn tất mà
+ * bệnh viện bật gắn lượt tiếp nhận (quyết định 25), phải chọn lượt tiếp nhận của người bệnh trước khi ký.
  */
 export function StaffSignModal({
   title,
   description,
   okText,
   loading,
+  encounterSource,
   onSign,
   onClose,
 }: {
@@ -160,7 +165,9 @@ export function StaffSignModal({
   description: string
   okText: string
   loading: boolean
-  onSign: (signature: StaffSignatureInput) => void
+  /** Danh sách lượt tiếp nhận để chọn (phiếu hoặc bộ phiếu); bỏ trống khi không cần gắn lượt tiếp nhận. */
+  encounterSource?: EncounterSource | null
+  onSign: (signature: StaffSignatureInput, encounter: EncounterChoice | null) => void
   onClose: () => void
 }) {
   const pad = useRef<SignaturePadHandle>(null)
@@ -169,6 +176,8 @@ export function StaffSignModal({
   // Có chữ ký mẫu: ký bằng chữ ký mẫu, không cần vẽ; vẫn chọn được "Ký tay lần này".
   const [drawInstead, setDrawInstead] = useState(false)
   const useSpecimen = !!specimen.data && !drawInstead
+  const [encounter, setEncounter] = useState<EncounterChoice | null>(null)
+  const missingEncounter = !!encounterSource && !encounter
 
   return (
     <Modal
@@ -176,18 +185,22 @@ export function StaffSignModal({
       title={title}
       okText={okText}
       cancelText="Đóng"
-      width={640}
-      okButtonProps={{ disabled: specimen.isPending || (!useSpecimen && !hasInk), loading }}
+      width={encounterSource ? 800 : 640}
+      okButtonProps={{ disabled: specimen.isPending || (!useSpecimen && !hasInk) || missingEncounter, loading }}
       onOk={() => {
+        if (missingEncounter) {
+          return
+        }
         if (useSpecimen) {
-          onSign({ useSpecimen: true })
+          onSign({ useSpecimen: true }, encounter)
         } else if (pad.current) {
-          onSign({ image: pad.current.toPngBase64() })
+          onSign({ image: pad.current.toPngBase64() }, encounter)
         }
       }}
       onCancel={onClose}
     >
       <Typography.Paragraph>{description}</Typography.Paragraph>
+      {encounterSource && <EncounterPicker source={encounterSource} value={encounter} onChange={setEncounter} />}
       {specimen.isPending ? (
         <Spin />
       ) : useSpecimen ? (
@@ -207,7 +220,7 @@ export function StaffSignModal({
             <SpecimenImage height={96} />
           </div>
           <Typography.Text type="secondary">
-            Bấm “{okText}” để ký bằng chữ ký mẫu.{' '}
+            {missingEncounter ? 'Chọn lượt tiếp nhận ở trên, rồi bấm' : 'Bấm'} “{okText}” để ký bằng chữ ký mẫu.{' '}
             <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setDrawInstead(true)}>
               Ký tay lần này
             </Button>
@@ -229,9 +242,13 @@ export function StaffSignModal({
             </Typography.Paragraph>
           )}
           <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
-          {!hasInk && (
+          {(!hasInk || missingEncounter) && (
             <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-              Ký vào khung trên để bật nút {okText}.
+              {missingEncounter && !hasInk
+                ? `Chọn lượt tiếp nhận và ký vào khung trên để bật nút ${okText}.`
+                : missingEncounter
+                  ? `Chọn lượt tiếp nhận ở trên để bật nút ${okText}.`
+                  : `Ký vào khung trên để bật nút ${okText}.`}
             </Typography.Paragraph>
           )}
         </>

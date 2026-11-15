@@ -626,6 +626,30 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         footer.AddPageField();
         footer.AddText("/");
         footer.AddNumPagesField();
+
+        // Quyết định 25: lượt tiếp nhận (HIS) mà phiếu thuộc về, in ở chân mỗi trang để đối soát.
+        if (document.Encounter is { } encounter)
+        {
+            var line = section.Footers.Primary.AddParagraph();
+            line.Format.Font.Size = 8;
+            line.Format.Font.Color = Muted;
+            var parts = new List<string>
+            {
+                $"Số tiếp nhận: {encounter.Number}",
+                encounter.ReceivedAt.ToString("HH:mm dd/MM/yyyy", CultureInfo.InvariantCulture),
+            };
+            if (encounter.Place is { } place)
+            {
+                parts.Add(place);
+            }
+
+            if (encounter.ReceivedBy is { } receivedBy)
+            {
+                parts.Add($"Người tiếp nhận: {receivedBy}");
+            }
+
+            line.AddText(string.Join(" · ", parts));
+        }
     }
 
     private static void AddSectionTitle(Section section, string text)

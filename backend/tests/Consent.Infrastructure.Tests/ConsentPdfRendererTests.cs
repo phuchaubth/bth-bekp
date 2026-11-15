@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Application.Settings;
+using Consent.Domain.ConsentForms;
 using Consent.Domain.Patients;
 using Consent.Infrastructure.Pdf;
 using PdfSharp.Pdf.IO;
@@ -342,6 +343,26 @@ public sealed class ConsentPdfRendererTests
 
         var withLine = renderer.Render(together);
         var withoutLine = renderer.Render(alone);
+
+        using var stream = new MemoryStream(withLine);
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.InRange(pdf.PageCount, 1, 3);
+        Assert.True(withLine.Length > withoutLine.Length);
+    }
+
+    [Fact]
+    public void Encounter_PrintsTheReconciliationLineInTheFooter()
+    {
+        var plain = Document("CK-01", representative: false, isFinal: true);
+        var linked = plain with
+        {
+            Encounter = new ConsentEncounter(
+                "TN-2026-0001", new DateTimeOffset(2026, 11, 11, 7, 30, 0, TimeSpan.FromHours(7)), "Phòng khám 1", "Người tiếp đón giả lập"),
+        };
+        var renderer = new MigraDocConsentPdfRenderer();
+
+        var withLine = renderer.Render(linked);
+        var withoutLine = renderer.Render(plain);
 
         using var stream = new MemoryStream(withLine);
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);

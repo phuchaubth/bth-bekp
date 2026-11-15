@@ -140,6 +140,17 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     /// <summary>Phiếu do người bệnh tự làm trên kiosk và cách người bệnh nhận diện; rỗng với phiếu nhân viên lập.</summary>
     public KioskIdentityMethod? KioskIdentity { get; private set; }
 
+    /// <summary>Số tiếp nhận (HIS) của lượt khám mà phiếu thuộc về, gắn khi hoàn tất (quyết định 25).</summary>
+    public string? EncounterNo { get; private set; }
+
+    /// <summary>Thời gian tiếp nhận của lượt khám (giờ bệnh viện, UTC+7).</summary>
+    public DateTimeOffset? EncounterReceivedAt { get; private set; }
+
+    public string? EncounterPlace { get; private set; }
+
+    /// <summary>Người tiếp nhận lượt khám trên HIS.</summary>
+    public string? EncounterReceivedBy { get; private set; }
+
     /// <summary>Khóa lưu trữ của file PDF đã ký (file được mã hóa khi lưu).</summary>
     public string? SignedPdfKey { get; private set; }
 
@@ -317,8 +328,9 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     }
 
     /// <summary>
-    /// Phía bệnh viện xác nhận bằng tài khoản kèm chữ ký tay và hoàn tất phiếu, kèm file PDF đã ký (khóa lưu trữ, SHA-256).
-    /// Phiếu hoàn tất không sửa được; muốn thay đổi thì thu hồi rồi lập phiếu thay thế.
+    /// Phía bệnh viện xác nhận bằng tài khoản kèm chữ ký tay và hoàn tất phiếu, kèm file PDF đã ký (khóa lưu trữ, SHA-256) và
+    /// lượt tiếp nhận mà phiếu thuộc về (khi bệnh viện bật gắn lượt tiếp nhận). Phiếu hoàn tất không sửa được; muốn thay đổi
+    /// thì thu hồi rồi lập phiếu thay thế.
     /// </summary>
     public void Complete(
         Guid confirmedByUserId,
@@ -329,7 +341,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         string signedPdfSha256,
         long signedPdfSize,
         DateTimeOffset nowUtc,
-        IReadOnlyCollection<string>? requiredStepKeys = null)
+        IReadOnlyCollection<string>? requiredStepKeys = null,
+        ConsentEncounter? encounter = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfKey);
         ArgumentException.ThrowIfNullOrWhiteSpace(signedPdfSha256);
@@ -344,6 +357,14 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         SignedPdfKey = signedPdfKey;
         SignedPdfSha256 = signedPdfSha256;
         SignedPdfSize = signedPdfSize;
+        if (encounter is not null)
+        {
+            EncounterNo = encounter.Number;
+            EncounterReceivedAt = encounter.ReceivedAt;
+            EncounterPlace = encounter.Place;
+            EncounterReceivedBy = encounter.ReceivedBy;
+        }
+
         Status = ConsentFormStatus.Completed;
         CompletedAtUtc = nowUtc;
         UpdatedAtUtc = nowUtc;

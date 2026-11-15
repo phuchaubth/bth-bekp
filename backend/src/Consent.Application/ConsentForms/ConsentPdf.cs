@@ -40,6 +40,9 @@ public sealed record ConsentPdfDocument(
 {
     /// <summary>Logo bệnh viện in ở góc trên bên trái (PNG/JPEG); không có thì in như cũ.</summary>
     public Settings.LogoImage? Logo { get; init; }
+
+    /// <summary>Lượt tiếp nhận gắn với phiếu (quyết định 25): in ở chân mỗi trang để đối soát.</summary>
+    public ConsentEncounter? Encounter { get; init; }
 }
 
 /// <summary>Chữ ký tay của người bệnh/người đại diện: ảnh PNG đã chuẩn hóa, thời điểm ký (giờ Việt Nam).</summary>
