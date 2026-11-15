@@ -25,6 +25,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     private static string Box(bool selected) => selected ? Checked : Unchecked;
     private const string Blank = "……………………";
+
+    /// <summary>Khoảng cách giữa các phần in chung một dòng (lựa chọn, trường "sameLine"); khoảng trắng không ngắt để không dính nhau.</summary>
+    private const string InlineGap = "\u00A0\u00A0\u00A0 ";
     private static readonly Color Muted = new(0x55, 0x5D, 0x6B);
 
     /// <summary>Màu phần tiếng Anh của mẫu song ngữ (in nghiêng; tiếng Việt giữ màu đen, chữ đứng).</summary>
@@ -143,7 +146,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         left.AddLineBreak();
         // Tên bệnh viện in đậm, không gạch dưới (yêu cầu của bệnh viện 15/11/2026); quốc hiệu bên phải vẫn gạch dưới.
         left.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
-        if (!string.IsNullOrWhiteSpace(document.DepartmentName))
+        // Mẫu có "hideDepartment" (bản giấy không có dòng khoa, ví dụ TTNB-NGOAITRU, TUVAN-CONGTT) thì bỏ dòng này.
+        if (!document.Definition.HideDepartment && !string.IsNullOrWhiteSpace(document.DepartmentName))
         {
             left.AddLineBreak();
             left.AddText($"Khoa/phòng: {document.DepartmentName}");
@@ -188,35 +192,68 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
     }
 
+    /// <summary>Nhãn mục "I. Thông tin người bệnh": chỉ tiếng Việt, hoặc kèm tiếng Anh với mẫu song ngữ (<c>bilingual</c>).</summary>
+    private sealed record PatientLabels(
+        string Title,
+        string FullName,
+        string Gender,
+        string DateOfBirth,
+        string PatientCode,
+        string CitizenId,
+        string Phone,
+        string Address,
+        string Representative,
+        string Relationship)
+    {
+        public static readonly PatientLabels VietnameseOnly = new(
+            "I. Thông tin người bệnh", "Họ và tên: ", "Giới tính: ", "Ngày sinh: ", "Mã người bệnh: ", "Số CCCD: ", "Điện thoại: ",
+            "Địa chỉ: ", "Người ký thay mặt người bệnh: ", "Quan hệ: ");
+
+        // Cột phải rộng 67 mm: nhãn tiếng Anh ở cột phải viết gọn ("Phone", "ID No.") để số không bị xuống dòng.
+        public static readonly PatientLabels WithEnglish = new(
+            "I. Thông tin người bệnh (Patient information)",
+            "Họ và tên (Full name): ",
+            "Giới tính (Gender): ",
+            "Ngày sinh (Date of birth): ",
+            "Mã người bệnh (Patient ID): ",
+            "Số CCCD (ID No.): ",
+            "Điện thoại (Phone): ",
+            "Địa chỉ (Address): ",
+            "Người ký thay mặt người bệnh (Signing on behalf of the patient): ",
+            "Quan hệ (Relationship): ");
+    }
+
     private static void AddPatient(Section section, ConsentPdfDocument document)
     {
-        AddSectionTitle(section, "I. Thông tin người bệnh");
+        var bilingual = document.Definition.Bilingual;
+        var labels = bilingual ? PatientLabels.WithEnglish : PatientLabels.VietnameseOnly;
+        AddSectionTitle(section, labels.Title);
         var patient = document.Patient;
         var age = VietnameseLabels.Age(patient.DateOfBirth, document.DocumentDate);
+        var dateOfBirth = $"{patient.DateOfBirth:dd/MM/yyyy} ({age} tuổi)";
 
-        var line1 = TwoColumns(section);
-        AddLabelValue(line1, "Họ và tên: ", patient.FullName.ToUpper(Vietnamese), bold: true);
-        line1.AddTab();
-        AddLabelValue(line1, "Giới tính: ", VietnameseLabels.Gender(patient.Gender));
+        AddTwoColumns(
+            section, labels.FullName, patient.FullName.ToUpper(Vietnamese), labels.Gender, VietnameseLabels.Gender(patient.Gender), boldLeft: true);
+        if (bilingual)
+        {
+            // Nhãn song ngữ dài hơn: mã người bệnh sang cột trái, cột phải chỉ để điện thoại và số CCCD (độ dài cố định).
+            AddTwoColumns(section, labels.DateOfBirth, dateOfBirth, labels.Phone, patient.PhoneNumber);
+            AddTwoColumns(section, labels.PatientCode, patient.PatientCode, labels.CitizenId, patient.CitizenId);
+        }
+        else
+        {
+            AddTwoColumns(section, labels.DateOfBirth, dateOfBirth, labels.PatientCode, patient.PatientCode);
+            AddTwoColumns(section, labels.CitizenId, patient.CitizenId, labels.Phone, patient.PhoneNumber);
+        }
 
-        var line2 = TwoColumns(section);
-        AddLabelValue(line2, "Ngày sinh: ", $"{patient.DateOfBirth:dd/MM/yyyy} ({age} tuổi)");
-        line2.AddTab();
-        AddLabelValue(line2, "Mã người bệnh: ", patient.PatientCode);
-
-        var line3 = TwoColumns(section);
-        AddLabelValue(line3, "Số CCCD: ", patient.CitizenId);
-        line3.AddTab();
-        AddLabelValue(line3, "Điện thoại: ", patient.PhoneNumber);
-
-        AddLabelValue(section.AddParagraph(), "Địa chỉ: ", patient.Address);
+        AddLabelValue(section.AddParagraph(), labels.Address, patient.Address);
 
         if (document.Representative is { } representative)
         {
             var signer = section.AddParagraph();
-            AddLabelValue(signer, "Người ký thay mặt người bệnh: ", representative.FullName.ToUpper(Vietnamese), bold: true);
-            AddLabelValue(signer, " – Quan hệ: ", VietnameseLabels.Relationship(representative.Relationship));
-            AddLabelValue(signer, " – Số CCCD: ", representative.CitizenId);
+            AddLabelValue(signer, labels.Representative, representative.FullName.ToUpper(Vietnamese), bold: true);
+            AddLabelValue(signer, $" – {labels.Relationship}", VietnameseLabels.Relationship(representative.Relationship));
+            AddLabelValue(signer, $" – {labels.CitizenId}", representative.CitizenId);
         }
     }
 
@@ -227,6 +264,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             AddSectionTitle(section, templateSection.Title);
         }
 
+        // Dòng "nhãn: giá trị" vừa in; trường có "sameLine" in tiếp trên dòng này thay vì xuống dòng.
+        Paragraph? valueLine = null;
         foreach (var block in templateSection.Blocks)
         {
             switch (block.Type)
@@ -235,18 +274,21 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                     var paragraph = section.AddParagraph();
                     AddBilingual(paragraph, block.Text ?? string.Empty);
                     paragraph.Format.Alignment = ParagraphAlignment.Justify;
+                    valueLine = null;
                     break;
                 case BlockTypes.List:
                     AddList(section, block);
+                    valueLine = null;
                     break;
                 case BlockTypes.Score:
                     AddScore(section, block, document);
+                    valueLine = null;
                     break;
                 default:
                     // Trường không hiển thị (điều kiện chưa thỏa) thì không in.
                     if (IsShown(block, document))
                     {
-                        AddField(section, block, document.Data[block.Key!]);
+                        valueLine = AddField(section, block, document.Data[block.Key!], block.SameLine ? valueLine : null);
                     }
 
                     break;
@@ -258,14 +300,18 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     private static bool IsShown(TemplateBlock block, ConsentPdfDocument document) =>
         block.VisibleWhen is null || document.Data[block.Key!] is not null;
 
-    private static void AddField(Section section, TemplateBlock block, JsonNode? value)
+    /// <summary>
+    /// In một trường. Trường dạng "nhãn: giá trị" in tiếp trên <paramref name="sameLine"/> nếu có, và trả về dòng đó để
+    /// trường sau in tiếp; các kiểu khác trả về <c>null</c>.
+    /// </summary>
+    private static Paragraph? AddField(Section section, TemplateBlock block, JsonNode? value, Paragraph? sameLine)
     {
         switch (block.Type)
         {
             case BlockTypes.Choice:
             case BlockTypes.MultiChoice:
                 AddChoices(section, block, value);
-                break;
+                return null;
             case BlockTypes.Confirm:
                 var confirm = section.AddParagraph();
                 confirm.Format.LeftIndent = Unit.FromMillimeter(6);
@@ -273,13 +319,19 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 confirm.AddText($"{(value is JsonValue v && v.TryGetValue<bool>(out var flag) && flag ? Checked : Unchecked)}\t");
                 confirm.Format.TabStops.AddTabStop(Unit.FromMillimeter(6));
                 AddBilingual(confirm, block.Label ?? string.Empty);
-                break;
+                return null;
             case BlockTypes.Repeater:
                 AddRows(section, block, value as JsonArray);
-                break;
+                return null;
             default:
-                AddLabelValue(section.AddParagraph(), $"{block.Label}: ", FormatValue(block.Type, value));
-                break;
+                var line = sameLine ?? section.AddParagraph();
+                if (sameLine is not null)
+                {
+                    line.AddText(InlineGap);
+                }
+
+                AddLabelValue(line, $"{block.Label}: ", FormatValue(block.Type, value));
+                return line;
         }
     }
 
@@ -310,8 +362,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             {
                 if (i > 0)
                 {
-                    // Khoảng trắng không ngắt để các lựa chọn trên cùng dòng không dính vào nhau.
-                    line.AddText("\u00A0\u00A0\u00A0 ");
+                    line.AddText(InlineGap);
                 }
 
                 Mark(line, options[i]);
@@ -702,6 +753,16 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         var paragraph = section.AddParagraph();
         paragraph.Format.TabStops.AddTabStop(Unit.FromMillimeter(100));
         return paragraph;
+    }
+
+    /// <summary>Một dòng hai cột "nhãn: giá trị" (cột phải bắt đầu ở 100 mm).</summary>
+    private static void AddTwoColumns(
+        Section section, string leftLabel, string? leftValue, string rightLabel, string? rightValue, bool boldLeft = false)
+    {
+        var line = TwoColumns(section);
+        AddLabelValue(line, leftLabel, leftValue, boldLeft);
+        line.AddTab();
+        AddLabelValue(line, rightLabel, rightValue);
     }
 
     /// <summary>Thêm chữ của mẫu song ngữ: phần tiếng Anh màu xanh, chữ nghiêng; tiếng Việt giữ màu đen; "\n" thành xuống dòng.</summary>

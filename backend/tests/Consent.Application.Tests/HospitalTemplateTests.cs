@@ -63,6 +63,33 @@ public sealed class HospitalTemplateTests
         }
     }
 
+    /// <summary>Bệnh viện yêu cầu 15/11/2026: hai phiếu không in dòng khoa; phiếu tư vấn in phần I song ngữ.</summary>
+    [Theory]
+    [InlineData("QT-KNGT-BM02", false, false)]
+    [InlineData("TTNB-NGOAITRU", true, false)]
+    [InlineData("QT-KNGT-BM10", false, false)]
+    [InlineData("TUVAN-CONGTT", true, true)]
+    public void HeaderAndPatientSection_FollowThePaperForm(string code, bool hideDepartment, bool bilingual)
+    {
+        var definition = Definition(code);
+
+        Assert.Equal(hideDepartment, definition.HideDepartment);
+        Assert.Equal(bilingual, definition.Bilingual);
+    }
+
+    [Fact]
+    public void OutpatientInformation_SharesLinesLikeThePaperForm()
+    {
+        var blocks = Definition("TTNB-NGOAITRU").Sections.SelectMany(s => s.Blocks).ToList();
+        var occupation = blocks.FindIndex(b => b.Key == "occupation");
+
+        // Nghề nghiệp in cùng dòng với trình độ văn hóa đứng ngay trước; "Có"/"Không" của câu người liên hệ khẩn cấp cùng một dòng.
+        Assert.True(blocks[occupation].SameLine);
+        Assert.Equal("educationLevel", blocks[occupation - 1].Key);
+        Assert.Equal(["occupation"], blocks.Where(b => b.SameLine).Select(b => b.Key!));
+        Assert.Equal("inline", blocks.Single(b => b.Key == "familyIsEmergencyContact").Layout);
+    }
+
     [Fact]
     public void Bm02_InsuranceScheme_RequiresCardNumber_AndChecksFormat()
     {

@@ -60,6 +60,8 @@ export interface TemplateBlock {
   patternMessage?: string
   prefill?: string
   layout?: 'inline' | 'ordered'
+  /** PDF in trường này tiếp trên dòng của trường đứng trước (trường "nhãn: giá trị"); màn hình nhập liệu không đổi. */
+  sameLine?: boolean
   options?: TemplateOption[]
   columns?: TemplateColumn[]
   visibleWhen?: TemplateCondition
@@ -80,6 +82,10 @@ export interface TemplateSection {
 export interface TemplateDefinition {
   title: string
   subtitle?: string
+  /** PDF không in dòng "Khoa/phòng: …" dưới tên bệnh viện. */
+  hideDepartment?: boolean
+  /** Mẫu song ngữ: mục "I. Thông tin người bệnh" trên PDF in kèm tiếng Anh. */
+  bilingual?: boolean
   sections: TemplateSection[]
   signatures?: TemplateSignatures
 }

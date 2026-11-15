@@ -100,6 +100,8 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
             list.EnumerateArray().Select(t => t.GetProperty("code").GetString()).Order(StringComparer.Ordinal));
         Assert.All(list.EnumerateArray(), t => Assert.Equal(1, t.GetProperty("publishedVersionNo").GetInt32()));
         Assert.Equal(HttpStatusCode.Created, draftStatus);
+        // Màn hình soạn JSON chỉ thấy định nghĩa, không có bản sao "inputBlocks" (sửa ở bản sao không có tác dụng).
+        Assert.False(draft.GetProperty("definition").TryGetProperty("inputBlocks", out _));
         Assert.Equal(HttpStatusCode.BadRequest, invalidStatus);
         Assert.Equal("consent_templates.invalid_definition", invalid.GetProperty("code").GetString());
         Assert.Equal(HttpStatusCode.OK, validStatus);

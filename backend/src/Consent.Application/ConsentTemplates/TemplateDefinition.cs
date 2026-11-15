@@ -14,7 +14,17 @@ public sealed record TemplateDefinition(
     IReadOnlyList<TemplateSection> Sections,
     TemplateSignatures? Signatures = null)
 {
-    /// <summary>Mọi khối nhập liệu (có <see cref="TemplateBlock.Key"/>), theo thứ tự xuất hiện.</summary>
+    /// <summary>Không in dòng "Khoa/phòng: …" dưới tên bệnh viện ở đầu phiếu (bản giấy của mẫu không có dòng này).</summary>
+    public bool HideDepartment { get; init; }
+
+    /// <summary>Mẫu song ngữ: mục "I. Thông tin người bệnh" do hệ thống in cũng kèm tiếng Anh, ví dụ "Họ và tên (Full name)".</summary>
+    public bool Bilingual { get; init; }
+
+    /// <summary>
+    /// Mọi khối nhập liệu (có <see cref="TemplateBlock.Key"/>), theo thứ tự xuất hiện. Chỉ để tính toán: không ghi vào JSON
+    /// (trước đây bị ghi thành bản sao "inputBlocks", sửa ở bản sao đó không có tác dụng).
+    /// </summary>
+    [JsonIgnore]
     public IEnumerable<TemplateBlock> InputBlocks =>
         Sections.SelectMany(s => s.Blocks).Where(b => BlockTypes.IsInput(b.Type));
 }
@@ -57,6 +67,12 @@ public sealed record TemplateBlock
 
     /// <summary><c>inline</c>: các lựa chọn trên một dòng; <c>ordered</c>: danh sách có đánh số.</summary>
     public string? Layout { get; init; }
+
+    /// <summary>
+    /// PDF in trường này tiếp trên dòng của trường đứng trước, ví dụ "Trình độ văn hóa: … Nghề nghiệp: …" (chỉ trường dạng
+    /// "nhãn: giá trị", xem <see cref="BlockTypes.CanShareLine"/>). Màn hình nhập liệu không đổi.
+    /// </summary>
+    public bool SameLine { get; init; }
 
     public IReadOnlyList<TemplateOption>? Options { get; init; }
 
@@ -171,6 +187,9 @@ public static class BlockTypes
 
     /// <summary>Khối có tên trường (dữ liệu nhập hoặc giá trị tự tính).</summary>
     public static bool IsInput(string type) => type is not (Paragraph or List);
+
+    /// <summary>Trường in một dòng "nhãn: giá trị" trên PDF, nên in chung dòng với trường khác được.</summary>
+    public static bool CanShareLine(string type) => type is Text or Date or DateTime or Computed;
 }
 
 /// <summary>Nguồn tự điền khi lập phiếu.</summary>

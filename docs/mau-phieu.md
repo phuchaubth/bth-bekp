@@ -21,6 +21,10 @@ hai mã này (13/11/2026).
 
 - **Thông tin hành chính** (họ tên, ngày sinh, giới tính, mã người bệnh, CCCD, điện thoại, địa chỉ) in tự động ở mục
   "I. Thông tin người bệnh" từ hồ sơ, nên không lặp lại trong nội dung riêng của mẫu.
+- **Đầu phiếu và mục I** (bệnh viện yêu cầu 15/11/2026, quyết định 28): `TTNB-NGOAITRU` và `TUVAN-CONGTT` không in dòng
+  "Khoa/phòng: …" dưới tên bệnh viện (`hideDepartment`), vì bản giấy không có dòng này. Phiếu tư vấn in mục
+  "I. Thông tin người bệnh" song ngữ (`bilingual`): "Họ và tên (Full name)", "Mã người bệnh (Patient ID)"… Hai mẫu còn lại
+  giữ như cũ; muốn đổi thì thêm hai thuộc tính này khi tạo phiên bản mới.
 - **Ngày tháng và chữ ký** do hệ thống in: người bệnh ký tay trên điện thoại; nhân viên phía bệnh viện đăng nhập bằng tài khoản và cũng ký tay khi xác nhận (quyết định 17). PDF có ảnh chữ ký, họ tên, chức danh và thời điểm của từng người.
   Các dòng "Ngày … tháng … năm …" trên giấy được thay bằng ngày lập và thời điểm ký.
 - **Ô đánh dấu** chuyển thành câu hỏi chọn một hoặc chọn nhiều. Dòng "Có, ghi rõ…" mở thêm ô nhập chỉ khi chọn "Có".
@@ -64,6 +68,8 @@ hai mã này (13/11/2026).
 - Người nhà: họ tên, quan hệ, số điện thoại. Hỏi "Đây có phải người liên hệ khẩn cấp không?". Chọn "Không" thì bắt
   buộc họ tên, quan hệ, số điện thoại của người liên hệ khẩn cấp.
 - Lời cam đoan của người khai. Nhãn ký bên bệnh viện kèm ghi chú "đã đối chiếu thông tin trên giấy tờ tùy thân".
+- Trên PDF (15/11/2026): trình độ văn hóa và nghề nghiệp in cùng một dòng (`sameLine` ở trường nghề nghiệp); hai ô "Có" và
+  "Không, điền thêm thông tin dưới đây" của câu người liên hệ khẩn cấp in trên cùng một dòng (`layout: "inline"`).
 
 ### 2.3. QT-KNGT-BM10 – Phiếu nhận định ban đầu và nhu cầu GDSK
 
@@ -102,6 +108,8 @@ rất cao).
   đã xem và đồng ý tham gia sử dụng các Cổng thông tin chính thức tại bệnh viện?". Ý kiến được thống kê như các phiếu
   đồng ý/từ chối khác.
 - Hai mã QR trên bản giấy không đưa vào, vì định nghĩa mẫu chưa hỗ trợ hình ảnh.
+- Phần tư vấn và phần ý kiến giữ số I, II như bản giấy, nên PDF có hai mục số I ("I. Thông tin người bệnh" do hệ thống in
+  và "I. Phần tư vấn"). Chờ bệnh viện chọn có đánh lại thành II, III không (chỉ sửa tiêu đề trong định nghĩa mẫu).
 
 ## 3. Giới hạn hiện tại
 
@@ -131,6 +139,8 @@ rất cao).
 
 - Sửa câu chữ, thêm/bớt câu hỏi, đổi ngưỡng điểm: người quản lý mẫu tạo **phiên bản mới** ở màn hình *Mẫu phiếu* (soạn
   JSON, xem trước), rồi phát hành. Phiếu đã lập giữ đúng phiên bản cũ.
+- Cách in trên PDF (bỏ dòng khoa ở đầu phiếu, mục I song ngữ, in hai trường cùng dòng): thêm `hideDepartment`,
+  `bilingual`, `sameLine` khi soạn JSON của phiên bản mới (xem [API, mục 6b](api.md)).
 - **Cấu hình ký** (thẻ *Cấu hình ký* của phiên bản nháp, không cần sửa JSON): thêm, xóa, đổi thứ tự các bước xác nhận
   (tối đa 5, mỗi bước chọn vai trò và tên ô ký), chọn hỏi Đồng ý/Không đồng ý hay chỉ ký xác nhận, câu hỏi và nhãn lựa
   chọn, tên các ô ký trên PDF. Ô để trống dùng nhãn mặc định. Lưu xong phải **phát hành** phiên bản thì phiếu mới mới áp

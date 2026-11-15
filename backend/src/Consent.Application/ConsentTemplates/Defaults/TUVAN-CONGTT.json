@@ -1,6 +1,8 @@
 {
   "title": "Phiếu tư vấn tham gia và sử dụng\ncổng thông tin chính thức của bệnh viện",
   "subtitle": "Consultation Form for Participation and Use of the Hospital’s Official Information Portals",
+  "hideDepartment": true,
+  "bilingual": true,
   "sections": [
     {
       "title": "I. Phần tư vấn (Consultation section)",

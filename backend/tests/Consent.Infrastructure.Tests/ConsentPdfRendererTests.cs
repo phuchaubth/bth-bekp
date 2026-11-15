@@ -153,6 +153,135 @@ public sealed class ConsentPdfRendererTests
     private static string Plain(Mdom.FormattedText text) =>
         string.Concat(text.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Text>().Select(t => t.Content));
 
+    /// <summary>Phiếu theo mẫu thật của bệnh viện, dữ liệu giả lập đầy đủ, khoa "Khoa Khám bệnh".</summary>
+    private static ConsentPdfDocument HospitalDocument(string code)
+    {
+        var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
+        var evaluation = FormDataEvaluator.Evaluate(definition, HospitalData(code));
+        Assert.True(evaluation.IsValid, string.Join("; ", evaluation.Errors.Select(e => $"{e.Key}: {string.Join(",", e.Value)}")));
+        return new ConsentPdfDocument(
+            new HospitalOptions(), "Khoa Khám bệnh", code, 1, "PDT-2026-000001", definition, evaluation.Data, evaluation.Scores,
+            Patient, null, new DateOnly(2026, 11, 11), IsFinal: true);
+    }
+
+    /// <summary>Chữ ở đầu phiếu (tên đơn vị, khoa, quốc hiệu), mỗi ô một dòng.</summary>
+    private static string HeadText(Mdom.Document layout)
+    {
+        var row = layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
+        return string.Join('\n', Enumerable.Range(0, row.Cells.Count)
+            .SelectMany(i => row.Cells[i].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>())
+            .Select(p => TextOf(p.Elements)));
+    }
+
+    /// <summary>Chữ của từng đoạn trong thân phiếu (ngoài bảng), theo thứ tự in; tab là "\t", xuống dòng là "\n".</summary>
+    private static List<string> BodyLines(Mdom.Document layout) =>
+        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements)).ToList();
+
+    private static string TextOf(Mdom.ParagraphElements elements) =>
+        string.Concat(elements.Cast<Mdom.DocumentObject>().Select(element => element switch
+        {
+            Mdom.Text text => text.Content,
+            Mdom.FormattedText formatted => TextOf(formatted.Elements),
+            Mdom.Character { SymbolName: Mdom.SymbolName.Tab } => "\t",
+            Mdom.Character { SymbolName: Mdom.SymbolName.LineBreak } => "\n",
+            _ => string.Empty,
+        }));
+
+    /// <summary>Mọi đoạn chữ có định dạng trong thân phiếu (ngoài bảng).</summary>
+    private static IEnumerable<Mdom.FormattedText> BodyFormattedTexts(Mdom.Document layout) =>
+        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>()
+            .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>());
+
+    [Theory]
+    [InlineData("QT-KNGT-BM02", true)]
+    [InlineData("QT-KNGT-BM10", true)]
+    [InlineData("TTNB-NGOAITRU", false)]
+    [InlineData("TUVAN-CONGTT", false)]
+    public void DepartmentLine_IsLeftOut_ForFormsWhosePaperVersionHasNone(string code, bool printed)
+    {
+        var head = HeadText(MigraDocConsentPdfRenderer.Build(HospitalDocument(code)));
+
+        Assert.Contains("BỆNH VIỆN", head, StringComparison.Ordinal);
+        Assert.Equal(printed, head.Contains("Khoa/phòng: Khoa Khám bệnh", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BilingualForm_PrintsThePatientSectionWithEnglishLabels()
+    {
+        var bilingual = HospitalDocument("TUVAN-CONGTT");
+        var vietnameseOnly = bilingual with { Definition = bilingual.Definition with { Bilingual = false } };
+
+        var layout = MigraDocConsentPdfRenderer.Build(bilingual);
+
+        // Nhãn song ngữ dài hơn: mã người bệnh sang cột trái, cột phải chỉ có mục ngắn để số không bị xuống dòng.
+        Assert.Equal(
+            [
+                "I. Thông tin người bệnh (Patient information)",
+                "Họ và tên (Full name): PHẠM THỊ DUNG (GIẢ LẬP)\tGiới tính (Gender): Nữ",
+                "Ngày sinh (Date of birth): 05/04/1988 (38 tuổi)\tĐiện thoại (Phone): 0900000125",
+                "Mã người bệnh (Patient ID): BN000125\tSố CCCD (ID No.): 036188000125",
+                "Địa chỉ (Address): Số 9 Đường Thử Nghiệm, Phường Mẫu",
+            ],
+            PatientSection(layout));
+        Assert.Equal(
+            [
+                "I. Thông tin người bệnh",
+                "Họ và tên: PHẠM THỊ DUNG (GIẢ LẬP)\tGiới tính: Nữ",
+                "Ngày sinh: 05/04/1988 (38 tuổi)\tMã người bệnh: BN000125",
+                "Số CCCD: 036188000125\tĐiện thoại: 0900000125",
+                "Địa chỉ: Số 9 Đường Thử Nghiệm, Phường Mẫu",
+            ],
+            PatientSection(MigraDocConsentPdfRenderer.Build(vietnameseOnly)));
+
+        // Phần tiếng Anh in nghiêng, màu xanh như các phần song ngữ khác của phiếu.
+        var english = Assert.Single(BodyFormattedTexts(layout), t => Plain(t) == "(Full name)");
+        Assert.True(english.Italic);
+        Assert.Equal(MigraDocConsentPdfRenderer.English, english.Color);
+    }
+
+    /// <summary>Năm dòng của mục "I. Thông tin người bệnh": tiêu đề, ba dòng hai cột, địa chỉ.</summary>
+    private static IEnumerable<string> PatientSection(Mdom.Document layout) =>
+        BodyLines(layout).SkipWhile(l => !l.StartsWith("I. Thông tin người bệnh", StringComparison.Ordinal)).Take(5);
+
+    [Fact]
+    public void OutpatientInformation_PrintsOccupationBesideEducation_AndBothEmergencyAnswersOnOneLine()
+    {
+        var lines = BodyLines(MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU")));
+
+        var education = Assert.Single(lines, l => l.StartsWith("Trình độ văn hóa (Education Level): 12/12", StringComparison.Ordinal));
+        Assert.EndsWith("Nghề nghiệp (Occupation): Nhân viên văn phòng", education, StringComparison.Ordinal);
+        Assert.DoesNotContain(lines, l => l.StartsWith("Nghề nghiệp", StringComparison.Ordinal));
+        var emergency = Assert.Single(lines, l => l.StartsWith("Đây có phải là thông tin của người liên hệ khẩn cấp không?", StringComparison.Ordinal));
+        Assert.Contains("□ Có (Yes)", emergency, StringComparison.Ordinal);
+        Assert.Contains("■ Không, điền thêm thông tin dưới đây", emergency, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("no", new[] { "A: 1    C: 3", "Đoạn văn", "D: 11/11/2026" })]
+    [InlineData("yes", new[] { "A: 1", "B: 2    C: 3", "Đoạn văn", "D: 11/11/2026" })]
+    public void SameLineField_ContinuesTheLineOfThePreviousPrintedField(string showB, string[] expected)
+    {
+        // B chỉ in khi chọn "Có": ẩn B thì C in tiếp dòng của A. D đứng sau đoạn văn nên xuống dòng mới.
+        var definition = TemplateDefinitionValidator.Parse("""
+            {"title":"T","sections":[{"blocks":[
+              {"type":"choice","key":"showB","label":"Hiện B","layout":"inline","options":[{"value":"yes","label":"Có"},{"value":"no","label":"Không"}]},
+              {"type":"text","key":"a","label":"A"},
+              {"type":"text","key":"b","label":"B","visibleWhen":{"field":"showB","in":["yes"]}},
+              {"type":"text","key":"c","label":"C","sameLine":true},
+              {"type":"paragraph","text":"Đoạn văn"},
+              {"type":"date","key":"d","label":"D","sameLine":true}]}]}
+            """).Definition!;
+        var evaluation = FormDataEvaluator.Evaluate(
+            definition, new JsonObject { ["showB"] = showB, ["a"] = "1", ["b"] = "2", ["c"] = "3", ["d"] = "2026-11-11" });
+        var document = new ConsentPdfDocument(
+            new HospitalOptions(), "Khoa Khám bệnh", "T-01", 1, "PDT-2026-000001", definition, evaluation.Data, evaluation.Scores,
+            Patient, null, new DateOnly(2026, 11, 11), IsFinal: true);
+
+        var lines = BodyLines(MigraDocConsentPdfRenderer.Build(document));
+
+        Assert.Equal(expected, lines.SkipWhile(l => !l.StartsWith("Hiện B", StringComparison.Ordinal)).Skip(1).Take(expected.Length));
+    }
+
     [Fact]
     public void Logo_ThatCannotBeDecoded_IsSkipped_AndThePdfStillRenders()
     {

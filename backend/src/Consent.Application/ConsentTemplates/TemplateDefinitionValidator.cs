@@ -183,6 +183,11 @@ public static partial class TemplateDefinitionValidator
 
     private static void ValidateBlock(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)
     {
+        if (block.SameLine && !BlockTypes.CanShareLine(block.Type))
+        {
+            errors.Add($"{where}: \"sameLine\" (in cùng dòng với trường đứng trước) chỉ dùng cho trường văn bản, ngày, ngày giờ hoặc trường tự tính.");
+        }
+
         switch (block.Type)
         {
             case BlockTypes.Paragraph:

@@ -46,6 +46,8 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"valueFrom\":\"bmi\",\"options\":[{\"value\":\"x\",\"label\":\"X\",\"min\":1}]}]}]}", "trường tự tính đứng trước")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"statement\":{\"suggestions\":[\"A\",\" \"]}}}", "câu gợi ý không được trống")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"statement\":{\"suggestions\":[\"1\",\"2\",\"3\",\"4\",\"5\",\"6\",\"7\",\"8\",\"9\"]}}}", "tối đa 8 câu gợi ý")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"choice\",\"key\":\"b\",\"label\":\"B\",\"sameLine\":true,\"options\":[{\"value\":\"x\",\"label\":\"X\"}]}]}]}", "\"sameLine\"")]
+    [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"paragraph\",\"text\":\"P\",\"sameLine\":true}]}]}", "\"sameLine\"")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);
@@ -217,5 +219,38 @@ public sealed class TemplateDefinitionTests
         Assert.Equal("sai-ma", draft.Data["insuranceNumber"]!.GetValue<string>());
         Assert.DoesNotContain("insuranceNumber", draft.Errors.Keys);
         Assert.Null(final.Data["insuranceNumber"]);
+    }
+
+    [Fact]
+    public void PrintOptions_AreKeptWhenSaved_AndLeftOutWhenOff()
+    {
+        // Mọi trường dạng "nhãn: giá trị" đều in chung dòng được.
+        const string json = """
+            {"title":"T","hideDepartment":true,"bilingual":true,"sections":[{"blocks":[
+              {"type":"text","key":"w","label":"W"},
+              {"type":"text","key":"h","label":"H","sameLine":true},
+              {"type":"computed","key":"bmi","label":"BMI","formula":"bmi","inputs":["w","h"],"sameLine":true},
+              {"type":"date","key":"d","label":"D"},
+              {"type":"datetime","key":"t","label":"T","sameLine":true}]}]}
+            """;
+
+        var (definition, errors) = TemplateDefinitionValidator.Parse(json);
+
+        Assert.Empty(errors);
+        Assert.True(definition!.HideDepartment);
+        Assert.True(definition.Bilingual);
+        Assert.Equal(["h", "bmi", "t"], definition.InputBlocks.Where(b => b.SameLine).Select(b => b.Key!));
+        var saved = TemplateJson.Serialize(definition);
+        Assert.Contains("\"hideDepartment\":true", saved, StringComparison.Ordinal);
+        Assert.Contains("\"bilingual\":true", saved, StringComparison.Ordinal);
+        Assert.Equal(3, saved.Split("\"sameLine\":true").Length - 1);
+        // Danh sách tính toán InputBlocks không bị ghi thành bản sao "inputBlocks" (sửa ở bản sao không có tác dụng).
+        Assert.DoesNotContain("inputBlocks", saved, StringComparison.Ordinal);
+
+        // Mẫu không dùng các tùy chọn này: JSON lưu không có thuộc tính thừa.
+        var plain = TemplateJson.Serialize(Default("CK-01"));
+        Assert.DoesNotContain("hideDepartment", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("bilingual", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("sameLine", plain, StringComparison.Ordinal);
     }
 }
