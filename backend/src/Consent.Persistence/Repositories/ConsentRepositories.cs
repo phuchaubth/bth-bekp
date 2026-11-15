@@ -61,6 +61,14 @@ internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormR
             .ConfigureAwait(false);
     }
 
+    public Task<ConsentForm?> FindLatestCompletedAsync(
+        Guid patientId, Guid templateId, Guid departmentId, DateTimeOffset completedSinceUtc, CancellationToken cancellationToken) =>
+        db.ConsentForms.AsNoTracking()
+            .Where(f => f.PatientId == patientId && f.TemplateId == templateId && f.DepartmentId == departmentId
+                && f.Status == ConsentFormStatus.Completed && f.CompletedAtUtc >= completedSinceUtc)
+            .OrderByDescending(f => f.CompletedAtUtc)
+            .FirstOrDefaultAsync(cancellationToken);
+
     public Task<ConsentFormRef?> FindReplacementAsync(Guid formId, CancellationToken cancellationToken) =>
         db.ConsentForms.AsNoTracking()
             .Where(f => f.ReplacesFormId == formId)

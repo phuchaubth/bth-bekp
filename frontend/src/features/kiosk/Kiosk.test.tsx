@@ -245,6 +245,98 @@ describe('Kiosk người bệnh tự làm phiếu', () => {
     ])
   })
 
+  describe('phiếu lần trước (quyết định 27)', () => {
+    // Hồ sơ có sẵn, đã làm BM02 và TTNB gần đây: máy chủ chỉ báo tên các câu đã trả lời, không gửi câu trả lời.
+    const returning: KioskIdentity = {
+      ...cardIdentity,
+      foundRecord: true,
+      hasPhoneNumber: true,
+      missingFields: [],
+      inherited: [
+        { templateId: 't-bm02', keys: ['careScheme'] },
+        { templateId: 't-ttnb', keys: ['ethnicity', 'familyPhone'] },
+      ],
+    }
+    const submitted = {
+      patientName: 'Nguyễn Văn Kiosk',
+      patientCode: 'BN000125',
+      bundleId: 'b-1',
+      forms: [
+        { id: 'f-1', formNo: 'PDT-2026-000301', templateName: 'Giấy đồng thuận BHYT', decision: null },
+        { id: 'f-2', formNo: 'PDT-2026-000302', templateName: 'Phiếu thông tin người bệnh', decision: null },
+        { id: 'f-3', formNo: 'PDT-2026-000303', templateName: 'Phiếu tư vấn cổng thông tin', decision: 'Agreed' },
+      ],
+      signedAtUtc: '2026-11-15T02:00:00Z',
+    }
+
+    const identifyByCard = async (user: ReturnType<typeof userEvent.setup>) => {
+      await user.click(await screen.findByRole('button', { name: /Quét CCCD/ }))
+      await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${QR}{Enter}`)
+      await user.click(await screen.findByRole('button', { name: 'Đúng, tiếp tục' }))
+    }
+
+    it('hỏi một câu "giữ như lần trước", không hiện câu trả lời cũ; giữ thì chỉ còn câu Đồng ý và ký', async () => {
+      const user = userEvent.setup()
+      const { calls } = mockApi({
+        ...baseRoutes(kioskAccount()),
+        'GET /api/v1/kiosk/config': config,
+        'POST /api/v1/kiosk/identify': returning,
+        'POST /api/v1/kiosk/submit': submitted,
+      })
+      renderApp('/kiosk')
+
+      await identifyByCard(user)
+      expect(await screen.findByRole('heading', { name: /có thay đổi so với lần trước/ })).toBeInTheDocument()
+      expect(screen.queryByText(/Khám dịch vụ|Khám BHYT/)).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /Không thay đổi/ }))
+
+      expect(await screen.findByRole('heading', { name: /cổng thông tin/ })).toBeInTheDocument()
+      await user.click(screen.getByRole('radio', { name: /^Đồng ý/ }))
+      await user.click(screen.getByRole('button', { name: 'Tiếp tục' }))
+
+      expect(await screen.findByRole('heading', { name: 'Ký tên cho các phiếu' })).toBeInTheDocument()
+      expect(screen.getAllByText('✓ Giữ như lần trước')).toHaveLength(2)
+      drawStroke(screen.getByRole('img', { name: /Khung ký tên/ }))
+      await user.click(screen.getByRole('button', { name: 'Ký xác nhận cho cả 3 phiếu' }))
+
+      expect(await screen.findByRole('heading', { name: 'Ông/bà đã ký xong 3 phiếu' })).toBeInTheDocument()
+      const submit = calls.find((c) => c.path === '/api/v1/kiosk/submit')!.body as KioskSubmitRequest
+      expect(submit.keepPrevious).toBe(true)
+      expect(submit.forms).toEqual([
+        { templateId: 't-bm02', data: {}, decision: null },
+        { templateId: 't-ttnb', data: {}, decision: null },
+        { templateId: 't-tuvan', data: {}, decision: 'Agreed' },
+      ])
+    })
+
+    it('"có thay đổi" thì hỏi lại đủ các câu; quay lại từ câu đầu về câu hỏi giữ như lần trước', async () => {
+      const user = userEvent.setup()
+      mockApi({ ...baseRoutes(kioskAccount()), 'GET /api/v1/kiosk/config': config, 'POST /api/v1/kiosk/identify': returning })
+      renderApp('/kiosk')
+
+      await identifyByCard(user)
+      await user.click(await screen.findByRole('button', { name: /Có thay đổi/ }))
+
+      expect(await screen.findByRole('heading', { name: /Chế độ khám chữa bệnh/ })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Quay lại' }))
+      expect(await screen.findByRole('heading', { name: /có thay đổi so với lần trước/ })).toBeInTheDocument()
+    })
+
+    it('không có phiếu lần trước thì không hỏi, vào thẳng câu đầu', async () => {
+      const user = userEvent.setup()
+      mockApi({
+        ...baseRoutes(kioskAccount()),
+        'GET /api/v1/kiosk/config': config,
+        'POST /api/v1/kiosk/identify': { ...returning, inherited: [] },
+      })
+      renderApp('/kiosk')
+
+      await identifyByCard(user)
+      expect(await screen.findByRole('heading', { name: /Chế độ khám chữa bệnh/ })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: /có thay đổi so với lần trước/ })).not.toBeInTheDocument()
+    })
+  })
+
   it('nhập mã sai ngày sinh: báo chung và cho biết còn bao nhiêu lần thử', async () => {
     const user = userEvent.setup()
     mockApi({

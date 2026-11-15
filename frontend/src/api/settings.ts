@@ -51,7 +51,30 @@ export const settingsApi = {
   deleteSignatureFrame: () => apiRequest<SystemSettings>('/api/v1/settings/signature-frame', { method: 'DELETE' }),
 }
 
-export const settingsKeys = { all: ['settings'] as const, encounters: ['settings', 'encounters'] as const }
+export const settingsKeys = {
+  all: ['settings'] as const,
+  encounters: ['settings', 'encounters'] as const,
+  formInheritance: ['settings', 'form-inheritance'] as const,
+}
+
+/** Kế thừa phiếu lần trước (quyết định 27): số ngày được kế thừa, 0 là tắt. */
+export interface FormInheritanceSettings {
+  days: number
+  updatedAtUtc: string | null
+}
+
+/** Giới hạn của máy chủ (FormInheritanceService.MaxDays). */
+export const FORM_INHERITANCE_MAX_DAYS = 365
+
+export const formInheritanceApi = {
+  get: (signal?: AbortSignal) => apiRequest<FormInheritanceSettings>('/api/v1/settings/form-inheritance', { signal }),
+  update: (days: number) =>
+    apiRequest<FormInheritanceSettings>('/api/v1/settings/form-inheritance', { method: 'PUT', body: { days } }),
+}
+
+export function useFormInheritanceSettings() {
+  return useQuery({ queryKey: settingsKeys.formInheritance, queryFn: ({ signal }) => formInheritanceApi.get(signal) })
+}
 
 export function useSystemSettings() {
   return useQuery({ queryKey: settingsKeys.all, queryFn: ({ signal }) => settingsApi.get(signal) })

@@ -67,6 +67,16 @@ export interface KioskIdentity {
   missingFields: string[]
   /** Nguồn tự điền đã có giá trị: câu hỏi lấy từ các nguồn này không hỏi lại. */
   prefilledSources: string[]
+  /**
+   * Mẫu có phiếu lần trước kế thừa được (quyết định 27): chỉ tên các câu đã trả lời, không có câu trả lời. Người bệnh chọn
+   * "giữ như lần trước" thì kiosk không hỏi lại các câu này.
+   */
+  inherited?: KioskInheritedTemplate[]
+}
+
+export interface KioskInheritedTemplate {
+  templateId: string
+  keys: string[]
 }
 
 export interface KioskFormAnswers {
@@ -81,6 +91,8 @@ export interface KioskSubmitRequest {
   forms: KioskFormAnswers[]
   statement: string
   image: string
+  /** Người bệnh chọn "không thay đổi so với lần trước": máy chủ lấy câu chưa trả lời lại theo phiếu lần trước. */
+  keepPrevious?: boolean
 }
 
 export interface KioskSubmittedForm {

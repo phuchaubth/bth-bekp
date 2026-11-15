@@ -97,6 +97,9 @@ public static class AuditActions
     /// <summary>Tra cứu nguồn thông tin người bệnh bên ngoài (CSDL bệnh viện) theo mã người bệnh hoặc CCCD.</summary>
     public const string PatientSourceLookedUp = "Patients.SourceLookedUp";
     public const string ConsentFormViewed = "ConsentForms.Viewed";
+
+    /// <summary>Phiếu mới được điền sẵn theo phiếu lần trước (quyết định 27); chi tiết ghi số phiếu nguồn.</summary>
+    public const string ConsentFormInherited = "ConsentForms.Inherited";
     public const string ConsentFormPdfViewed = "ConsentForms.PdfViewed";
     public const string ConsentFormSigningStarted = "ConsentForms.SigningStarted";
     public const string ConsentFormPatientSigned = "ConsentForms.PatientSigned";

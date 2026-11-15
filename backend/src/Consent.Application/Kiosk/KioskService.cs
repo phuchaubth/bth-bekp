@@ -46,7 +46,8 @@ public sealed class KioskService(
     ICurrentUser currentUser,
     IRequestContext requestContext,
     IOptions<HisOptions> sourceTimeouts,
-    IValidator<PatientRequest> patientValidator)
+    IValidator<PatientRequest> patientValidator,
+    FormInheritanceService inheritance)
 {
     public const string PhoneNumberField = "phoneNumber";
 
@@ -114,7 +115,35 @@ public sealed class KioskService(
             merged.PermanentAddress is not null || merged.CurrentAddress is not null,
             merged.PhoneNumber is not null,
             merged.PhoneNumber is null ? [PhoneNumberField] : [],
-            PrefilledSources(merged));
+            PrefilledSources(merged),
+            identity.Local is { } local ? await InheritableAsync(local, cancellationToken).ConfigureAwait(false) : []);
+    }
+
+    /// <summary>
+    /// Mẫu kiosk có phiếu lần trước kế thừa được (quyết định 27): phiếu đã hoàn tất gần nhất của người bệnh ở khoa của kiosk,
+    /// trong số ngày quản trị đặt. Chỉ trả tên các câu đã trả lời, không trả câu trả lời.
+    /// </summary>
+    private async Task<IReadOnlyList<KioskInheritedTemplateDto>> InheritableAsync(Patient patient, CancellationToken cancellationToken)
+    {
+        var days = await inheritance.GetDaysAsync(cancellationToken).ConfigureAwait(false);
+        var department = days > 0 ? await KioskDepartmentAsync(cancellationToken).ConfigureAwait(false) : null;
+        if (department is null)
+        {
+            return [];
+        }
+
+        var result = new List<KioskInheritedTemplateDto>();
+        foreach (var item in await LoadTemplatesAsync(department.Id, cancellationToken).ConfigureAwait(false))
+        {
+            if (await inheritance.FindAsync(patient.Id, item.Template.Id, department.Id, item.Definition, days, cancellationToken)
+                    .ConfigureAwait(false) is { } previous
+                && FormInheritanceService.AnsweredKeys(previous) is { Count: > 0 } keys)
+            {
+                result.Add(new KioskInheritedTemplateDto(item.Template.Id, keys));
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -186,13 +215,28 @@ public sealed class KioskService(
         // Bản xem trước của hồ sơ (sau khi bổ sung) để tự điền phiếu; hồ sơ thật chỉ đổi khi mọi thứ đã hợp lệ.
         var preview = Patient.Create(details.Value.ToDetails(), clock.UtcNow);
 
+        // Người bệnh chọn "Không thay đổi" so với lần trước (quyết định 27): máy chủ tự tìm lại phiếu cũ của hồ sơ có sẵn.
+        var inheritanceDays = request.KeepPrevious && identity.Local is not null
+            ? await inheritance.GetDaysAsync(cancellationToken).ConfigureAwait(false)
+            : 0;
+
         // Câu trả lời của từng mẫu: trường tự điền từ hồ sơ luôn lấy theo hồ sơ (không nhận giá trị gửi lên).
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        var filled = new List<(PreparedTemplate Prepared, string DataJson, ConsentDecision? Decision)>(prepared.Count);
+        var filled = new List<(PreparedTemplate Prepared, string DataJson, ConsentDecision? Decision, string? InheritedFrom)>(prepared.Count);
         foreach (var item in prepared)
         {
             var answer = answers.Single(a => a.TemplateId == item.Template.Id);
             var data = answer.Data?.DeepClone().AsObject() ?? [];
+            var previous = inheritanceDays > 0
+                ? await inheritance.FindAsync(identity.Local!.Id, item.Template.Id, department.Id, item.Definition, inheritanceDays, cancellationToken)
+                    .ConfigureAwait(false)
+                : null;
+            if (previous is not null)
+            {
+                // Câu kiosk không hỏi lại lấy theo phiếu cũ; câu người bệnh vừa trả lời được ưu tiên.
+                data = FormInheritanceService.Merge(previous.Data, data);
+            }
+
             foreach (var (key, value) in ConsentFormService.Prefill(item.Definition, preview))
             {
                 data[key] = value?.DeepClone();
@@ -218,7 +262,7 @@ public sealed class KioskService(
                 decision = chosen;
             }
 
-            filled.Add((item, evaluation.Data.ToJsonString(), decision));
+            filled.Add((item, evaluation.Data.ToJsonString(), decision, previous?.FormNo));
         }
 
         if (errors.Count > 0)
@@ -246,7 +290,7 @@ public sealed class KioskService(
         var snapshot = JsonSerializer.Serialize(
             new ConsentFormSnapshot(ConsentFormService.ToPatientInfo(patient), null), TemplateJson.Options);
         var created = new List<ConsentForm>(filled.Count);
-        foreach (var (item, dataJson, decision) in filled)
+        foreach (var (item, dataJson, decision, inheritedFrom) in filled)
         {
             var formNo = await numbers.NextAsync(now, cancellationToken).ConfigureAwait(false);
             var form = ConsentForm.Create(
@@ -265,6 +309,10 @@ public sealed class KioskService(
                 item.Definition.Signatures?.Statement is not null ? statement : null);
             forms.Add(form);
             created.Add(form);
+            if (inheritedFrom is not null)
+            {
+                AddAudit(AuditActions.ConsentFormInherited, nameof(ConsentForm), form.Id.ToString(), new { from = inheritedFrom });
+            }
         }
 
         List<string> formNos = [.. created.Select(f => f.FormNo)];
@@ -281,7 +329,13 @@ public sealed class KioskService(
             AuditActions.KioskSubmitted,
             nameof(Patient),
             patient.Id.ToString(),
-            new { method = identity.Method.ToString(), forms = created.Count, bundle = bundleId });
+            new
+            {
+                method = identity.Method.ToString(),
+                forms = created.Count,
+                bundle = bundleId,
+                inherited = filled.Where(f => f.InheritedFrom is not null).Select(f => f.InheritedFrom).ToList(),
+            });
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return new KioskSubmitResultDto(

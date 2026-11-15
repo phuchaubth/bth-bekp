@@ -3,6 +3,7 @@ import { Alert, App, Button, Card, Col, Descriptions, Form, Input, Row, Tag, Typ
 import { settingsApi, settingsKeys, useSystemSettings, type HospitalSettingsInput } from '../../../api/settings'
 import { PageHeader } from '../../../components/PageHeader'
 import { EncounterSettingsCard } from './EncounterSettingsCard'
+import { FormInheritanceCard } from './FormInheritanceCard'
 import { KioskSettingsCard } from './KioskSettingsCard'
 import { LogoCard } from './LogoCard'
 import { SignatureFrameCard } from './SignatureFrameCard'
@@ -95,6 +96,9 @@ export function SettingsPage() {
         </Col>
         <Col xs={24} xl={12}>
           <EncounterSettingsCard />
+        </Col>
+        <Col xs={24} xl={12}>
+          <FormInheritanceCard />
         </Col>
         <Col xs={24} xl={12}>
           <Card title="Cấu hình triển khai (chỉ đọc)" loading={settings.isPending}>

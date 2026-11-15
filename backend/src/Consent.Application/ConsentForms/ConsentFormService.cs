@@ -39,7 +39,8 @@ public sealed class ConsentFormService(
     IValidator<CancelConsentFormRequest> cancelValidator,
     IConsentPdfRenderer pdfRenderer,
     IDocumentStore documents,
-    SettingsService settingsService)
+    SettingsService settingsService,
+    FormInheritanceService inheritance)
 {
     /// <summary>Bệnh viện ở Việt Nam (UTC+7, không đổi giờ theo mùa): lọc theo ngày dùng giờ địa phương.</summary>
     public static readonly TimeSpan VietnamOffset = TimeSpan.FromHours(7);
@@ -130,6 +131,7 @@ public sealed class ConsentFormService(
 
         var definition = ConsentTemplateService.ReadDefinition(version);
         var data = Prefill(definition, patient);
+        InheritedForm? inherited = null;
         if (request.ReplacesFormId is { } replacesId)
         {
             var replaced = await LoadInScopeAsync(replacesId, cancellationToken).ConfigureAwait(false);
@@ -147,6 +149,17 @@ public sealed class ConsentFormService(
             // Lấy lại nội dung phiếu cũ (chuẩn hóa theo phiên bản mẫu hiện hành) để chỉ cần sửa chỗ sai.
             data = FormDataEvaluator.Evaluate(definition, FormDataEvaluator.ParseData(replaced.DataJson), keepHidden: true).Data;
         }
+        else
+        {
+            // Quyết định 27: người bệnh làm lại mẫu này ở khoa trong số ngày cho phép thì điền sẵn theo phiếu lần trước.
+            inherited = await inheritance.FindAsync(
+                patient.Id, template.Id, department.Id, definition,
+                await inheritance.GetDaysAsync(cancellationToken).ConfigureAwait(false), cancellationToken).ConfigureAwait(false);
+            if (inherited is not null)
+            {
+                data = FormInheritanceService.Merge(inherited.Data, data);
+            }
+        }
 
         var formNo = await numbers.NextAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
         var form = ConsentForm.Create(
@@ -154,8 +167,14 @@ public sealed class ConsentFormService(
             currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng."), clock.UtcNow,
             request.ReplacesFormId);
         forms.Add(form);
+        if (inherited is not null)
+        {
+            AddAudit(AuditActions.ConsentFormInherited, form.Id, JsonSerializer.Serialize(new { from = inherited.FormNo }));
+        }
+
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+        var detail = await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
+        return inherited is null ? detail : detail with { Notices = [.. detail.Notices, FormInheritanceService.Notice(inherited)] };
     }
 
     /// <summary>
@@ -208,16 +227,32 @@ public sealed class ConsentFormService(
 
         var bundleId = Guid.CreateVersion7();
         var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        var days = await inheritance.GetDaysAsync(cancellationToken).ConfigureAwait(false);
+        var notices = new List<string>();
         foreach (var (template, version, definition) in prepared)
         {
+            var data = Prefill(definition, patient);
+            var inherited = await inheritance.FindAsync(patient.Id, template.Id, department.Id, definition, days, cancellationToken)
+                .ConfigureAwait(false);
+            if (inherited is not null)
+            {
+                data = FormInheritanceService.Merge(inherited.Data, data);
+            }
+
             var formNo = await numbers.NextAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
-            forms.Add(ConsentForm.Create(
-                formNo, patient.Id, template.Id, version.Id, department.Id, Prefill(definition, patient).ToJsonString(),
-                userId, clock.UtcNow, bundleId: bundleId));
+            var form = ConsentForm.Create(
+                formNo, patient.Id, template.Id, version.Id, department.Id, data.ToJsonString(), userId, clock.UtcNow, bundleId: bundleId);
+            forms.Add(form);
+            if (inherited is not null)
+            {
+                AddAudit(AuditActions.ConsentFormInherited, form.Id, JsonSerializer.Serialize(new { from = inherited.FormNo }));
+                notices.Add($"{formNo}: {FormInheritanceService.Notice(inherited)}");
+            }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return await GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false);
+        var bundle = await GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false);
+        return bundle.IsFailure || notices.Count == 0 ? bundle : bundle.Value with { Notices = [.. bundle.Value.Notices, .. notices] };
     }
 
     /// <summary>

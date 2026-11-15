@@ -400,6 +400,14 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
         Task.FromResult(store.ConsentForms.Where(f => f.ReplacesFormId == formId).Select(f => new ConsentFormRef(f.Id, f.FormNo))
             .FirstOrDefault());
 
+    public Task<ConsentForm?> FindLatestCompletedAsync(
+        Guid patientId, Guid templateId, Guid departmentId, DateTimeOffset completedSinceUtc, CancellationToken cancellationToken) =>
+        Task.FromResult(store.ConsentForms
+            .Where(f => f.PatientId == patientId && f.TemplateId == templateId && f.DepartmentId == departmentId
+                && f.Status == ConsentFormStatus.Completed && f.CompletedAtUtc >= completedSinceUtc)
+            .OrderByDescending(f => f.CompletedAtUtc)
+            .FirstOrDefault());
+
     public Task<int> CountAsync(ConsentFormSearch query, CancellationToken cancellationToken) => Task.FromResult(Filter(query).Count());
 
     public async IAsyncEnumerable<ConsentFormExportRecord> StreamForExportAsync(

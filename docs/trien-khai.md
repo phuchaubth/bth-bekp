@@ -472,13 +472,14 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 2. Đăng xuất máy: **giữ biểu tượng bệnh viện ở góc trên bên trái 3 giây** → *Đăng xuất*. Thoát Chrome toàn màn hình: `Alt + F4` bằng bàn phím rời.
 3. **60 giây không chạm** thì màn hình tự xóa thông tin và về trang đầu (10 giây cuối có nhắc).
 4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng → Mở khóa* tài khoản kiosk.
-5. Phiếu từ kiosk có nhãn **"Lập tại kiosk"** trong danh sách bộ phiếu và chi tiết phiếu. Nhân viên **đối chiếu CCCD** rồi bấm *Xác nhận cả bộ*; nhãn **"tự khai"** (màu cam) thì kiểm tra kỹ giấy tờ và thông tin hành chính trước khi xác nhận.
+5. Người bệnh đã làm cùng phiếu gần đây (trong số ngày đặt ở *Cấu hình hệ thống → Kế thừa phiếu lần trước*, quyết định 27): kiosk hỏi *"Thông tin có thay đổi so với lần trước không?"*; *Không thay đổi* thì không hỏi lại các câu đã trả lời (không hiện câu trả lời cũ), Đồng ý/Không đồng ý và chữ ký vẫn làm lại.
+6. Phiếu từ kiosk có nhãn **"Lập tại kiosk"** trong danh sách bộ phiếu và chi tiết phiếu. Nhân viên **đối chiếu CCCD** rồi bấm *Xác nhận cả bộ*; nhãn **"tự khai"** (màu cam) thì kiểm tra kỹ giấy tờ và thông tin hành chính trước khi xác nhận.
 
 ## 10. Danh sách kiểm tra sau triển khai
 
 1. `https://…/health/ready` trả `Healthy`; `http://` chuyển sang `https://` (hoặc không mở).
 2. Đăng nhập `admin`, đổi mật khẩu; đã xóa `Seed__AdminPassword`.
-3. **Quản trị → Cấu hình hệ thống**: nhập cơ quan chủ quản, tên bệnh viện, địa danh; mở một phiếu nháp → PDF in đúng tên. Tải logo và **khung chữ ký** (ảnh thiết kế của bệnh viện, PNG/JPG tối đa 1 MB, nên ngang 4:3): khung ký trên điện thoại, kiosk, máy tính và khung chữ ký mẫu dùng ảnh này làm nền.
+3. **Quản trị → Cấu hình hệ thống**: nhập cơ quan chủ quản, tên bệnh viện, địa danh; mở một phiếu nháp → PDF in đúng tên. Đặt số ngày **Kế thừa phiếu lần trước** nếu dùng (0 là tắt). Tải logo và **khung chữ ký** (ảnh thiết kế của bệnh viện, PNG/JPG tối đa 1 MB, nên ngang 4:3): khung ký trên điện thoại, kiosk, máy tính và khung chữ ký mẫu dùng ảnh này làm nền.
 4. **Mẫu phiếu**: Phòng KHTH rà soát 4 mẫu phiếu của bệnh viện (được tạo ở trạng thái nháp khi không có dữ liệu demo, xem [mẫu phiếu](mau-phieu.md)) và **phát hành**.
 5. Tạo khoa/phòng và tài khoản thật; đăng nhập thử từng vai trò (menu chỉ hiện đúng chức năng).
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").

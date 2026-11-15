@@ -335,6 +335,37 @@ export function QuestionScreen({
   )
 }
 
+/**
+ * Kế thừa phiếu lần trước (quyết định 27): một câu hỏi thay cho các câu đã trả lời lần trước. Không hiện lại câu trả lời cũ
+ * (giữ kín thông tin); câu Đồng ý/Không đồng ý và chữ ký vẫn làm lại.
+ */
+export function PreviousAnswersScreen({ onKeep, onChange, onBack }: { onKeep: () => void; onChange: () => void; onBack: () => void }) {
+  return (
+    <>
+      <main className="kiosk-main">
+        <h1>Thông tin của ông/bà có thay đổi so với lần trước không?</h1>
+        <p className="kiosk-hint">
+          Ông/bà đã làm các phiếu này gần đây. Nếu không có gì thay đổi, máy dùng lại câu trả lời lần trước; ông/bà chỉ cần trả lời
+          các câu còn lại và ký.
+        </p>
+        <div className="kiosk-choices single kiosk-bottom" role="group" aria-label="Thông tin so với lần trước">
+          <button type="button" className="kiosk-choice" onClick={onKeep}>
+            Không thay đổi, giữ như lần trước
+          </button>
+          <button type="button" className="kiosk-choice" onClick={onChange}>
+            Có thay đổi, trả lời lại
+          </button>
+        </div>
+      </main>
+      <KioskFooter>
+        <button type="button" className="kiosk-btn" onClick={onBack}>
+          Quay lại
+        </button>
+      </KioskFooter>
+    </>
+  )
+}
+
 /** Ký một lần cho cả bộ: xem lại phiếu, chọn lời xác nhận (chữ đỏ đậm), ký vào khung. */
 export function SignScreen({
   config,
@@ -344,6 +375,7 @@ export function SignScreen({
   answers,
   decisions,
   prefilled,
+  kept,
   onBack,
   onDone,
 }: {
@@ -354,6 +386,8 @@ export function SignScreen({
   answers: KioskAnswers
   decisions: KioskDecisions
   prefilled: ReadonlySet<string>
+  /** Người bệnh chọn giữ như lần trước (quyết định 27): các câu đã trả lời lần trước, theo mẫu. */
+  kept?: ReadonlyMap<string, ReadonlySet<string>>
   onBack: () => void
   onDone: (result: KioskSubmitResult) => void
 }) {
@@ -377,6 +411,9 @@ export function SignScreen({
       return decision === 'Refused' ? `✗ ${signatures?.refuseLabel ?? 'Không đồng ý'}` : `✓ ${signatures?.agreeLabel ?? 'Đồng ý'}`
     }
     const answered = Object.values(answers[template.id] ?? {}).filter((v) => v !== '' && v != null).length
+    if (kept?.has(template.id)) {
+      return answered > 0 ? `✓ Đã trả lời ${answered} câu, còn lại giữ như lần trước` : '✓ Giữ như lần trước'
+    }
     return answered > 0 ? `✓ Đã trả lời ${answered} câu` : '✓ Thông tin lấy từ hồ sơ'
   }
 
@@ -397,6 +434,7 @@ export function SignScreen({
         })),
         statement,
         image: pad.current.toPngBase64(),
+        ...(kept ? { keepPrevious: true } : {}),
       })
       onDone(result)
     } catch (failure) {

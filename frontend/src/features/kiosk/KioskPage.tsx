@@ -4,13 +4,13 @@ import { useCallback, useMemo, useState } from 'react'
 import type { ConsentDecision } from '../../api/consentForms'
 import { useKioskConfig, type KioskIdentity, type KioskIdentityRequest, type KioskSubmitResult } from '../../api/kiosk'
 import { useAuth } from '../../auth/authContext'
-import { DoneScreen, QuestionScreen, SignScreen } from './AnswerScreens'
+import { DoneScreen, PreviousAnswersScreen, QuestionScreen, SignScreen } from './AnswerScreens'
 import { ConfirmScreen, LookupScreen, ManualScreen, ScanScreen, StartScreen, type IdentifyMethod } from './IdentifyScreens'
 import { KioskHeader, KioskSteps } from './KioskLayout'
 import { kioskQuestions, questionKey, type KioskAnswers, type KioskDecisions } from './kioskQuestions'
 import { kioskErrorMessage, useIdleReset } from './kioskSession'
 
-type Step = 'start' | IdentifyMethod | 'confirm' | 'questions' | 'sign' | 'done'
+type Step = 'start' | IdentifyMethod | 'confirm' | 'previous' | 'questions' | 'sign' | 'done'
 
 /** Quyết định 24: 60 giây không chạm thì tự xóa thông tin, về trang đầu. */
 const IDLE_MS = 60_000
@@ -23,10 +23,23 @@ interface Visit {
   answers: KioskAnswers
   decisions: KioskDecisions
   questionIndex: number
+  /** Quyết định 27: người bệnh chọn giữ câu trả lời của phiếu lần trước (null: chưa hỏi hoặc không có phiếu lần trước). */
+  keepPrevious: boolean | null
   result: KioskSubmitResult | null
 }
 
-const EMPTY_VISIT: Visit = { request: null, identity: null, phone: '', answers: {}, decisions: {}, questionIndex: 0, result: null }
+const EMPTY_VISIT: Visit = {
+  request: null,
+  identity: null,
+  phone: '',
+  answers: {},
+  decisions: {},
+  questionIndex: 0,
+  keepPrevious: null,
+  result: null,
+}
+
+const hasPrevious = (identity: KioskIdentity | null) => (identity?.inherited?.length ?? 0) > 0
 
 const STEP_NUMBER: Record<Step, number> = {
   start: -1,
@@ -34,6 +47,7 @@ const STEP_NUMBER: Record<Step, number> = {
   lookup: 0,
   manual: 0,
   confirm: 0,
+  previous: 1,
   questions: 1,
   sign: 2,
   done: 3,
@@ -67,21 +81,36 @@ export function KioskPage() {
     }
     return sources
   }, [visit.identity, visit.phone])
-  const questions = useMemo(() => kioskQuestions(templates, prefilled, visit.answers), [templates, prefilled, visit.answers])
+  // Câu đã trả lời ở phiếu lần trước, theo mẫu: chỉ bỏ qua khi người bệnh chọn giữ như lần trước.
+  const kept = useMemo(
+    () =>
+      new Map(
+        visit.keepPrevious ? (visit.identity?.inherited ?? []).map((t) => [t.templateId, new Set(t.keys)] as const) : [],
+      ),
+    [visit.identity, visit.keepPrevious],
+  )
+  const questions = useMemo(
+    () => kioskQuestions(templates, prefilled, visit.answers, kept),
+    [templates, prefilled, visit.answers, kept],
+  )
   const questionIndex = Math.min(visit.questionIndex, Math.max(questions.length - 1, 0))
   // Không còn câu nào phải hỏi (mọi thông tin đã có trong hồ sơ): sang thẳng bước ký.
   const shown: Step = step === 'questions' && questions.length === 0 ? 'sign' : step
 
   const identified = (request: KioskIdentityRequest, identity: KioskIdentity) => {
     setVisit({ ...EMPTY_VISIT, request, identity })
-    setStep(request.method === 'SelfReported' ? 'questions' : 'confirm')
+    setStep(request.method !== 'SelfReported' ? 'confirm' : hasPrevious(identity) ? 'previous' : 'questions')
   }
+
+  /** Bước trước câu hỏi đầu tiên: hỏi giữ như lần trước (nếu có phiếu lần trước), rồi xác nhận thông tin hay tự khai. */
+  const beforeQuestions = (): Step =>
+    hasPrevious(visit.identity) ? 'previous' : visit.request?.method === 'SelfReported' ? 'manual' : 'confirm'
 
   const backFromQuestions = () => {
     if (questionIndex > 0) {
       setVisit((v) => ({ ...v, questionIndex: questionIndex - 1 }))
     } else {
-      setStep(visit.request?.method === 'SelfReported' ? 'manual' : 'confirm')
+      setStep(beforeQuestions())
     }
   }
 
@@ -90,8 +119,13 @@ export function KioskPage() {
       setVisit((v) => ({ ...v, questionIndex: questions.length - 1 }))
       setStep('questions')
     } else {
-      setStep(visit.request?.method === 'SelfReported' ? 'manual' : 'confirm')
+      setStep(beforeQuestions())
     }
+  }
+
+  const startQuestions = (keepPrevious: boolean | null) => {
+    setVisit((v) => ({ ...v, keepPrevious, questionIndex: 0 }))
+    setStep('questions')
   }
 
   let content
@@ -125,11 +159,16 @@ export function KioskPage() {
         identity={visit.identity}
         phone={visit.phone}
         onPhoneChange={(phone) => setVisit((v) => ({ ...v, phone }))}
-        onConfirm={() => {
-          setVisit((v) => ({ ...v, questionIndex: 0 }))
-          setStep('questions')
-        }}
+        onConfirm={() => (hasPrevious(visit.identity) ? setStep('previous') : startQuestions(null))}
         onReject={restart}
+      />
+    )
+  } else if (shown === 'previous') {
+    content = (
+      <PreviousAnswersScreen
+        onKeep={() => startQuestions(true)}
+        onChange={() => startQuestions(false)}
+        onBack={() => setStep(visit.request?.method === 'SelfReported' ? 'manual' : 'confirm')}
       />
     )
   } else if (shown === 'questions') {
@@ -168,6 +207,7 @@ export function KioskPage() {
         answers={visit.answers}
         decisions={visit.decisions}
         prefilled={prefilled}
+        kept={visit.keepPrevious ? kept : undefined}
         onBack={backFromSign}
         onDone={(result) => {
           setVisit((v) => ({ ...v, result }))

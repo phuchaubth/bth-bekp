@@ -19,10 +19,16 @@ export const asksDecision = (template: KioskTemplate) => template.definition.sig
 
 /**
  * Các câu cần hỏi, theo thứ tự mẫu rồi thứ tự trường: chỉ trường đang hiện (theo câu trả lời trước đó), bỏ trường đã tự
- * điền từ hồ sơ (<paramref name="prefilled"/>) và câu hỏi tự chọn theo trường khác. Mẫu có hỏi Đồng ý/Không đồng ý thì câu
- * đó ở cuối mẫu. Tính lại sau mỗi câu trả lời vì điều kiện hiển thị có thể đổi.
+ * điền từ hồ sơ (<paramref name="prefilled"/>), câu đã trả lời ở phiếu lần trước khi người bệnh chọn giữ như lần trước
+ * (<paramref name="kept"/>, theo mẫu) và câu hỏi tự chọn theo trường khác. Mẫu có hỏi Đồng ý/Không đồng ý thì câu đó ở cuối
+ * mẫu (luôn hỏi lại). Tính lại sau mỗi câu trả lời vì điều kiện hiển thị có thể đổi.
  */
-export function kioskQuestions(templates: KioskTemplate[], prefilled: ReadonlySet<string>, answers: KioskAnswers): KioskQuestion[] {
+export function kioskQuestions(
+  templates: KioskTemplate[],
+  prefilled: ReadonlySet<string>,
+  answers: KioskAnswers,
+  kept: ReadonlyMap<string, ReadonlySet<string>> = new Map(),
+): KioskQuestion[] {
   return templates.flatMap((template, templateIndex) => {
     const values = answers[template.id] ?? {}
     const evaluation = evaluate(template.definition, values)
@@ -30,6 +36,7 @@ export function kioskQuestions(templates: KioskTemplate[], prefilled: ReadonlySe
       .flatMap((section) => section.blocks)
       .filter((block) => block.key && ASKABLE.has(block.type) && evaluation.visible.has(block.key))
       .filter((block) => !(block.prefill && prefilled.has(block.prefill)))
+      .filter((block) => !kept.get(template.id)?.has(block.key!))
       .filter((block) => !(block.valueFrom && evaluation.derived[block.key!]))
       .map((block) => ({ kind: 'field', template, templateIndex, block }))
     return asksDecision(template) ? [...fields, { kind: 'decision', template, templateIndex }] : fields

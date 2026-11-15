@@ -169,7 +169,15 @@ internal sealed class AppTestContext
         new CancelConsentFormRequestValidator(),
         Pdf,
         Documents,
-        CreateSettingsService());
+        CreateSettingsService(),
+        CreateFormInheritanceService());
+
+    public FormInheritanceService CreateFormInheritanceService() => new(
+        new InMemorySystemSettingRepository(Store), new InMemoryConsentFormRepository(Store), Store, Clock);
+
+    /// <summary>Quản trị đặt số ngày được kế thừa phiếu lần trước (quyết định 27).</summary>
+    public void SetInheritanceDays(int days) =>
+        Store.SystemSettings.Add(SystemSetting.Create(SettingKeys.FormInheritanceDays, days.ToString(System.Globalization.CultureInfo.InvariantCulture), Clock.UtcNow));
 
     public SignatureSpecimenService CreateSignatureSpecimenService() => new(CurrentUser, new InMemoryUserRepository(Store), Store, Clock);
 
@@ -264,7 +272,8 @@ internal sealed class AppTestContext
         CurrentUser,
         new FakeRequestContext(),
         Microsoft.Extensions.Options.Options.Create(HisOptions),
-        new PatientRequestValidator(Clock));
+        new PatientRequestValidator(Clock),
+        CreateFormInheritanceService());
 
     public KioskSettingsService CreateKioskSettingsService() => new(
         new InMemorySystemSettingRepository(Store),

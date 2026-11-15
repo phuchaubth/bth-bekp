@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SystemSettings } from '../../../api/settings'
@@ -275,5 +275,36 @@ describe('Gắn phiếu với lượt tiếp nhận (quyết định 25)', () =>
 
     expect(await screen.findByRole('switch', { name })).toBeDisabled()
     expect(screen.getByText('Chưa cấu hình API thông tin người bệnh nên chưa bật được.')).toBeInTheDocument()
+  })
+})
+
+describe('Kế thừa phiếu lần trước (quyết định 27)', () => {
+  it('đặt số ngày rồi lưu; 0 là tắt', async () => {
+    let days = 0
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'GET /api/v1/settings/form-inheritance': () => ({ days, updatedAtUtc: null }),
+      'PUT /api/v1/settings/form-inheritance': (call) => {
+        days = (call.body as { days: number }).days
+        return { days, updatedAtUtc: '2026-11-15T10:00:00Z' }
+      },
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    const input = await screen.findByRole('spinbutton', { name: 'Số ngày được kế thừa phiếu lần trước' })
+    expect(input).toHaveValue('0')
+    expect(screen.getByText('Chưa đặt: đang tắt.', { exact: false })).toBeInTheDocument()
+    const card = input.closest('.ant-card') as HTMLElement
+    expect(within(card).getByRole('button', { name: 'Lưu' })).toBeDisabled()
+
+    await user.clear(input)
+    await user.type(input, '30')
+    await user.click(within(card).getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText('Đã lưu: phiếu mới được điền sẵn theo phiếu lần trước trong 30 ngày.')).toBeInTheDocument()
+    expect(calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/settings/form-inheritance')!.body).toEqual({ days: 30 })
+    expect(screen.getByText(/Đổi lần cuối/)).toBeInTheDocument()
   })
 })

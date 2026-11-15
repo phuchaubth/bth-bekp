@@ -1,5 +1,6 @@
 using Consent.Api.Authorization;
 using Consent.Api.Infrastructure;
+using Consent.Application.ConsentForms;
 using Consent.Application.Kiosk;
 using Consent.Application.Settings;
 using Consent.Domain.Authorization;
@@ -12,8 +13,23 @@ namespace Consent.Api.Controllers;
 [Route("api/v1/settings")]
 [Produces("application/json")]
 public sealed class SettingsController(
-    SettingsService settings, KioskSettingsService kioskSettings, EncounterSettingsService encounterSettings) : ControllerBase
+    SettingsService settings,
+    KioskSettingsService kioskSettings,
+    EncounterSettingsService encounterSettings,
+    FormInheritanceService formInheritance) : ControllerBase
 {
+    /// <summary>Kế thừa phiếu lần trước (quyết định 27): số ngày được kế thừa (0 = tắt).</summary>
+    [HttpGet("form-inheritance")]
+    [HasPermission(Permissions.SettingsManage)]
+    public Task<FormInheritanceSettingsDto> GetFormInheritance(CancellationToken cancellationToken) =>
+        formInheritance.GetAsync(cancellationToken);
+
+    /// <summary>Đặt số ngày được kế thừa phiếu lần trước (0–365, 0 = tắt), có hiệu lực ngay cho phiếu lập sau đó.</summary>
+    [HttpPut("form-inheritance")]
+    [HasPermission(Permissions.SettingsManage)]
+    public async Task<IActionResult> UpdateFormInheritance(UpdateFormInheritanceRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await formInheritance.UpdateAsync(request, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Gắn phiếu với lượt tiếp nhận HIS khi ký hoàn tất (quyết định 25): đang bật hay tắt, bật được không.</summary>
     [HttpGet("encounters")]
     [HasPermission(Permissions.SettingsManage)]

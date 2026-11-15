@@ -17,6 +17,9 @@ import { genderLabels } from '../patients/labels'
 import { QuickPatientModal } from '../patients/QuickPatientModal'
 import { SourceLookup } from '../patients/SourceLookup'
 
+/** Lưu ý máy chủ gửi khi phiếu mới được điền sẵn theo phiếu lần trước (quyết định 27). */
+const INHERITED_NOTICE = 'Đã điền sẵn theo phiếu'
+
 const BUNDLE_SELECTION_KEY = 'consent.bundleTemplates.'
 
 /** Lựa chọn mẫu cho bộ phiếu đã nhớ trên máy này theo khoa (mặc định: chọn hết các mẫu đang phát hành). */
@@ -82,6 +85,8 @@ export function ConsentFormCreatePage() {
     onSuccess: async (bundle) => {
       await queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
       message.success(`Đã lập bộ ${bundle.forms.length} phiếu nháp cho ${bundle.patientName}.`)
+      // Quyết định 27: phiếu nào được điền sẵn theo phiếu lần trước thì nhắc kiểm tra lại (lưu ý khác của bộ hiện ở thanh bộ phiếu).
+      bundle.notices.filter((notice) => notice.includes(INHERITED_NOTICE)).forEach((notice) => message.warning(notice))
       navigate(`/phieu-dong-thuan/${bundle.forms[0].id}`)
     },
     onError: (error) => message.error(errorMessage(error)),

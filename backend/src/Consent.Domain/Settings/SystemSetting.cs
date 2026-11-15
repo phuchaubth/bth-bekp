@@ -92,11 +92,17 @@ public static class SettingKeys
     /// <summary>Kiểu ảnh của khung chữ ký: <c>image/png</c> hoặc <c>image/jpeg</c>.</summary>
     public const string SignatureFrameContentType = "SignatureFrame.ContentType";
 
+    /// <summary>
+    /// Số ngày được kế thừa phiếu lần trước (quyết định 27): người bệnh làm lại cùng mẫu ở cùng khoa trong số ngày này thì
+    /// phiếu mới điền sẵn câu trả lời của phiếu đã hoàn tất gần nhất. <c>0</c> hoặc chưa đặt là tắt.
+    /// </summary>
+    public const string FormInheritanceDays = "Forms.InheritanceDays";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
             [
                 HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled,
-                SignatureFrameStorageKey, SignatureFrameContentType,
+                SignatureFrameStorageKey, SignatureFrameContentType, FormInheritanceDays,
             ],
             StringComparer.Ordinal);
 

@@ -120,6 +120,76 @@ public sealed class KioskServiceTests
         user.Permissions.Add(Permissions.KioskUse);
     }
 
+    /// <summary>Tiếp đón lập, cho ký và xác nhận một phiếu BM02 (khám dịch vụ) của người bệnh có sẵn; trả về số phiếu.</summary>
+    private static async Task<string> CompletedBm02(Kiosk k)
+    {
+        var s = k.S;
+        var ct = CancellationToken.None;
+        s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+        var form = (await s.Service.CreateAsync(new(s.Patient.Id, k.Bm02.Id, null), ct)).Value;
+        Assert.True((await s.Service.UpdateAsync(
+            form.Id, new(new JsonObject { ["careScheme"] = "nonInsurance" }, ConsentSignerKind.Patient, null), ct)).IsSuccess);
+        Assert.True((await s.Service.SubmitAsync(form.Id, ct)).IsSuccess);
+        Assert.True((await s.Signing.StartSigningAsync(form.Id, ct)).IsSuccess);
+        var staffLogsInAgain = s.UseSigningToken();
+        var signed = await s.Signing.SignAsPatientAsync(form.Id, new(null, SignaturePng, Statement), ct);
+        staffLogsInAgain();
+        Assert.True(signed.IsSuccess, signed.Error?.Message);
+        var completed = await s.Signing.CompleteAsync(form.Id, new(SignaturePng), ct);
+        Assert.True(completed.IsSuccess, completed.Error?.Message);
+        LogInKiosk(s, k.Account);
+        return form.FormNo;
+    }
+
+    [Fact]
+    public async Task PreviousForm_IsOfferedWithoutItsAnswers_AndKeptWhenThePatientChangesNothing()
+    {
+        var k = await NewKiosk();
+        k.S.Ctx.SetInheritanceDays(30);
+        var previous = await CompletedBm02(k);
+        k.S.Ctx.Clock.Advance(TimeSpan.FromDays(1));
+
+        var identity = (await k.Service.IdentifyAsync(ByCode(), CancellationToken.None)).Value;
+        var newcomer = (await k.Service.IdentifyAsync(NewCard, CancellationToken.None)).Value;
+
+        // Chỉ báo mẫu nào có phiếu lần trước và câu nào đã trả lời, không trả câu trả lời.
+        var offered = Assert.Single(identity.Inherited!);
+        Assert.Equal(k.Bm02.Id, offered.TemplateId);
+        Assert.Equal(["careScheme"], offered.Keys);
+        Assert.Empty(newcomer.Inherited!);
+
+        // "Không thay đổi": kiosk không hỏi lại câu BM02; không giữ như lần trước thì phải trả lời.
+        var answers = k.Answers();
+        answers[0] = new(k.Bm02.Id, [], null);
+        var notKept = await k.Service.SubmitAsync(new(ByCode(), null, answers, Statement, SignaturePng), CancellationToken.None);
+        var kept = await k.Service.SubmitAsync(new(ByCode(), null, answers, Statement, SignaturePng, KeepPrevious: true), CancellationToken.None);
+
+        Assert.Equal("kiosk.incomplete", notKept.Error!.Code);
+        Assert.Contains("QT-KNGT-BM02.careScheme", notKept.Error.FieldErrors!.Keys);
+        Assert.True(kept.IsSuccess, kept.Error?.Message);
+        var bm02 = k.Store.ConsentForms.Single(f => f.Id == kept.Value.Forms[0].Id);
+        Assert.Equal("nonInsurance", JsonNode.Parse(bm02.DataJson)!["careScheme"]!.GetValue<string>());
+        // Ý kiến Đồng ý/Không đồng ý vẫn do người bệnh chọn lại (TUVAN), không lấy theo lần trước.
+        Assert.Equal(ConsentDecision.Agreed, kept.Value.Forms[2].Decision);
+        var audit = Assert.Single(k.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormInherited && a.EntityId == bm02.Id.ToString());
+        Assert.Contains(previous, audit.Details, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task NothingIsOffered_WhenInheritanceIsOff()
+    {
+        var k = await NewKiosk();
+        await CompletedBm02(k);
+
+        var identity = (await k.Service.IdentifyAsync(ByCode(), CancellationToken.None)).Value;
+        var answers = k.Answers();
+        answers[0] = new(k.Bm02.Id, [], null);
+        var kept = await k.Service.SubmitAsync(new(ByCode(), null, answers, Statement, SignaturePng, KeepPrevious: true), CancellationToken.None);
+
+        Assert.Empty(identity.Inherited!);
+        Assert.Contains("QT-KNGT-BM02.careScheme", kept.Error!.FieldErrors!.Keys);
+    }
+
     [Fact]
     public async Task Config_ListsTheKioskTemplatesInOrder_WithOneStatementForTheWholeBundle()
     {

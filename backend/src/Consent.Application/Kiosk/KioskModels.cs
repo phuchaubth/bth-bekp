@@ -73,7 +73,14 @@ public sealed record KioskIdentityDto(
     bool HasAddressOnFile,
     bool HasPhoneNumber,
     IReadOnlyList<string> MissingFields,
-    IReadOnlyList<string> PrefilledSources);
+    IReadOnlyList<string> PrefilledSources,
+    IReadOnlyList<KioskInheritedTemplateDto>? Inherited = null);
+
+/// <summary>
+/// Mẫu có phiếu lần trước kế thừa được (quyết định 27) và các câu đã trả lời ở phiếu đó. Chỉ có tên trường, không có câu trả lời:
+/// kiosk hỏi một câu "giữ như lần trước", không hiện lại thông tin cũ.
+/// </summary>
+public sealed record KioskInheritedTemplateDto(Guid TemplateId, IReadOnlyList<string> Keys);
 
 /// <summary>Câu trả lời cho một mẫu: dữ liệu các trường và Đồng ý/Không đồng ý (nếu mẫu có hỏi).</summary>
 public sealed record KioskFormAnswers(Guid TemplateId, JsonObject? Data, ConsentDecision? Decision);
@@ -82,12 +89,17 @@ public sealed record KioskFormAnswers(Guid TemplateId, JsonObject? Data, Consent
 /// Nộp và ký cả bộ trên kiosk: nhận diện lại (máy chủ không giữ trạng thái giữa các bước), thông tin bổ sung, câu trả lời
 /// của từng mẫu, một lời xác nhận và một chữ ký cho cả bộ.
 /// </summary>
+/// <param name="KeepPrevious">
+/// Người bệnh chọn "Không thay đổi" so với lần trước (quyết định 27): câu không trả lời lại được lấy theo phiếu đã hoàn tất gần
+/// nhất của cùng mẫu (máy chủ tự tìm lại, không nhận câu trả lời cũ từ kiosk).
+/// </param>
 public sealed record KioskSubmitRequest(
     KioskIdentityRequest? Identity,
     string? PhoneNumber,
     IReadOnlyList<KioskFormAnswers>? Forms,
     string? Statement,
-    string? Image);
+    string? Image,
+    bool KeepPrevious = false);
 
 public sealed record KioskSubmittedFormDto(Guid Id, string FormNo, string TemplateName, ConsentDecision? Decision);
 

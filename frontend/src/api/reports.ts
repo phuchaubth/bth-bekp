@@ -252,6 +252,7 @@ export const auditActionLabels: Record<string, string> = {
   'Patients.Viewed': 'Xem hồ sơ người bệnh',
   'Patients.LookedUp': 'Tra cứu người bệnh theo CCCD',
   'ConsentForms.Viewed': 'Xem phiếu',
+  'ConsentForms.Inherited': 'Điền sẵn theo phiếu lần trước',
   'ConsentForms.PdfViewed': 'Tải PDF phiếu',
   'ConsentForms.SigningStarted': 'Mở phiên ký',
   'ConsentForms.PatientSigned': 'Người bệnh ký',

@@ -128,6 +128,14 @@ public interface IConsentFormRepository
     Task<IReadOnlyList<EncounterFormRecord>> ListByEncountersAsync(
         Guid patientId, IReadOnlyCollection<string> encounterNos, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Phiếu đã hoàn tất gần nhất của người bệnh theo mẫu, ở khoa <paramref name="departmentId"/>, hoàn tất từ
+    /// <paramref name="completedSinceUtc"/> trở đi (kế thừa phiếu lần trước, quyết định 27). Phiếu nháp, chờ ký, đã hủy hay đã
+    /// thu hồi không tính.
+    /// </summary>
+    Task<ConsentForm?> FindLatestCompletedAsync(
+        Guid patientId, Guid templateId, Guid departmentId, DateTimeOffset completedSinceUtc, CancellationToken cancellationToken);
+
     /// <summary>Số phiếu khớp bộ lọc (bỏ qua phân trang).</summary>
     Task<int> CountAsync(ConsentFormSearch query, CancellationToken cancellationToken);
 
