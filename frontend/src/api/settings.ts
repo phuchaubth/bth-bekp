@@ -33,6 +33,8 @@ export interface SystemSettings {
   smartCaEnabled: boolean
   exportMaxRows: number
   retentionPolicy: string
+  /** Ảnh khung chữ ký (nền thiết kế của bệnh viện quanh khung ký trên màn hình); chưa có thì null. */
+  signatureFrame: LogoInfo | null
 }
 
 export const settingsApi = {
@@ -43,6 +45,10 @@ export const settingsApi = {
   uploadLogo: (image: string) => apiRequest<SystemSettings>('/api/v1/settings/logo', { method: 'PUT', body: { image } }),
   deleteLogo: () => apiRequest<SystemSettings>('/api/v1/settings/logo', { method: 'DELETE' }),
   logo: (signal?: AbortSignal) => apiBlob('/api/v1/settings/logo', signal),
+  /** Ảnh khung chữ ký PNG/JPG dạng data URL hoặc Base64. */
+  uploadSignatureFrame: (image: string) =>
+    apiRequest<SystemSettings>('/api/v1/settings/signature-frame', { method: 'PUT', body: { image } }),
+  deleteSignatureFrame: () => apiRequest<SystemSettings>('/api/v1/settings/signature-frame', { method: 'DELETE' }),
 }
 
 export const settingsKeys = { all: ['settings'] as const, encounters: ['settings', 'encounters'] as const }

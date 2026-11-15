@@ -478,7 +478,7 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 
 1. `https://…/health/ready` trả `Healthy`; `http://` chuyển sang `https://` (hoặc không mở).
 2. Đăng nhập `admin`, đổi mật khẩu; đã xóa `Seed__AdminPassword`.
-3. **Quản trị → Cấu hình hệ thống**: nhập cơ quan chủ quản, tên bệnh viện, địa danh; mở một phiếu nháp → PDF in đúng tên.
+3. **Quản trị → Cấu hình hệ thống**: nhập cơ quan chủ quản, tên bệnh viện, địa danh; mở một phiếu nháp → PDF in đúng tên. Tải logo và **khung chữ ký** (ảnh thiết kế của bệnh viện, PNG/JPG tối đa 1 MB, nên ngang 4:3): khung ký trên điện thoại, kiosk, máy tính và khung chữ ký mẫu dùng ảnh này làm nền.
 4. **Mẫu phiếu**: Phòng KHTH rà soát 4 mẫu phiếu của bệnh viện (được tạo ở trạng thái nháp khi không có dữ liệu demo, xem [mẫu phiếu](mau-phieu.md)) và **phát hành**.
 5. Tạo khoa/phòng và tài khoản thật; đăng nhập thử từng vai trò (menu chỉ hiện đúng chức năng).
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").

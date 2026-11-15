@@ -510,7 +510,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
                 AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement);
                 if (slot.ImagePng is { } image)
                 {
-                    AddSignatureImage(space.Cells[c], image);
+                    // Ảnh lưu là ảnh xám; in bằng màu mực xanh (cả chữ ký cũ vẽ mực đen).
+                    AddSignatureImage(space.Cells[c], SignatureImage.Colorize(image));
                 }
 
                 if (slot.Name is { } fullName)

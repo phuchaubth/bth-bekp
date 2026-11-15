@@ -28,6 +28,12 @@ public static class SignatureImage
     /// <summary>Điểm ảnh (đã phủ lên nền trắng) tối hơn ngưỡng này được coi là nét ký.</summary>
     private const int InkThreshold = 160;
 
+    /// <summary>
+    /// Màu mực của chữ ký khi in lên PDF và khi xem lại: xanh dương như mực bút bi, trùng màu nét vẽ trên khung ký
+    /// (<c>#1D4ED8</c>, frontend <c>SignaturePad</c>).
+    /// </summary>
+    public static readonly (byte R, byte G, byte B) InkColor = (0x1D, 0x4E, 0xD8);
+
     private const int Padding = 8;
 
     private static readonly byte[] PngSignature = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
@@ -72,8 +78,47 @@ public static class SignatureImage
         var y = Math.Max(0, top - Padding);
         var width = Math.Min(image.Width, right + Padding + 1) - x;
         var height = Math.Min(image.Height, bottom + Padding + 1) - y;
-        return new Outcome(EncodeGray(image, x, y, width, height), null, IsBlank: false);
+        return new Outcome(EncodePng(image.Pixels, image.Width, x, y, width, height, colorType: 0, bytesPerPixel: 1), null, IsBlank: false);
     }
+
+    /// <summary>
+    /// Tô màu mực cho ảnh chữ ký đã lưu (ảnh xám nền trắng, kết quả của <see cref="Normalize"/>): điểm càng tối càng gần
+    /// <see cref="InkColor"/>, nền giữ trắng. Chữ ký cũ vẽ mực đen và chữ ký mới vẽ mực xanh ra cùng một màu. Ảnh lưu trong
+    /// CSDL không đổi (chỉ tô khi in hoặc xem); ảnh không đọc được thì trả lại nguyên ảnh để việc in không bị hỏng.
+    /// </summary>
+    public static byte[] Colorize(byte[] png)
+    {
+        ArgumentNullException.ThrowIfNull(png);
+        Gray? image;
+        try
+        {
+            image = Decode(png, out _);
+        }
+        catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException)
+        {
+            return png;
+        }
+
+        if (image is null)
+        {
+            return png;
+        }
+
+        // Độ đậm của mực: nền trắng = 0; tối bằng nét mực xanh vẽ trên trình duyệt (hoặc tối hơn, như mực đen) = 255.
+        var full = 255 - Luminance(InkColor.R, InkColor.G, InkColor.B);
+        var rgb = new byte[image.Pixels.Length * 3];
+        for (var i = 0; i < image.Pixels.Length; i++)
+        {
+            var strength = Math.Min(255, (255 - image.Pixels[i]) * 255 / full);
+            rgb[i * 3] = Blend(InkColor.R, strength);
+            rgb[(i * 3) + 1] = Blend(InkColor.G, strength);
+            rgb[(i * 3) + 2] = Blend(InkColor.B, strength);
+        }
+
+        return EncodePng(rgb, image.Width, 0, 0, image.Width, image.Height, colorType: 2, bytesPerPixel: 3);
+    }
+
+    private static byte Blend(byte ink, int strength) => (byte)(255 - ((((255 - ink) * strength) + 127) / 255));
 
     private static Outcome Invalid(string error) => new(null, error, IsBlank: false);
 
@@ -259,7 +304,11 @@ public static class SignatureImage
     }
 
     /// <summary>Mã hóa vùng ảnh thành PNG xám 8 bit (chỉ gồm IHDR, IDAT, IEND).</summary>
-    private static byte[] EncodeGray(Gray image, int x, int y, int width, int height)
+    /// <summary>
+    /// Mã hóa PNG 8 bit vùng (x, y, width, height) của ảnh rộng <paramref name="sourceWidth"/> điểm ảnh: xám
+    /// (<paramref name="colorType"/> 0, 1 byte/điểm) hoặc màu RGB (2, 3 byte/điểm). Không kèm dữ liệu nào khác ngoài điểm ảnh.
+    /// </summary>
+    private static byte[] EncodePng(byte[] pixels, int sourceWidth, int x, int y, int width, int height, byte colorType, int bytesPerPixel)
     {
         using var compressed = new MemoryStream();
         using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, leaveOpen: true))
@@ -267,7 +316,7 @@ public static class SignatureImage
             for (var row = 0; row < height; row++)
             {
                 zlib.WriteByte(0);
-                zlib.Write(image.Pixels, ((y + row) * image.Width) + x, width);
+                zlib.Write(pixels, (((y + row) * sourceWidth) + x) * bytesPerPixel, width * bytesPerPixel);
             }
         }
 
@@ -275,6 +324,7 @@ public static class SignatureImage
         BinaryPrimitives.WriteInt32BigEndian(header, width);
         BinaryPrimitives.WriteInt32BigEndian(header.AsSpan(4), height);
         header[8] = 8;
+        header[9] = colorType;
 
         using var output = new MemoryStream();
         output.Write(PngSignature);

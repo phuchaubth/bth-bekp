@@ -20,6 +20,7 @@ import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { useSignatureSpecimen } from '../../api/account'
 import { SpecimenImage } from '../account/SignatureSpecimen'
+import { SignatureFrameBox } from '../signing/SignatureFrame'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
 import { EncounterPicker } from './EncounterPicker'
@@ -239,19 +240,9 @@ export function StaffSignModal({
       ) : useSpecimen ? (
         <Flex vertical gap={8}>
           <Typography.Text strong>Ký bằng chữ ký mẫu của bạn:</Typography.Text>
-          <div
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              minHeight: 120,
-              padding: 12,
-              background: '#ffffff',
-              border: '1px solid #e1eaeb',
-              borderRadius: 10,
-            }}
-          >
-            <SpecimenImage height={96} />
-          </div>
+          <SignatureFrameBox>
+            <SpecimenImage fill />
+          </SignatureFrameBox>
           <Typography.Text type="secondary">
             {missingEncounter ? 'Chọn lượt tiếp nhận ở trên, rồi bấm' : 'Bấm'} “{okText}” để ký bằng chữ ký mẫu.{' '}
             <Button type="link" style={{ padding: 0, height: 'auto' }} onClick={() => setDrawInstead(true)}>

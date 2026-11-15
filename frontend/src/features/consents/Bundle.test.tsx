@@ -166,7 +166,7 @@ const future = () => new Date(Date.now() + 30 * 60_000).toISOString()
 
 /** jsdom không vẽ được canvas: giả lập phần vẽ và ảnh xuất ra. */
 function mockCanvas() {
-  const context = { setTransform: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn() }
+  const context = { setTransform: vi.fn(), fillRect: vi.fn(), clearRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn() }
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never)
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,QU5IX0NIVV9LWQ==')
   vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue(

@@ -83,9 +83,21 @@ public static class SettingKeys
     /// </summary>
     public const string EncountersEnabled = "Encounters.Enabled";
 
+    /// <summary>
+    /// Khóa lưu trữ của ảnh khung chữ ký: ảnh nền thiết kế của bệnh viện hiện quanh khung ký trên màn hình (điện thoại, kiosk,
+    /// máy tính). Chỉ để hiển thị, không in vào ảnh chữ ký hay PDF. File nằm trong kho tài liệu.
+    /// </summary>
+    public const string SignatureFrameStorageKey = "SignatureFrame.StorageKey";
+
+    /// <summary>Kiểu ảnh của khung chữ ký: <c>image/png</c> hoặc <c>image/jpeg</c>.</summary>
+    public const string SignatureFrameContentType = "SignatureFrame.ContentType";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
-            [HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled],
+            [
+                HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled,
+                SignatureFrameStorageKey, SignatureFrameContentType,
+            ],
             StringComparer.Ordinal);
 
     public static bool IsDefined(string key) => key is not null && All.Contains(key);

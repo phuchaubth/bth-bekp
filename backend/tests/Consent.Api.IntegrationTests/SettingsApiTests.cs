@@ -141,6 +141,48 @@ public sealed class SettingsApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SignatureFrame_IsManagedByAdministrators_AndServedWithoutLogin()
+    {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;
+        // Khung giả lập (PNG 64 × 64 vẽ bằng máy, không phải khung thật của bệnh viện).
+        const string Png = "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABq0lEQVR4nO1aQRLCMAhUx3949gX+/+gLPPuSeogzZhJCIJAAtXt1ZHdDk9LAedu2U2RcrAVIcVWP+LzdkV8f75cu3VnlEcJFt6BiRmRgTHcNiZNBA1rSc4zZYBvoSsd1CP9eg2egRT+2eCrRGAZAPvlGFIYlGZgkXYWib6AOrX6WS7g6BrgRiacTEoTLiJUSK9ceocAXhVELLVA/QNQ0UPheph6kQ5IAG7BVD5K2PAAGPKgHqUEPnT1gqJ4ooDQwo0pTRC0Py4D58icw3gPOlz+hENnMgJPlT0DEhP+o/xnIU+Nq+RNySbnUHWUgKPr3QjOOJlZM0jHqfAMkgNsg/CN0GLDGYcAahwFrHAas8TXQqvVcASwXwmegX8yxSiP53SgX4TPwM+B8G7Tq5R1loICrJFAvd91+yuQoRPIaHCbgNTicJ6GW19nE5knoCgAM0Lsjs0HpVMAZ8OCB2GehXu4u9kDvEjFeZMs8sIh4DY4FHjQb3eCfp3rQHzVoxaWEZmHisIecY2rYfxp4wlmJ9MYjZ3QdA1g09Jcj8NhlgaiDryBCjh4bIvxH/Qc4GQtKXacLhQAAAABJRU5ErkJggg==";
+        using var anonymous = _factory.CreateHttpsClient();
+
+        var before = await anonymous.GetAsync("/api/v1/branding/signature-frame");
+        var (nurseStatus, _) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/settings/signature-frame", nurse, new { image = Png });
+        var (savedStatus, saved) = await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/settings/signature-frame", admin, new { image = "data:image/png;base64," + Png });
+
+        Assert.Equal(HttpStatusCode.NotFound, before.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, nurseStatus);
+        Assert.Equal(HttpStatusCode.OK, savedStatus);
+        Assert.Equal(64, saved.GetProperty("signatureFrame").GetProperty("width").GetInt32());
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, saved.GetProperty("logo").ValueKind);
+
+        // Điện thoại đang ở chế độ ký và kiosk tải được khung mà không cần đăng nhập.
+        using (var info = await anonymous.GetAsync("/api/v1/branding/signature-frame"))
+        {
+            Assert.Equal(HttpStatusCode.OK, info.StatusCode);
+            using var json = System.Text.Json.JsonDocument.Parse(await info.Content.ReadAsStringAsync());
+            Assert.Equal(64, json.RootElement.GetProperty("width").GetInt32());
+            Assert.Equal(64, json.RootElement.GetProperty("height").GetInt32());
+        }
+
+        using (var image = await anonymous.GetAsync("/api/v1/branding/signature-frame/image?v=1"))
+        {
+            Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+            Assert.Equal("image/png", image.Content.Headers.ContentType!.MediaType);
+            Assert.Equal(Convert.FromBase64String(Png), await image.Content.ReadAsByteArrayAsync());
+        }
+
+        var (deletedStatus, deleted) = await _client.SendJsonAsync(HttpMethod.Delete, "/api/v1/settings/signature-frame", admin);
+        Assert.Equal(HttpStatusCode.OK, deletedStatus);
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, deleted.GetProperty("signatureFrame").ValueKind);
+        Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync("/api/v1/branding/signature-frame/image")).StatusCode);
+    }
+
+    [Fact]
     public async Task SignatureSpecimen_IsPerAccount_StoredEncrypted_AndRemovable()
     {
         var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;

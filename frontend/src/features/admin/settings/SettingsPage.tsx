@@ -5,6 +5,7 @@ import { PageHeader } from '../../../components/PageHeader'
 import { EncounterSettingsCard } from './EncounterSettingsCard'
 import { KioskSettingsCard } from './KioskSettingsCard'
 import { LogoCard } from './LogoCard'
+import { SignatureFrameCard } from './SignatureFrameCard'
 import { applyServerFieldErrors, errorMessage } from '../../../utils/formErrors'
 import { formatDateTime } from '../../../utils/format'
 
@@ -82,6 +83,11 @@ export function SettingsPage() {
         {settings.data && (
           <Col xs={24} xl={12}>
             <LogoCard settings={settings.data} />
+          </Col>
+        )}
+        {settings.data && (
+          <Col xs={24} xl={12}>
+            <SignatureFrameCard settings={settings.data} />
           </Col>
         )}
         <Col xs={24} xl={12}>

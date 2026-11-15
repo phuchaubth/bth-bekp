@@ -4,10 +4,14 @@ import { Alert, App, Button, Flex, Modal, Popconfirm, Spin, Typography } from 'a
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { accountApi, accountKeys, useSignatureSpecimen } from '../../api/account'
 import { errorMessage } from '../../utils/formErrors'
+import { SignatureFrameBox } from '../signing/SignatureFrame'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 
-/** Ảnh chữ ký mẫu của mình (tải có xác thực, hiển thị qua blob URL). Chưa có thì hiện `empty`. */
-export function SpecimenImage({ height = 72, empty }: { height?: number; empty?: React.ReactNode }) {
+/**
+ * Ảnh chữ ký mẫu của mình (tải có xác thực, hiển thị qua blob URL), mực xanh như khi in. Chưa có thì hiện `empty`. `fill`: phủ
+ * vừa vùng chứa (trong khung chữ ký), giữ tỉ lệ.
+ */
+export function SpecimenImage({ height = 72, empty, fill = false }: { height?: number; empty?: React.ReactNode; fill?: boolean }) {
   const specimen = useSignatureSpecimen()
   const url = useMemo(() => (specimen.data ? URL.createObjectURL(specimen.data) : null), [specimen.data])
   useEffect(() => () => {
@@ -16,7 +20,13 @@ export function SpecimenImage({ height = 72, empty }: { height?: number; empty?:
 
   if (specimen.isPending) return <Spin size="small" />
   if (!url) return <>{empty ?? null}</>
-  return <img src={url} alt="Chữ ký mẫu của bạn" style={{ height, maxWidth: '100%', objectFit: 'contain' }} />
+  return (
+    <img
+      src={url}
+      alt="Chữ ký mẫu của bạn"
+      style={fill ? { width: '100%', height: '100%', objectFit: 'contain' } : { height, maxWidth: '100%', objectFit: 'contain' }}
+    />
+  )
 }
 
 /** Thẻ "Chữ ký mẫu" ở trang Tài khoản: ký trong khung để lưu hoặc thay, xóa chữ ký mẫu. */
@@ -39,19 +49,9 @@ export function SignatureSpecimenCard() {
       <Typography.Paragraph type="secondary" style={{ marginBottom: 0 }}>
         Chữ ký mẫu hiện bên cạnh khung ký mỗi khi bạn ký xác nhận phiếu, để bạn và người kiểm tra đối chiếu chữ ký.
       </Typography.Paragraph>
-      <div
-        style={{
-          minHeight: 96,
-          border: '1px dashed #c7d5d6',
-          borderRadius: 10,
-          display: 'grid',
-          placeItems: 'center',
-          padding: 12,
-          background: '#ffffff',
-        }}
-      >
-        <SpecimenImage height={88} empty={<Typography.Text type="secondary">Chưa có chữ ký mẫu</Typography.Text>} />
-      </div>
+      <SignatureFrameBox plainHeight={112}>
+        <SpecimenImage fill empty={<Typography.Text type="secondary">Chưa có chữ ký mẫu</Typography.Text>} />
+      </SignatureFrameBox>
       {specimen.isError && <Alert type="error" showIcon title={errorMessage(specimen.error)} />}
       <Flex gap={8} wrap>
         <Button type="primary" icon={<EditOutlined />} onClick={() => setDrawing(true)}>

@@ -64,6 +64,21 @@ public sealed class SettingsController(
     public async Task<IActionResult> UploadLogo(UploadLogoRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await settings.UploadLogoAsync(request, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>
+    /// Tải lên hoặc thay ảnh khung chữ ký (PNG/JPG, tối đa 1 MB): nền thiết kế của bệnh viện quanh khung ký trên màn hình.
+    /// Xem ảnh đang dùng ở <c>GET /api/v1/branding/signature-frame</c>.
+    /// </summary>
+    [HttpPut("signature-frame")]
+    [HasPermission(Permissions.SettingsManage)]
+    public async Task<IActionResult> UploadSignatureFrame(UploadSignatureFrameRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await settings.UploadSignatureFrameAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Bỏ ảnh khung chữ ký: khung ký trở lại dạng mặc định.</summary>
+    [HttpDelete("signature-frame")]
+    [HasPermission(Permissions.SettingsManage)]
+    public Task<SystemSettingsDto> DeleteSignatureFrame(CancellationToken cancellationToken) =>
+        settings.DeleteSignatureFrameAsync(cancellationToken);
+
     /// <summary>Bỏ logo: phiếu in sau đó không có logo.</summary>
     [HttpDelete("logo")]
     [HasPermission(Permissions.SettingsManage)]

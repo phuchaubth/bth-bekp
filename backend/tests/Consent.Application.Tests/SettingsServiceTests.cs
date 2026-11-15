@@ -81,6 +81,47 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public async Task SignatureFrame_IsStoredSeparatelyFromTheLogo_ReportsItsSize_AndCanBeRemoved()
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreateSettingsService();
+        await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
+
+        var none = await service.GetSignatureFrameInfoAsync(CancellationToken.None);
+        var uploaded = await service.UploadSignatureFrameAsync(new(TestLogos.Jpeg40x32), CancellationToken.None);
+        var info = await service.GetSignatureFrameInfoAsync(CancellationToken.None);
+        var image = await service.ResolveSignatureFrameAsync(CancellationToken.None);
+        var removed = await service.DeleteSignatureFrameAsync(CancellationToken.None);
+
+        Assert.Null(none);
+        Assert.True(uploaded.IsSuccess, uploaded.Error?.Message);
+        Assert.Equal(new LogoInfoDto("image/jpeg", 40, 32, ctx.Clock.UtcNow), uploaded.Value.SignatureFrame);
+        Assert.Equal(uploaded.Value.SignatureFrame, info);
+        Assert.Equal(Convert.FromBase64String(TestLogos.Jpeg40x32), image!.Content);
+        // Logo không bị ảnh khung thay thế, và bỏ khung không bỏ logo.
+        Assert.Equal("image/png", uploaded.Value.Logo!.ContentType);
+        Assert.Null(removed.SignatureFrame);
+        Assert.NotNull(removed.Logo);
+        Assert.Null(await service.GetSignatureFrameInfoAsync(CancellationToken.None));
+        Assert.DoesNotContain(ctx.Store.SystemSettings, s => s.Key.StartsWith("SignatureFrame.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SignatureFrame_RejectsFilesThatAreNotPngOrJpeg_NamingTheFrameInTheMessage()
+    {
+        var ctx = new AppTestContext();
+        var service = ctx.CreateSettingsService();
+
+        var svg = await service.UploadSignatureFrameAsync(new("PHN2Zz48L3N2Zz4="), CancellationToken.None);
+        var empty = await service.UploadSignatureFrameAsync(new(" "), CancellationToken.None);
+
+        Assert.Equal("Ảnh khung chữ ký phải là ảnh PNG hoặc JPG.", svg.Error!.FieldErrors!["image"].Single());
+        Assert.Equal("Vui lòng chọn file ảnh khung chữ ký.", empty.Error!.FieldErrors!["image"].Single());
+        Assert.Empty(ctx.Documents.Files);
+        Assert.Null(await service.GetSignatureFrameInfoAsync(CancellationToken.None));
+    }
+
+    [Fact]
     public async Task Update_TrimsValues_OnlyTouchesChangedKeys_AndRejectsEmptyOrTooLong()
     {
         var ctx = new AppTestContext();

@@ -64,7 +64,7 @@ Ví dụ lỗi kiểm tra dữ liệu:
 | POST | `/api/v1/auth/logout` | Không cần đăng nhập (dùng cookie) · cần `X-Requested-With` | Thu hồi refresh token hiện tại, xóa cookie → `204` |
 | GET | `/api/v1/auth/me` | Đã đăng nhập | Thông tin người dùng hiện tại, vai trò, quyền |
 | POST | `/api/v1/auth/change-password` | Đã đăng nhập · 10 lần/phút/IP | Đổi mật khẩu; thu hồi các phiên khác; trả phiên mới |
-| GET | `/api/v1/account/signature-specimen` | Đã đăng nhập | Ảnh PNG chữ ký mẫu **của chính mình** (`Cache-Control: no-store`); chưa có → `404` |
+| GET | `/api/v1/account/signature-specimen` | Đã đăng nhập | Ảnh PNG chữ ký mẫu **của chính mình**, mực xanh như khi in lên phiếu (`Cache-Control: no-store`); chưa có → `404` |
 | PUT | `/api/v1/account/signature-specimen` | Đã đăng nhập | `{ image }` PNG Base64 vẽ trong khung ký; kiểm tra và chuẩn hóa như chữ ký trên phiếu (thiếu/sai → `400` trường `image`, khung trống → `422 consent_forms.signature_blank`); lưu mã hóa (cột `Users.SignatureSpecimenEncrypted`) → `{ updatedAtUtc }`. `auth/me` có `hasSignatureSpecimen`. Khi xác nhận phiếu (`confirm-step`, `complete`) gửi `{ "useSpecimen": true }` thay cho `image` để ký bằng chữ ký mẫu; chưa có chữ ký mẫu → `400` trường `image`. Nhật ký ghi nguồn chữ ký (`signature`: `specimen`/`drawn`) |
 | DELETE | `/api/v1/account/signature-specimen` | Đã đăng nhập | Xóa chữ ký mẫu → `204` |
 
@@ -472,12 +472,21 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 | GET | `/api/v1/settings/logo` | `settings.manage` | Ảnh logo đang dùng (`image/png` hoặc `image/jpeg`, `Cache-Control: no-store`); chưa có → `404` |
 | PUT | `/api/v1/settings/logo` | `settings.manage` | `{ image }`: PNG/JPG dạng Base64 (có thể kèm `data:image/...;base64,`), tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; nhận dạng theo nội dung file, không nhận SVG/GIF (`400` ở trường `image`). File lưu trong kho tài liệu (mã hóa), khóa lưu trong `SystemSettings` (`Logo.*`, ghi audit). In ở góc trên bên trái phiếu (khoảng 18 × 18 mm) cho PDF tạo sau khi lưu; PDF đã ký giữ nguyên. File hỏng không đọc được thì phiếu in không có logo |
 | DELETE | `/api/v1/settings/logo` | `settings.manage` | Bỏ logo; trả cấu hình mới (`logo: null`) |
+| PUT | `/api/v1/settings/signature-frame` | `settings.manage` | `{ image }`: ảnh **khung chữ ký** (quyết định 26), cùng quy tắc với logo (PNG/JPG, tối đa 1 MB, mỗi chiều 32–4000 điểm ảnh; lỗi ở trường `image`). Lưu riêng với logo (khóa `SignatureFrame.*`, ghi audit). Trả cấu hình mới, có `signatureFrame: { contentType, width, height, updatedAtUtc }`. Chỉ để hiển thị quanh khung ký trên màn hình; ảnh chữ ký và PDF không có khung |
+| DELETE | `/api/v1/settings/signature-frame` | `settings.manage` | Bỏ khung chữ ký (khung ký trở lại nền trắng, viền nét đứt); trả cấu hình mới (`signatureFrame: null`) |
 | GET | `/api/v1/settings/kiosk` | `settings.manage` | Mẫu dùng trên kiosk theo thứ tự làm: `{ templates: [{ id, code, name, problems[] }], updatedAtUtc }` (`problems`: lý do mẫu đã chọn nay không dùng được, ví dụ đã ngừng) |
 | GET | `/api/v1/settings/encounters` | `settings.manage` | Gắn phiếu với lượt tiếp nhận HIS (quyết định 25): `{ enabled, available, updatedAtUtc }`. `enabled`: đang bắt buộc chọn lượt khi ký hoàn tất; `available`: đã cấu hình API thông tin người bệnh (`PatientSource:Provider = Api`) nên bật được |
 | PUT | `/api/v1/settings/encounters` | `settings.manage` | `{ "enabled": true \| false }`: bật/tắt, **có hiệu lực ngay** (không cần khởi động lại). HIS lỗi thì tắt để nhân viên hoàn tất tiếp. Bật khi chưa cấu hình API → `422 settings.encounters_unavailable`. Lưu khóa `Encounters.Enabled`, ghi audit |
 | PUT | `/api/v1/settings/kiosk` | `settings.manage` | `{ templateIds: [...] }` theo thứ tự làm, tối đa 10, không trùng; chỉ nhận mẫu đang dùng, đã phát hành, không có trường bảng nhiều dòng/ngày giờ (`400` ở `templateIds`). Danh sách rỗng: bỏ cấu hình. Lưu khóa `Kiosk.TemplateCodes` (mã mẫu), ghi audit |
 
-Mọi phản hồi của API có `Cache-Control: no-store`; thân yêu cầu lớn hơn 2 MB bị từ chối.
+Mọi phản hồi của API có `Cache-Control: no-store` (trừ ảnh khung chữ ký bên dưới, không có dữ liệu cá nhân); thân yêu cầu lớn hơn 2 MB bị từ chối.
+
+**Ảnh nhận diện (`/api/v1/branding`)**, không cần đăng nhập: điện thoại đang ở chế độ ký (token phiên ký) và kiosk cũng phải tải được. Chỉ trả ảnh do quản trị tải lên.
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/branding/signature-frame` | Không cần đăng nhập | Khung chữ ký đang dùng `{ contentType, width, height, updatedAtUtc }` (`Cache-Control: no-cache`); chưa có → `404`, khung ký hiện như mặc định |
+| GET | `/api/v1/branding/signature-frame/image` | Không cần đăng nhập | Ảnh khung (`image/png` hoặc `image/jpeg`). Giao diện gọi kèm `?v=<updatedAtUtc>` nên ảnh được lưu đệm một ngày (`Cache-Control: public, max-age=86400`); chưa có → `404` |
 
 ---
 

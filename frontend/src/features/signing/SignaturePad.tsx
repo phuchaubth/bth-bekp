@@ -1,9 +1,11 @@
 import { Button, Flex, Grid, Typography } from 'antd'
 import { useCallback, useEffect, useImperativeHandle, useRef, type PointerEvent, type Ref } from 'react'
+import { useSignatureFrame } from '../../api/branding'
+import { frameStyle, SIGNATURE_INK, strokeWidth } from './signatureStyle'
 
 export interface SignaturePadHandle {
   clear: () => void
-  /** Ảnh PNG nền trắng của khung ký (Base64, không kèm tiền tố data:). */
+  /** Ảnh PNG nét ký trên nền trong suốt, không kèm khung (Base64, không kèm tiền tố data:); máy chủ phủ lên nền trắng. */
   toPngBase64: () => string
 }
 
@@ -20,8 +22,6 @@ type Point = { x: number; y: number }
 
 /** Tổng độ dài nét (điểm ảnh CSS) tối thiểu để coi là đã ký; máy chủ vẫn kiểm tra lại. */
 const MIN_INK_LENGTH = 40
-const LINE_WIDTH = 2.5
-const INK = '#111827'
 
 /**
  * Khung ký tay dùng Pointer Events: ký được bằng ngón tay, bút cảm ứng hoặc chuột. Nét ký chỉ nằm trong bộ nhớ để vẽ lại
@@ -32,6 +32,8 @@ export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }
   // Điện thoại cầm dọc: khung ký cao hơn (2:1 thay vì 3:1) để đủ chỗ ký bằng ngón tay, và gợi ý xoay ngang.
   const screens = Grid.useBreakpoint()
   const narrow = screens.sm === false
+  // Khung chữ ký của bệnh viện (nếu quản trị đã tải lên): ảnh nền phía sau nét ký, không nằm trong ảnh gửi đi.
+  const frame = useSignatureFrame().data ?? null
   // Tọa độ chuẩn hóa 0..1 theo kích thước khung, để vẽ lại đúng khi khung đổi kích thước.
   const strokes = useRef<Point[][]>([])
   const drawing = useRef(false)
@@ -52,12 +54,12 @@ export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }
       canvas.height = height
     }
     context.setTransform(1, 0, 0, 1, 0, 0)
-    context.fillStyle = '#ffffff'
-    context.fillRect(0, 0, width, height)
+    // Nền trong suốt: thấy khung phía sau, và ảnh gửi đi chỉ có nét ký (máy chủ phủ lên nền trắng).
+    context.clearRect(0, 0, width, height)
     context.lineCap = 'round'
     context.lineJoin = 'round'
-    context.lineWidth = LINE_WIDTH * ratio
-    context.strokeStyle = INK
+    context.lineWidth = strokeWidth(rect.width) * ratio
+    context.strokeStyle = SIGNATURE_INK
     for (const stroke of strokes.current) {
       context.beginPath()
       stroke.forEach((point, index) => {
@@ -157,11 +159,15 @@ export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }
         onPointerCancel={onPointerUp}
         onPointerLeave={onPointerUp}
         style={{
-          width: '100%',
-          aspectRatio: aspectRatio ?? (narrow ? '2 / 1' : '3 / 1'),
-          border: '2px dashed #94a3b8',
-          borderRadius: 8,
-          background: '#ffffff',
+          ...(frame
+            ? { ...frameStyle(frame), display: 'block' }
+            : {
+                width: '100%',
+                aspectRatio: aspectRatio ?? (narrow ? '2 / 1' : '3 / 1'),
+                border: '2px dashed #94a3b8',
+                borderRadius: 8,
+                background: '#ffffff',
+              }),
           // Không cuộn trang hay phóng to khi đang ký bằng ngón tay.
           touchAction: 'none',
           cursor: disabled ? 'not-allowed' : 'crosshair',
@@ -169,7 +175,8 @@ export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }
       />
       <Flex justify="space-between" align="center" wrap gap={8}>
         <Typography.Text type="secondary">
-          Ký trong khung trên bằng ngón tay hoặc bút cảm ứng.{narrow ? ' Có thể xoay ngang điện thoại để khung ký rộng hơn.' : ''}
+          {frame ? 'Ký vào khoảng trống trong khung' : 'Ký trong khung trên'} bằng ngón tay hoặc bút cảm ứng.
+          {narrow ? ' Có thể xoay ngang điện thoại để khung ký rộng hơn.' : ''}
         </Typography.Text>
         <Button onClick={clear} disabled={disabled}>
           Ký lại

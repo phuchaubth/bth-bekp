@@ -20,12 +20,15 @@ public sealed record LogoImage(byte[] Content, string ContentType, int Width, in
     /// <summary>
     /// Kiểm tra ảnh tải lên (Base64, có thể kèm tiền tố <c>data:image/...;base64,</c>). Chỉ nhận PNG/JPEG nhận ra được từ
     /// nội dung file (không tin phần mở rộng hay kiểu do trình duyệt gửi); không nhận SVG hay định dạng khác.
+    /// <paramref name="noun"/> là tên ảnh trong thông báo lỗi (viết thường), ví dụ "logo", "ảnh khung chữ ký".
     /// </summary>
-    public static Result<LogoImage> Parse(string? base64)
+    public static Result<LogoImage> Parse(string? base64, string noun = "logo")
     {
+        ArgumentException.ThrowIfNullOrEmpty(noun);
+        var subject = char.ToUpperInvariant(noun[0]) + noun[1..];
         if (string.IsNullOrWhiteSpace(base64))
         {
-            return Invalid("Vui lòng chọn file logo.");
+            return Invalid($"Vui lòng chọn file {noun}.");
         }
 
         var data = base64.Trim();
@@ -37,7 +40,7 @@ public sealed record LogoImage(byte[] Content, string ContentType, int Width, in
 
         if (data.Length > (MaxBytes + 2) / 3 * 4 + 4)
         {
-            return Invalid("Logo tối đa 1 MB.");
+            return Invalid($"{subject} tối đa 1 MB.");
         }
 
         byte[] content;
@@ -47,22 +50,22 @@ public sealed record LogoImage(byte[] Content, string ContentType, int Width, in
         }
         catch (FormatException)
         {
-            return Invalid("File logo không hợp lệ.");
+            return Invalid($"File {noun} không hợp lệ.");
         }
 
         if (content.Length > MaxBytes)
         {
-            return Invalid("Logo tối đa 1 MB.");
+            return Invalid($"{subject} tối đa 1 MB.");
         }
 
         if (Read(content) is not { } image)
         {
-            return Invalid("Logo phải là ảnh PNG hoặc JPG.");
+            return Invalid($"{subject} phải là ảnh PNG hoặc JPG.");
         }
 
         if (image.Width < MinSide || image.Height < MinSide || image.Width > MaxSide || image.Height > MaxSide)
         {
-            return Invalid($"Kích thước logo phải từ {MinSide} đến {MaxSide} điểm ảnh mỗi chiều.");
+            return Invalid($"Kích thước {noun} phải từ {MinSide} đến {MaxSide} điểm ảnh mỗi chiều.");
         }
 
         return image;

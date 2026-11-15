@@ -13,6 +13,7 @@ const settings: SystemSettings = {
   smartCaEnabled: false,
   exportMaxRows: 100000,
   retentionPolicy: 'Theo thời hạn lưu trữ hồ sơ bệnh án; hệ thống không tự động xóa phiếu.',
+  signatureFrame: null,
 }
 
 describe('Cấu hình hệ thống (màn hình 19)', () => {
@@ -123,6 +124,51 @@ describe('Cấu hình hệ thống (màn hình 19)', () => {
 
       expect(await screen.findByText('Chưa có logo')).toBeInTheDocument()
       expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/settings/logo')).toBe(true)
+    })
+  })
+
+  describe('khung chữ ký', () => {
+    const frame = { contentType: 'image/png' as const, width: 1440, height: 1080, updatedAtUtc: '2026-11-15T09:00:00Z' }
+    const withFrame: SystemSettings = { ...settings, signatureFrame: frame }
+
+    it('tải ảnh khung lên: gửi data URL, hiện ảnh khung đang dùng kèm kích thước', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': settings,
+        'PUT /api/v1/settings/signature-frame': () => json(withFrame),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup()
+
+      expect(await screen.findByText(/Chưa có khung/)).toBeInTheDocument()
+      const file = new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'khung-gia-lap.png', { type: 'image/png' })
+      await user.upload(screen.getByLabelText('Chọn file khung chữ ký'), file)
+
+      const image = await screen.findByRole('img', { name: 'Khung chữ ký đang dùng' })
+      expect(image.getAttribute('src')).toBe(`/api/v1/branding/signature-frame/image?v=${encodeURIComponent(frame.updatedAtUtc)}`)
+      expect(screen.getByText(/PNG 1440 × 1080 điểm ảnh/)).toBeInTheDocument()
+      const put = calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/settings/signature-frame')!
+      expect((put.body as { image: string }).image).toMatch(/^data:image\/png;base64,/)
+    })
+
+    it('chặn file không phải PNG/JPG; bỏ khung sau khi xác nhận', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': withFrame,
+        'DELETE /api/v1/settings/signature-frame': () => json(settings),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup({ applyAccept: false })
+
+      await screen.findByRole('img', { name: 'Khung chữ ký đang dùng' })
+      await user.upload(screen.getByLabelText('Chọn file khung chữ ký'), new File(['GIF89a'], 'khung.gif', { type: 'image/gif' }))
+      expect(await screen.findByText('Ảnh khung chữ ký phải là ảnh PNG hoặc JPG.')).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'PUT')).toBe(false)
+
+      await user.click(screen.getByRole('button', { name: /Bỏ khung/ }))
+      await user.click(await screen.findByRole('button', { name: 'Bỏ khung' }))
+      expect(await screen.findByText(/Chưa có khung/)).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/settings/signature-frame')).toBe(true)
     })
   })
 

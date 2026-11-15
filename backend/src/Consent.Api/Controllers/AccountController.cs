@@ -1,5 +1,6 @@
 using Consent.Api.Infrastructure;
 using Consent.Application.Auth;
+using Consent.Application.ConsentForms;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,14 +12,14 @@ namespace Consent.Api.Controllers;
 [Authorize]
 public sealed class AccountController(SignatureSpecimenService specimens) : ControllerBase
 {
-    /// <summary>Ảnh PNG chữ ký mẫu của mình; chưa có → 404.</summary>
+    /// <summary>Ảnh PNG chữ ký mẫu của mình, màu mực như khi in lên phiếu; chưa có → 404.</summary>
     [HttpGet("signature-specimen")]
     [Produces("image/png")]
     public async Task<IActionResult> GetSignatureSpecimen(CancellationToken cancellationToken)
     {
         Response.Headers.CacheControl = "no-store";
         return await specimens.GetMineAsync(cancellationToken).ConfigureAwait(false) is { } png
-            ? File(png, "image/png")
+            ? File(SignatureImage.Colorize(png), "image/png")
             : NotFound();
     }
 

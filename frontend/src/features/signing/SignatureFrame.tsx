@@ -1,0 +1,34 @@
+import type { ReactNode } from 'react'
+import { useSignatureFrame } from '../../api/branding'
+import { frameStyle } from './signatureStyle'
+
+/**
+ * Hộp hiện chữ ký (ví dụ chữ ký mẫu của nhân viên) nằm trong khung chữ ký của bệnh viện. Chữ ký đặt ở vùng trống giữa khung,
+ * tránh phần logo phía trên, và co giãn vừa vùng đó. Chưa có khung thì là hộp trắng viền mảnh cao `plainHeight`.
+ */
+export function SignatureFrameBox({ children, plainHeight = 120 }: { children: ReactNode; plainHeight?: number }) {
+  const frame = useSignatureFrame().data ?? null
+  if (!frame) {
+    return (
+      <div
+        style={{
+          display: 'grid',
+          placeItems: 'center',
+          height: plainHeight,
+          boxSizing: 'border-box',
+          padding: 12,
+          background: '#ffffff',
+          border: '1px solid #e1eaeb',
+          borderRadius: 10,
+        }}
+      >
+        {children}
+      </div>
+    )
+  }
+  return (
+    <div data-testid="signature-frame" style={{ ...frameStyle(frame), position: 'relative' }}>
+      <div style={{ position: 'absolute', inset: '26% 8% 8% 8%', display: 'grid', placeItems: 'center' }}>{children}</div>
+    </div>
+  )
+}

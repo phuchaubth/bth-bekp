@@ -1,3 +1,6 @@
+using System.Buffers.Binary;
+using System.IO.Compression;
+using System.Text;
 using Consent.Application.ConsentForms;
 using Consent.Application.Tests.Fakes;
 
@@ -92,6 +95,93 @@ public sealed class SignatureImageTests
         var result = SignatureImage.Normalize(new byte[SignatureImage.MaxBytes + 1]);
 
         Assert.Contains("quá lớn", result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Colorize_PrintsTheStoredGraySignatureInBlueInk_OnAWhiteBackground()
+    {
+        // Ảnh đã lưu (xám, 30 × 4): cột 0–9 mực đen (chữ ký cũ), cột 10–19 xám bằng độ tối của mực xanh (chữ ký vẽ bằng mực
+        // xanh), cột 20–29 nền trắng.
+        var ink = SignatureImage.InkColor;
+        var inkGray = (byte)(((299 * ink.R) + (587 * ink.G) + (114 * ink.B)) / 1000);
+        const int Width = 30, Height = 4;
+        var raw = new byte[Height * (Width + 1)];
+        for (var row = 0; row < Height; row++)
+        {
+            for (var x = 0; x < Width; x++)
+            {
+                raw[(row * (Width + 1)) + 1 + x] = x < 10 ? (byte)0 : x < 20 ? inkGray : (byte)255;
+            }
+        }
+
+        var colored = SignatureImage.Colorize(TestPng.Build(Width, Height, 8, 0, raw));
+
+        Assert.Equal((Width, Height, (byte)2), TestPng.ReadHeader(colored));
+        var pixels = DecodeRgb(colored, Width, Height);
+        Assert.Equal((ink.R, ink.G, ink.B), Pixel(pixels, Width, 3, 1));
+        Assert.Equal((ink.R, ink.G, ink.B), Pixel(pixels, Width, 15, 2));
+        Assert.Equal(((byte)255, (byte)255, (byte)255), Pixel(pixels, Width, 25, 3));
+        Assert.DoesNotContain("tEXt"u8.ToArray(), Chunks(colored));
+    }
+
+    [Fact]
+    public void Colorize_KeepsTheSizeOfWhatNormalizeStores()
+    {
+        var stored = SignatureImage.Normalize(TestPng.Signature()).Png!;
+
+        var colored = SignatureImage.Colorize(stored);
+
+        var (width, height, _) = TestPng.ReadHeader(stored);
+        Assert.Equal((width, height, (byte)2), TestPng.ReadHeader(colored));
+    }
+
+    [Fact]
+    public void Colorize_ReturnsTheImageUnchanged_WhenItCannotBeDecoded()
+    {
+        var notPng = "khong phai anh PNG nao ca, chi la chu"u8.ToArray();
+        var corrupt = TestPng.Build(30, 4, 8, 0, new byte[4 * 31], corruptCrc: true);
+
+        Assert.Same(notPng, SignatureImage.Colorize(notPng));
+        Assert.Same(corrupt, SignatureImage.Colorize(corrupt));
+    }
+
+    /// <summary>Đọc điểm ảnh RGB của PNG do máy chủ tạo (một khối nén, mọi dòng không dùng bộ lọc).</summary>
+    private static byte[] DecodeRgb(byte[] png, int width, int height)
+    {
+        using var idat = new MemoryStream();
+        for (var offset = 8; offset + 8 <= png.Length;)
+        {
+            var length = BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(offset));
+            if (Encoding.ASCII.GetString(png, offset + 4, 4) == "IDAT")
+            {
+                idat.Write(png, offset + 8, length);
+            }
+
+            offset += 12 + length;
+        }
+
+        idat.Position = 0;
+        var stride = width * 3;
+        var raw = new byte[height * (stride + 1)];
+        using (var zlib = new ZLibStream(idat, CompressionMode.Decompress))
+        {
+            zlib.ReadExactly(raw);
+        }
+
+        var pixels = new byte[height * stride];
+        for (var row = 0; row < height; row++)
+        {
+            Assert.Equal(0, raw[row * (stride + 1)]);
+            Array.Copy(raw, (row * (stride + 1)) + 1, pixels, row * stride, stride);
+        }
+
+        return pixels;
+    }
+
+    private static (byte R, byte G, byte B) Pixel(byte[] pixels, int width, int x, int y)
+    {
+        var i = ((y * width) + x) * 3;
+        return (pixels[i], pixels[i + 1], pixels[i + 2]);
     }
 
     private static IEnumerable<byte[]> Chunks(byte[] png)

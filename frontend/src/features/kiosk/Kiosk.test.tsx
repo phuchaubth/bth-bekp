@@ -111,7 +111,7 @@ const kioskAccount = () =>
 
 /** jsdom không vẽ được canvas: giả lập phần vẽ và ảnh xuất ra. */
 function mockCanvas() {
-  const context = { setTransform: vi.fn(), fillRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn() }
+  const context = { setTransform: vi.fn(), fillRect: vi.fn(), clearRect: vi.fn(), beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn() }
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never)
   vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,S0lPU0tfS1k=')
   vi.spyOn(HTMLCanvasElement.prototype, 'getBoundingClientRect').mockReturnValue(
