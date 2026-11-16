@@ -26,6 +26,7 @@ internal sealed partial class DatabaseSeeder(
         ("KKB", "Khoa Khám bệnh"),
         ("NOI", "Khoa Nội tổng hợp"),
         ("KHTH", "Phòng Kế hoạch tổng hợp"),
+        ("PDD", "Phòng Điều dưỡng"),
     ];
 
     /// <summary>Tài khoản demo: tên giả lập, không phải người thật.</summary>
@@ -38,6 +39,7 @@ internal sealed partial class DatabaseSeeder(
         ("mauphieu.demo", "Quản lý mẫu phiếu Demo", "Chuyên viên", SystemRoles.TemplateManager, "KHTH"),
         ("baocao.demo", "Báo cáo Demo", "Chuyên viên", SystemRoles.Reporter, "KHTH"),
         ("kiemtra.demo", "Kiểm tra Demo", "Chuyên viên", SystemRoles.Auditor, "KHTH"),
+        ("phongdieuduong.demo", "Phòng Điều dưỡng Demo", "Điều dưỡng trưởng", SystemRoles.NursingOffice, "PDD"),
     ];
 
     /// <summary>Người bệnh demo: họ tên có "(giả lập)", số giấy tờ là số thử nghiệm, không phải người thật.</summary>

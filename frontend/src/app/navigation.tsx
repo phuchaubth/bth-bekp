@@ -5,6 +5,7 @@ import {
   ExportOutlined,
   FileProtectOutlined,
   FileTextOutlined,
+  MedicineBoxOutlined,
   SettingOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
@@ -33,6 +34,17 @@ export const navItems: NavItem[] = [
   { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, permission: Permissions.ExportsRun },
   { path: '/bao-cao', label: 'Báo cáo thống kê', shortLabel: 'Báo cáo', icon: <BarChartOutlined />, permission: Permissions.ReportsRead },
   { path: '/nhat-ky', label: 'Nhật ký hệ thống', shortLabel: 'Nhật ký', icon: <AuditOutlined />, permission: Permissions.AuditRead },
+  {
+    // Quyết định 31: khoa lập báo cáo hằng ngày, Phòng Điều dưỡng tổng hợp.
+    path: '/dieu-duong',
+    label: 'Báo cáo điều dưỡng',
+    shortLabel: 'Điều dưỡng',
+    icon: <MedicineBoxOutlined />,
+    children: [
+      { path: '/dieu-duong/bao-cao-khoa', label: 'Báo cáo của khoa', permission: Permissions.NursingReportsSubmit },
+      { path: '/dieu-duong/tong-hop', label: 'Tổng hợp hằng ngày', permission: Permissions.NursingReportsRead },
+    ],
+  },
   {
     path: '/quan-tri',
     label: 'Quản trị',

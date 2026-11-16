@@ -32,6 +32,16 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
         "FROM dbo.TiepNhan t JOIN dbo.BenhNhan b ON b.MaBN = t.MaBN " +
         "WHERE (b.MaBN = @PatientCode OR b.SoCCCD = @CitizenId) AND t.ThoiGian >= @From AND t.ThoiGian < @To";
 
+    /// <summary>
+    /// Số liệu trong ngày cho bảng tổng hợp điều dưỡng (quyết định 31): nhiều câu SELECT nối bằng UNION ALL, mỗi dòng một chỉ
+    /// số; người bệnh chờ nhập viện tính theo khoa.
+    /// </summary>
+    private const string DailyStatisticsQuery =
+        "SELECT 'outpatientVisits' AS Indicator, NULL AS DepartmentCode, COUNT(*) AS Value FROM dbo.TiepNhan " +
+        "WHERE ThoiGian >= @From AND ThoiGian < @To " +
+        "UNION ALL SELECT 'waitingAdmission', MaKhoa, COUNT(*) FROM dbo.ChoNhapVien WHERE ThoiGian >= @From AND ThoiGian < @To GROUP BY MaKhoa " +
+        "UNION ALL SELECT LoaiChiDinh, NULL, COUNT(*) FROM dbo.ChiDinhCLS WHERE ThoiGian >= @From AND ThoiGian < @To GROUP BY LoaiChiDinh";
+
     private static readonly string SqlServerImage =
         Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image ? image : "mcr.microsoft.com/mssql/server:2025-latest";
 
@@ -71,6 +81,14 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
                     (N'TN-GL-0003', N'BN-GL-001', '2026-11-11T23:59:00', N'Phòng khám 3', NULL),
                     (N'TN-GL-0004', N'BN-GL-001', '2026-11-12T00:00:00', N'Phòng khám 2', NULL),
                     (N'TN-GL-0005', N'BN-GL-002', '2026-11-11T08:00:00', N'Phòng khám 1', N'Người tiếp đón B (giả lập)');
+                CREATE TABLE dbo.ChoNhapVien (Id int IDENTITY PRIMARY KEY, MaKhoa nvarchar(20), ThoiGian datetime);
+                INSERT INTO dbo.ChoNhapVien (MaKhoa, ThoiGian) VALUES
+                    (N'NOIA', '2026-11-11T08:00:00'), (N'NOIA', '2026-11-11T23:59:00'), (N'NGOAIB', '2026-11-11T09:00:00'),
+                    (N'NOIA', '2026-11-12T00:00:00');
+                CREATE TABLE dbo.ChiDinhCLS (Id int IDENTITY PRIMARY KEY, LoaiChiDinh nvarchar(30), ThoiGian datetime);
+                INSERT INTO dbo.ChiDinhCLS (LoaiChiDinh, ThoiGian) VALUES
+                    (N'xray', '2026-11-11T10:00:00'), (N'xray', '2026-11-11T11:00:00'), (N'mri', '2026-11-11T12:00:00'),
+                    (N'xray', '2026-11-10T10:00:00');
                 """,
                 source);
             await setup.ExecuteNonQueryAsync();
@@ -83,6 +101,7 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
             ["PatientInfo:ConnectionString"] = connectionString,
             ["PatientInfo:Query"] = Query,
             ["PatientInfo:EncounterQuery"] = EncounterQuery,
+            ["PatientInfo:DailyStatisticsQuery"] = DailyStatisticsQuery,
             ["PatientInfo:ApiKeys:0"] = ApiKey,
         });
         var app = _app = PatientInfoProgram.Build(builder);
@@ -236,6 +255,62 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
     }
 
     [Fact]
+    public async Task DailyStatistics_CountTheHospitalDay_EndOfDayIncluded_NextMidnightExcluded()
+    {
+        var (status, body) = await DailyStatisticsAsync(new { date = "2026-11-11" });
+
+        Assert.Equal(HttpStatusCode.OK, status);
+        var items = body.GetProperty("items").EnumerateArray()
+            .Select(i => (i.GetProperty("indicator").GetString(), i.GetProperty("departmentCode").GetString(), i.GetProperty("value").GetInt32()))
+            .OrderBy(i => i.Item1, StringComparer.Ordinal)
+            .ThenBy(i => i.Item2, StringComparer.Ordinal)
+            .ToList();
+        Assert.Equal(
+            [("mri", null, 1), ("outpatientVisits", null, 3), ("waitingAdmission", "NGOAIB", 1), ("waitingAdmission", "NOIA", 2), ("xray", null, 2)],
+            items);
+    }
+
+    [Fact]
+    public async Task DailyStatistics_RequireADate_AndAValidApiKey()
+    {
+        Assert.Equal(HttpStatusCode.BadRequest, (await DailyStatisticsAsync(new { })).Status);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/daily-statistics")
+        {
+            Content = JsonContent.Create(new { date = "2026-11-11" }),
+        };
+        using var response = await _client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DailyStatistics_WithoutAConfiguredQuery_AreNotImplemented()
+    {
+        // Phòng CNTT chưa đặt PatientInfo__DailyStatisticsQuery: bảng tổng hợp điều dưỡng nhập tay số liệu HIS.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PatientInfo:ConnectionString"] = "Server=khong-dung.gia-lap.local;Database=BenhVienGiaLap",
+            ["PatientInfo:Query"] = "SELECT MaBN AS PatientCode FROM dbo.BenhNhan WHERE MaBN = @PatientCode",
+            ["PatientInfo:ApiKeys:0"] = ApiKey,
+        });
+        await using var app = PatientInfoProgram.Build(builder);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/daily-statistics")
+        {
+            Content = JsonContent.Create(new { date = "2026-11-11" }),
+        };
+        request.Headers.Add("X-Api-Key", ApiKey);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
+        await app.StopAsync();
+    }
+
+    [Fact]
     public async Task Encounters_WithoutAConfiguredQuery_AreNotImplemented()
     {
         // Bệnh viện chưa đặt PatientInfo__EncounterQuery: tra người bệnh vẫn chạy, tra lượt tiếp nhận báo 501.
@@ -265,6 +340,15 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
     private async Task<(HttpStatusCode Status, JsonElement Body)> SearchEncountersAsync(object body)
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/encounters/search") { Content = JsonContent.Create(body) };
+        request.Headers.Add("X-Api-Key", ApiKey);
+        using var response = await _client.SendAsync(request);
+        var text = await response.Content.ReadAsStringAsync();
+        return (response.StatusCode, text.Length == 0 ? default : JsonDocument.Parse(text).RootElement.Clone());
+    }
+
+    private async Task<(HttpStatusCode Status, JsonElement Body)> DailyStatisticsAsync(object body)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/daily-statistics") { Content = JsonContent.Create(body) };
         request.Headers.Add("X-Api-Key", ApiKey);
         using var response = await _client.SendAsync(request);
         var text = await response.Content.ReadAsStringAsync();

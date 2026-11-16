@@ -1,5 +1,6 @@
 using Consent.Application.Abstractions;
 using Consent.Application.ConsentForms;
+using Consent.Application.NursingReports;
 using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.His;
 using Consent.Infrastructure.Pdf;
@@ -29,6 +30,8 @@ public static class DependencyInjection
         services.AddSingleton<IFieldEncryptor, AesGcmFieldEncryptor>();
         services.AddSingleton<IBlindIndexer, HmacBlindIndexer>();
         services.AddSingleton<IConsentPdfRenderer, MigraDocConsentPdfRenderer>();
+        services.AddSingleton<INursingReportPdfRenderer, MigraDocNursingReportPdfRenderer>();
+        services.AddSingleton<INursingSummaryWorkbookWriter, XlsxNursingSummaryWriter>();
         services.AddSingleton<IDocumentStore, EncryptedFileDocumentStore>();
         services.AddSingleton<ITabularFileWriter, XlsxTabularFileWriter>();
         services.AddSingleton<ITabularFileWriter, CsvTabularFileWriter>();
@@ -81,6 +84,10 @@ public static class DependencyInjection
         services.AddSingleton<IEncounterSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
             ? ActivatorUtilities.CreateInstance<ApiEncounterSource>(sp)
             : new DisabledEncounterSource());
+        // Số liệu trong ngày cho bảng tổng hợp điều dưỡng (quyết định 31), cũng lấy qua API thông tin người bệnh.
+        services.AddSingleton<IDailyStatisticsSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
+            ? ActivatorUtilities.CreateInstance<ApiDailyStatisticsSource>(sp)
+            : new DisabledDailyStatisticsSource());
 
         return services;
     }

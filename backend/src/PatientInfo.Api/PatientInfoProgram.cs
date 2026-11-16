@@ -12,6 +12,9 @@ public sealed record PatientLookupRequest(string? PatientCode, string? CitizenId
 /// <summary>Tra lượt tiếp nhận của một người bệnh (mã <b>hoặc</b> CCCD) từ ngày đến ngày (theo ngày của bệnh viện).</summary>
 public sealed record EncounterSearchRequest(string? PatientCode, string? CitizenId, DateOnly? From, DateOnly? To);
 
+/// <summary>Lấy số liệu trong ngày (theo ngày của bệnh viện) cho bảng tổng hợp điều dưỡng.</summary>
+public sealed record DailyStatisticsRequest(DateOnly? Date);
+
 /// <summary>
 /// API thông tin người bệnh: dịch vụ riêng, chỉ đọc, là nơi duy nhất kết nối CSDL bệnh viện. Các phần mềm khác (phiếu đồng
 /// thuận…) gọi qua HTTPS với khóa API, không cần giữ chuỗi kết nối CSDL.
@@ -34,12 +37,15 @@ public static partial class PatientInfoProgram
             .Validate(o => o.HasValidApiKeys, $"Thiếu khóa API: đặt PatientInfo__ApiKeys__0 (mỗi khóa ≥ {PatientInfoOptions.MinimumApiKeyLength} ký tự ngẫu nhiên).")
             .Validate(o => o.HasValidEncounterQuery,
                 "PatientInfo:EncounterQuery (nếu đặt) phải là một câu SELECT dùng @From, @To và @PatientCode/@CitizenId, không có dấu ';' giữa câu.")
+            .Validate(o => o.HasValidDailyStatisticsQuery,
+                "PatientInfo:DailyStatisticsQuery (nếu đặt) phải là một câu SELECT dùng @From và @To, không có dấu ';' giữa câu.")
             .Validate(o => o.QueryTimeoutSeconds is >= 1 and <= 60, "PatientInfo:QueryTimeoutSeconds phải trong khoảng 1–60 giây.")
             .Validate(o => o.HasUnambiguousGenderValues,
                 "Giá trị giới tính bị trùng giữa Nam và Nữ: đặt cả PatientInfo__MaleValues__0… và PatientInfo__FemaleValues__0… (danh sách đặt thay hẳn mặc định).")
             .ValidateOnStart();
         builder.Services.AddSingleton<PatientRepository>();
         builder.Services.AddSingleton<EncounterRepository>();
+        builder.Services.AddSingleton<DailyStatisticsRepository>();
         builder.Services.ConfigureHttpJsonOptions(o =>
         {
             o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -56,6 +62,7 @@ public static partial class PatientInfoProgram
         app.MapGet("/health", () => Results.Ok(new { status = "Healthy" }));
         app.MapPost("/api/v1/patients/lookup", LookupAsync);
         app.MapPost("/api/v1/encounters/search", SearchEncountersAsync);
+        app.MapPost("/api/v1/daily-statistics", GetDailyStatisticsAsync);
         return app;
     }
 
@@ -142,6 +149,40 @@ public static partial class PatientInfoProgram
         catch (SqlException ex)
         {
             logger.LogWarning("Lỗi CSDL khi tra lượt tiếp nhận (mã lỗi SQL {Number}).", ex.Number);
+            return Results.Problem("Không truy vấn được CSDL bệnh viện.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    /// <summary>Số dòng số liệu nhiều nhất trả về một lần.</summary>
+    public const int MaxDailyStatistics = 1000;
+
+    internal static async Task<IResult> GetDailyStatisticsAsync(
+        DailyStatisticsRequest? request,
+        DailyStatisticsRepository repository,
+        IOptions<PatientInfoOptions> options,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Value.HasDailyStatisticsQuery)
+        {
+            return Results.Problem("Chưa cấu hình truy vấn số liệu trong ngày (PatientInfo__DailyStatisticsQuery).", statusCode: StatusCodes.Status501NotImplemented);
+        }
+
+        if (request?.Date is not { } date)
+        {
+            return Problem("Thiếu ngày lấy số liệu.");
+        }
+
+        var logger = loggerFactory.CreateLogger("PatientInfo.DailyStatistics");
+        try
+        {
+            var items = await repository.GetAsync(date, cancellationToken).ConfigureAwait(false);
+            logger.LogInformation("Lấy số liệu trong ngày: {Count} dòng", items.Count);
+            return Results.Ok(new { items });
+        }
+        catch (SqlException ex)
+        {
+            logger.LogWarning("Lỗi CSDL khi lấy số liệu trong ngày (mã lỗi SQL {Number}).", ex.Number);
             return Results.Problem("Không truy vấn được CSDL bệnh viện.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }

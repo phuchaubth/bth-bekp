@@ -27,6 +27,10 @@ GRANT SELECT ON [dbo].[BANG_BENH_NHAN] TO [patientinfo_reader];
 -- GRANT SELECT ON [dbo].[BANG_TIEP_NHAN] TO [patientinfo_reader];
 -- GRANT SELECT ON [dbo].[DM_PHONG_KHAM] TO [patientinfo_reader];
 -- GRANT SELECT ON [dbo].[DM_NHAN_VIEN] TO [patientinfo_reader];
+-- Báo cáo điều dưỡng hằng ngày (quyết định 31, tùy chọn): cấp SELECT các bảng câu truy vấn
+-- PatientInfo__DailyStatisticsQuery dùng (tiếp nhận khám, chờ nhập viện, chỉ định cận lâm sàng…):
+-- GRANT SELECT ON [dbo].[BANG_CHO_NHAP_VIEN] TO [patientinfo_reader];
+-- GRANT SELECT ON [dbo].[BANG_CHI_DINH_CLS] TO [patientinfo_reader];
 GO
 
 -- Chặn ghi tuyệt đối (phòng khi tài khoản lỡ được thêm vào nhóm có quyền ghi).

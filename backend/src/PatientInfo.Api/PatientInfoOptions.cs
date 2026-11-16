@@ -32,6 +32,15 @@ public sealed class PatientInfoOptions
     public string? EncounterQuery { get; set; }
 
     /// <summary>
+    /// Tùy chọn (quyết định 31): câu SELECT trả về <b>số liệu trong ngày</b> cho bảng tổng hợp điều dưỡng, nhận tham số
+    /// <c>@From</c> (đầu ngày) và <c>@To</c> (đầu ngày hôm sau: lọc <c>ThoiGian &gt;= @From AND ThoiGian &lt; @To</c>). Mỗi
+    /// dòng một số liệu, tên cột: Indicator (mã chỉ số: outpatientVisits, waitingAdmission, ultrasound, echocardiography,
+    /// ecg, xray, ct, mri), DepartmentCode (mã khoa trong phần mềm phiếu, chỉ cần với waitingAdmission), Value (số nguyên ≥ 0).
+    /// Thường viết bằng nhiều câu SELECT nối bằng UNION ALL. Để trống thì API không có chức năng này.
+    /// </summary>
+    public string? DailyStatisticsQuery { get; set; }
+
+    /// <summary>
     /// Các khóa API được phép gọi (mỗi phần mềm một khóa, đổi khóa không gián đoạn bằng cách thêm khóa mới rồi bỏ khóa cũ):
     /// biến môi trường <c>PatientInfo__ApiKeys__0</c>, <c>PatientInfo__ApiKeys__1</c>…
     /// </summary>
@@ -72,6 +81,15 @@ public sealed class PatientInfoOptions
             && query.Contains("@From", StringComparison.OrdinalIgnoreCase)
             && query.Contains("@To", StringComparison.OrdinalIgnoreCase)
             && (query.Contains("@PatientCode", StringComparison.OrdinalIgnoreCase) || query.Contains("@CitizenId", StringComparison.OrdinalIgnoreCase)));
+
+    public bool HasDailyStatisticsQuery => !string.IsNullOrWhiteSpace(DailyStatisticsQuery);
+
+    /// <summary>Câu truy vấn số liệu trong ngày (nếu đặt): một câu SELECT dùng @From và @To.</summary>
+    public bool HasValidDailyStatisticsQuery =>
+        !HasDailyStatisticsQuery
+        || (IsSingleSelect(DailyStatisticsQuery, out var query)
+            && query.Contains("@From", StringComparison.OrdinalIgnoreCase)
+            && query.Contains("@To", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsSingleSelect(string? value, out string query)
     {

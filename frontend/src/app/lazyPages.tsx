@@ -35,6 +35,12 @@ export const SigningKioskPage = lazy(() =>
 export const KioskPage = lazy(() => import('../features/kiosk/KioskPage').then((m) => ({ default: m.KioskPage })))
 export const ExportsPage = lazy(() => import('../features/exports/ExportsPage').then((m) => ({ default: m.ExportsPage })))
 export const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
+export const NursingReportPage = lazy(() =>
+  import('../features/nursing/NursingReportPage').then((m) => ({ default: m.NursingReportPage })),
+)
+export const NursingSummaryPage = lazy(() =>
+  import('../features/nursing/NursingSummaryPage').then((m) => ({ default: m.NursingSummaryPage })),
+)
 export const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })))
 export const SettingsPage = lazy(() => import('../features/admin/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))

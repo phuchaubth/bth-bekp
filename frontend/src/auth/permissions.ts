@@ -19,6 +19,12 @@ export const Permissions = {
   ReportsRead: 'reports.read',
   ExportsRun: 'exports.run',
   ExportsSensitive: 'exports.sensitive',
+  /** Lập và gửi báo cáo điều dưỡng hằng ngày của khoa mình (quyết định 31). */
+  NursingReportsSubmit: 'nursingreports.submit',
+  /** Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp, in PDF, xuất Excel. */
+  NursingReportsRead: 'nursingreports.read',
+  /** Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo và số giường, số liệu HIS. */
+  NursingReportsManage: 'nursingreports.manage',
   ScopeAllDepartments: 'scope.all_departments',
 } as const
 

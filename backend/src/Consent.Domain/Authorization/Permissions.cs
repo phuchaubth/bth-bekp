@@ -31,6 +31,18 @@ public static class Permissions
     public const string ExportsRun = "exports.run";
     public const string ExportsSensitive = "exports.sensitive";
 
+    /// <summary>
+    /// Lập, sửa và gửi báo cáo điều dưỡng hằng ngày của khoa mình (quyết định 31); có thêm
+    /// <see cref="ScopeAllDepartments"/> thì lập được cho mọi khoa.
+    /// </summary>
+    public const string NursingReportsSubmit = "nursingreports.submit";
+
+    /// <summary>Xem báo cáo điều dưỡng của mọi khoa và bảng tổng hợp hằng ngày, in PDF, xuất Excel.</summary>
+    public const string NursingReportsRead = "nursingreports.read";
+
+    /// <summary>Phòng Điều dưỡng: mở lại báo cáo đã gửi, cài khoa báo cáo và số giường, lấy hoặc nhập số liệu HIS.</summary>
+    public const string NursingReportsManage = "nursingreports.manage";
+
     /// <summary>Xem dữ liệu của mọi khoa (không giới hạn theo khoa của người dùng).</summary>
     public const string ScopeAllDepartments = "scope.all_departments";
 }
@@ -46,6 +58,7 @@ public static class PermissionCatalog
     private const string TemplateGroup = "Mẫu phiếu";
     private const string ConsentGroup = "Phiếu đồng thuận";
     private const string ReportGroup = "Báo cáo và xuất dữ liệu";
+    private const string NursingGroup = "Báo cáo điều dưỡng";
     private const string ScopeGroup = "Phạm vi dữ liệu";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
@@ -68,6 +81,9 @@ public static class PermissionCatalog
         new(Permissions.ReportsRead, "Xem báo cáo thống kê", ReportGroup),
         new(Permissions.ExportsRun, "Xuất dữ liệu", ReportGroup),
         new(Permissions.ExportsSensitive, "Xuất dữ liệu nhạy cảm (CCCD đầy đủ)", ReportGroup),
+        new(Permissions.NursingReportsSubmit, "Lập và gửi báo cáo điều dưỡng của khoa", NursingGroup),
+        new(Permissions.NursingReportsRead, "Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp", NursingGroup),
+        new(Permissions.NursingReportsManage, "Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo, số liệu HIS", NursingGroup),
         new(Permissions.ScopeAllDepartments, "Xem dữ liệu toàn viện", ScopeGroup),
     ];
 

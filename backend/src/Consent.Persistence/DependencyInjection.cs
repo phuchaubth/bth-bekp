@@ -51,6 +51,7 @@ public static class DependencyInjection
         services.AddScoped<IExportJobRepository, ExportJobRepository>();
         services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
+        services.AddScoped<INursingReportRepository, NursingReportRepository>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

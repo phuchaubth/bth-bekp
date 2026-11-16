@@ -12,6 +12,7 @@ using Consent.Application.Users;
 using Consent.Domain.Auditing;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
+using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
 using Consent.Shared;
 using Consent.Application.ConsentForms;
@@ -118,6 +119,12 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<ExportJob> ExportJobs { get; } = [];
 
     public List<SystemSetting> SystemSettings { get; } = [];
+
+    public List<NursingDailyReport> NursingReports { get; } = [];
+
+    public List<NursingReportDepartment> NursingDepartments { get; } = [];
+
+    public List<NursingDailyStatistics> NursingStatistics { get; } = [];
 
     public int SaveCount { get; private set; }
 

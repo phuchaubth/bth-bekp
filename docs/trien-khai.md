@@ -355,6 +355,63 @@ Khi quản trị bật (bước 5), người ký hoàn tất phiếu (tiếp nh�
    - Hồ sơ người bệnh cần có **mã y tế** (dùng trước) hoặc **số CCCD** để tra lượt tiếp nhận.
    - **HIS hoặc API thông tin người bệnh lỗi:** nhân viên chưa hoàn tất được phiếu (phiếu vẫn chờ xác nhận, giữ chữ ký người bệnh). Quản trị **tắt công tắc** để nhân viên hoàn tất tiếp: trong hộp ký bấm *Thử lại* là ký được, không cần tải lại trang. Phiếu hoàn tất lúc tắt không gắn lượt tiếp nhận. HIS ổn định thì bật lại.
 
+### 5.7. Báo cáo điều dưỡng hằng ngày (quyết định 31)
+
+Khoa lập "Báo cáo công tác điều dưỡng" mỗi ngày, Phòng Điều dưỡng tổng hợp (menu **Báo cáo điều dưỡng**). Bản phát hành có tính năng này kèm migration `AddNursingReports` (3 bảng mới; thêm quyền `nursingreports.submit` cho vai trò **Điều dưỡng** có sẵn): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khi khởi động, phần mềm tự tạo vai trò mới **Phòng Điều dưỡng**.
+
+1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, mở lại báo cáo, cài khoa báo cáo, số giường và số liệu HIS. Ban giám đốc chỉ cần xem: tạo vai trò riêng chỉ có quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp*.
+2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa của người dùng). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
+3. **Khoa báo cáo và số giường:** Phòng Điều dưỡng vào *Báo cáo điều dưỡng → Tổng hợp hằng ngày*, bấm **Khoa báo cáo và số giường**, chọn các khoa phải gửi báo cáo và nhập số giường thực kê (không tính băng ca). Khoa chưa được chọn thì chưa lập được báo cáo.
+4. **Số liệu HIS (tùy chọn):** mục B (TSNB đến khám), mục D (số liệu CĐHA) và cột "NB PK chờ nhập viện" lấy từ HIS qua API thông tin người bệnh (mục 5.5). Chưa làm bước này thì Phòng Điều dưỡng bấm **Nhập số liệu HIS** để nhập tay.
+   - **Quyền đọc:** cấp `SELECT` cho `patientinfo_reader` trên các bảng câu truy vấn dùng (xem phần *báo cáo điều dưỡng* cuối `deploy\sql\04-patientinfo-reader.sql`).
+   - **Câu truy vấn:** một câu `SELECT` (thường nhiều câu nối bằng `UNION ALL`), mỗi dòng một số liệu, tham số `@From` (đầu ngày) và `@To` (đầu ngày hôm sau), lọc thời gian bằng `>= @From AND < @To`.
+
+     | Tên sau `AS` | Ý nghĩa |
+     |---|---|
+     | `Indicator` | Mã chỉ số: `outpatientVisits` (tổng số người bệnh đến khám), `ultrasound` (siêu âm tổng quát), `echocardiography` (siêu âm tim), `ecg` (điện tâm đồ), `xray` (X-quang), `ct` (CT Scan), `mri` (MRI), `waitingAdmission` (người bệnh phòng khám chờ nhập viện, theo khoa) |
+     | `DepartmentCode` | Mã khoa **trong phần mềm phiếu** (*Quản trị → Khoa/phòng*); chỉ cần với `waitingAdmission`. Mã khác thì dùng `CASE` để đổi |
+     | `Value` | Số nguyên ≥ 0 |
+
+     Ví dụ (tên bảng/cột thay theo CSDL thật):
+
+     ```sql
+     SELECT 'outpatientVisits' AS Indicator, NULL AS DepartmentCode, COUNT(*) AS Value
+     FROM dbo.TiepNhan WHERE ThoiGianTiepNhan >= @From AND ThoiGianTiepNhan < @To
+     UNION ALL
+     SELECT 'waitingAdmission', MaKhoa, COUNT(*)
+     FROM dbo.ChoNhapVien WHERE ThoiGianChiDinh >= @From AND ThoiGianChiDinh < @To GROUP BY MaKhoa
+     UNION ALL
+     SELECT CASE LoaiCLS WHEN N'SA' THEN 'ultrasound' WHEN N'SAT' THEN 'echocardiography' WHEN N'ECG' THEN 'ecg'
+                         WHEN N'XQ' THEN 'xray' WHEN N'CT' THEN 'ct' WHEN N'MRI' THEN 'mri' END, NULL, COUNT(*)
+     FROM dbo.ChiDinhCLS WHERE ThoiGianThucHien >= @From AND ThoiGianThucHien < @To
+       AND LoaiCLS IN (N'SA', N'SAT', N'ECG', N'XQ', N'CT', N'MRI')
+     GROUP BY LoaiCLS
+     ```
+
+     Chạy thử trong SSMS với `DECLARE @From datetime2 = '2026-11-16', @To datetime2 = '2026-11-17';`. Câu thiếu `@From` hoặc `@To`, có `;` giữa câu, hoặc không phải `SELECT`/`WITH` thì API dừng khi khởi động (HTTP 500.30).
+   - **Đặt biến** cho Application Pool `PatientInfoApi` (như mục 5.6 bước 3):
+
+     ```powershell
+     $dailyQuery = @'
+     <dán câu truy vấn đã chạy thử>
+     '@
+     $dailyQuery = ($dailyQuery -replace '\s+', ' ').Trim()
+     Set-PoolEnv PatientInfoApi 'PatientInfo__DailyStatisticsQuery' $dailyQuery
+     Restart-WebAppPool PatientInfoApi
+     ```
+
+   - **Kiểm tra** (chỉ in số đếm):
+
+     ```powershell
+     $key = (Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add[@name='PatientInfo__ApiKeys__0']").value
+     $r = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:5081/api/v1/daily-statistics -Headers @{ 'X-Api-Key' = $key } `
+       -ContentType 'application/json; charset=utf-8' -Body (@{ date = (Get-Date).ToString('yyyy-MM-dd') } | ConvertTo-Json)
+     $r.items | Format-Table indicator, departmentCode, value
+     ```
+
+     `(404)`: `PatientInfoApi` còn bản cũ (thay thư mục như mục 5.4 bước 5). `(501)`: chưa đặt `PatientInfo__DailyStatisticsQuery`. `(503)`: câu truy vấn lỗi hoặc thiếu quyền đọc.
+   - Trên bảng tổng hợp, bấm **Lấy số liệu HIS**: số liệu được lưu lại theo ngày (số "chờ nhập viện" là số tại lúc lấy). Mã khoa HIS trả về mà không khớp khoa nào được báo lên màn hình để sửa câu truy vấn.
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).
@@ -485,10 +542,11 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
 7. Kiosk (mục 9b): quét thử vài thẻ CCCD thật (họ tên có dấu đọc đúng), làm trọn một bộ phiếu với người bệnh giả lập, nhân viên tiếp đón **Xác nhận cả bộ**; nhập sai ngày sinh 5 lần thấy máy tạm khóa tra cứu; để yên 60 giây thấy màn hình tự về trang đầu.
 8. Lượt tiếp nhận (mục 5.6, nếu dùng): bật công tắc ở Cấu hình hệ thống; hoàn tất một phiếu thử của người bệnh có lượt tiếp nhận hôm nay trên HIS; danh sách đúng thời gian, nơi tiếp nhận; chân PDF có số tiếp nhận và người tiếp nhận; mở lại hộp ký phiếu khác của người bệnh đó thấy phiếu vừa gắn ở cột *Các phiếu đã gắn vào*. Tắt thử công tắc: hộp ký không còn bảng lượt. Thu hồi phiếu thử.
-9. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
-10. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
-11. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
-12. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+9. Báo cáo điều dưỡng (mục 5.7): Phòng Điều dưỡng cài khoa báo cáo và số giường; một điều dưỡng lập, lưu nháp, gửi báo cáo khoa mình (gửi xong thấy khóa); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, mở lại báo cáo thử kèm lý do; lấy hoặc nhập tay số liệu HIS.
+10. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
+11. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
+12. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
+13. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 
 ## 11. Sự cố thường gặp
 

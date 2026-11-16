@@ -5,6 +5,7 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
+using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
 using Consent.Domain.Settings;
 using Consent.Persistence.Configurations;
@@ -39,6 +40,12 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
 
+    public DbSet<NursingDailyReport> NursingDailyReports => Set<NursingDailyReport>();
+
+    public DbSet<NursingReportDepartment> NursingReportDepartments => Set<NursingReportDepartment>();
+
+    public DbSet<NursingDailyStatistics> NursingDailyStatistics => Set<NursingDailyStatistics>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardAuditLogIsAppendOnly();
@@ -58,6 +65,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
         var encrypted = new EncryptedStringConverter(fieldEncryptor);
         PatientConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         ConsentFormConfiguration.ConfigureEncryption(modelBuilder, encrypted);
+        NursingDailyReportConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         var encryptedBytes = new EncryptedBytesConverter(fieldEncryptor);
         ConsentSignatureConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         UserConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);

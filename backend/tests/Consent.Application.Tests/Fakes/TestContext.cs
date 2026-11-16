@@ -4,6 +4,7 @@ using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
+using Consent.Application.NursingReports;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -219,6 +220,32 @@ internal sealed class AppTestContext
 
     public EncounterSettingsService CreateEncounterSettingsService() => new(
         new InMemorySystemSettingRepository(Store), EncounterSource, Store, Clock);
+
+    public StubDailyStatisticsSource DailyStatistics { get; } = new();
+
+    public CapturingNursingDocuments NursingDocuments { get; } = new();
+
+    public NursingReportService CreateNursingReportService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        CreateSettingsService(),
+        NursingDocuments);
+
+    public NursingSummaryService CreateNursingSummaryService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        DailyStatistics,
+        Store,
+        CurrentUser,
+        Clock,
+        CreateSettingsService(),
+        NursingDocuments,
+        NursingDocuments);
 
     /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
     public void TurnOnEncounters()

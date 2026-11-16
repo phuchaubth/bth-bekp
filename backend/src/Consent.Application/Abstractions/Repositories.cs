@@ -10,6 +10,7 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
+using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
 using Consent.Domain.Settings;
 using Consent.Shared;
@@ -179,6 +180,32 @@ public interface IConsentStatisticsRepository
 
     /// <summary>Phiếu nháp/chờ ký do người dùng <paramref name="userId"/> lập.</summary>
     Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken);
+}
+
+/// <summary>Báo cáo điều dưỡng hằng ngày, khoa báo cáo kèm số giường, số liệu HIS theo ngày (quyết định 31).</summary>
+public interface INursingReportRepository
+{
+    Task<NursingDailyReport?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<NursingDailyReport?> FindAsync(Guid departmentId, DateOnly reportDate, CancellationToken cancellationToken);
+
+    /// <summary>Báo cáo đã gửi gần nhất của khoa trước ngày <paramref name="before"/> (để điền sẵn nhân sự, chỉ tiêu).</summary>
+    Task<NursingDailyReport?> FindLatestSubmittedBeforeAsync(Guid departmentId, DateOnly before, CancellationToken cancellationToken);
+
+    /// <summary>Mọi báo cáo (nháp và đã gửi) của một ngày.</summary>
+    Task<IReadOnlyList<NursingDailyReport>> ListByDateAsync(DateOnly reportDate, CancellationToken cancellationToken);
+
+    void Add(NursingDailyReport report);
+
+    Task<IReadOnlyList<NursingReportDepartment>> ListDepartmentsAsync(CancellationToken cancellationToken);
+
+    void AddDepartment(NursingReportDepartment department);
+
+    void RemoveDepartment(NursingReportDepartment department);
+
+    Task<NursingDailyStatistics?> FindStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken);
+
+    void AddStatistics(NursingDailyStatistics statistics);
 }
 
 public interface ISystemSettingRepository

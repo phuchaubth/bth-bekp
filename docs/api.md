@@ -277,6 +277,7 @@ Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của
 |---|---|---|---|
 | GET | `/health` | Không | `{"status":"Healthy"}` |
 | POST | `/api/v1/patients/lookup` | Header `X-Api-Key` | `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một; mã ≤ 50 ký tự, CCCD 12 chữ số) → `200` thông tin hành chính; `404` không có; `400` sai dữ liệu; `401` thiếu/sai khóa; `503` lỗi CSDL |
+| POST | `/api/v1/daily-statistics` | Header `X-Api-Key` | **Số liệu trong ngày cho bảng tổng hợp điều dưỡng** (quyết định 31): `{ "date": "yyyy-MM-dd" }` → `200 { items: [{ indicator, departmentCode, value }] }` (tối đa 1.000 dòng; dòng thiếu mã chỉ số hoặc giá trị không phải số nguyên ≥ 0 bị bỏ); `400` thiếu ngày; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:DailyStatisticsQuery`; `503` lỗi CSDL. Chỉ là số đếm, không có thông tin người bệnh |
 | POST | `/api/v1/encounters/search` | Header `X-Api-Key` | **Lượt tiếp nhận** (quyết định 25): `{ "patientCode" \| "citizenId", "from": "yyyy-MM-dd", "to": "yyyy-MM-dd" }` (đúng một trong mã/CCCD; `from` ≤ `to`, tối đa 366 ngày, tính cả ngày `to`) → `200 { items: [{ encounterNo, receivedAt, place, receivedBy }] }`, mới nhất trước, tối đa 200 lượt; `400` sai dữ liệu; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:EncounterQuery`; `503` lỗi CSDL |
 
 ```json
@@ -524,6 +525,28 @@ Chỉ tài khoản có quyền `kiosk.use` (vai trò `KIOSK`; quản trị có t
 Sai 5 lần liên tiếp (tính cả khi nộp) thì **tạm khóa tra cứu 5 phút** trên tài khoản kiosk: `422 kiosk.lookup_locked` kèm `lockedUntilUtc`; tự khai không kèm số CCCD vẫn làm được (không tra ai). Khóa tra cứu không làm máy bị đăng xuất; quản trị mở khóa sớm bằng nút Mở khóa tài khoản. Nhật ký ghi cách nhận diện và kết quả (`Kiosk.Identified`, `Kiosk.LookupFailed`, `Kiosk.LookupLocked`, `Kiosk.Submitted`), không ghi mã y tế hay số CCCD.
 
 Phiếu lập trên kiosk có `kioskIdentity` (`CitizenIdCard`/`LookupCode`/`SelfReported`) ở chi tiết phiếu và bộ phiếu (`GET /api/v1/consent-forms/{id}`, `GET /api/v1/consent-forms/bundles/{bundleId}`); khi chờ xác nhận, `notices` có lời nhắc đối chiếu CCCD (tự khai: kiểm tra kỹ giấy tờ và thông tin hành chính).
+
+## 6h. Báo cáo điều dưỡng hằng ngày (`/api/v1/nursing-reports`, quyết định 31)
+
+Khoa lập báo cáo theo bản giấy "Báo cáo công tác điều dưỡng"; Phòng Điều dưỡng tổng hợp theo bản giấy "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày". Ngày là ngày của bệnh viện (`yyyy-MM-dd`).
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/form` | Đăng nhập | Mẫu báo cáo khoa: `{ title, category, sections: [{ title, valueKey, items: [{ key, label, carryOver }] }], checks: [{ key, label, inSummary }], issueLabel, okLabel, notesLabel, maxValue, notesMaxLength }`. `valueKey`: dòng tiêu đề mục là ô nhập (mục IV. ADR) |
+| GET | `/daily?date=&departmentId=` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) hoặc `nursingreports.read`/`manage` (mọi khoa) | Báo cáo của khoa trong ngày; bỏ trống `departmentId` là khoa của người dùng. Chưa có thì `status: "New"`, `id: null`, điền sẵn các dòng `carryOver` (nhân sự, chỉ tiêu) theo báo cáo đã gửi gần nhất (`carriedOverKeys`). Trả `{ id, departmentId, departmentName, reportDate, status, values, checks, notes, canEdit, canReopen, updatedBy, updatedAtUtc, submittedBy, submittedAtUtc, reopenedBy, reopenedAtUtc, reopenReason, carriedOverKeys, isReportingDepartment }` |
+| PUT | `/daily` | `nursingreports.submit` | `{ departmentId?, reportDate, values: { key: số \| null }, checks: { key: "ok" \| "issue" \| null }, notes, submit }`: tạo hoặc sửa báo cáo của khoa trong ngày; `submit: true` thì gửi luôn và khóa. Số từ 0 đến 99.999; gửi thì phải chọn đủ phần tick (`400 checks`). Khoa khác khoa mình → `403`; khoa chưa có trong danh sách báo cáo → `422 nursing_reports.department_not_reporting`; đã gửi → `422 nursing_reports.submitted`; ngày sau hôm nay hoặc quá 366 ngày → `400 reportDate` |
+| POST | `/{id}/reopen` | `nursingreports.manage` | `{ reason }` (bắt buộc, ≤ 500 ký tự): mở lại báo cáo đã gửi về nháp để khoa sửa và gửi lại. Chưa gửi → `422 nursing_reports.not_submitted` |
+| GET | `/{id}/pdf` | như `GET /daily` | PDF báo cáo khoa theo bố cục bản giấy (chân trang ghi đã gửi lúc, bởi ai hoặc "Bản nháp") |
+| GET | `/summary?date=` | `nursingreports.read` | Bảng tổng hợp: `{ reportDate, columns, rows: [{ departmentId, departmentName, isReporting, reportId, status, submittedBy, submittedAtUtc, cells }], totals, outpatient, procedures, imaging, situation: [{ key, label, text, issueDepartments }], incidents: [{ departmentId, departmentName, text }], statistics: { hisAvailable, hasValues, source, updatedAtUtc, updatedBy }, submittedCount, reportingCount }`. Chỉ báo cáo đã gửi được tính |
+| GET | `/summary/pdf?date=`, `/summary/xlsx?date=` | `nursingreports.read` | Bảng tổng hợp dạng PDF (bố cục bản giấy) và Excel (`.xlsx`, số ghi dạng số) |
+| POST | `/statistics/refresh` | `nursingreports.manage` | `{ reportDate }`: lấy số liệu HIS của ngày (thay số cũ, kể cả số nhập tay) và lưu lại. Trả `{ summary, unmatchedDepartmentCodes }`. Chưa cấu hình API thông tin người bệnh → `422 nursing_reports.his_disabled`; HIS lỗi hoặc chưa có câu truy vấn → `422 nursing_reports.his_unavailable` |
+| PUT | `/statistics` | `nursingreports.manage` | `{ reportDate, hospital: { chỉ số: số \| null }, waitingAdmission: { departmentId: số \| null } }`: nhập tay số liệu HIS của ngày (thay toàn bộ số cũ của ngày) |
+| GET | `/departments` | `nursingreports.manage` | Các khoa: `[{ departmentId, code, name, isReporting, bedCount }]` |
+| PUT | `/departments` | `nursingreports.manage` | `{ items: [{ departmentId, bedCount }] }`: danh sách khoa phải báo cáo và số giường thực kê (khoa không có trong danh sách thì bỏ ra) |
+
+**Chỉ số HIS** (cột `Indicator` của câu truy vấn `PatientInfo__DailyStatisticsQuery`): `outpatientVisits` (B. TSNB đến khám), `ultrasound`, `echocardiography`, `ecg`, `xray`, `ct`, `mri` (D. CĐHA) tính toàn viện (trả theo khoa thì cộng lại); `waitingAdmission` (NB PK chờ nhập viện) theo khoa, cột `DepartmentCode` trùng mã khoa trong phần mềm phiếu (không phân biệt hoa thường; mã không khớp được trả lại ở `unmatchedDepartmentCodes`).
+
+**Bảng tổng hợp:** "Số ca đi ngoại viện" là tổng 4 dòng mục V. Mục E: "Ổn" khi mọi khoa đã gửi báo ổn, "Không ổn: <tên khoa>" khi có khoa báo sự cố, trống khi chưa khoa nào gửi. Mục F: phần nhập thêm của khoa có ghi. Phần nhập thêm có thể có thông tin người bệnh: lưu mã hóa (cột `NotesEncrypted`), nhật ký chỉ ghi `***`.
 
 ---
 
