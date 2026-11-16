@@ -164,6 +164,7 @@ CI (GitHub Actions, `.github/workflows/ci.yml`) chạy các bước trên cho m�
 
 | Tài liệu | Nội dung |
 |---|---|
+| [docs/huong-dan-su-dung.md](docs/huong-dan-su-dung.md) | **Hướng dẫn sử dụng** cho nhân viên, theo từng vai trò, kèm ảnh màn hình (dữ liệu giả lập) |
 | [docs/KE_HOACH_TRIEN_KHAI.md](docs/KE_HOACH_TRIEN_KHAI.md) | Kế hoạch triển khai, danh sách màn hình, sprint và tiêu chí nghiệm thu |
 | [docs/yeu-cau-nghiep-vu.md](docs/yeu-cau-nghiep-vu.md) | Yêu cầu nghiệp vụ (SRS) |
 | [docs/kien-truc.md](docs/kien-truc.md) | Kiến trúc, mô hình dữ liệu, xác thực/phân quyền/audit, ADR |

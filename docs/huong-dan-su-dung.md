@@ -106,7 +106,10 @@ Mỗi người chỉ thấy các mục menu được phép dùng. Với phân qu
 | **Xuất dữ liệu** | không | có | không | có | không | có |
 | **Báo cáo** (Báo cáo thống kê) | không | có | không | có | có | có |
 | **Nhật ký** (Nhật ký hệ thống) | không | không | không | không | có | có |
+| **Điều dưỡng** (Báo cáo điều dưỡng, mục 9) | chỉ Điều dưỡng: **Báo cáo của khoa** | không | không | không | không | có |
 | **Quản trị** | không | không | không | không | chỉ **Người dùng** (xem) | có |
+
+Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Tổng hợp hằng ngày**.
 
 Quản trị hệ thống có thể đổi quyền của từng vai trò (mục 8.3), nên menu của bạn có thể khác bảng trên.
 
@@ -1029,7 +1032,7 @@ Mỗi nhân viên tự ký chữ ký mẫu của mình ở **Tài khoản của 
 
 ## 9. Báo cáo điều dưỡng hằng ngày
 
-*Phần này sẽ được bổ sung khi chức năng hoàn thành.*
+*Phần này sẽ được bổ sung sau.*
 
 ---
 
