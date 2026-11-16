@@ -14,6 +14,12 @@ const QUOTED = /“[^”]*”/g
 
 const isVietnameseLetter = (c: string) => c > '\u007f' && /\p{L}/u.test(c)
 
+/** Chữ viết tắt tiếng Việt không dấu: tính là từ tiếng Việt, để "(theo CCCD)" không bị coi là tiếng Anh. */
+const VIETNAMESE_ABBREVIATIONS = new Set(['CCCD', 'CMND', 'BHYT', 'BHXH'])
+
+const isVietnameseWord = (word: string) =>
+  [...word].some(isVietnameseLetter) || VIETNAMESE_ABBREVIATIONS.has(word.replace(/^[(),.:;]+|[(),.:;]+$/g, ''))
+
 /** allowVietnameseWords: cho phép tối đa 1/4 số từ có dấu (tên riêng); cả dòng tiêu đề thì không cho phép. */
 export function isEnglish(text: string, allowVietnameseWords = true): boolean {
   const trimmed = text.trim()
@@ -25,7 +31,7 @@ export function isEnglish(text: string, allowVietnameseWords = true): boolean {
     .replace(QUOTED, ' ')
     .split(' ')
     .filter((w) => /\p{L}/u.test(w))
-  const vietnamese = words.filter((w) => [...w].some(isVietnameseLetter)).length
+  const vietnamese = words.filter(isVietnameseWord).length
   return allowVietnameseWords ? vietnamese * 4 <= words.length : vietnamese === 0
 }
 

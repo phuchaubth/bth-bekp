@@ -86,9 +86,14 @@ public static partial class TemplateDefinitionValidator
     private static void ValidateDocumentControl(TemplateDocumentControl? control, List<string> errors)
     {
         if (control is not null
-            && new[] { control.Code, control.IssueNo, control.EffectiveDate }.Any(v => v is { Length: > TemplateDocumentControl.MaxLength }))
+            && new[]
+                {
+                    control.Code, control.IssueNo, control.EffectiveDate, control.CodeLabel, control.IssueNoLabel, control.EffectiveDateLabel,
+                }
+                .Any(v => v is { Length: > TemplateDocumentControl.MaxLength }))
         {
-            errors.Add($"Mã tài liệu (\"documentControl\"): mã số, lần ban hành, ngày hiệu lực mỗi mục tối đa {TemplateDocumentControl.MaxLength} ký tự.");
+            errors.Add(
+                $"Mã tài liệu (\"documentControl\"): mã số, lần ban hành, ngày hiệu lực và các nhãn mỗi mục tối đa {TemplateDocumentControl.MaxLength} ký tự.");
         }
     }
 
@@ -138,11 +143,13 @@ public static partial class TemplateDefinitionValidator
             errors.Add($"{where}: \"{source}\" không in được (chỉ có: {string.Join(", ", PatientLineSources.DefaultLabels.Keys)}).");
         }
 
+        TemplateBlock? field = null;
         if (item.Field is { } key)
         {
-            if (!declared.TryGetValue(key, out var block) || !BlockTypes.CanShareLine(block.Type))
+            if (!declared.TryGetValue(key, out field) || !(BlockTypes.CanShareLine(field.Type) || IsChoice(field.Type)))
             {
-                errors.Add($"{where}: \"{key}\" phải là trường văn bản, ngày, ngày giờ hoặc trường tự tính của mẫu.");
+                errors.Add($"{where}: \"{key}\" phải là trường văn bản, ngày, ngày giờ, trường tự tính hoặc câu hỏi chọn của mẫu.");
+                field = null;
             }
             else if (!fields.Add(key))
             {
@@ -155,12 +162,52 @@ public static partial class TemplateDefinitionValidator
             errors.Add($"{where}: nhãn tối đa {MaxLabelLength} ký tự.");
         }
 
-        if (item.Options is { } options
-            && (item.Patient != PatientLineSources.Gender || options.Count != 2 || options.Any(o => string.IsNullOrWhiteSpace(o) || o.Length > 100)))
+        ValidatePatientLineOther(item, field, where, declared, fields, errors);
+        if (item.Options is not { } options)
         {
-            errors.Add($"{where}: \"options\" chỉ dùng cho giới tính, gồm đúng hai nhãn (Nam, Nữ), mỗi nhãn tối đa 100 ký tự.");
+            return;
+        }
+
+        if (item.Patient is not null)
+        {
+            if (item.Patient != PatientLineSources.Gender || options.Count != 2 || options.Any(o => string.IsNullOrWhiteSpace(o) || o.Length > 100))
+            {
+                errors.Add($"{where}: \"options\" của thông tin hồ sơ chỉ dùng cho giới tính, gồm đúng hai nhãn (Nam, Nữ), mỗi nhãn tối đa 100 ký tự.");
+            }
+        }
+        else if (field is not null
+                 && (field.Type != BlockTypes.Text || options.Count is < 2 or > PatientLineItem.MaxFieldOptions
+                     || options.Any(o => string.IsNullOrWhiteSpace(o) || o.Length > 100)))
+        {
+            errors.Add(
+                $"{where}: \"options\" của trường chỉ dùng cho trường văn bản, từ 2 đến {PatientLineItem.MaxFieldOptions} nhãn (nhãn cuối là \"Khác\"), mỗi nhãn tối đa 100 ký tự.");
         }
     }
+
+    /// <summary><c>other</c>: trường văn bản in tiếp sau các ô của một câu hỏi chọn (ví dụ "Khác (Other): …").</summary>
+    private static void ValidatePatientLineOther(
+        PatientLineItem item, TemplateBlock? field, string where, Dictionary<string, TemplateBlock> declared, HashSet<string> fields, List<string> errors)
+    {
+        if (item.Other is not { } other)
+        {
+            return;
+        }
+
+        if (field is null || !IsChoice(field.Type))
+        {
+            errors.Add($"{where}: \"other\" chỉ dùng kèm một câu hỏi chọn của mẫu (\"field\").");
+        }
+        else if (!declared.TryGetValue(other, out var block) || block.Type != BlockTypes.Text)
+        {
+            errors.Add($"{where}: \"other\" phải là trường văn bản của mẫu.");
+        }
+        else if (!fields.Add(other))
+        {
+            errors.Add($"{where}: trường \"{other}\" đã in ở dòng khác.");
+        }
+    }
+
+    private static bool IsChoice(string type) => type is BlockTypes.Choice or BlockTypes.MultiChoice;
 
     private static void ValidateSignatures(TemplateSignatures? signatures, List<string> errors)
     {
@@ -176,7 +223,7 @@ public static partial class TemplateDefinitionValidator
 
         foreach (var label in new[]
                  {
-                     signatures.Patient, signatures.Representative, signatures.Hospital, signatures.HospitalHint,
+                     signatures.Patient, signatures.Representative, signatures.Hospital, signatures.HospitalHint, signatures.PatientHint,
                      signatures.DecisionLabel, signatures.AgreeLabel, signatures.RefuseLabel,
                  })
         {

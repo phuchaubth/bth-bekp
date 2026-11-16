@@ -249,7 +249,7 @@ public sealed class ConsentPdfRendererTests
         var logo = LogoImage.Read(Convert.FromBase64String(TestLogos.Png64))!;
         var withLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02") with { Logo = logo });
         var withoutLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
-        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10"));
 
         var head = withLogo.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
         Assert.Equal(3, head.Cells.Count);
@@ -264,7 +264,176 @@ public sealed class ConsentPdfRendererTests
         Assert.Contains("BỆNH VIỆN", HeadText(withoutLogo), StringComparison.Ordinal);
         // Dòng "MS … Số phiếu" dưới đầu phiếu chỉ còn ở mẫu thường (số phiếu vẫn in ở chân trang).
         Assert.DoesNotContain(BodyLines(withLogo), l => l.StartsWith("MS:", StringComparison.Ordinal));
-        Assert.Contains(BodyLines(standard), l => l.StartsWith("MS: TTNB-NGOAITRU", StringComparison.Ordinal));
+        Assert.Contains(BodyLines(standard), l => l.StartsWith("MS: QT-KNGT-BM10", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Bản giấy TTNB (mã QT-KNGT/BM03, lần ban hành 08): logo bên trái, tên phiếu ở giữa (không có quốc hiệu), mã tài liệu bên
+    /// phải với nhãn của bản giấy; dòng tiếng Anh của tên phiếu màu xanh, chữ đứng.
+    /// </summary>
+    [Fact]
+    public void TitleInHead_PrintsLogoTitleAndDocumentCodeOnOneRow_LikeTheOutpatientPaperForm()
+    {
+        var logo = LogoImage.Read(TestPng.Rgba(400, 200, (x, y) => true, whiteBackground: true))!;
+        var withLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU") with { Logo = logo });
+        var withoutLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+
+        var head = withLogo.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
+        Assert.Equal(Mdom.Tables.VerticalAlignment.Center, head.VerticalAlignment);
+        var image = head.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>()
+            .SelectMany(p => p.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Shapes.Image>()).Single();
+        Assert.InRange(image.Width.Millimeter, 18, 19.1);
+        Assert.InRange(image.Height.Millimeter, 9, 15);
+        // Ô logo (chỉ có ảnh, không có chữ), tên phiếu, mã tài liệu.
+        Assert.Equal(
+            "\nPHIẾU THÔNG TIN NGƯỜI BỆNH NGOẠI TRÚ\nOUTPATIENT INFORMATION FORM\n"
+            + "Mã số (Code): QT-KNGT/BM03\nLần ban hành (Issue number): 08\nNgày hiệu lực (Effective date): ",
+            HeadText(withLogo));
+        var english = Assert.Single(HeadTexts(withLogo), t => Plain(t) == "OUTPATIENT INFORMATION FORM");
+        Assert.True(english.Bold);
+        Assert.False(english.Italic);
+        Assert.Equal(MigraDocConsentPdfRenderer.English, english.Color);
+        // Tên phiếu đã ở đầu phiếu nên không in lại bên dưới; không có quốc hiệu, dòng "MS … Số phiếu".
+        var lines = BodyLines(withLogo);
+        Assert.DoesNotContain(lines, l => l.Contains("PHIẾU THÔNG TIN", StringComparison.Ordinal));
+        Assert.DoesNotContain(lines, l => l.StartsWith("MS:", StringComparison.Ordinal));
+        Assert.DoesNotContain("CỘNG HÒA", HeadText(withLogo), StringComparison.Ordinal);
+        // Chưa tải logo thì ô trái chỉ in tên bệnh viện (cột hẹp).
+        Assert.StartsWith(new HospitalOptions().Name.ToUpper(new System.Globalization.CultureInfo("vi-VN")) + "\n", HeadText(withoutLogo), StringComparison.Ordinal);
+    }
+
+    /// <summary>Bản giấy TTNB: 15 mục đánh số, gồm cả thông tin hồ sơ và trường của phiếu, như bản giấy.</summary>
+    [Fact]
+    public void OutpatientInformation_PrintsTheFifteenNumberedItemsOfThePaperForm()
+    {
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+        var lines = BodyLines(layout);
+        const string Gap = "    ";
+
+        Assert.Equal(
+            [
+                "1.\tHọ và Tên (theo Chứng minh /Căn cước) (Full Name (as per ID Card / Citizen ID)): PHẠM THỊ DUNG (GIẢ LẬP)",
+                $"2.\tGiới tính (Gender): ☐ Nam (Male){Gap}☒ Nữ (Female)",
+                "3.\tNgày sinh (theo CCCD) (Date of Birth (as per ID Card / Citizen ID)): 05/04/1988",
+                $"4.\tDân tộc (Ethnicity): ☒ Kinh{Gap}☐ Khác, ghi rõ (Other, specify): ……………………",
+                $"5.\tTôn giáo (Religion): ☐ Phật giáo (Buddhism){Gap}☐ Thiên chúa giáo (Catholicism){Gap}☒ Khác (Other): Không theo tôn giáo",
+                "6.\tTrình độ văn hóa (Education Level): 12/12",
+                "7.\tSố căn cước/mã số định danh cá nhân/số hộ chiếu (Identity Card/Citizen ID/Personal Identification Number/Passport Number): 036188000125",
+                "8.\tNghề nghiệp (Occupation): Nhân viên văn phòng",
+                "9.\tĐịa chỉ thường trú (theo hộ khẩu) (Permanent Address (as per household registration)): Số 9 Đường Thử Nghiệm, Phường Mẫu",
+                "10.\tChỗ ở hiện nay (Current Address): Số 9 Đường Thử Nghiệm, Phường Mẫu",
+                "11.\tSố điện thoại liên lạc (Contact Phone number): 0900000125",
+                "12.\tHọ và Tên người nhà (Full Name of Family Member): Phạm Văn Chồng (giả lập)",
+                "13.\tQuan hệ với người bệnh (Relationship to Patient): Chồng",
+                "14.\tSố điện thoại (Phone number): 0900000777",
+                "15.\tĐây có phải là thông tin của người liên hệ khẩn cấp không? (Is this the emergency contact information?) "
+                + $"☐ Có (Yes){Gap}☒ Không, điền thêm thông tin dưới đây (No, please provide additional information below)",
+                "Họ và Tên người liên hệ khẩn cấp (Full Name of Emergency Contact): Phạm Thị Em (giả lập)",
+                "Quan hệ với người bệnh (Relationship to Patient): Em gái",
+                "Số điện thoại (Phone number): 0900000888",
+                "Tôi, người ký tên dưới đây, chịu trách nhiệm với tất cả các thông tin tôi cung cấp trong phiếu này là đúng sự thật "
+                + "(I, the undersigned, am responsible for the accuracy of all the information I have provided in this form).",
+            ],
+            lines.SkipWhile(l => !l.StartsWith("1.\t", StringComparison.Ordinal)).Take(19));
+        // Không còn mục "I. Thông tin người bệnh", tiêu đề phần hay dòng nào in lại ở thân phiếu.
+        Assert.DoesNotContain(lines, l => l.StartsWith("I. Thông tin", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.Contains("Không theo tôn giáo", StringComparison.Ordinal));
+        Assert.Single(lines, l => l.Contains("(Ethnicity)", StringComparison.Ordinal));
+
+        // Số thứ tự thụt treo như danh sách; ba dòng của người liên hệ khẩn cấp thụt vào, không có số.
+        var paragraphs = BodyParagraphs(layout).ToList();
+        var first = paragraphs.Single(p => TextOf(p.Elements).StartsWith("1.\t", StringComparison.Ordinal));
+        Assert.Equal(7, first.Format.LeftIndent.Millimeter, 1);
+        Assert.Equal(-7, first.Format.FirstLineIndent.Millimeter, 1);
+        var subLine = paragraphs.Single(p => TextOf(p.Elements).StartsWith("Họ và Tên người liên hệ khẩn cấp", StringComparison.Ordinal));
+        Assert.Equal(7, subLine.Format.LeftIndent.Millimeter, 1);
+        Assert.Equal(0, subLine.Format.FirstLineIndent.Millimeter, 1);
+        // "(theo CCCD)" là tiếng Việt (chữ đen), phần tiếng Anh màu xanh.
+        Assert.DoesNotContain(BodyFormattedTexts(layout), t => Plain(t).Contains("theo CCCD", StringComparison.Ordinal) && t.Color == MigraDocConsentPdfRenderer.English);
+    }
+
+    /// <summary>Dân tộc là trường chữ (tự điền từ hồ sơ): "Kinh" đánh dấu ô Kinh; dân tộc khác đánh dấu ô "Khác" và in tên dân tộc.</summary>
+    [Theory]
+    [InlineData("kinh", "☒ Kinh    ☐ Khác, ghi rõ (Other, specify): ……………………")]
+    [InlineData("Tày", "☐ Kinh    ☒ Khác, ghi rõ (Other, specify): Tày")]
+    public void OutpatientInformation_Ethnicity_IsPrintedAsTheBoxesOfThePaperForm(string ethnicity, string expected)
+    {
+        var document = HospitalDocument("TTNB-NGOAITRU");
+        var data = document.Data.DeepClone().AsObject();
+        data["ethnicity"] = ethnicity;
+
+        var lines = BodyLines(MigraDocConsentPdfRenderer.Build(document with { Data = data }));
+
+        Assert.Contains($"4.\tDân tộc (Ethnicity): {expected}", lines);
+    }
+
+    /// <summary>
+    /// Phần ký của bản giấy TTNB: ngày tháng canh giữa, chữ đứng; nhân viên tiếp nhận bên trái với ghi chú đỏ "đã đối chiếu…"
+    /// (giữ nguyên sau khi xác nhận); người khai bên phải với ghi chú riêng.
+    /// </summary>
+    [Fact]
+    public void OutpatientInformation_SignatureBlock_FollowsThePaperForm()
+    {
+        var vietnam = TimeSpan.FromHours(7);
+        var unsigned = HospitalDocument("TTNB-NGOAITRU") with { IsFinal = false };
+        var confirmed = unsigned with
+        {
+            IsFinal = true,
+            HospitalConfirmation = new ConsentPdfConfirmation(
+                "Nhân viên giả lập", "Tiếp đón", new DateTimeOffset(2026, 11, 11, 9, 32, 0, vietnam)) { ImagePng = SignatureImage.Normalize(TestPng.Signature()).Png },
+        };
+
+        foreach (var layout in new[] { MigraDocConsentPdfRenderer.Build(unsigned), MigraDocConsentPdfRenderer.Build(confirmed) })
+        {
+            var date = BodyParagraphs(layout).Single(p => TextOf(p.Elements).Contains("ngày (day) 11 tháng (month) 11 năm (year) 2026", StringComparison.Ordinal));
+            Assert.Equal(Mdom.ParagraphAlignment.Center, date.Format.Alignment);
+            Assert.DoesNotContain(date.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>(), t => Plain(t).StartsWith("ngày", StringComparison.Ordinal) && t.Italic);
+            Assert.Equal(
+                ["Nhân viên tiếp nhận",
+                 "(đã đối chiếu thông tin trên giấy tờ tùy thân)\n(Patient Admission Staff)\n(verified against identification documents)"],
+                SignatureCell(layout, 0).Take(2));
+            Assert.Equal(
+                ["Người khai (ký tên, ghi rõ họ tên)",
+                 "(Declarant (signature, full name))\nNếu không phải người bệnh, ghi rõ quan hệ với người bệnh\n(If not the patient, state relationship to the patient)"],
+                SignatureCell(layout, 1).Take(2));
+            // Dòng bắt đầu bằng "!" in màu đỏ như bản giấy; ghi chú cỡ 11 (gần bằng tên ô ký).
+            var hint = SignatureRoles(layout).Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().ElementAt(1);
+            Assert.Equal(11, hint.Format.Font.Size.Point);
+            Assert.Equal(
+                ["(đã đối chiếu thông tin trên giấy tờ tùy thân)", "(verified against identification documents)"],
+                hint.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>().Where(t => t.Color == MigraDocConsentPdfRenderer.Note).Select(Plain));
+        }
+
+        // Sau khi xác nhận: ghi chú giữ nguyên, trạng thái xác nhận in dưới họ tên.
+        var names = MigraDocConsentPdfRenderer.Build(confirmed).Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().Last().Rows[2].Cells[0]
+            .Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements));
+        Assert.Equal(["Nhân viên giả lập", "Tiếp đón", "Đã ký, xác nhận bằng tài khoản", "Xác nhận lúc 09:32, 11/11/2026"], names);
+    }
+
+    /// <summary>Bản giấy TTNB là một trang: phiếu đã ký đủ (kể cả người đại diện ký, có khung chữ ký) vẫn vừa một trang.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OutpatientInformation_SignedWithFrame_FitsOnOnePage(bool representative)
+    {
+        var signature = SignatureImage.Normalize(TestPng.Signature());
+        var vietnam = TimeSpan.FromHours(7);
+        var document = HospitalDocument("TTNB-NGOAITRU") with
+        {
+            Representative = representative ? Spouse : null,
+            Logo = LogoImage.Read(TestPng.Rgba(400, 200, (x, y) => true, whiteBackground: true)),
+            SignatureFrame = LogoImage.Read(TestPng.Rgba(400, 300, (x, y) => x < 100 && y < 60, whiteBackground: true)),
+            PatientSignature = new ConsentPdfSignature(signature.Png!, new DateTimeOffset(2026, 11, 11, 9, 30, 0, vietnam), "Tôi xác nhận các thông tin trên là đúng sự thật"),
+            HospitalConfirmation = new ConsentPdfConfirmation("Nhân viên giả lập", "Tiếp đón", new DateTimeOffset(2026, 11, 11, 9, 32, 0, vietnam)) { ImagePng = signature.Png },
+        };
+
+        var bytes = new MigraDocConsentPdfRenderer().Render(document);
+        if (Environment.GetEnvironmentVariable("CONSENT_PDF_OUT") is { Length: > 0 } output)
+        {
+            File.WriteAllBytes(Path.Combine(output, $"TTNB-NGOAITRU-one-page{(representative ? "-representative" : string.Empty)}.pdf"), bytes);
+        }
+
+        Assert.Equal(1, PageCount(bytes));
     }
 
     [Fact]
@@ -308,7 +477,7 @@ public sealed class ConsentPdfRendererTests
     public void Bm02_StaffSignsOnTheLeft_WithTitlesAsWritten_AndABilingualDateLine()
     {
         var bm02 = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
-        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU"));
+        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10"));
 
         Assert.Contains(BodyLines(bm02), l => l.EndsWith(", ngày (day) 11 tháng (month) 11 năm (year) 2026", StringComparison.Ordinal));
         Assert.Contains(BodyLines(standard), l => l.EndsWith(", ngày 11 tháng 11 năm 2026", StringComparison.Ordinal));
@@ -316,9 +485,12 @@ public sealed class ConsentPdfRendererTests
             ["Nhân viên hướng dẫn/ Counseling Staff", "(Ký, ghi rõ họ tên)\n(Signature and full name)"], SignatureCell(bm02, 0).Take(2));
         Assert.Equal(["Người thỏa thuận/ Declarant", "(Ký, ghi rõ họ tên)\n(Signature and full name)"], SignatureCell(bm02, 1).Take(2));
         Assert.DoesNotContain(SignatureTitleRuns(bm02, 0), t => t.Bold);
-        // Mẫu thường: người bệnh bên trái, tên ô ký viết hoa, in đậm.
-        Assert.Equal("NGƯỜI KHAI (DECLARANT)", SignatureCell(standard, 0).First());
+        // Mẫu thường: người bệnh bên trái, tên ô ký viết hoa, in đậm, ghi chú cỡ 10.
+        Assert.Equal("NGƯỜI BỆNH (PATIENT)", SignatureCell(standard, 0).First());
         Assert.All(SignatureTitleRuns(standard, 0), t => Assert.True(t.Bold));
+        Assert.Equal(
+            10,
+            SignatureRoles(standard).Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().ElementAt(1).Format.Font.Size.Point);
     }
 
     /// <summary>Bệnh viện yêu cầu 15/11/2026: ô đã chọn có dấu X bên trong (☒), ô chưa chọn để trống (☐).</summary>
@@ -394,7 +566,7 @@ public sealed class ConsentPdfRendererTests
     /// <summary>Bệnh viện yêu cầu 15/11/2026: logo nhỏ lại, cạnh trên logo thẳng cạnh trên chữ quốc hiệu (cả hai kiểu đầu phiếu).</summary>
     [Theory]
     [InlineData("QT-KNGT-BM02")]
-    [InlineData("TTNB-NGOAITRU")]
+    [InlineData("TUVAN-CONGTT")]
     public void Logo_IsAtMost15mmTall_AndTopAlignedWithTheMotto(string code)
     {
         var logo = LogoImage.Read(TestPng.Rgba(300, 300, (x, y) => true, whiteBackground: true))!;
@@ -423,19 +595,6 @@ public sealed class ConsentPdfRendererTests
     /// <summary>Năm dòng của mục "I. Thông tin người bệnh": tiêu đề, ba dòng hai cột, địa chỉ.</summary>
     private static IEnumerable<string> PatientSection(Mdom.Document layout) =>
         BodyLines(layout).SkipWhile(l => !l.StartsWith("I. Thông tin người bệnh", StringComparison.Ordinal)).Take(5);
-
-    [Fact]
-    public void OutpatientInformation_PrintsOccupationBesideEducation_AndBothEmergencyAnswersOnOneLine()
-    {
-        var lines = BodyLines(MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU")));
-
-        var education = Assert.Single(lines, l => l.StartsWith("Trình độ văn hóa (Education Level): 12/12", StringComparison.Ordinal));
-        Assert.EndsWith("Nghề nghiệp (Occupation): Nhân viên văn phòng", education, StringComparison.Ordinal);
-        Assert.DoesNotContain(lines, l => l.StartsWith("Nghề nghiệp", StringComparison.Ordinal));
-        var emergency = Assert.Single(lines, l => l.StartsWith("Đây có phải là thông tin của người liên hệ khẩn cấp không?", StringComparison.Ordinal));
-        Assert.Contains("☐ Có (Yes)", emergency, StringComparison.Ordinal);
-        Assert.Contains("☒ Không, điền thêm thông tin dưới đây", emergency, StringComparison.Ordinal);
-    }
 
     [Theory]
     [InlineData("no", new[] { "A: 1\u00A0\u00A0\u00A0 C: 3", "Đoạn văn", "D: 11/11/2026" })]

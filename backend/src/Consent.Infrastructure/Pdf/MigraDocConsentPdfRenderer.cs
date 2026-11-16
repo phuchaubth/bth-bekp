@@ -50,6 +50,9 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     /// <summary>Màu lời xác nhận của người ký ("Tôi đã nghe, hiểu và đồng ý"): đỏ, chữ đậm nghiêng.</summary>
     internal static readonly Color Statement = new(0xC0, 0x00, 0x00);
+
+    /// <summary>Màu dòng ghi chú bắt đầu bằng "!" dưới tên ô ký, như chữ đỏ "đã đối chiếu…" của bản giấy TTNB.</summary>
+    internal static readonly Color Note = new(0xFF, 0x00, 0x00);
     private static readonly CultureInfo Vietnamese = CultureInfo.GetCultureInfo("vi-VN");
     private static readonly Lock FontGate = new();
 
@@ -202,24 +205,46 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     private const double ControlLogoColumnMm = 38;
     private const double ControlBoxColumnMm = 43;
 
+    // Tên phiếu ở giữa đầu phiếu (bản giấy TTNB, lề hẹp hơn lề của phiếu điện tử): cột logo hẹp, tên phiếu cỡ 12 và mã tài
+    // liệu cỡ 9 để cả ba vừa một hàng trong 167 mm mà không xuống dòng (bản giấy: cỡ 14 và 10 trên trang rộng 187 mm).
+    private const double TitleHeadLogoColumnMm = 21;
+    private const double TitleHeadBoxColumnMm = 46;
+
     /// <summary>
-    /// Đầu phiếu như bản giấy có mã tài liệu (<c>documentControl</c>): logo bên trái, quốc hiệu ở giữa, mã số – lần ban hành –
-    /// ngày hiệu lực bên phải. Không in dòng khoa và dòng "MS … Số phiếu" (số phiếu in ở chân trang). Chưa tải logo thì ô
-    /// trái in tên đơn vị để phiếu vẫn có tên bệnh viện.
+    /// Đầu phiếu như bản giấy có mã tài liệu (<c>documentControl</c>): logo bên trái, quốc hiệu ở giữa (hoặc tên phiếu, với
+    /// <c>titleInHead</c>), mã số – lần ban hành – ngày hiệu lực bên phải. Không in dòng khoa và dòng "MS … Số phiếu" (số phiếu
+    /// in ở chân trang). Chưa tải logo thì ô trái in tên đơn vị để phiếu vẫn có tên bệnh viện.
     /// </summary>
     private static void AddControlledDocumentHead(Section section, ConsentPdfDocument document, TemplateDocumentControl control)
     {
+        var titleInHead = control.TitleInHead;
+        var logoColumn = titleInHead ? TitleHeadLogoColumnMm : ControlLogoColumnMm;
+        var boxColumn = titleInHead ? TitleHeadBoxColumnMm : ControlBoxColumnMm;
         var table = section.AddTable();
-        table.AddColumn(Unit.FromMillimeter(ControlLogoColumnMm));
-        table.AddColumn(Unit.FromMillimeter(167 - ControlLogoColumnMm - ControlBoxColumnMm));
-        table.AddColumn(Unit.FromMillimeter(ControlBoxColumnMm));
+        table.AddColumn(Unit.FromMillimeter(logoColumn));
+        table.AddColumn(Unit.FromMillimeter(167 - logoColumn - boxColumn));
+        table.AddColumn(Unit.FromMillimeter(boxColumn));
         var row = table.AddRow();
         // Canh trên: cạnh trên logo thẳng cạnh trên chữ quốc hiệu (bệnh viện yêu cầu 15/11/2026), ô mã tài liệu cũng từ đó.
-        row.VerticalAlignment = VerticalAlignment.Top;
+        // Tên phiếu ở giữa thì logo, tên phiếu, mã tài liệu canh giữa theo chiều dọc như bản giấy TTNB.
+        row.VerticalAlignment = titleInHead ? VerticalAlignment.Center : VerticalAlignment.Top;
+        if (titleInHead)
+        {
+            // Khoảng trống giữa đầu phiếu và dòng thông tin đầu tiên (thay cho khoảng trên của tên phiếu).
+            row.BottomPadding = Unit.FromMillimeter(4);
+        }
 
         if (document.Logo is { } logo && CanDecode(logo))
         {
-            AddLogo(row.Cells[0], logo, ControlLogoColumnMm - 2, LogoMaxHeightMm, alignWithTextOfSize: 11);
+            AddLogo(row.Cells[0], logo, logoColumn - 2, LogoMaxHeightMm, alignWithTextOfSize: titleInHead ? 0 : 11);
+        }
+        else if (titleInHead)
+        {
+            // Cột logo hẹp: chưa tải logo thì chỉ in tên bệnh viện, chữ nhỏ.
+            var name = row.Cells[0].AddParagraph();
+            name.Format.Alignment = ParagraphAlignment.Center;
+            name.Format.Font.Size = 7;
+            name.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
         }
         else
         {
@@ -231,21 +256,71 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             name.AddFormattedText(document.Hospital.Name.ToUpper(Vietnamese), TextFormat.Bold);
         }
 
-        AddNationalMotto(row.Cells[1], 11);
+        if (titleInHead)
+        {
+            AddHeadTitle(row.Cells[1], document.Definition.Title);
+        }
+        else
+        {
+            AddNationalMotto(row.Cells[1], 11);
+        }
 
         var box = row.Cells[2].AddParagraph();
-        box.Format.Font.Size = 7.5;
-        AddBilingual(box, $"Mã số (Code No): {control.Code}");
+        box.Format.Font.Size = titleInHead ? 9 : 7.5;
+        AddBilingual(box, $"{control.CodeLabel ?? TemplateDocumentControl.DefaultCodeLabel}: {control.Code}");
         box.AddLineBreak();
-        AddBilingual(box, $"Lần ban hành (Issue No): {control.IssueNo}");
+        AddBilingual(box, $"{control.IssueNoLabel ?? TemplateDocumentControl.DefaultIssueNoLabel}: {control.IssueNo}");
         box.AddLineBreak();
-        AddBilingual(box, $"Ngày hiệu lực (Effective Date): {control.EffectiveDate}");
+        AddBilingual(box, $"{control.EffectiveDateLabel ?? TemplateDocumentControl.DefaultEffectiveDateLabel}: {control.EffectiveDate}");
+    }
+
+    /// <summary>
+    /// Tên phiếu ở giữa đầu phiếu (<c>titleInHead</c>, bản giấy TTNB): chữ hoa, đậm, canh giữa; dòng tiếng Anh màu xanh, chữ
+    /// đứng như bản giấy.
+    /// </summary>
+    private static void AddHeadTitle(Cell cell, string title)
+    {
+        var paragraph = cell.AddParagraph();
+        paragraph.Format.Alignment = ParagraphAlignment.Center;
+        paragraph.Format.Font.Size = 12;
+        foreach (var segment in BilingualText.Split(title, wholeLines: true))
+        {
+            if (segment.Text == "\n")
+            {
+                paragraph.AddLineBreak();
+                continue;
+            }
+
+            var run = paragraph.AddFormattedText(segment.Text.ToUpper(Vietnamese), TextFormat.Bold);
+            if (segment.IsEnglish)
+            {
+                run.Color = English;
+            }
+        }
     }
 
     /// <summary>Dòng trong ngoặc của tiêu đề, ví dụ "(Về chế độ thanh toán …)": dòng phụ, không viết hoa.</summary>
     private static bool IsTitleSubLine(string line) => line.Length > 2 && line[0] == '(' && line[^1] == ')';
 
     private static void AddTitle(Section section, ConsentPdfDocument document)
+    {
+        if (document.Definition.DocumentControl?.TitleInHead != true)
+        {
+            AddTitleLines(section, document);
+        }
+
+        if (document.Definition.Subtitle is { } subtitle)
+        {
+            var sub = section.AddParagraph();
+            AddBilingual(sub, subtitle, wholeLines: true);
+            sub.Format.Alignment = ParagraphAlignment.Center;
+            sub.Format.Font.Italic = true;
+            sub.Format.SpaceAfter = Unit.FromMillimeter(4);
+        }
+    }
+
+    /// <summary>Tên phiếu dưới đầu phiếu: chữ hoa, đậm, cỡ 14; dòng trong ngoặc là dòng phụ.</summary>
+    private static void AddTitleLines(Section section, ConsentPdfDocument document)
     {
         var title = section.AddParagraph();
         title.Format.Alignment = ParagraphAlignment.Center;
@@ -280,15 +355,6 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             {
                 AddBilingual(title, lines[i], upper: true, wholeLines: true);
             }
-        }
-
-        if (document.Definition.Subtitle is { } subtitle)
-        {
-            var sub = section.AddParagraph();
-            AddBilingual(sub, subtitle, wholeLines: true);
-            sub.Format.Alignment = ParagraphAlignment.Center;
-            sub.Format.Font.Italic = true;
-            sub.Format.SpaceAfter = Unit.FromMillimeter(4);
         }
     }
 
@@ -370,13 +436,36 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     /// </summary>
     private const double PatientLineSecondItemMm = 76;
 
-    /// <summary>Dòng thông tin người bệnh theo bản giấy của mẫu (<c>patientLines</c>), thay cho mục "I. Thông tin người bệnh".</summary>
+    /// <summary>Cột số thứ tự của dòng thông tin người bệnh đánh số (<c>numberedPatientLines</c>), thụt treo như danh sách.</summary>
+    private const double LineNumberColumnMm = 7;
+
+    /// <summary>
+    /// Dòng thông tin người bệnh theo bản giấy của mẫu (<c>patientLines</c>), thay cho mục "I. Thông tin người bệnh". Mẫu đánh
+    /// số dòng (bản giấy TTNB) thì chữ mọi dòng thẳng cột sau số thứ tự; dòng phụ (<c>indent</c>) không có số.
+    /// </summary>
     private static void AddPatientLines(Section section, ConsentPdfDocument document, IReadOnlyList<IReadOnlyList<PatientLineItem>> lines)
     {
+        var numbered = document.Definition.NumberedPatientLines;
+        var number = 0;
         foreach (var items in lines)
         {
             var line = section.AddParagraph();
-            line.Format.SpaceAfter = Unit.FromPoint(4);
+            // Mẫu đánh số có nhiều dòng (TTNB 18 dòng): khoảng cách dòng gần như bản giấy để phiếu và khối chữ ký vừa một trang.
+            line.Format.SpaceAfter = Unit.FromPoint(numbered ? 1 : 4);
+            var indent = items[0].Indent;
+            if (numbered || indent)
+            {
+                line.Format.LeftIndent = Unit.FromMillimeter(LineNumberColumnMm);
+            }
+
+            if (numbered && !indent)
+            {
+                line.Format.FirstLineIndent = Unit.FromMillimeter(-LineNumberColumnMm);
+                line.Format.TabStops.AddTabStop(Unit.FromMillimeter(LineNumberColumnMm));
+                line.AddText($"{++number}.");
+                line.AddTab();
+            }
+
             line.Format.TabStops.AddTabStop(Unit.FromMillimeter(PatientLineSecondItemMm));
             for (var i = 0; i < items.Count; i++)
             {
@@ -396,7 +485,21 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         {
             // Trường của phiếu (ví dụ số thẻ BHYT): in ở đây thay cho chỗ của nó trong thân phiếu; đang ẩn thì để chấm trống.
             var block = document.Definition.InputBlocks.First(b => b.Key == key);
-            AddLabelValue(line, $"{item.Label ?? block.Label}: ", FormatValue(block.Type, document.Data[key]));
+            var fieldLabel = item.Label ?? block.Label ?? string.Empty;
+            if (block.Type is BlockTypes.Choice or BlockTypes.MultiChoice)
+            {
+                AddChoiceLine(
+                    line, fieldLabel, block, document.Data[key], item.Other is { } other ? document.Data[other] : null, item.Other is not null);
+            }
+            else if (item.Options is { Count: > 0 } choices)
+            {
+                AddTextAsBoxes(line, fieldLabel, choices, FormatValue(block.Type, document.Data[key]));
+            }
+            else
+            {
+                AddLabelValue(line, $"{fieldLabel}: ", FormatValue(block.Type, document.Data[key]));
+            }
+
             return;
         }
 
@@ -439,9 +542,88 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         }
     }
 
-    /// <summary>Trường của phiếu đã in ở dòng thông tin người bệnh, không in lại ở thân phiếu.</summary>
+    /// <summary>
+    /// Câu hỏi chọn trên một dòng như bản giấy: "Tôn giáo (Religion): ☒ Phật giáo (Buddhism) ☐ … ☐ Khác (Other): …", với
+    /// trường chữ <paramref name="other"/> in sau các ô (để chấm khi trống).
+    /// </summary>
+    private static void AddChoiceLine(Paragraph line, string label, TemplateBlock block, JsonNode? value, JsonNode? other, bool hasOther)
+    {
+        AddBilingual(line, LabelWithSeparator(label));
+        var selected = SelectedValues(value);
+        var options = block.Options ?? [];
+        for (var i = 0; i < options.Count; i++)
+        {
+            if (i > 0)
+            {
+                line.AddText(InlineGap);
+            }
+
+            AddBox(line, selected.Contains(options[i].Value));
+            line.AddText(" ");
+            AddBilingual(line, options[i].Label);
+        }
+
+        if (hasOther)
+        {
+            AddLabelValue(line, ": ", FormatValue(BlockTypes.Text, other));
+        }
+    }
+
+    /// <summary>
+    /// Trường chữ in thành các ô như bản giấy (ví dụ dân tộc "☐ Kinh ☐ Khác, ghi rõ (Other, specify): …"): giá trị trùng phần
+    /// tiếng Việt của một lựa chọn (trừ lựa chọn cuối) thì đánh dấu ô đó; giá trị khác thì đánh dấu ô cuối và in giá trị sau ô.
+    /// </summary>
+    private static void AddTextAsBoxes(Paragraph line, string label, IReadOnlyList<string> choices, string? value)
+    {
+        var text = value?.Trim().Normalize();
+        var match = -1;
+        for (var i = 0; i < choices.Count - 1 && match < 0 && !string.IsNullOrEmpty(text); i++)
+        {
+            if (string.Equals(VietnamesePart(choices[i]), text, StringComparison.OrdinalIgnoreCase))
+            {
+                match = i;
+            }
+        }
+
+        var isOther = match < 0 && !string.IsNullOrEmpty(text);
+        AddBilingual(line, LabelWithSeparator(label));
+        for (var i = 0; i < choices.Count; i++)
+        {
+            if (i > 0)
+            {
+                line.AddText(InlineGap);
+            }
+
+            AddBox(line, i == match || (isOther && i == choices.Count - 1));
+            line.AddText(" ");
+            AddBilingual(line, choices[i]);
+        }
+
+        AddLabelValue(line, ": ", isOther ? text : null);
+    }
+
+    /// <summary>Phần tiếng Việt của một nhãn song ngữ ("Nam (Male)" → "Nam").</summary>
+    private static string VietnamesePart(string label) =>
+        string.Concat(BilingualText.Split(label).Where(s => !s.IsEnglish).Select(s => s.Text)).Trim().Normalize();
+
+    /// <summary>Nhãn kèm dấu ":"; câu hỏi (kết thúc bằng "?" hoặc "?)") chỉ thêm khoảng trắng.</summary>
+    private static string LabelWithSeparator(string label)
+    {
+        var trimmed = label.TrimEnd(':', ' ');
+        return trimmed.EndsWith('?') || trimmed.EndsWith("?)", StringComparison.Ordinal) ? $"{trimmed} " : $"{trimmed}: ";
+    }
+
+    private static HashSet<string> SelectedValues(JsonNode? value) => value switch
+    {
+        JsonArray array => array.Select(v => v!.GetValue<string>()).ToHashSet(StringComparer.Ordinal),
+        JsonValue single when single.TryGetValue<string>(out var text) => [text],
+        _ => new HashSet<string>(StringComparer.Ordinal),
+    };
+
+    /// <summary>Trường của phiếu đã in ở dòng thông tin người bệnh (kể cả trường "other"), không in lại ở thân phiếu.</summary>
     private static HashSet<string> FieldsInPatientLines(TemplateDefinition definition) =>
-        definition.PatientLines?.SelectMany(line => line).Select(item => item.Field).OfType<string>().ToHashSet(StringComparer.Ordinal)
+        definition.PatientLines?.SelectMany(line => line).SelectMany(item => new[] { item.Field, item.Other }).OfType<string>()
+            .ToHashSet(StringComparer.Ordinal)
         ?? [];
 
     private static void AddSection(Section section, TemplateSection templateSection, ConsentPdfDocument document)
@@ -527,12 +709,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
 
     private static void AddChoices(Section section, TemplateBlock block, JsonNode? value)
     {
-        var selected = value switch
-        {
-            JsonArray array => array.Select(v => v!.GetValue<string>()).ToHashSet(StringComparer.Ordinal),
-            JsonValue single when single.TryGetValue<string>(out var text) => [text],
-            _ => new HashSet<string>(StringComparer.Ordinal),
-        };
+        var selected = SelectedValues(value);
         var options = block.Options ?? [];
         void Mark(Paragraph paragraph, TemplateOption option)
         {
@@ -665,17 +842,19 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     }
 
     /// <summary>
-    /// Dòng "địa danh, ngày … tháng … năm …" (chữ nghiêng). Mẫu song ngữ ghi kèm tiếng Anh như bản giấy: "ngày (day) …
-    /// tháng (month) … năm (year) …"; các chữ này ngắn nên tô màu trực tiếp, không qua nhận diện tiếng Anh.
+    /// Dòng "địa danh, ngày … tháng … năm …" (chữ nghiêng, hoặc chữ đứng với <paramref name="upright"/> như bản giấy TTNB; phần
+    /// tiếng Anh luôn nghiêng). Mẫu song ngữ ghi kèm tiếng Anh như bản giấy: "ngày (day) … tháng (month) … năm (year) …"; các
+    /// chữ này ngắn nên tô màu trực tiếp, không qua nhận diện tiếng Anh.
     /// </summary>
-    private static void AddDateLine(Paragraph paragraph, string place, DateOnly date, bool bilingual)
+    private static void AddDateLine(Paragraph paragraph, string place, DateOnly date, bool bilingual, bool upright = false)
     {
-        AddBilingual(paragraph, $"{place}, ", TextFormat.Italic);
+        var style = upright ? TextFormat.NotItalic : TextFormat.Italic;
+        AddBilingual(paragraph, $"{place}, ", style);
         string[] parts = ["ngày", $" {date.Day:00} tháng", $" {date.Month:00} năm", $" {date.Year}"];
         string[] english = ["(day)", "(month)", "(year)"];
         for (var i = 0; i < parts.Length; i++)
         {
-            paragraph.AddFormattedText(parts[i], TextFormat.Italic);
+            paragraph.AddFormattedText(parts[i], style);
             if (bilingual && i < english.Length)
             {
                 paragraph.AddText(" ");
@@ -688,7 +867,12 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     /// <summary>Ghi chú dưới tên ô ký; mẫu song ngữ thêm dòng tiếng Anh như bản giấy ("(Signature and full name)").</summary>
     private static string Hint(string vietnamese, string english, bool bilingual) => bilingual ? $"{vietnamese}\n{english}" : vietnamese;
 
-    private static SignatureSlot ConfirmationSlot(string role, string? hint, ConsentPdfConfirmation? confirmation, bool bilingual)
+    /// <param name="keepHint">
+    /// Ghi chú của mẫu giữ nguyên sau khi xác nhận (<c>paperHints</c>, ví dụ "đã đối chiếu thông tin trên giấy tờ tùy thân"
+    /// của bản giấy TTNB); trạng thái xác nhận in thành dòng nhỏ dưới họ tên.
+    /// </param>
+    private static SignatureSlot ConfirmationSlot(
+        string role, string? hint, ConsentPdfConfirmation? confirmation, bool bilingual, bool keepHint = false)
     {
         if (confirmation is null)
         {
@@ -701,11 +885,19 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             lines.Add(title);
         }
 
+        var kept = keepHint && hint is not null;
+        if (kept)
+        {
+            lines.Add(confirmation.ImagePng is null ? "Đã xác nhận bằng tài khoản" : "Đã ký, xác nhận bằng tài khoản");
+        }
+
         lines.Add($"Xác nhận lúc {confirmation.ConfirmedAt:HH:mm}, {confirmation.ConfirmedAt:dd/MM/yyyy}");
         // Quyết định 17: nhân viên ký tay khi xác nhận; phiếu hoàn tất trước đó không có ảnh.
-        var signedHint = confirmation.ImagePng is null
-            ? Hint("(Đã xác nhận bằng tài khoản)", "(Confirmed with staff account)", bilingual)
-            : Hint("(Đã ký, xác nhận bằng tài khoản)", "(Signed, confirmed with staff account)", bilingual);
+        var signedHint = kept
+            ? hint!
+            : confirmation.ImagePng is null
+                ? Hint("(Đã xác nhận bằng tài khoản)", "(Confirmed with staff account)", bilingual)
+                : Hint("(Đã ký, xác nhận bằng tài khoản)", "(Signed, confirmed with staff account)", bilingual);
         return new SignatureSlot(role, signedHint, confirmation.ImagePng, confirmation.Name, lines);
     }
 
@@ -728,9 +920,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         {
             var question = labels?.DecisionLabel ?? $"Ý kiến của {(isRepresentative ? "người đại diện" : "người bệnh")}";
             // Câu hỏi đã có dấu "?" (hoặc kết thúc bằng ngoặc sau dấu "?") thì không thêm dấu ":".
-            var trimmed = question.TrimEnd(':', ' ');
-            var isQuestion = trimmed.EndsWith('?') || trimmed.EndsWith("?)", StringComparison.Ordinal);
-            AddBilingual(decision, isQuestion ? $"{trimmed} " : $"{trimmed}: ", TextFormat.Bold);
+            AddBilingual(decision, LabelWithSeparator(question), TextFormat.Bold);
             if (labels?.DecisionLabel is not null)
             {
                 // Câu hỏi riêng của mẫu thường dài: đưa lựa chọn và ngày tháng xuống dòng dưới.
@@ -748,7 +938,19 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             AddBilingual(decision, labels?.RefuseLabel ?? "Từ chối");
         }
 
-        if (bilingual && (labels?.RequiresDecision ?? true))
+        var centerDate = labels?.CenterDate == true;
+        if (centerDate)
+        {
+            // Như bản giấy TTNB: dòng ngày tháng canh giữa trang, chữ đứng; có câu hỏi ý kiến thì ngày tháng in dòng riêng.
+            if (labels?.RequiresDecision ?? true)
+            {
+                decision = section.AddParagraph();
+                decision.Format.KeepWithNext = true;
+            }
+
+            decision.Format.Alignment = ParagraphAlignment.Center;
+        }
+        else if (bilingual && (labels?.RequiresDecision ?? true))
         {
             // Dòng ngày tháng song ngữ dài hơn: in dòng riêng, canh phải, để không xuống dòng giữa chừng sau các ô ý kiến.
             decision = section.AddParagraph();
@@ -760,7 +962,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             decision.AddTab();
         }
 
-        AddDateLine(decision, document.Hospital.Place, document.DocumentDate, bilingual);
+        AddDateLine(decision, document.Hospital.Place, document.DocumentDate, bilingual, upright: centerDate);
 
         // Ô chữ ký theo thứ tự: người bệnh/người đại diện, các bước xác nhận trung gian (nếu mẫu có), xác nhận cuối của
         // bệnh viện; xếp hai ô mỗi hàng.
@@ -778,7 +980,8 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             }
         }
 
-        var patientHint = Hint("(Ký, ghi rõ họ tên)", "(Signature and full name)", bilingual);
+        var patientHint = labels?.PatientHint ?? Hint("(Ký, ghi rõ họ tên)", "(Signature and full name)", bilingual);
+        var paperHints = labels?.PaperHints == true;
         var slots = new List<SignatureSlot>
         {
             new(patientRole, patientHint, document.PatientSignature?.ImagePng, patientName, patientLines)
@@ -790,10 +993,11 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
         for (var i = 0; i < steps.Count; i++)
         {
             var done = document.StepConfirmations is { } confirmations && i < confirmations.Count ? confirmations[i] : null;
-            slots.Add(ConfirmationSlot(steps[i].Label, steps[i].Hint, done, bilingual));
+            slots.Add(ConfirmationSlot(steps[i].Label, steps[i].Hint, done, bilingual, keepHint: paperHints));
         }
 
-        slots.Add(ConfirmationSlot(labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint, document.HospitalConfirmation, bilingual));
+        slots.Add(ConfirmationSlot(
+            labels?.Hospital ?? "Nhân viên y tế", labels?.HospitalHint, document.HospitalConfirmation, bilingual, keepHint: paperHints));
         if (labels?.HospitalFirst == true)
         {
             // Như bản giấy: các ô ký phía bệnh viện trước (bên trái), người bệnh/người đại diện sau cùng.
@@ -827,7 +1031,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             for (var c = 0; c < pair.Count; c++)
             {
                 var slot = pair[c];
-                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement, plainTitles);
+                AddSignatureCell(roles.Cells[c], slot.Role, slot.Hint, slot.Statement, plainTitles, paperHints);
                 if (slot.ImagePng is { } image)
                 {
                     // Ảnh lưu là ảnh xám; in bằng màu mực xanh (cả chữ ký cũ vẽ mực đen), trong khung nếu có.
@@ -949,7 +1153,10 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     }
 
     /// <param name="plainTitle">In tên ô ký đúng như đã ghi (không viết hoa toàn bộ, không đậm), như bản giấy của mẫu.</param>
-    private static void AddSignatureCell(Cell cell, string role, string hint, string? statement, bool plainTitle)
+    /// <param name="paperHint">
+    /// Ghi chú gần bằng cỡ chữ tên ô ký như bản giấy: cỡ 11 (bản giấy cỡ 12 trên trang rộng hơn), mặc định cỡ 10.
+    /// </param>
+    private static void AddSignatureCell(Cell cell, string role, string hint, string? statement, bool plainTitle, bool paperHint = false)
     {
         var title = cell.AddParagraph();
         title.Format.Alignment = ParagraphAlignment.Center;
@@ -962,10 +1169,10 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             AddBilingual(title, role, TextFormat.Bold, upper: true);
         }
         var help = cell.AddParagraph();
-        AddBilingual(help, hint);
+        AddHint(help, hint);
         help.Format.Alignment = ParagraphAlignment.Center;
         help.Format.Font.Italic = true;
-        help.Format.Font.Size = 10;
+        help.Format.Font.Size = paperHint ? 11 : 10;
         if (statement is not null)
         {
             // Lời xác nhận người ký ghi khi ký, như dòng viết tay trên phiếu giấy.
@@ -974,6 +1181,28 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
             words.Format.SpaceBefore = Unit.FromPoint(2);
             var text = words.AddFormattedText($"“{statement}”", TextFormat.Bold | TextFormat.Italic);
             text.Color = Statement;
+        }
+    }
+
+    /// <summary>Ghi chú dưới tên ô ký: dòng bắt đầu bằng "!" in màu đỏ, cả phần tiếng Anh (dấu "!" không in), như bản giấy TTNB.</summary>
+    private static void AddHint(Paragraph paragraph, string hint)
+    {
+        var lines = hint.Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (i > 0)
+            {
+                paragraph.AddLineBreak();
+            }
+
+            if (lines[i].StartsWith('!'))
+            {
+                paragraph.AddFormattedText(lines[i][1..]).Color = Note;
+            }
+            else
+            {
+                AddBilingual(paragraph, lines[i]);
+            }
         }
     }
 

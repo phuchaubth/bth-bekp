@@ -21,6 +21,13 @@ internal static partial class BilingualText
     /// <summary>Dấu hai chấm, khoảng trắng cuối phần tiếng Anh sau dấu "/" giữ màu chữ thường (như phần sau dấu ngoặc).</summary>
     private static readonly char[] TrailingMarks = [':', ' '];
 
+    /// <summary>
+    /// Chữ viết tắt tiếng Việt không dấu: tính là từ tiếng Việt, để "(theo CCCD)" của bản giấy TTNB không bị coi là tiếng Anh.
+    /// </summary>
+    private static readonly HashSet<string> VietnameseAbbreviations = new(StringComparer.Ordinal) { "CCCD", "CMND", "BHYT", "BHXH" };
+
+    private static readonly char[] WordPunctuation = ['(', ')', ',', '.', ':', ';'];
+
     /// <param name="wholeLines">Cho phép cả dòng là tiếng Anh (chỉ dùng cho tiêu đề, phụ đề).</param>
     public static IReadOnlyList<TextSegment> Split(string text, bool wholeLines = false)
     {
@@ -168,7 +175,8 @@ internal static partial class BilingualText
         // Tên riêng trong ngoặc kép (“BV Truyền máu Huyết học”) không tính khi đếm từ có dấu.
         var words = QuotedText().Replace(trimmed, " ")
             .Split(' ', StringSplitOptions.RemoveEmptyEntries).Where(w => w.Any(char.IsLetter)).ToList();
-        var vietnamese = words.Count(w => w.Any(c => c > '\u007F' && char.IsLetter(c)));
+        var vietnamese = words.Count(
+            w => w.Any(c => c > '\u007F' && char.IsLetter(c)) || VietnameseAbbreviations.Contains(w.Trim(WordPunctuation)));
         return allowVietnameseWords ? vietnamese * 4 <= words.Count : vietnamese == 0;
     }
 

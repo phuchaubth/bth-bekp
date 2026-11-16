@@ -1,10 +1,44 @@
 {
   "title": "Phiếu thông tin người bệnh ngoại trú\nOutpatient Information Form",
-  "subtitle": "Họ tên, giới tính, ngày sinh, số giấy tờ tùy thân và số điện thoại của người bệnh in ở phần thông tin người bệnh (Patient's name, gender, date of birth, ID number and phone number are printed in the patient information section)",
   "hideDepartment": true,
+  "bilingual": true,
+  "documentControl": {
+    "code": "QT-KNGT/BM03",
+    "issueNo": "08",
+    "effectiveDate": "",
+    "titleInHead": true,
+    "codeLabel": "Mã số (Code)",
+    "issueNoLabel": "Lần ban hành (Issue number)",
+    "effectiveDateLabel": "Ngày hiệu lực (Effective date)"
+  },
+  "numberedPatientLines": true,
+  "patientLines": [
+    [ { "patient": "fullName", "label": "Họ và Tên (theo Chứng minh /Căn cước) (Full Name (as per ID Card / Citizen ID))" } ],
+    [ { "patient": "gender", "label": "Giới tính (Gender)", "options": ["Nam (Male)", "Nữ (Female)"] } ],
+    [ { "patient": "dateOfBirth", "label": "Ngày sinh (theo CCCD) (Date of Birth (as per ID Card / Citizen ID))" } ],
+    [ { "field": "ethnicity", "label": "Dân tộc (Ethnicity)", "options": ["Kinh", "Khác, ghi rõ (Other, specify)"] } ],
+    [ { "field": "religion", "label": "Tôn giáo (Religion)", "other": "religionOther" } ],
+    [ { "field": "educationLevel", "label": "Trình độ văn hóa (Education Level)" } ],
+    [
+      {
+        "patient": "citizenId",
+        "label": "Số căn cước/mã số định danh cá nhân/số hộ chiếu (Identity Card/Citizen ID/Personal Identification Number/Passport Number)"
+      }
+    ],
+    [ { "field": "occupation", "label": "Nghề nghiệp (Occupation)" } ],
+    [ { "field": "permanentAddress", "label": "Địa chỉ thường trú (theo hộ khẩu) (Permanent Address (as per household registration))" } ],
+    [ { "field": "currentAddress", "label": "Chỗ ở hiện nay (Current Address)" } ],
+    [ { "patient": "phoneNumber", "label": "Số điện thoại liên lạc (Contact Phone number)" } ],
+    [ { "field": "familyName", "label": "Họ và Tên người nhà (Full Name of Family Member)" } ],
+    [ { "field": "familyRelationship", "label": "Quan hệ với người bệnh (Relationship to Patient)" } ],
+    [ { "field": "familyPhone", "label": "Số điện thoại (Phone number)" } ],
+    [ { "field": "familyIsEmergencyContact" } ],
+    [ { "field": "emergencyName", "label": "Họ và Tên người liên hệ khẩn cấp (Full Name of Emergency Contact)", "indent": true } ],
+    [ { "field": "emergencyRelationship", "label": "Quan hệ với người bệnh (Relationship to Patient)", "indent": true } ],
+    [ { "field": "emergencyPhone", "label": "Số điện thoại (Phone number)", "indent": true } ]
+  ],
   "sections": [
     {
-      "title": "Thông tin bổ sung của người bệnh (Additional patient information)",
       "blocks": [
         {
           "type": "text",
@@ -47,8 +81,7 @@
           "label": "Nghề nghiệp (Occupation)",
           "required": true,
           "maxLength": 100,
-          "prefill": "patient.occupation",
-          "sameLine": true
+          "prefill": "patient.occupation"
         },
         {
           "type": "text",
@@ -65,12 +98,7 @@
           "required": true,
           "maxLength": 300,
           "prefill": "patient.currentAddress"
-        }
-      ]
-    },
-    {
-      "title": "Người nhà và người liên hệ khẩn cấp (Family member and emergency contact)",
-      "blocks": [
+        },
         {
           "type": "text",
           "key": "familyName",
@@ -147,10 +175,15 @@
         "Tôi đã nghe, hiểu và đồng ý"
       ]
     },
-    "patient": "Người khai (Declarant)",
-    "representative": "Người khai – không phải người bệnh (Declarant – not the patient)",
-    "hospital": "Nhân viên tiếp nhận (Patient Admission Staff)",
-    "hospitalHint": "(Đã đối chiếu thông tin trên giấy tờ tùy thân – verified against identification documents)",
-    "decision": "none"
+    "patient": "Người khai (ký tên, ghi rõ họ tên)",
+    "representative": "Người khai (ký tên, ghi rõ họ tên)",
+    "patientHint": "(Declarant (signature, full name))\nNếu không phải người bệnh, ghi rõ quan hệ với người bệnh\n(If not the patient, state relationship to the patient)",
+    "hospital": "Nhân viên tiếp nhận",
+    "hospitalHint": "!(đã đối chiếu thông tin trên giấy tờ tùy thân)\n(Patient Admission Staff)\n!(verified against identification documents)",
+    "decision": "none",
+    "hospitalFirst": true,
+    "plainTitles": true,
+    "centerDate": true,
+    "paperHints": true
   }
 }

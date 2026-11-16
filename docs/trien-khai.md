@@ -192,6 +192,8 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
 1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
 
+**Khi bản mới đổi định nghĩa một mẫu khởi tạo sẵn** (ví dụ TTNB in theo bản giấy QT-KNGT/BM03, quyết định 33): máy chủ đang chạy vẫn giữ phiên bản mẫu cũ, nên sau khi cài gói, người quản lý mẫu vào **Mẫu phiếu → mẫu đó → Tạo phiên bản mới**, mở thẻ **Soạn định nghĩa (JSON)**, dán đè bằng nội dung file `backend/src/Consent.Application/ConsentTemplates/Defaults/<mã mẫu>.json` của bản mới, bấm **Lưu phiên bản nháp** rồi **Phát hành**. Phải cài gói trước: bản cũ không biết các tùy chọn mới và sẽ bỏ mất chúng khi lưu. Phiếu đã lập giữ phiên bản cũ; PDF đã ký giữ nguyên.
+
 ### 5.5. API thông tin người bệnh (tùy chọn, quyết định 22)
 
 Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL của bệnh viện (HIS) theo mã người bệnh hoặc CCCD. Phần mềm phiếu đồng thuận **chỉ gọi API này**, không giữ chuỗi kết nối CSDL bệnh viện. Không cài thì phần mềm vẫn chạy bình thường (nhập tay/quét CCCD).

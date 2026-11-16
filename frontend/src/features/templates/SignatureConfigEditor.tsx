@@ -64,7 +64,8 @@ function toValues(signatures: TemplateSignatures | undefined): SignatureValues {
 
 /**
  * Dựng lại khối `signatures`: bỏ ô trống (dùng nhãn mặc định), giữ mã bước cũ, tạo mã cho bước mới. Cách in ô ký trên PDF
- * (`hospitalFirst`, `plainTitles`, sửa trong JSON) không có trên biểu mẫu này nên giữ nguyên như trước khi lưu.
+ * (`hospitalFirst`, `plainTitles`, `patientHint`, `centerDate`, `paperHints`, sửa trong JSON) không có trên biểu mẫu này nên
+ * giữ nguyên như trước khi lưu.
  */
 function toSignatures(values: SignatureValues, previous?: TemplateSignatures): TemplateSignatures | undefined {
   const used = new Set(values.steps.map((s) => s.key).filter(Boolean))
@@ -100,6 +101,9 @@ function toSignatures(values: SignatureValues, previous?: TemplateSignatures): T
       : undefined,
     hospitalFirst: previous?.hospitalFirst || undefined,
     plainTitles: previous?.plainTitles || undefined,
+    patientHint: previous?.patientHint || undefined,
+    centerDate: previous?.centerDate || undefined,
+    paperHints: previous?.paperHints || undefined,
   }
   const entries = Object.entries(signatures).filter(([, v]) => v !== undefined)
   return entries.length > 0 ? (Object.fromEntries(entries) as TemplateSignatures) : undefined

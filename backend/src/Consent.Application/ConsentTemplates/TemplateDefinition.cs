@@ -38,6 +38,12 @@ public sealed record TemplateDefinition(
     public IReadOnlyList<IReadOnlyList<PatientLineItem>>? PatientLines { get; init; }
 
     /// <summary>
+    /// Đánh số 1, 2, 3… các dòng thông tin người bệnh (<see cref="PatientLines"/>) như bản giấy TTNB (QT-KNGT/BM03); dòng có
+    /// mục đầu là <see cref="PatientLineItem.Indent"/> là dòng phụ của dòng trên, không đánh số.
+    /// </summary>
+    public bool NumberedPatientLines { get; init; }
+
+    /// <summary>
     /// Mọi khối nhập liệu (có <see cref="TemplateBlock.Key"/>), theo thứ tự xuất hiện. Chỉ để tính toán: không ghi vào JSON
     /// (trước đây bị ghi thành bản sao "inputBlocks", sửa ở bản sao đó không có tác dụng).
     /// </summary>
@@ -150,6 +156,15 @@ public sealed record ScoreLevel(string Code, string Label, int Min);
 /// </summary>
 /// <param name="HospitalFirst">PDF in các ô ký phía bệnh viện trước (bên trái), ô của người bệnh/người đại diện sau cùng.</param>
 /// <param name="PlainTitles">PDF in tên ô ký đúng như đã ghi (không viết hoa toàn bộ, không in đậm), như bản giấy.</param>
+/// <param name="PatientHint">
+/// Ghi chú dưới tên ô ký của người bệnh/người đại diện trên PDF (bỏ trống: "(Ký, ghi rõ họ tên)"). Ở mọi ghi chú dưới tên ô
+/// ký, dòng bắt đầu bằng dấu "!" in màu đỏ (dấu "!" không in), như ghi chú "đã đối chiếu…" của bản giấy TTNB.
+/// </param>
+/// <param name="CenterDate">Dòng "địa danh, ngày … tháng … năm …" canh giữa, chữ đứng (mặc định canh phải, chữ nghiêng).</param>
+/// <param name="PaperHints">
+/// Ghi chú dưới tên ô ký in gần bằng cỡ chữ tên ô ký (cỡ 11) như bản giấy, và giữ nguyên sau khi nhân viên xác nhận (trạng
+/// thái "Đã ký, xác nhận bằng tài khoản" in dưới họ tên). Mặc định ghi chú in cỡ 10 và được thay bằng trạng thái xác nhận.
+/// </param>
 public sealed record TemplateSignatures(
     string? Patient = null,
     string? Representative = null,
@@ -162,7 +177,10 @@ public sealed record TemplateSignatures(
     IReadOnlyList<TemplateConfirmationStep>? Steps = null,
     TemplateStatement? Statement = null,
     bool HospitalFirst = false,
-    bool PlainTitles = false)
+    bool PlainTitles = false,
+    string? PatientHint = null,
+    bool CenterDate = false,
+    bool PaperHints = false)
 {
     public const int MaxSteps = 5;
 
@@ -192,18 +210,53 @@ public sealed record TemplateStatement(string? Label = null, bool Required = fal
 /// </summary>
 public sealed record TemplateConfirmationStep(string Key, string RoleCode, string Label, string? Hint = null);
 
-/// <summary>Mã tài liệu in ở góc phải đầu phiếu, ví dụ mã số "QT-KNGT/BM02", lần ban hành "09"; mục để trống thì chỉ in nhãn.</summary>
-public sealed record TemplateDocumentControl(string? Code = null, string? IssueNo = null, string? EffectiveDate = null)
+/// <summary>
+/// Mã tài liệu in ở góc phải đầu phiếu, ví dụ mã số "QT-KNGT/BM02", lần ban hành "09"; mục để trống thì chỉ in nhãn. Nhãn
+/// bỏ trống thì dùng nhãn của bản giấy BM02 ("Mã số (Code No)", "Lần ban hành (Issue No)", "Ngày hiệu lực (Effective Date)").
+/// </summary>
+/// <param name="TitleInHead">
+/// Tên phiếu in ở giữa đầu phiếu, thay cho quốc hiệu (bản giấy TTNB QT-KNGT/BM03 không có quốc hiệu): logo, tên phiếu, mã tài
+/// liệu trên cùng một hàng; dòng tiếng Anh của tên phiếu màu xanh, chữ đứng.
+/// </param>
+public sealed record TemplateDocumentControl(
+    string? Code = null,
+    string? IssueNo = null,
+    string? EffectiveDate = null,
+    bool TitleInHead = false,
+    string? CodeLabel = null,
+    string? IssueNoLabel = null,
+    string? EffectiveDateLabel = null)
 {
     public const int MaxLength = 50;
+
+    public const string DefaultCodeLabel = "Mã số (Code No)";
+    public const string DefaultIssueNoLabel = "Lần ban hành (Issue No)";
+    public const string DefaultEffectiveDateLabel = "Ngày hiệu lực (Effective Date)";
 }
 
 /// <summary>
 /// Một mục trên dòng thông tin người bệnh: thông tin trong hồ sơ (<see cref="Patient"/>, xem <see cref="PatientLineSources"/>)
-/// hoặc trường của phiếu (<see cref="Field"/>), kèm nhãn (bỏ trống thì dùng nhãn mặc định). Giới tính có <see cref="Options"/>
-/// (nhãn Nam, nhãn Nữ) thì in hai ô đánh dấu như bản giấy.
+/// hoặc trường của phiếu (<see cref="Field"/>), kèm nhãn (bỏ trống thì dùng nhãn mặc định).
+/// <list type="bullet">
+/// <item>Giới tính có <see cref="Options"/> (nhãn Nam, nhãn Nữ): in hai ô đánh dấu như bản giấy.</item>
+/// <item>Trường chọn của phiếu: in nhãn và các ô lựa chọn trên dòng; <see cref="Other"/> là trường chữ in tiếp sau các ô
+/// (ví dụ "☐ Khác (Other): …").</item>
+/// <item>Trường chữ có <see cref="Options"/> (ví dụ dân tộc: "Kinh", "Khác, ghi rõ"): in các ô như bản giấy; giá trị trùng một
+/// lựa chọn (trừ lựa chọn cuối) thì đánh dấu ô đó, giá trị khác thì đánh dấu ô cuối và in giá trị sau ô.</item>
+/// <item><see cref="Indent"/>: dòng phụ của dòng trên (không đánh số, thụt vào), đặt ở mục đầu của dòng.</item>
+/// </list>
 /// </summary>
-public sealed record PatientLineItem(string? Patient = null, string? Field = null, string? Label = null, IReadOnlyList<string>? Options = null);
+public sealed record PatientLineItem(
+    string? Patient = null,
+    string? Field = null,
+    string? Label = null,
+    IReadOnlyList<string>? Options = null,
+    bool Indent = false,
+    string? Other = null)
+{
+    /// <summary>Số lựa chọn tối đa của trường chữ in thành ô.</summary>
+    public const int MaxFieldOptions = 6;
+}
 
 /// <summary>Thông tin hồ sơ in được trên dòng thông tin người bệnh, kèm nhãn mặc định.</summary>
 public static class PatientLineSources
@@ -216,7 +269,7 @@ public static class PatientLineSources
     public const string PhoneNumber = "phoneNumber";
     public const string Address = "address";
 
-    public const int MaxLines = 8;
+    public const int MaxLines = 20;
     public const int MaxItemsPerLine = 2;
 
     public static IReadOnlyDictionary<string, string> DefaultLabels { get; } = new Dictionary<string, string>(StringComparer.Ordinal)
