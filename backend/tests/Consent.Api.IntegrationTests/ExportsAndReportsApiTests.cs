@@ -210,6 +210,157 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
         Assert.Equal(3, dashboard.GetProperty("last14Days").EnumerateArray().Last().GetProperty("created").GetInt32());
     }
 
+    /// <summary>
+    /// "Chờ tôi xác nhận" theo thứ tự các bước xác nhận (quyết định 13/11/2026), với SQL Server thật và tài khoản demo: tiếp
+    /// đón (Khoa Khám bệnh) lập cho Khoa Nội phiếu nhận định BM10 (hướng dẫn → điều dưỡng → bác sĩ) và phiếu tư vấn (người tư
+    /// vấn → điều dưỡng khoa). Mỗi người chỉ thấy phiếu đang đến lượt mình, khớp với nút xác nhận trên phiếu.
+    /// </summary>
+    [Fact]
+    public async Task Dashboard_AwaitingMyConfirmation_FollowsTheConfirmationSteps()
+    {
+        var receptionist = await LoginDemoAsync("tiepdon.demo");
+        // Điều dưỡng demo có thêm vai trò bác sĩ (ví dụ cấu hình nhầm): xác nhận bước điều dưỡng rồi thì không còn lượt xác nhận cuối.
+        await AddRoleAsync(await _client.LoginAsAdministratorAsync(), "dieuduong.demo", "DOCTOR");
+        var nurse = await LoginDemoAsync("dieuduong.demo");
+        var doctor = await LoginDemoAsync("bacsi.demo");
+        var patientId = await DemoPatientIdAsync(receptionist);
+        var (_, departments) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/departments", receptionist);
+        var noi = departments.EnumerateArray().Single(d => d.GetProperty("code").GetString() == "NOI").GetProperty("id").GetString()!;
+        var bm10 = await PatientSignedAsync(receptionist, patientId, noi, "QT-KNGT-BM10", Bm10Data());
+        var portal = await PatientSignedAsync(receptionist, patientId, noi, "TUVAN-CONGTT");
+
+        // Người bệnh vừa ký: bước đầu của cả hai phiếu là của tiếp đón; điều dưỡng (xác nhận cuối phiếu tư vấn) và bác sĩ
+        // (xác nhận cuối BM10) chưa đến lượt.
+        Assert.Equal([bm10, portal], await AwaitingMineAsync(receptionist, bm10, portal));
+        Assert.Empty(await AwaitingMineAsync(nurse, bm10, portal));
+        Assert.Empty(await AwaitingMineAsync(doctor, bm10, portal));
+
+        await ConfirmStepAsync(receptionist, bm10, "screeningStaff");
+        await ConfirmStepAsync(receptionist, portal, "consultant");
+
+        // Bước trung gian của điều dưỡng (BM10) và xác nhận cuối của điều dưỡng khoa (phiếu tư vấn).
+        Assert.Empty(await AwaitingMineAsync(receptionist, bm10, portal));
+        Assert.Equal([bm10, portal], await AwaitingMineAsync(nurse, bm10, portal));
+        Assert.Empty(await AwaitingMineAsync(doctor, bm10, portal));
+
+        await ConfirmStepAsync(nurse, bm10, "nurse");
+
+        // Điều dưỡng đã xác nhận một bước của BM10 nên không còn lượt xác nhận cuối, dù có vai trò bác sĩ.
+        Assert.Equal([portal], await AwaitingMineAsync(nurse, bm10, portal));
+        Assert.Equal([bm10], await AwaitingMineAsync(doctor, bm10, portal));
+    }
+
+    /// <summary>Phiếu nhận định BM10 đầy đủ, người lớn, không cấp cứu (giả lập).</summary>
+    private static Dictionary<string, string> Bm10Data() => new()
+    {
+        ["consultingRoom"] = "Phòng 05",
+        ["selfFallHistory"] = "no",
+        ["selfMobilityAid"] = "no",
+        ["infectionSymptoms"] = "no",
+        ["staffMobilityAid"] = "no",
+        ["staffUnsteady"] = "no",
+        ["pulse"] = "80",
+        ["temperature"] = "37",
+        ["bloodPressure"] = "120/80",
+        ["respiratoryRate"] = "18",
+        ["height"] = "160",
+        ["weight"] = "55",
+        ["bmi"] = "21,5",
+        ["emergencySigns"] = "yes",
+        ["emergencySignsDetail"] = "Khó thở",
+        ["nurseEduFall"] = "notNeeded",
+        ["nurseEduWound"] = "notNeeded",
+        ["dietCounseling"] = "notRequired",
+        ["physicianEduFall"] = "notRequired",
+        ["physicianEduWound"] = "notRequired",
+        ["physicianEduPain"] = "notRequired",
+        ["physicianEduNewPatient"] = "notRequired",
+        ["physicianEduOther"] = "notRequired",
+    };
+
+    /// <summary>
+    /// Tiếp đón lập phiếu theo mẫu <paramref name="templateCode"/> cho khoa <paramref name="departmentId"/> (quyết định 19), trình
+    /// ký; người bệnh ký trên điện thoại.
+    /// </summary>
+    private async Task<string> PatientSignedAsync(
+        string receptionist, string patientId, string departmentId, string templateCode, object? data = null)
+    {
+        var templateId = await TemplateIdAsync(receptionist, templateCode);
+        var (createdStatus, created) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId, templateId, departmentId });
+        Assert.True(createdStatus == HttpStatusCode.Created, created.ToString());
+        var id = created.GetProperty("id").GetString()!;
+        var form = $"/api/v1/consent-forms/{id}";
+        if (data is not null)
+        {
+            var (updated, updatedBody) = await _client.SendJsonAsync(HttpMethod.Put, form, receptionist, new { data, signerKind = "Patient" });
+            Assert.True(updated == HttpStatusCode.OK, updatedBody.ToString());
+        }
+
+        var (submitted, submittedBody) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/submit", receptionist);
+        Assert.True(submitted == HttpStatusCode.OK, submittedBody.ToString());
+        var (_, session) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/signing-session", receptionist);
+        // BM10 chỉ ký xác nhận (quyết định bị bỏ qua); phiếu tư vấn hỏi Đồng ý/Không đồng ý.
+        var (signed, signedBody) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString(),
+            new { decision = "Agreed", image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
+        Assert.True(signed == HttpStatusCode.OK, signedBody.ToString());
+        return id;
+    }
+
+    private async Task ConfirmStepAsync(string token, string formId, string stepKey)
+    {
+        var (status, body) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"/api/v1/consent-forms/{formId}/confirm-step", token,
+            new { stepKey, image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.True(status == HttpStatusCode.OK, body.ToString());
+    }
+
+    /// <summary>
+    /// Phiếu trong "Chờ tôi xác nhận" của người dùng. Kiểm tra luôn số đếm khớp danh sách, và mỗi phiếu
+    /// <paramref name="formIds"/> có trong danh sách khi và chỉ khi mở phiếu thấy nút xác nhận (bước hoặc xác nhận cuối).
+    /// </summary>
+    private async Task<List<string>> AwaitingMineAsync(string token, params string[] formIds)
+    {
+        var (status, dashboard) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/dashboard", token);
+        Assert.Equal(HttpStatusCode.OK, status);
+        var awaiting = dashboard.GetProperty("awaitingMyConfirmation");
+        var listed = awaiting.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("id").GetString()!).ToList();
+        Assert.Equal(listed.Count, awaiting.GetProperty("total").GetInt32());
+        foreach (var formId in formIds)
+        {
+            var (formStatus, form) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formId}", token);
+            Assert.True(formStatus == HttpStatusCode.OK, form.ToString());
+            var actions = form.GetProperty("actions");
+            Assert.Equal(
+                actions.GetProperty("canConfirmStep").GetBoolean() || actions.GetProperty("canConfirm").GetBoolean(),
+                listed.Contains(formId));
+        }
+
+        return listed;
+    }
+
+    /// <summary>Quản trị thêm vai trò <paramref name="roleCode"/> cho tài khoản <paramref name="userName"/>, giữ nguyên thông tin khác.</summary>
+    private async Task AddRoleAsync(string admin, string userName, string roleCode)
+    {
+        var (_, users) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users?keyword={userName}", admin);
+        var id = users.GetProperty("items").EnumerateArray()
+            .Single(u => u.GetProperty("userName").GetString() == userName).GetProperty("id").GetString()!;
+        var (_, user) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users/{id}", admin);
+        var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", admin);
+        var roleIds = user.GetProperty("roles").EnumerateArray().Select(r => r.GetProperty("id").GetString()!)
+            .Append(roles.EnumerateArray().Single(r => r.GetProperty("code").GetString() == roleCode).GetProperty("id").GetString()!)
+            .ToArray();
+        var (status, body) = await _client.SendJsonAsync(HttpMethod.Put, $"/api/v1/users/{id}", admin, new
+        {
+            fullName = user.GetProperty("fullName").GetString(),
+            title = user.GetProperty("title").GetString(),
+            departmentId = user.GetProperty("departmentId").GetString(),
+            roleIds,
+        });
+        Assert.True(status == HttpStatusCode.OK, body.ToString());
+    }
+
     /// <summary>Tiêu chí nghiệm thu: xuất 10.000 phiếu giả lập dưới 30 giây. Phiếu được chèn thẳng vào CSDL (đã mã hóa nội dung).</summary>
     [Fact]
     public async Task Export_TenThousandForms_CompletesUnder30Seconds()

@@ -663,22 +663,27 @@ public sealed class ConsentFormService(
                 : null);
     }
 
-    /// <summary>Thao tác người dùng hiện tại được làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại).</summary>
+    /// <summary>
+    /// Thao tác người dùng hiện tại được làm với phiếu (giao diện chỉ hiện nút hợp lệ; API vẫn kiểm tra lại). Lượt xác nhận
+    /// theo <see cref="ConfirmationTurn"/>, cùng quy tắc với "Chờ tôi xác nhận" ở trang tổng quan.
+    /// </summary>
     internal ConsentFormActions BuildActions(
         ConsentForm form, ConsentTemplate template, IReadOnlyList<ConsentFormStepDto> steps, bool hasReplacement)
     {
-        var nextStep = steps.FirstOrDefault(s => s.IsNext);
-        var canSign = currentUser.HasPermission(Permissions.ConsentsSign);
-        var alreadyConfirmedStep = form.StepSignatures.Any(s => s.UserId == currentUser.UserId);
+        var (canConfirmStep, canConfirm) = ConfirmationTurn.For(
+            currentUser,
+            form.CanComplete,
+            steps.FirstOrDefault(s => s.IsNext)?.RoleCode,
+            template.HospitalSignerRoleCode,
+            confirmedAStep: form.StepSignatures.Any(s => s.UserId == currentUser.UserId));
         return new ConsentFormActions(
             form.CanEdit,
             form.CanSubmit,
             form.CanReturnToDraft,
             form.CanCancel,
             CanStartSigning: form.CanStartSigning && currentUser.HasPermission(Permissions.ConsentsCreate),
-            CanConfirmStep: nextStep is not null && canSign && !alreadyConfirmedStep && currentUser.IsInRole(nextStep.RoleCode),
-            CanConfirm: form.CanComplete && canSign && steps.All(s => s.Confirmation is not null) && !alreadyConfirmedStep
-                && currentUser.IsInRole(template.HospitalSignerRoleCode),
+            CanConfirmStep: canConfirmStep,
+            CanConfirm: canConfirm,
             CanRevoke: form.CanRevoke && currentUser.HasPermission(Permissions.ConsentsRevoke),
             CanReplace: form.Status == ConsentFormStatus.Revoked && !hasReplacement
                 && currentUser.HasPermission(Permissions.ConsentsCreate));
@@ -715,12 +720,11 @@ public sealed class ConsentFormService(
 
         var allRoles = await roles.ListAsync(cancellationToken).ConfigureAwait(false);
         var result = new List<ConsentFormStepDto>(stepDefinitions.Count);
-        var nextFound = false;
+        var next = form.CanComplete ? ConfirmationTurn.NextStep(stepDefinitions, form.StepSignatures.Select(s => s.StepKey)) : null;
         foreach (var step in stepDefinitions)
         {
             var done = form.StepSignatures.FirstOrDefault(s => s.StepKey == step.Key);
-            var isNext = done is null && !nextFound && form.CanComplete;
-            nextFound |= done is null;
+            var isNext = next is not null && step.Key == next.Key;
             var roleName = allRoles.FirstOrDefault(r => string.Equals(r.Code, step.RoleCode, StringComparison.OrdinalIgnoreCase))?.Name
                 ?? step.RoleCode;
             result.Add(new ConsentFormStepDto(

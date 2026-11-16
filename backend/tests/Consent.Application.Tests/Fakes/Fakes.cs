@@ -520,15 +520,22 @@ internal sealed class InMemoryConsentStatisticsRepository(InMemoryStore store) :
         Task.FromResult(InMemoryConsentFormRepository.Filter(store, scope)
             .Count(f => revoked ? f.RevokedAtUtc >= fromUtc && f.RevokedAtUtc < toUtc : f.CompletedAtUtc >= fromUtc && f.CompletedAtUtc < toUtc));
 
-    public Task<DashboardFormList> AwaitingConfirmationAsync(
-        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateIds, int take, CancellationToken cancellationToken)
-    {
-        var forms = InMemoryConsentFormRepository.Filter(store, scope)
-            .Where(f => f.Status == ConsentFormStatus.PendingSignature && templateIds.Contains(f.TemplateId) && f.PatientSignature is not null)
-            .OrderBy(f => f.PatientSignature!.SignedAtUtc)
-            .ToList();
-        return Task.FromResult(new DashboardFormList(forms.Count, [.. forms.Take(take).Select(f => Item(f, f.PatientSignature!.SignedAtUtc))]));
-    }
+    public Task<IReadOnlyList<AwaitingConfirmationForm>> ListAwaitingConfirmationAsync(
+        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateVersionIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<AwaitingConfirmationForm>>([.. InMemoryConsentFormRepository.Filter(store, scope)
+            .Where(f => f.Status == ConsentFormStatus.PendingSignature && templateVersionIds.Contains(f.TemplateVersionId)
+                && f.PatientSignature is not null)
+            .Select(f => new AwaitingConfirmationForm(
+                f.Id,
+                f.TemplateVersionId,
+                f.PatientSignature!.SignedAtUtc,
+                [.. f.StepSignatures.Select(s => new StepConfirmationRecord(s.StepKey!, s.UserId))]))]);
+
+    public Task<IReadOnlyList<DashboardFormItem>> ListAwaitingConfirmationItemsAsync(
+        IReadOnlyCollection<Guid> formIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<DashboardFormItem>>([.. store.ConsentForms
+            .Where(f => formIds.Contains(f.Id))
+            .Select(f => Item(f, f.PatientSignature?.SignedAtUtc ?? f.UpdatedAtUtc))]);
 
     public Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken)
     {

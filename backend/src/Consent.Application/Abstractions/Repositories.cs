@@ -174,9 +174,17 @@ public interface IConsentStatisticsRepository
     Task<int> CountClosedAsync(
         ConsentFormSearch scope, bool revoked, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
 
-    /// <summary>Phiếu chờ ký mà người bệnh đã ký, thuộc các mẫu <paramref name="templateIds"/>: chờ phía bệnh viện xác nhận.</summary>
-    Task<DashboardFormList> AwaitingConfirmationAsync(
-        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateIds, int take, CancellationToken cancellationToken);
+    /// <summary>
+    /// Phiếu chờ ký mà người bệnh đã ký (chờ phía bệnh viện xác nhận), lập theo các phiên bản mẫu
+    /// <paramref name="templateVersionIds"/>, kèm các bước trung gian đã xác nhận. Không đọc nội dung phiếu hay thông tin
+    /// người bệnh: lượt xác nhận được xét trong ứng dụng theo định nghĩa của phiên bản mẫu.
+    /// </summary>
+    Task<IReadOnlyList<AwaitingConfirmationForm>> ListAwaitingConfirmationAsync(
+        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateVersionIds, CancellationToken cancellationToken);
+
+    /// <summary>Thông tin hiển thị của các phiếu chờ xác nhận <paramref name="formIds"/> (thời điểm là lúc người bệnh ký).</summary>
+    Task<IReadOnlyList<DashboardFormItem>> ListAwaitingConfirmationItemsAsync(
+        IReadOnlyCollection<Guid> formIds, CancellationToken cancellationToken);
 
     /// <summary>Phiếu nháp/chờ ký do người dùng <paramref name="userId"/> lập.</summary>
     Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken);

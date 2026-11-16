@@ -471,7 +471,7 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 
 `reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; khoa khác khoa mình (không có quyền toàn viện) → `403 reports.department_forbidden`.
 
-`dashboard` trả: `drafts`, `pendingSignature`, `completedToday`, `revokedLast30Days`, `awaitingMyConfirmation` (phiếu người bệnh đã ký thuộc mẫu mà người dùng có vai trò xác nhận; `total` + tối đa 5 `items`), `myOpenForms` (phiếu nháp/chờ ký do mình lập), `last14Days` (`date`, `created`, `completed`).
+`dashboard` trả: `drafts`, `pendingSignature`, `completedToday`, `revokedLast30Days`, `awaitingMyConfirmation` (phiếu người bệnh đã ký đang đến lượt người dùng xác nhận, cùng quy tắc với `actions.canConfirmStep`/`actions.canConfirm` của phiếu: bước trung gian kế tiếp thuộc vai trò của người dùng, hoặc đã xong mọi bước và người dùng có vai trò xác nhận cuối; người đã xác nhận một bước của phiếu thì không còn lượt; `total` + tối đa 5 `items`, người bệnh ký sớm nhất trước), `myOpenForms` (phiếu nháp/chờ ký do mình lập), `last14Days` (`date`, `created`, `completed`).
 
 ---
 
