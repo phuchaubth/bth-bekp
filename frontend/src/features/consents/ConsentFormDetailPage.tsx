@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Descriptions, Flex, Form, Input, Modal, Popconfirm, Progress, Radio, Select, Space, Spin, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
 import {
   consentFormKeys,
@@ -33,6 +33,7 @@ import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, fieldErrorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
+import { useObjectUrl } from '../../utils/useObjectUrl'
 import { maskCitizenId } from '../patients/cccd'
 import { relationshipLabels } from '../patients/labels'
 import { signerRoleLabel } from '../templates/signerRoles'
@@ -546,17 +547,6 @@ function ReadOnlyContent({ form }: { form: ConsentFormDetail }) {
       <DynamicForm definition={form.definition} form={antForm} initialValues={form.data} disabled />
     </Card>
   )
-}
-
-/** Đường dẫn tạm cho dữ liệu nhị phân; tự thu hồi khi dữ liệu đổi hoặc component bị gỡ. */
-function useObjectUrl(blob: Blob | undefined): string | null {
-  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob])
-  useEffect(() => () => {
-    if (url) {
-      URL.revokeObjectURL(url)
-    }
-  }, [url])
-  return url
 }
 
 /** Tải PDF có xác thực (chỉ khi mở) rồi hiển thị trong khung xem. */

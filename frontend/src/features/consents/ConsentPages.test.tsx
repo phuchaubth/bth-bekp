@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { accountKeys } from '../../api/account'
 import type { ConsentFormActions, ConsentFormDetail, ConsentFormListItem } from '../../api/consentForms'
 import type { TemplateDefinition } from '../../api/consentTemplates'
 import type { PatientDetail } from '../../api/patients'
@@ -657,6 +658,36 @@ describe('Ký, hoàn tất, thu hồi (Sprint 4)', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Ký và hoàn tất' }))
     expect(await screen.findByText('Phiếu đã hoàn tất')).toBeInTheDocument()
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms/f-1/complete')!.body).toEqual({ useSpecimen: true })
+  })
+
+  it('StrictMode (như khi chạy dev): ảnh chữ ký mẫu trong hộp ký dùng đường dẫn còn hiệu lực, không bị thu hồi', async () => {
+    // Đường dẫn blob giả lập có theo dõi thu hồi: ảnh trỏ tới đường dẫn đã thu hồi là ảnh vỡ trên trình duyệt.
+    const live = new Set<string>()
+    let next = 0
+    URL.createObjectURL = vi.fn(() => {
+      const url = `blob:chu-ky-mau-${++next}`
+      live.add(url)
+      return url
+    })
+    URL.revokeObjectURL = vi.fn((url: string) => {
+      live.delete(url)
+    })
+    mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/consent-forms/f-1': () => signedByPatient(true),
+      'GET /api/v1/account/signature-specimen': () => new Response('PNG-gia-lap', { headers: { 'Content-Type': 'image/png' } }),
+    })
+    const { queryClient } = renderApp('/phieu-dong-thuan/f-1', { strictMode: true })
+    // Như cấu hình thật (app/queryClient.ts): chữ ký mẫu vừa tải còn mới 30 giây, ảnh trong hộp ký không tải lại. (Tải lại tạo
+    // đường dẫn mới, che mất đường dẫn đã bị thu hồi.)
+    queryClient.setQueryDefaults(accountKeys.signatureSpecimen, { staleTime: 30_000 })
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Xác nhận và hoàn tất/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Ký xác nhận và hoàn tất phiếu/ })
+    const specimen = await within(dialog).findByRole('img', { name: 'Chữ ký mẫu của bạn' })
+
+    expect(live.has(specimen.getAttribute('src')!)).toBe(true)
   })
 
   it('chưa có chữ ký mẫu: phải ký vào khung, có chỗ đăng ký chữ ký mẫu', async () => {

@@ -1,11 +1,12 @@
 import { DeleteOutlined, UploadOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Flex, Popconfirm, Spin, Typography } from 'antd'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { LOGO_MAX_BYTES, settingsApi, settingsKeys, type SystemSettings } from '../../../api/settings'
 import { ApiError } from '../../../api/http'
 import { errorMessage } from '../../../utils/formErrors'
 import { formatDateTime } from '../../../utils/format'
+import { useObjectUrl } from '../../../utils/useObjectUrl'
 
 const ACCEPTED = ['image/png', 'image/jpeg']
 
@@ -32,10 +33,7 @@ export function LogoCard({ settings }: { settings: SystemSettings }) {
     enabled: !!logo,
   })
   // Ảnh xem trước tải có xác thực, hiển thị qua blob URL (được giải phóng khi đổi ảnh hoặc rời trang).
-  const url = useMemo(() => (logo && preview.data ? URL.createObjectURL(preview.data) : null), [logo, preview.data])
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url)
-  }, [url])
+  const url = useObjectUrl(logo ? preview.data : undefined)
 
   const onSaved = (updated: SystemSettings, text: string) => {
     queryClient.setQueryData(settingsKeys.all, updated)

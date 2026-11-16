@@ -5,6 +5,7 @@ import { useEffect, useMemo, type ReactNode } from 'react'
 import type { NursingReport, NursingReportFormDefinition } from '../../api/nursingReports'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
+import { useObjectUrl } from '../../utils/useObjectUrl'
 import { statusTag, toFormValues, type NursingReportFormValues } from './nursingReportUtils'
 
 /** Dòng trạng thái: ai gửi lúc nào; lần mở lại gần nhất và lý do. */
@@ -110,20 +111,6 @@ export function NursingReportFields({
       </Form>
     </ConfigProvider>
   )
-}
-
-/** Tạo đường dẫn tạm cho file tải về, tự thu hồi khi đóng. */
-function useObjectUrl(blob: Blob | undefined) {
-  const url = useMemo(() => (blob ? URL.createObjectURL(blob) : null), [blob])
-  useEffect(
-    () => () => {
-      if (url) {
-        URL.revokeObjectURL(url)
-      }
-    },
-    [url],
-  )
-  return url
 }
 
 /** Xem PDF (tải có xác thực khi mở), có nút tải về. */
