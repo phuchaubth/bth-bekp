@@ -24,6 +24,21 @@ function drawStroke(canvas: HTMLElement) {
   fireEvent.pointerUp(canvas, { clientX: 260, clientY: 140, pointerId: 1, pointerType: 'mouse' })
 }
 
+/**
+ * Ảnh chữ ký mẫu phủ vừa đúng một ô lưới có kích thước theo hộp (hàng và cột `minmax(0, 1fr)`, không nở theo ảnh), giữ tỉ lệ,
+ * nên không tràn khỏi hộp dù ảnh rộng hay cao. jsdom không tính bố cục nên ở đây kiểm tra quy tắc CSS; kích thước thật đã đo
+ * trên Chromium với bản build (máy tính và điện thoại, có và không có khung).
+ */
+function expectFillsCell(specimen: HTMLElement) {
+  expect(specimen).toHaveStyle({ width: '100%', height: '100%', objectFit: 'contain' })
+  expect(specimen.parentElement).toHaveStyle({
+    display: 'grid',
+    gridTemplateRows: 'minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    placeItems: 'center',
+  })
+}
+
 describe('Tài khoản của tôi: chữ ký mẫu', () => {
   beforeEach(() => {
     mockCanvas()
@@ -81,6 +96,9 @@ describe('Tài khoản của tôi: chữ ký mẫu', () => {
     const box = await screen.findByTestId('signature-frame')
     expect(box).toContainElement(specimen)
     expect(box.style.backgroundImage).toContain(frameUrl)
+    // Vùng trống giữa khung (tránh phần logo phía trên) là ô chữ ký co vừa.
+    expectFillsCell(specimen)
+    expect(specimen.parentElement).toHaveStyle({ position: 'absolute', inset: '26% 8% 8% 8%' })
 
     await user.click(screen.getByRole('button', { name: /Ký lại chữ ký mẫu/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Ký chữ ký mẫu' })
@@ -91,6 +109,22 @@ describe('Tài khoản của tôi: chữ ký mẫu', () => {
     expect(context.strokeStyle).toBe(SIGNATURE_INK)
     // Khung giả lập rộng 600 điểm ảnh, devicePixelRatio = 1: nét 5 (gấp đôi nét cũ 2,5).
     expect(context.lineWidth).toBe(5)
+  })
+
+  it('chưa có khung chữ ký: chữ ký mẫu co vừa hộp trắng (giữ tỉ lệ, ở giữa), không tràn ra che chữ và nút bên dưới', async () => {
+    mockApi({
+      ...baseRoutes(session()),
+      // Không có route khung chữ ký: máy chủ trả 404 như khi quản trị chưa tải khung lên.
+      'GET /api/v1/account/signature-specimen': () => new Response('PNG-gia-lap', { headers: { 'Content-Type': 'image/png' } }),
+    })
+    renderApp('/tai-khoan')
+
+    const specimen = await screen.findByRole('img', { name: 'Chữ ký mẫu của bạn' })
+    expect(screen.queryByTestId('signature-frame')).not.toBeInTheDocument()
+    expectFillsCell(specimen)
+    // Ô là chính hộp trắng cao cố định 112 điểm ảnh (gồm viền và lề trong).
+    expect(specimen.parentElement).toHaveStyle({ height: '112px', boxSizing: 'border-box', padding: '12px' })
+    expect(screen.getByRole('button', { name: /Ký lại chữ ký mẫu/ })).toBeInTheDocument()
   })
 
   it('nét ký to dần theo bề rộng khung để cân đối: điện thoại 5, kiosk 32 inch khoảng 9', () => {

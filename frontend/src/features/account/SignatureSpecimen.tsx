@@ -1,9 +1,10 @@
 import { DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Flex, Modal, Popconfirm, Spin, Typography } from 'antd'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { accountApi, accountKeys, useSignatureSpecimen } from '../../api/account'
 import { errorMessage } from '../../utils/formErrors'
+import { useObjectUrl } from '../../utils/useObjectUrl'
 import { SignatureFrameBox } from '../signing/SignatureFrame'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 
@@ -13,13 +14,12 @@ import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
  */
 export function SpecimenImage({ height = 72, empty, fill = false }: { height?: number; empty?: React.ReactNode; fill?: boolean }) {
   const specimen = useSignatureSpecimen()
-  const url = useMemo(() => (specimen.data ? URL.createObjectURL(specimen.data) : null), [specimen.data])
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url)
-  }, [url])
+  const url = useObjectUrl(specimen.data)
 
   if (specimen.isPending) return <Spin size="small" />
-  if (!url) return <>{empty ?? null}</>
+  if (!specimen.data) return <>{empty ?? null}</>
+  // Có ảnh nhưng đường dẫn tạm được tạo ngay sau lần render này: vẫn hiện đang tải, không hiện "chưa có".
+  if (!url) return <Spin size="small" />
   return (
     <img
       src={url}
