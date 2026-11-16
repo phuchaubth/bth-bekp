@@ -128,6 +128,8 @@ internal sealed class InMemoryStore : IUnitOfWork
 
     public List<NursingDailyStatistics> NursingStatistics { get; } = [];
 
+    public List<NursingDepartmentStatistics> NursingDepartmentStatistics { get; } = [];
+
     public int SaveCount { get; private set; }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)

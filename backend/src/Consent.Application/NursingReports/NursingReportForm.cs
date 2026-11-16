@@ -163,6 +163,9 @@ public static class NursingReportForm
     /// <summary>Các dòng mục V: "Số ca đi ngoại viện" trên bảng tổng hợp là tổng các dòng này (giả định, ghi ở quyết định 31).</summary>
     public static IReadOnlyList<string> OutsideVisitKeys { get; } = ["outsideExams", "consultations", "specialistExams", "transfers"];
 
+    /// <summary>Tên cột "NB PK chờ nhập viện" (người bệnh phòng khám chờ nhập viện) trên bảng tổng hợp.</summary>
+    public const string WaitingAdmissionLabel = "NB PK chờ nhập viện";
+
     /// <summary>Cột số của bảng A, theo thứ tự bản giấy.</summary>
     public static IReadOnlyList<NursingSummaryColumn> SummaryColumns { get; } =
     [
@@ -173,7 +176,7 @@ public static class NursingReportForm
         new("expectedDischarges", "Dự kiến xuất viện"),
         new("scheduledAdmissions", "Hẹn nhập viện"),
         new("newAdmissions", "Dự kiến Nhận mới"),
-        new(NursingHisIndicators.WaitingAdmission, "NB PK chờ nhập viện"),
+        new(NursingHisIndicators.WaitingAdmission, WaitingAdmissionLabel),
         new("noBed", "*Chưa có giường"),
         new(AdrKey, "Phản ứng có hại thuốc ADR"),
         new(OutsideVisitsColumn, "Số ca đi ngoại viện"),

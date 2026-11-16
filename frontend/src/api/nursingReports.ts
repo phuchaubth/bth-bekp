@@ -60,6 +60,33 @@ export interface NursingReport {
   carriedOverKeys: string[]
   /** Khoa có trong danh sách khoa báo cáo do Phòng Điều dưỡng cài. */
   isReportingDepartment: boolean
+  /** Số liệu HIS khoa nhập khi HIS lỗi (quyết định 35); null khi khoa không có dòng nào phải nhập. */
+  hisEntry: NursingHisEntry | null
+}
+
+/** Một dòng số liệu HIS khoa nhập. `hisValue`: số lấy từ HIS của ngày (nếu có, bảng tổng hợp dùng số này). */
+export interface NursingHisEntryLine {
+  key: string
+  label: string
+  value: number | null
+  hisValue: number | null
+}
+
+/** Số liệu HIS khoa nhập khi HIS lỗi: "NB PK chờ nhập viện" của khoa và chỉ số Phòng Điều dưỡng giao cho khoa. */
+export interface NursingHisEntry {
+  lines: NursingHisEntryLine[]
+  canEdit: boolean
+  /** Ngày này đã có số liệu lấy từ HIS. */
+  hisHasValues: boolean
+  hisUpdatedAtUtc: string | null
+  updatedBy: string | null
+  updatedAtUtc: string | null
+}
+
+export interface SaveNursingHisEntryInput {
+  departmentId?: string
+  reportDate: string
+  values: Record<string, number | null>
 }
 
 export interface SaveNursingReportInput {
@@ -92,6 +119,8 @@ export interface NursingSummaryLine {
   key: string
   label: string
   value: number | null
+  /** Tên khoa đã nhập tay số này khi HIS lỗi (mục B, D). */
+  enteredBy?: string | null
 }
 
 export interface NursingSummaryCheck {
@@ -110,10 +139,24 @@ export interface NursingSummaryNote {
 export interface NursingStatisticsInfo {
   /** Đã cấu hình API thông tin người bệnh (lấy được số liệu HIS). */
   hisAvailable: boolean
+  /** Ngày này đã có số liệu lấy từ HIS ("Manual": số Phòng Điều dưỡng nhập trước quyết định 35). */
   hasValues: boolean
   source: 'His' | 'Manual' | null
   updatedAtUtc: string | null
   updatedBy: string | null
+  /** Các khoa phải nhập tay khi HIS lỗi, và đã nhập chưa. */
+  entries: NursingHisEntryStatus[]
+  /** Bảng có số do khoa nhập tay. */
+  usesDepartmentEntries: boolean
+}
+
+/** Một khoa phải nhập số liệu HIS khi HIS lỗi: mã các dòng của khoa, đã nhập lúc nào, bởi ai. */
+export interface NursingHisEntryStatus {
+  departmentId: string
+  departmentName: string
+  keys: string[]
+  enteredAtUtc: string | null
+  enteredBy: string | null
 }
 
 /** Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (mục A–F). */
@@ -138,12 +181,8 @@ export interface NursingReportDepartment {
   name: string
   isReporting: boolean
   bedCount: number | null
-}
-
-export interface NursingStatisticsInput {
-  reportDate: string
-  hospital: Record<string, number | null>
-  waitingAdmission: Record<string, number | null>
+  /** Chỉ số toàn viện (mục B, D) khoa nhập tay khi HIS lỗi. */
+  hisIndicators: string[]
 }
 
 export interface NursingStatisticsRefresh {
@@ -165,6 +204,7 @@ export const nursingReportsApi = {
       { signal },
     ),
   save: (input: SaveNursingReportInput) => apiRequest<NursingReport>(`${base}/daily`, { method: 'PUT', body: input }),
+  saveHisEntry: (input: SaveNursingHisEntryInput) => apiRequest<NursingReport>(`${base}/his-entry`, { method: 'PUT', body: input }),
   reopen: (id: string, reason: string) => apiRequest<NursingReport>(`${base}/${id}/reopen`, { method: 'POST', body: { reason } }),
   pdf: (id: string) => apiBlob(`${base}/${id}/pdf`),
   summary: (date: string, signal?: AbortSignal) => apiRequest<NursingSummary>(`${base}/summary?date=${date}`, { signal }),
@@ -172,10 +212,10 @@ export const nursingReportsApi = {
   summaryWorkbook: (date: string) => apiBlob(`${base}/summary/xlsx?date=${date}`),
   refreshStatistics: (date: string) =>
     apiRequest<NursingStatisticsRefresh>(`${base}/statistics/refresh`, { method: 'POST', body: { reportDate: date } }),
-  updateStatistics: (input: NursingStatisticsInput) => apiRequest<NursingSummary>(`${base}/statistics`, { method: 'PUT', body: input }),
   departments: (signal?: AbortSignal) => apiRequest<NursingReportDepartment[]>(`${base}/departments`, { signal }),
-  updateDepartments: (items: { departmentId: string; bedCount: number }[]) =>
-    apiRequest<NursingReportDepartment[]>(`${base}/departments`, { method: 'PUT', body: { items } }),
+  /** `hisEntry`: khoa nhập tay từng chỉ số toàn viện khi HIS lỗi (đủ cả bảng; null là chưa giao). */
+  updateDepartments: (items: { departmentId: string; bedCount: number }[], hisEntry: Record<string, string | null>) =>
+    apiRequest<NursingReportDepartment[]>(`${base}/departments`, { method: 'PUT', body: { items, hisEntry } }),
 }
 
 export const nursingKeys = {

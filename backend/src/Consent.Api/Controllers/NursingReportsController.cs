@@ -8,8 +8,9 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 namespace Consent.Api.Controllers;
 
 /// <summary>
-/// Báo cáo điều dưỡng hằng ngày (quyết định 31): khoa lập và gửi báo cáo của mình; Phòng Điều dưỡng xem bảng tổng hợp, in
-/// PDF, xuất Excel, mở lại báo cáo, cài khoa báo cáo và số giường, lấy hoặc nhập số liệu HIS.
+/// Báo cáo điều dưỡng hằng ngày (quyết định 31): khoa lập và gửi báo cáo của mình, và nhập tay số liệu HIS của khoa khi HIS
+/// lỗi (quyết định 35); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, mở lại báo cáo, cài khoa báo cáo, số giường và
+/// khoa nhập từng chỉ số, lấy số liệu HIS.
 /// </summary>
 [ApiController]
 [Route("api/v1/nursing-reports")]
@@ -34,6 +35,15 @@ public sealed class NursingReportsController(NursingReportService reports, Nursi
     [HasPermission(Permissions.NursingReportsSubmit)]
     public async Task<IActionResult> SaveDaily(SaveNursingReportRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await reports.SaveAsync(request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>
+    /// Khoa nhập tay số liệu HIS của khoa khi HIS lỗi (quyết định 35): "NB PK chờ nhập viện" của khoa và chỉ số toàn viện Phòng
+    /// Điều dưỡng giao cho khoa. Trả lại báo cáo của khoa trong ngày.
+    /// </summary>
+    [HttpPut("his-entry")]
+    [HasPermission(Permissions.NursingReportsSubmit)]
+    public async Task<IActionResult> SaveHisEntry(SaveNursingHisEntryRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await reports.SaveHisEntryAsync(request, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi để khoa sửa (bắt buộc ghi lý do).</summary>
     [HttpPost("{id:guid}/reopen")]
@@ -83,19 +93,13 @@ public sealed class NursingReportsController(NursingReportService reports, Nursi
     public async Task<IActionResult> RefreshStatistics(RefreshNursingStatisticsRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await summaries.RefreshStatisticsAsync(request, cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Nhập tay số liệu HIS của ngày (khi HIS lỗi hoặc chưa có câu truy vấn).</summary>
-    [HttpPut("statistics")]
-    [HasPermission(Permissions.NursingReportsManage)]
-    public async Task<IActionResult> UpdateStatistics(UpdateNursingStatisticsRequest request, CancellationToken cancellationToken) =>
-        this.ToActionResult(await summaries.UpdateStatisticsAsync(request, cancellationToken).ConfigureAwait(false));
-
-    /// <summary>Các khoa, khoa nào phải báo cáo và số giường thực kê.</summary>
+    /// <summary>Các khoa, khoa nào phải báo cáo, số giường thực kê, chỉ số toàn viện khoa nhập tay khi HIS lỗi.</summary>
     [HttpGet("departments")]
     [HasPermission(Permissions.NursingReportsManage)]
     public Task<IReadOnlyList<NursingReportDepartmentDto>> GetDepartments(CancellationToken cancellationToken) =>
         summaries.ListDepartmentsAsync(cancellationToken);
 
-    /// <summary>Đặt danh sách khoa phải báo cáo và số giường từng khoa.</summary>
+    /// <summary>Đặt danh sách khoa phải báo cáo, số giường từng khoa và (khi có <c>hisEntry</c>) khoa nhập từng chỉ số.</summary>
     [HttpPut("departments")]
     [HasPermission(Permissions.NursingReportsManage)]
     public async Task<IActionResult> UpdateDepartments(UpdateNursingReportDepartmentsRequest request, CancellationToken cancellationToken) =>

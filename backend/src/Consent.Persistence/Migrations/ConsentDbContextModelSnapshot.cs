@@ -886,6 +886,41 @@ namespace Consent.Persistence.Migrations
                     b.ToTable("NursingDailyStatistics", (string)null);
                 });
 
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingDepartmentStatistics", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("ReportDate")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("UpdatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ValuesJson")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReportDate", "DepartmentId")
+                        .IsUnique();
+
+                    b.ToTable("NursingDepartmentStatistics", (string)null);
+                });
+
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDepartment", b =>
                 {
                     b.Property<Guid>("Id")

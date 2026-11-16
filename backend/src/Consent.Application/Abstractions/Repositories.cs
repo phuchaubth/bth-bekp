@@ -223,6 +223,11 @@ public interface INursingReportRepository
     Task<NursingDailyStatistics?> FindStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken);
 
     void AddStatistics(NursingDailyStatistics statistics);
+
+    /// <summary>Số liệu HIS các khoa nhập tay trong ngày khi HIS lỗi (quyết định 35).</summary>
+    Task<IReadOnlyList<NursingDepartmentStatistics>> ListDepartmentStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken);
+
+    void AddDepartmentStatistics(NursingDepartmentStatistics statistics);
 }
 
 public interface ISystemSettingRepository

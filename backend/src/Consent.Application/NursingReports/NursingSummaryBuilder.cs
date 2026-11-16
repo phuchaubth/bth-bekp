@@ -9,7 +9,8 @@ public sealed record NursingSummaryDepartment(Guid Id, string Name, bool IsRepor
 /// <summary>
 /// Dựng bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" từ báo cáo các khoa và số liệu HIS của ngày (quyết định 31).
 /// Chỉ báo cáo <b>đã gửi</b> được tính; khoa chưa gửi để trống các ô do khoa báo cáo (như bản giấy), còn số giường và số liệu
-/// HIS vẫn hiện. Khoa đã gửi mà bỏ trống ô nào thì ô đó tính là 0.
+/// HIS vẫn hiện. Khoa đã gửi mà bỏ trống ô nào thì ô đó tính là 0. <c>enteredBy</c>: chỉ số mục B, D lấy từ số khoa nhập tay
+/// khi HIS lỗi, kèm tên khoa (quyết định 35).
 /// </summary>
 public static class NursingSummaryBuilder
 {
@@ -23,7 +24,8 @@ public static class NursingSummaryBuilder
         IReadOnlyList<NursingDailyReport> reports,
         IReadOnlyDictionary<Guid, string> userNames,
         NursingStatisticsValues statistics,
-        NursingStatisticsInfoDto statisticsInfo)
+        NursingStatisticsInfoDto statisticsInfo,
+        IReadOnlyDictionary<string, string>? enteredBy = null)
     {
         ArgumentNullException.ThrowIfNull(departments);
         ArgumentNullException.ThrowIfNull(reports);
@@ -104,15 +106,19 @@ public static class NursingSummaryBuilder
             NursingReportForm.SummaryColumns,
             rows,
             totals,
-            [.. NursingReportForm.OutpatientLines.Select(l => new NursingSummaryLineDto(l.Key, l.Label, statistics.HospitalValue(l.Key)))],
+            [.. NursingReportForm.OutpatientLines.Select(l => HospitalLine(l, statistics, enteredBy))],
             procedures,
-            [.. NursingReportForm.ImagingLines.Select(l => new NursingSummaryLineDto(l.Key, l.Label, statistics.HospitalValue(l.Key)))],
+            [.. NursingReportForm.ImagingLines.Select(l => HospitalLine(l, statistics, enteredBy))],
             situation,
             incidents,
             statisticsInfo,
             rows.Count(r => r.Status == NursingReportState.Submitted),
             departments.Count(d => d.IsReporting));
     }
+
+    private static NursingSummaryLineDto HospitalLine(
+        NursingSummaryLine line, NursingStatisticsValues statistics, IReadOnlyDictionary<string, string>? enteredBy) =>
+        new(line.Key, line.Label, statistics.HospitalValue(line.Key), enteredBy?.GetValueOrDefault(line.Key));
 
     private static int? Cell(string column, NursingSummaryDepartment department, NursingReportFigures? figures, NursingStatisticsValues statistics) =>
         column switch

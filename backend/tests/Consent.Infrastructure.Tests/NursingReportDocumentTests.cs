@@ -54,7 +54,7 @@ public sealed class NursingReportDocumentTests
             new NursingStatisticsValues(
                 new Dictionary<string, int> { [NursingHisIndicators.OutpatientVisits] = 686 },
                 new Dictionary<Guid, int> { [Ward] = 2 }),
-            new NursingStatisticsInfoDto(true, true, NursingStatisticsSource.His, DateTimeOffset.UtcNow, "Phòng Điều dưỡng Demo"));
+            new NursingStatisticsInfoDto(true, true, NursingStatisticsSource.His, DateTimeOffset.UtcNow, "Phòng Điều dưỡng Demo", [], false));
         return new NursingSummaryDocument(Hospital, summary, "In lúc 08:00 16/11/2026 · Khoa đã gửi: 1/2");
     }
 

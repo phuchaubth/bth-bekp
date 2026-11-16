@@ -13,6 +13,7 @@ import {
 } from '../../api/nursingReports'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
+import { HisEntryCard } from './HisEntryCard'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
 import { toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
 
@@ -20,7 +21,8 @@ const DATE = 'YYYY-MM-DD'
 
 /**
  * Báo cáo công tác điều dưỡng hằng ngày của khoa (quyết định 31): điều dưỡng chọn ngày, nhập theo bản giấy, lưu nháp hoặc
- * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại.
+ * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại. Khi HIS lỗi, khoa nhập số liệu HIS
+ * thuộc nhiệm vụ của khoa ở thẻ riêng (quyết định 35); khoa không phải báo cáo nhưng được giao chỉ số thì chỉ thấy thẻ này.
  */
 export function NursingReportPage() {
   const [date, setDate] = useState<Dayjs>(() => dayjs())
@@ -47,8 +49,33 @@ export function NursingReportPage() {
         <Alert type="error" showIcon title={errorMessage(definition.error ?? report.error)} />
       ) : !definition.data || !report.data ? (
         <Spin style={{ display: 'block', padding: 48 }} />
+      ) : !report.data.isReportingDepartment && report.data.hisEntry ? (
+        <>
+          <Alert
+            type="info"
+            showIcon
+            title={`${report.data.departmentName} không phải gửi báo cáo công tác điều dưỡng.`}
+            description="Khoa chỉ nhập các số liệu HIS được Phòng Điều dưỡng giao, khi HIS lỗi."
+          />
+          <HisEntryCard
+            key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+            report={report.data}
+            entry={report.data.hisEntry}
+            maxValue={definition.data.maxValue}
+          />
+        </>
       ) : (
-        <ReportEditor key={`${reportDate}-${report.data.id ?? 'new'}`} definition={definition.data} report={report.data} />
+        <>
+          <ReportEditor key={`${reportDate}-${report.data.id ?? 'new'}`} definition={definition.data} report={report.data} />
+          {report.data.hisEntry && (
+            <HisEntryCard
+              key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+              report={report.data}
+              entry={report.data.hisEntry}
+              maxValue={definition.data.maxValue}
+            />
+          )}
+        </>
       )}
     </>
   )

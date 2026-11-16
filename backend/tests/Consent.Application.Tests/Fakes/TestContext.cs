@@ -244,7 +244,8 @@ internal sealed class AppTestContext
         CurrentUser,
         Clock,
         CreateSettingsService(),
-        NursingDocuments);
+        NursingDocuments,
+        new InMemorySystemSettingRepository(Store));
 
     public NursingSummaryService CreateNursingSummaryService() => new(
         new InMemoryNursingReportRepository(Store),
@@ -256,7 +257,8 @@ internal sealed class AppTestContext
         Clock,
         CreateSettingsService(),
         NursingDocuments,
-        NursingDocuments);
+        NursingDocuments,
+        new InMemorySystemSettingRepository(Store));
 
     /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
     public void TurnOnEncounters()

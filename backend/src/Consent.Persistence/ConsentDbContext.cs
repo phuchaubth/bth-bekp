@@ -48,6 +48,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<NursingDailyStatistics> NursingDailyStatistics => Set<NursingDailyStatistics>();
 
+    public DbSet<NursingDepartmentStatistics> NursingDepartmentStatistics => Set<NursingDepartmentStatistics>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardAuditLogIsAppendOnly();

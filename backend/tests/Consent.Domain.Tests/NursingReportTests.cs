@@ -95,4 +95,22 @@ public sealed class NursingReportTests
         Assert.Equal(Now.AddHours(1), statistics.UpdatedAtUtc);
         Assert.Throws<DomainException>(() => statistics.Set(" ", NursingStatisticsSource.His, Nurse, Now));
     }
+
+    [Fact]
+    public void DepartmentStatistics_BelongToOneDepartmentAndDay_AndKeepWhoEnteredThem()
+    {
+        var statistics = NursingDepartmentStatistics.Create(
+            Department, Day, """{"hospital":{},"waitingAdmission":{}}""", Nurse, Now);
+        statistics.Set("""{"hospital":{"outpatientVisits":15}}""", NursingOffice, Now.AddHours(1));
+
+        Assert.Equal(Department, statistics.DepartmentId);
+        Assert.Equal(Day, statistics.ReportDate);
+        Assert.Equal("""{"hospital":{"outpatientVisits":15}}""", statistics.ValuesJson);
+        Assert.Equal(NursingOffice, statistics.UpdatedByUserId);
+        Assert.Equal(Now.AddHours(1), statistics.UpdatedAtUtc);
+        Assert.Throws<DomainException>(() => NursingDepartmentStatistics.Create(Guid.Empty, Day, "{}", Nurse, Now));
+        Assert.Throws<DomainException>(() => statistics.Set(" ", Nurse, Now));
+        Assert.Throws<DomainException>(() => statistics.Set(new string('1', NursingDepartmentStatistics.ValuesMaxLength + 1), Nurse, Now));
+        Assert.Throws<DomainException>(() => statistics.Set("{}", Guid.Empty, Now));
+    }
 }
