@@ -520,7 +520,20 @@ Người bệnh tự nhận diện, trả lời và ký một lần cho cả b�
 
 1. **Màn hình cảm ứng 32 inch đặt dọc** (Full HD 1080×1920 hoặc 4K đặt tỉ lệ hiển thị 200%), máy tính Windows 10/11 chạy Chrome hoặc Edge bản mới. Trong Windows: *Settings → System → Display → Display orientation: Portrait*.
 2. **Máy quét mã 2D (đọc được QR) cổng USB**, gắn bên dưới màn hình, đặt ở **chế độ bàn phím (USB HID Keyboard)**, **thêm phím Enter sau mỗi lần quét**, và **xuất ký tự Unicode/UTF-8** để đọc đúng họ tên có dấu trong mã QR (xem tài liệu máy quét; nhiều máy có mã vạch cấu hình in sẵn). Thử với vài thẻ thật: CCCD gắn chip và thẻ căn cước mẫu mới.
-3. Không cần camera: quét bằng camera để sau, vì trình duyệt chỉ mở camera khi trang chạy HTTPS.
+3. **Camera (không bắt buộc, quyết định 34):** kiosk có webcam (gắn trên đỉnh màn hình, hướng về người bệnh) thì màn hình **Quét CCCD** tự hiện khung hình camera và đọc mã QR từ camera; máy quét 2D vẫn dùng được cùng lúc. Kiosk không có camera thì chỉ dùng máy quét như cũ. Điều kiện:
+   - Trang kiosk chạy **HTTPS** (trình duyệt không mở camera ở địa chỉ `http://`).
+   - Trình duyệt của kiosk **đã được cho phép dùng camera** cho địa chỉ phần mềm, để người bệnh không gặp hộp hỏi quyền. Cách 1: trên máy kiosk mở `/kiosk`, chạm **Quét CCCD**, chọn **Cho phép** (trình duyệt nhớ lựa chọn). Cách 2 (khuyến nghị): đặt chính sách trình duyệt `VideoCaptureAllowedUrls` bằng PowerShell *Run as administrator*, rồi mở `chrome://policy` (hoặc `edge://policy`) bấm *Reload policies*:
+
+     ```powershell
+     # Chrome; Edge thay 'Google\Chrome' bằng 'Microsoft\Edge'
+     $k = 'HKLM:\SOFTWARE\Policies\Google\Chrome\VideoCaptureAllowedUrls'
+     New-Item -Path $k -Force | Out-Null
+     Set-ItemProperty -Path $k -Name '1' -Value 'https://<địa chỉ phần mềm>'
+     ```
+
+   - Camera không mở được (người dùng vừa chọn Chặn ở hộp hỏi quyền, không thấy camera, ứng dụng khác đang dùng camera) thì màn hình quét ghi *"Camera của kiosk chưa dùng được (lý do)"* và người bệnh dùng máy quét.
+   - **Chọn thiết bị quét** (không có cài đặt trong phần mềm, kiosk tự nhận): chỉ cắm **máy quét 2D** → màn hình máy quét như cũ; chỉ có **camera** → màn hình camera; có **cả hai** → màn hình camera, máy quét vẫn nhận cùng lúc. Máy có sẵn webcam mà bệnh viện **chỉ muốn dùng máy quét**: chặn camera trong trình duyệt của kiosk (biểu tượng bên trái thanh địa chỉ → *Camera* → *Chặn*, hoặc chính sách `VideoCaptureAllowed` = 0); kiosk hiện màn hình máy quét, không báo lỗi.
+   - Hình từ camera chỉ dùng để đọc mã ngay trên máy kiosk, không lưu, không gửi lên máy chủ. Thẻ còn nằm trong khung hình thì máy không gửi lại, để không tự tính nhiều lần sai.
 
 **Tài khoản và mẫu phiếu** (làm một lần)
 
@@ -582,7 +595,10 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 | `Named Pipes Provider, error: 40` / `The network path was not found` (khi chạy `efbundle.exe` hoặc API) | Không tới được SQL Server: sai tên máy, bản cài theo tên riêng, TCP/IP tắt, tường lửa chặn 1433, dịch vụ SQL chưa chạy | Dùng `Server=tcp:<máy>,1433` (hoặc `<máy>\<TÊN>` + SQL Server Browser); `Get-Service *SQL*`; bật TCP/IP, cổng 1433 trong SQL Server Configuration Manager; `Test-NetConnection <máy-SQL> -Port 1433` |
 | `Process should have elevated status to access IIS configuration data`, rồi `Cannot find drive 'IIS'` và `No mapping between account names and security IDs` | PowerShell không chạy bằng quyền quản trị nên không tạo được Application Pool; `icacls` lỗi theo vì tài khoản `IIS AppPool\…` chưa tồn tại | Mở PowerShell bằng *Run as administrator*, chạy lại nguyên khối lệnh |
 | Không đọc được CCCD/PDF, lỗi "không khớp mã băm" sau khôi phục | Đặt sai khóa `FieldEncryptionKey` hoặc thư mục PDF khác thời điểm với CSDL | Đặt lại đúng khóa cũ; khôi phục thư mục PDF cùng thời điểm |
-| Camera không bật khi quét CCCD | Trang không chạy qua HTTPS hoặc trình duyệt chưa cấp quyền | Dùng HTTPS với chứng chỉ được tin cậy trên thiết bị; cấp quyền camera |
+| Camera không bật khi quét CCCD trên máy tính (khung đen, không báo lỗi) | Lỗi phần mềm ở các gói cài trước ngày 16/11/2026: camera không bao giờ bật (quyết định 34) | Cài gói mới. Từ gói mới, hộp thoại ghi *"Đang mở camera…"* rồi bật camera, hoặc ghi rõ lý do như dòng dưới |
+| Hộp thoại quét bằng camera báo lỗi | *"…chỉ hoạt động khi truy cập qua HTTPS"*: trang mở bằng `http://`. *"Bạn chưa cho phép…"*: trình duyệt hoặc Windows chặn camera. *"Không tìm thấy camera"*: máy không có webcam hoặc webcam chưa nhận. *"…ứng dụng khác sử dụng"*: Zalo, Teams, Zoom… đang giữ camera. *"Không mở được camera (tên lỗi)"*: lỗi khác của trình duyệt | Dùng HTTPS với chứng chỉ được tin cậy. Cho phép camera: biểu tượng bên trái thanh địa chỉ → *Camera* → *Cho phép*, tải lại trang; Windows: *Settings → Privacy & security → Camera*, bật cả *Let desktop apps access your camera*. Kiểm tra webcam trong *Device Manager → Cameras*. Đóng ứng dụng đang dùng camera |
+| Kiosk ghi *"Camera của kiosk chưa dùng được (…)"* | Trình duyệt kiosk chưa được cho phép dùng camera, không thấy camera, hoặc camera đang bị ứng dụng khác dùng | Cho phép camera cho địa chỉ phần mềm (mục 9b, *Phần cứng* bước 3); người bệnh vẫn dùng máy quét |
+| Kiosk có webcam nhưng màn hình **Quét CCCD** chỉ hiện hướng dẫn máy quét | Trang không chạy HTTPS, hoặc trình duyệt đang chặn camera cho trang (đã có người chọn *Chặn*, hoặc chính sách trình duyệt) | Mở kiosk bằng địa chỉ `https://`; bỏ chặn: biểu tượng bên trái thanh địa chỉ → *Camera* → *Cho phép*, hoặc đặt `VideoCaptureAllowedUrls` (mục 9b) để không bị hỏi lại |
 | PDF không hiển thị trong ứng dụng (trang trắng) | Reverse proxy ghi đè CSP, thiếu `frame-src blob:` | Dùng CSP như `deploy/iis/web.frontend.config` / `frontend/nginx.conf` |
 | 429 "Bạn thao tác quá nhiều lần" | Vượt giới hạn đăng nhập (10 lần/phút/IP), xuất dữ liệu (10 lần/phút/người) hoặc mở mã QR ký trên điện thoại (30 lần/phút/IP) | Chờ 1 phút; nếu nhiều máy chung IP qua NAT, tăng `RateLimiting__AuthPermitLimit` (hoặc `RateLimiting__RemoteSigningPermitLimit` cho Wi-Fi người bệnh) |
 | Nhật ký ghi IP là `127.0.0.1` | Reverse proxy không gửi `X-Forwarded-For` hoặc `ReverseProxy__TrustAllProxies=false` | Cấu hình proxy gửi header và bật biến trên (chỉ khi API không mở cổng ra ngoài) |

@@ -203,7 +203,7 @@ Bấm **Người bệnh** → **Tiếp nhận người bệnh**. Có ba cách đ
 3. Kiểm tra lại thông tin. Bổ sung số điện thoại, dân tộc, nghề nghiệp, mã thẻ BHYT, mã người bệnh nếu có.
 4. Bấm **Lưu hồ sơ**.
 
-Không có máy quét: bấm **Quét bằng camera**, cho phép trình duyệt dùng camera, đưa mã QR ở mặt thẻ vào giữa khung hình và giữ yên 1–2 giây. Camera chỉ hoạt động khi phần mềm chạy qua địa chỉ an toàn (HTTPS).
+Không có máy quét: bấm **Quét bằng camera**. Lần đầu, trình duyệt hỏi quyền dùng camera: chọn **Cho phép**. Hộp thoại ghi *"Đang mở camera…"* cho tới khi camera bật. Đưa mã QR ở mặt thẻ vào giữa khung hình, giữ yên 1–2 giây. Đọc được mã thì hộp thoại tự đóng và thông tin được điền như cách 1. Camera chỉ hoạt động khi phần mềm chạy qua địa chỉ an toàn (HTTPS).
 
 ![Tiếp nhận người bệnh sau khi quét CCCD](huong-dan-su-dung/11-tiep-nhan-quet-cccd.png)
 
@@ -639,20 +639,22 @@ Khi người đại diện ký thay, dòng **Người ký** ghi rõ *"…, ký t
 
 ### 3.2. Tự làm phiếu tại kiosk
 
-Máy kiosk là màn hình cảm ứng 32 inch đặt dọc, có máy quét mã QR gắn bên dưới. Người bệnh làm 3 bước: **Nhận diện**, **Trả lời**, **Ký tên**. Thanh bước ở đầu màn hình cho biết đang ở bước nào.
+Máy kiosk là màn hình cảm ứng 32 inch đặt dọc, có máy quét mã QR gắn bên dưới, camera, hoặc cả hai. Người bệnh làm 3 bước: **Nhận diện**, **Trả lời**, **Ký tên**. Thanh bước ở đầu màn hình cho biết đang ở bước nào.
 
 **Bước 1: Nhận diện.** Trên màn hình đầu, chạm một trong ba cách:
 
 - **Quét CCCD** (nhanh nhất): lật thẻ sang mặt có mã QR, đưa mã QR lại gần đèn đỏ của máy quét, giữ yên 1–2 giây. Nghe tiếng "bíp" là xong, máy tự chuyển sang bước sau. Máy chỉ đọc chữ trong mã QR, không chụp hay lưu ảnh thẻ.
+  Kiosk có camera thì màn hình hiện khung hình camera: đưa mã QR vào khung vuông trên màn hình, cách camera khoảng một gang tay, giữ yên 1–2 giây. Đọc xong máy tự chuyển sang bước sau. Máy quét bên dưới (nếu có) vẫn dùng được cùng lúc. Hình từ camera chỉ dùng để đọc mã ngay trên máy, không lưu, không gửi đi.
 - **Nhập mã y tế hoặc số CCCD**: chọn **Mã y tế** hoặc **Số CCCD**, nhập bằng bàn phím số trên màn hình, chạm **Ô tiếp**, nhập **Ngày sinh (ngày/tháng/năm)**, chạm **Lấy thông tin**. Máy chỉ hiện thông tin khi ngày sinh khớp hồ sơ.
 - **Nhập thông tin** (khi không mang CCCD hoặc chưa có mã y tế): nhập **Họ và tên**, **Ngày sinh**, **Giới tính**, **Số điện thoại**, **Số CCCD** (nếu có), **Chỗ ở hiện nay**, rồi chạm **Tiếp tục**. Bàn phím tiếng Việt có hàng phím dấu: gõ chữ rồi chạm dấu.
 
 <p>
 <img src="huong-dan-su-dung/50-kiosk-trang-dau.png" alt="Kiosk: màn hình đầu" width="250">
 <img src="huong-dan-su-dung/51-kiosk-quet-cccd.png" alt="Kiosk: quét CCCD" width="250">
+<img src="huong-dan-su-dung/51b-kiosk-quet-camera.png" alt="Kiosk có camera: quét CCCD bằng camera" width="250">
 </p>
 
-*Hình 3.5. Trái: màn hình đầu, chọn cách lấy thông tin. Phải: hướng dẫn đưa mã QR trên thẻ vào máy quét.*
+*Hình 3.5. Trái: màn hình đầu, chọn cách lấy thông tin. Giữa: kiosk chỉ có máy quét, hướng dẫn đưa mã QR trên thẻ vào máy quét. Phải: kiosk có camera, khung hình camera (lật như soi gương) với khung vuông chỉ chỗ đưa mã QR.*
 
 <p>
 <img src="huong-dan-su-dung/52-kiosk-nhap-ma.png" alt="Kiosk: nhập mã y tế và ngày sinh" width="250">
@@ -712,6 +714,7 @@ Màn hình báo **Ông/bà đã ký xong … phiếu** và mời đến **quầy
 Lưu ý về kiosk:
 
 - **60 giây không chạm** thì máy tự xóa thông tin và về trang đầu. 10 giây cuối có dòng nhắc *"Màn hình sẽ tự về trang đầu sau … giây"*. Chạm vào màn hình để tiếp tục.
+- Màn hình quét ghi *"Camera của kiosk chưa dùng được (…)"*: người bệnh dùng máy quét bên dưới màn hình; nhân viên báo bộ phận CNTT (cần cho phép trình duyệt của kiosk dùng camera, xem hướng dẫn triển khai mục 9b).
 - Nhập mã/CCCD kèm ngày sinh sai **5 lần** thì máy tạm khóa tra cứu **5 phút**. Trong lúc này, quét thẻ cũng phải chờ. Người bệnh vẫn chọn **Nhập thông tin** (không kèm số CCCD) được, hoặc đến quầy tiếp đón. Quản trị mở khóa sớm được: **Quản trị → Người dùng**, tài khoản kiosk có trạng thái **Tạm khóa tra cứu**, bấm **⋯** → **Mở khóa**.
 - Các phiếu chuyên môn khác (nếu có) do điều dưỡng làm cùng người bệnh tại phòng khám.
 
@@ -1222,7 +1225,15 @@ Nút này chỉ có khi bệnh viện đã kết nối hệ thống thông tin n
 Nhập trực tiếp vào phần **2. Thông tin người bệnh** ở trang **Tiếp nhận người bệnh**. Số CCCD không bắt buộc.
 
 **Camera không bật khi bấm "Quét bằng camera"?**
-Trình duyệt chỉ mở camera khi phần mềm chạy qua địa chỉ an toàn (HTTPS) và đã được cho phép dùng camera. Cho phép camera trong cài đặt trình duyệt, hoặc dùng máy quét 2D, hoặc nhập tay.
+Hộp thoại ghi lý do:
+
+- *"Đang mở camera…"* mãi không đổi: trình duyệt đang chờ trả lời câu hỏi quyền dùng camera ở góc trên màn hình. Chọn **Cho phép**.
+- *"…chỉ hoạt động khi truy cập qua HTTPS"*: phần mềm đang mở bằng địa chỉ `http://`. Mở bằng địa chỉ `https://` của phần mềm.
+- *"Bạn chưa cho phép trang này dùng camera"*: bấm biểu tượng bên trái thanh địa chỉ → **Camera** → **Cho phép**, rồi tải lại trang.
+- *"Không tìm thấy camera"*: máy không có webcam hoặc webcam chưa nhận.
+- *"Camera đang được ứng dụng khác sử dụng"*: đóng Zalo, Teams, Zoom… rồi thử lại.
+
+Trong lúc chưa dùng được camera: dùng máy quét 2D hoặc nhập tay. Báo bộ phận CNTT nếu vẫn lỗi.
 
 **Người bệnh có ký trên điện thoại riêng của họ được không?**
 Được. Bấm **Mã QR cho người bệnh** (hoặc **Mã QR ký cả bộ**), người bệnh quét mã, nhập ngày sinh của người bệnh rồi ký (mục 2.8, cách 2 và mục 3.1). Điện thoại phải vào được địa chỉ của phần mềm, ví dụ qua Wi-Fi của bệnh viện.

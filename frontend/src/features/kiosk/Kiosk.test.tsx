@@ -4,9 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TemplateDefinition } from '../../api/consentTemplates'
 import type { KioskConfig, KioskIdentity, KioskSubmitRequest } from '../../api/kiosk'
 import { Permissions } from '../../auth/permissions'
+import { fakeCameras, installFakeMediaDevices } from '../../test/fakeCamera'
 import { baseRoutes, session } from '../../test/fixtures'
 import { mockApi, problem } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
+
+vi.mock('@zxing/browser', () => import('../../test/fakeCamera').then((m) => m.fakeZxing))
 
 // Dữ liệu giả lập, không phải người thật.
 const bm02: TemplateDefinition = {
@@ -404,5 +407,135 @@ describe('Kiosk người bệnh tự làm phiếu', () => {
       vi.advanceTimersByTime(9_000)
     })
     await waitFor(() => expect(screen.getByRole('heading', { name: /Xin chào/ })).toBeInTheDocument())
+  })
+})
+
+describe('Kiosk quét CCCD bằng camera', () => {
+  const CAMERA_HEADING = 'Đưa mã QR trên thẻ căn cước vào trước camera'
+  const SCANNER_HEADING = 'Đưa mã QR trên thẻ căn cước vào máy quét'
+  let removeCamera: (() => void) | undefined
+
+  afterEach(() => {
+    removeCamera?.()
+    removeCamera = undefined
+  })
+
+  const openScan = async (identify: object | (() => Response) = cardIdentity) => {
+    const user = userEvent.setup()
+    const api = mockApi({ ...baseRoutes(kioskAccount()), 'GET /api/v1/kiosk/config': config, 'POST /api/v1/kiosk/identify': identify })
+    renderApp('/kiosk')
+    await user.click(await screen.findByRole('button', { name: /Quét CCCD/ }))
+    return { user, identifyCalls: () => api.calls.filter((c) => c.path === '/api/v1/kiosk/identify') }
+  }
+
+  it('kiosk có camera: hiện khung hình camera, đọc mã trên thẻ → lấy thông tin, sang bước xác nhận, tắt camera', async () => {
+    removeCamera = installFakeMediaDevices()
+    const { identifyCalls } = await openScan()
+
+    expect(await screen.findByRole('heading', { name: CAMERA_HEADING })).toBeInTheDocument()
+    await waitFor(() => expect(fakeCameras).toHaveLength(1))
+    const [camera] = fakeCameras
+    // Camera hướng về người bệnh, hình lật như soi gương.
+    expect(camera.constraints).toMatchObject({ video: { facingMode: 'user' } })
+    expect(camera.video).toHaveStyle({ transform: 'scaleX(-1)' })
+    expect(screen.getByRole('status')).toHaveTextContent('Đang mở camera…')
+    expect(screen.getByText(/không lưu và không gửi đi/)).toBeInTheDocument()
+
+    await act(async () => camera.start())
+    expect(screen.getByRole('status')).toHaveTextContent('Đang chờ quét thẻ…')
+
+    // Mã QR không phải của CCCD: nhắc đưa lại, camera vẫn đọc tiếp.
+    act(() => camera.read('https://vi-du.test/khong-phai-cccd'))
+    expect(screen.getByRole('alert')).toHaveTextContent('Chưa đọc được mã QR trên thẻ căn cước')
+
+    act(() => {
+      camera.read(QR)
+      camera.read(QR)
+    })
+    expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
+    expect(identifyCalls()).toHaveLength(1)
+    expect(identifyCalls()[0].body).toMatchObject({ method: 'CitizenIdCard', dateOfBirth: '1985-03-12', citizenId: '079085000123' })
+    expect(camera.stop).toHaveBeenCalled()
+  })
+
+  it('thẻ còn trong khung hình thì không gửi lại; đưa thẻ ra rồi đưa lại mới thử lại (tránh tự tính nhiều lần sai)', async () => {
+    removeCamera = installFakeMediaDevices()
+    const now = vi.spyOn(Date, 'now')
+    const start = Date.now()
+    const { identifyCalls } = await openScan(() =>
+      problem(422, 'Hồ sơ cần nhân viên kiểm tra. Mời ông/bà đến quầy tiếp đón.', { code: 'kiosk.needs_staff' }),
+    )
+    await waitFor(() => expect(fakeCameras).toHaveLength(1))
+    const [camera] = fakeCameras
+    await act(async () => camera.start())
+
+    now.mockReturnValue(start)
+    act(() => camera.read(QR))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Hồ sơ cần nhân viên kiểm tra')
+
+    // Thẻ vẫn trong khung hình: camera đọc lại liên tục nhưng không gửi lại.
+    for (const elapsed of [500, 1000, 1500, 2000, 2500]) {
+      now.mockReturnValue(start + elapsed)
+      act(() => camera.read(QR))
+    }
+    expect(identifyCalls()).toHaveLength(1)
+
+    // Thẻ rời khung hình hơn 2 giây rồi đưa lại: thử lại.
+    now.mockReturnValue(start + 5000)
+    act(() => camera.read(QR))
+    await waitFor(() => expect(identifyCalls()).toHaveLength(2))
+  })
+
+  it('máy quét 2D vẫn dùng được khi camera đang bật', async () => {
+    removeCamera = installFakeMediaDevices()
+    const { user } = await openScan()
+    await waitFor(() => expect(fakeCameras).toHaveLength(1))
+    await act(async () => fakeCameras[0].start())
+
+    await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${QR}{Enter}`)
+
+    expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
+    expect(fakeCameras[0].stop).toHaveBeenCalled()
+  })
+
+  it('kiosk không có camera: chỉ dùng máy quét như trước, không bật camera', async () => {
+    removeCamera = installFakeMediaDevices(['audioinput'])
+    await openScan()
+
+    expect(await screen.findByRole('heading', { name: SCANNER_HEADING })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Đang chờ quét thẻ…')
+    expect(screen.queryByText(/Camera của kiosk chưa dùng được/)).not.toBeInTheDocument()
+    expect(fakeCameras).toHaveLength(0)
+  })
+
+  it('trình duyệt của kiosk chặn camera (chủ ý chỉ dùng máy quét dù máy có webcam): màn hình máy quét, không bật camera, không báo lỗi', async () => {
+    removeCamera = installFakeMediaDevices(['videoinput'], 'denied')
+    await openScan()
+
+    expect(await screen.findByRole('heading', { name: SCANNER_HEADING })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Đang chờ quét thẻ…')
+    expect(screen.queryByText(/Camera của kiosk chưa dùng được/)).not.toBeInTheDocument()
+    expect(fakeCameras).toHaveLength(0)
+  })
+
+  it('camera không mở được: về màn hình máy quét, ghi lý do để bộ phận CNTT xử lý; máy quét vẫn dùng được', async () => {
+    removeCamera = installFakeMediaDevices()
+    const { user } = await openScan()
+    await waitFor(() => expect(fakeCameras).toHaveLength(1))
+
+    await act(async () => fakeCameras[0].fail('NotAllowedError'))
+
+    expect(screen.getByRole('heading', { name: SCANNER_HEADING })).toBeInTheDocument()
+    expect(screen.getByText(/Camera của kiosk chưa dùng được \(trình duyệt chưa cho phép dùng camera\)/)).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${QR}{Enter}`)
+    expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
+  })
+
+  it('trang không chạy HTTPS: không có camera, dùng máy quét như trước', async () => {
+    await openScan()
+
+    expect(screen.getByRole('heading', { name: SCANNER_HEADING })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Đang chờ quét thẻ…')
+    expect(fakeCameras).toHaveLength(0)
   })
 })
