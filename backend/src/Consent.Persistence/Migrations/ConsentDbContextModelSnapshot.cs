@@ -138,6 +138,9 @@ namespace Consent.Persistence.Migrations
                         .IsUnicode(false)
                         .HasColumnType("varchar(30)");
 
+                    b.Property<Guid?>("InheritedFromFormId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("KioskIdentity")
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
@@ -226,6 +229,8 @@ namespace Consent.Persistence.Migrations
                     b.HasIndex("FormNo")
                         .IsUnique();
 
+                    b.HasIndex("InheritedFromFormId");
+
                     b.HasIndex("PatientId");
 
                     b.HasIndex("ReplacesFormId")
@@ -313,6 +318,78 @@ namespace Consent.Persistence.Migrations
                         .HasFilter("[StepKey] IS NOT NULL");
 
                     b.ToTable("ConsentSignatures", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.ConsentForms.RemoteSigningLink", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("BundleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DeviceKeyHash")
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("char(64)")
+                        .IsFixedLength();
+
+                    b.Property<DateTimeOffset>("ExpiresAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("FailedAttempts")
+                        .HasColumnType("int");
+
+                    b.PrimitiveCollection<string>("FormIds")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("OpenedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PatientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<Guid>("SessionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CodeHash")
+                        .IsUnique();
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("PatientId");
+
+                    b.HasIndex("SessionId");
+
+                    b.ToTable("RemoteSigningLinks", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>
@@ -1045,6 +1122,11 @@ namespace Consent.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Consent.Domain.ConsentForms.ConsentForm", null)
+                        .WithMany()
+                        .HasForeignKey("InheritedFromFormId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Consent.Domain.Patients.Patient", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -1081,6 +1163,21 @@ namespace Consent.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.ConsentForms.RemoteSigningLink", b =>
+                {
+                    b.HasOne("Consent.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.Patients.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>

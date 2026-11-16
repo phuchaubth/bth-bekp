@@ -19,6 +19,12 @@ public sealed class RateLimitingOptions
     /// <summary>Số lần xuất dữ liệu tối đa của mỗi người dùng trong một cửa sổ thời gian (xuất file là thao tác nặng).</summary>
     public int ExportPermitLimit { get; set; } = 10;
 
+    /// <summary>
+    /// Số lần điện thoại mở mã ký (quyết định 32) tối đa mỗi địa chỉ IP trong một cửa sổ thời gian. Cao hơn đăng nhập vì nhiều
+    /// điện thoại dùng chung Wi-Fi của bệnh viện có thể ra cùng một địa chỉ IP; mỗi mã còn tự hủy khi sai ngày sinh 5 lần.
+    /// </summary>
+    public int RemoteSigningPermitLimit { get; set; } = 30;
+
     public int WindowSeconds { get; set; } = 60;
 }
 
@@ -27,6 +33,7 @@ internal static class RateLimitPolicies
     public const string Auth = "auth";
     public const string Refresh = "refresh";
     public const string Export = "export";
+    public const string RemoteSigning = "remote-signing";
 
     public static IServiceCollection AddApiRateLimiting(this IServiceCollection services, IConfiguration configuration)
     {
@@ -39,6 +46,7 @@ internal static class RateLimitPolicies
             limiter.AddPolicy(Auth, context => FixedWindowByIp(context, options.AuthPermitLimit, window));
             limiter.AddPolicy(Refresh, context => FixedWindowByIp(context, options.RefreshPermitLimit, window));
             limiter.AddPolicy(Export, context => FixedWindowByUser(context, options.ExportPermitLimit, window));
+            limiter.AddPolicy(RemoteSigning, context => FixedWindowByIp(context, options.RemoteSigningPermitLimit, window));
             limiter.OnRejected = async (rejected, cancellationToken) =>
             {
                 var http = rejected.HttpContext;

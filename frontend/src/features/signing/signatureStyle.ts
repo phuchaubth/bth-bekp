@@ -17,12 +17,12 @@ const MAX_FRAME_HEIGHT = '50vh'
 
 /**
  * Kiểu dáng chung của ảnh khung chữ ký: giữ đúng tỉ lệ ảnh, ảnh phủ kín khung. Dùng cho khung vẽ chữ ký và khung hiện chữ ký
- * mẫu, để chữ ký luôn nằm trong thiết kế của bệnh viện.
+ * mẫu, để chữ ký luôn nằm trong thiết kế của bệnh viện. `maxHeight`: chiều cao tối đa của khung (mặc định nửa màn hình).
  */
-export function frameStyle(frame: SignatureFrame): CSSProperties {
+export function frameStyle(frame: SignatureFrame, maxHeight: string = MAX_FRAME_HEIGHT): CSSProperties {
   return {
     width: '100%',
-    maxWidth: `calc(${MAX_FRAME_HEIGHT} * ${frame.width / frame.height})`,
+    maxWidth: `calc(${maxHeight} * ${frame.width / frame.height})`,
     marginInline: 'auto',
     aspectRatio: `${frame.width} / ${frame.height}`,
     backgroundColor: '#ffffff',

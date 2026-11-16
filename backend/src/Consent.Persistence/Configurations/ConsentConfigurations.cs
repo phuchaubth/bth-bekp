@@ -43,6 +43,26 @@ internal sealed class ConsentTemplateVersionConfiguration : IEntityTypeConfigura
     }
 }
 
+/// <summary>Mã ký trên điện thoại riêng của người bệnh (quyết định 32): chỉ lưu mã băm, có rowversion để hai máy không cùng mở.</summary>
+internal sealed class RemoteSigningLinkConfiguration : IEntityTypeConfiguration<RemoteSigningLink>
+{
+    public void Configure(EntityTypeBuilder<RemoteSigningLink> builder)
+    {
+        builder.ToTable("RemoteSigningLinks");
+        builder.HasKey(l => l.Id);
+        builder.Property(l => l.Id).ValueGeneratedNever();
+        builder.Property(l => l.CodeHash).HasMaxLength(RemoteSigningLink.HashLength).IsFixedLength().IsUnicode(false).IsRequired();
+        builder.HasIndex(l => l.CodeHash).IsUnique();
+        builder.Property(l => l.DeviceKeyHash).HasMaxLength(RemoteSigningLink.HashLength).IsFixedLength().IsUnicode(false);
+        builder.Property(l => l.FormIds).IsRequired();
+        builder.Property(l => l.CancelReason).HasConversion<string>().HasMaxLength(30);
+        builder.HasIndex(l => l.SessionId);
+        builder.HasOne<Patient>().WithMany().HasForeignKey(l => l.PatientId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<User>().WithMany().HasForeignKey(l => l.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasRowVersion();
+    }
+}
+
 internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<ConsentForm>
 {
     public void Configure(EntityTypeBuilder<ConsentForm> builder)
@@ -61,6 +81,7 @@ internal sealed class ConsentFormConfiguration : IEntityTypeConfiguration<Consen
         builder.Property(f => f.SignedPdfSha256).HasMaxLength(64).IsFixedLength().IsUnicode(false);
         builder.HasOne<ConsentForm>().WithMany().HasForeignKey(f => f.ReplacesFormId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(f => f.ReplacesFormId).IsUnique().HasFilter("[ReplacesFormId] IS NOT NULL");
+        builder.HasOne<ConsentForm>().WithMany().HasForeignKey(f => f.InheritedFromFormId).OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(f => f.BundleId).HasFilter("[BundleId] IS NOT NULL");
         builder.Property(f => f.KioskIdentity).HasConversion<string>().HasMaxLength(20);
         builder.Property(f => f.EncounterNo).HasMaxLength(ConsentEncounter.NumberMaxLength);

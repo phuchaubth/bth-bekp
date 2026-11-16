@@ -189,7 +189,8 @@ internal sealed class AppTestContext
         His,
         Microsoft.Extensions.Options.Options.Create(new HospitalOptions()),
         new UpdateHospitalSettingsRequestValidator(),
-        Documents);
+        Documents,
+        PatientSource);
 
     public ConsentSigningService CreateConsentSigningService() => new(
         CreateConsentFormService(),
@@ -206,6 +207,16 @@ internal sealed class AppTestContext
         new PatientSignatureRequestValidator(),
         new RevokeConsentFormRequestValidator(),
         CreateConsentEncounterService());
+
+    public RemoteSigningService CreateRemoteSigningService() => new(
+        CreateConsentFormService(),
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryRemoteSigningLinkRepository(Store),
+        new InMemoryUserRepository(Store),
+        Tokens,
+        Store,
+        Clock,
+        CurrentUser);
 
     public StubEncounterSource EncounterSource { get; } = new();
 

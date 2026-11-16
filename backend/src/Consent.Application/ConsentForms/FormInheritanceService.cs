@@ -115,12 +115,11 @@ public sealed class FormInheritanceService(
             .Select(p => p.Key)];
     }
 
-    /// <summary>Lưu ý hiện cho nhân viên khi phiếu mới được điền sẵn theo phiếu cũ.</summary>
-    public static string Notice(InheritedForm inherited)
+    /// <summary>Lưu ý hiện trên phiếu nháp được điền sẵn theo phiếu cũ, đến khi trình ký.</summary>
+    public static string Notice(string formNo, DateTimeOffset completedAtUtc)
     {
-        ArgumentNullException.ThrowIfNull(inherited);
-        var completed = inherited.CompletedAtUtc.ToOffset(ConsentFormService.VietnamOffset).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
-        return $"Đã điền sẵn theo phiếu {inherited.FormNo} (hoàn tất {completed}): kiểm tra lại trước khi trình ký.";
+        var completed = completedAtUtc.ToOffset(ConsentFormService.VietnamOffset).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        return $"Đã điền sẵn theo phiếu {formNo} (hoàn tất {completed}): kiểm tra lại trước khi trình ký.";
     }
 
     private static int Parse(SystemSetting? setting) =>

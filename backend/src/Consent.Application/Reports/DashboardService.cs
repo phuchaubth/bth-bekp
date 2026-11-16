@@ -1,5 +1,6 @@
 using Consent.Application.Abstractions;
 using Consent.Application.ConsentForms;
+using Consent.Application.ConsentTemplates;
 using Consent.Domain.Authorization;
 using Consent.Domain.ConsentForms;
 
@@ -7,7 +8,7 @@ namespace Consent.Application.Reports;
 
 /// <summary>
 /// Trang tổng quan (màn hình 2) trong phạm vi khoa của người dùng: số phiếu nháp, chờ ký, hoàn tất hôm nay, thu hồi
-/// 30 ngày qua; phiếu chờ người dùng xác nhận (người bệnh đã ký, người dùng có vai trò xác nhận của mẫu); phiếu người
+/// 30 ngày qua; phiếu chờ người dùng xác nhận (người bệnh đã ký, bước xác nhận đang chờ thuộc vai trò của người dùng); phiếu người
 /// dùng lập chưa hoàn tất; số phiếu lập và hoàn tất từng ngày trong 14 ngày gần nhất.
 /// </summary>
 public sealed class DashboardService(
@@ -36,18 +37,9 @@ public sealed class DashboardService(
         var revoked = await statistics.CountClosedAsync(scope, revoked: true, todayStart.AddDays(-29), tomorrow, cancellationToken)
             .ConfigureAwait(false);
 
-        var awaiting = new DashboardFormList(0, []);
-        if (currentUser.HasPermission(Permissions.ConsentsSign))
-        {
-            var templateIds = (await templates.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
-                .Where(t => currentUser.IsInRole(t.HospitalSignerRoleCode))
-                .Select(t => t.Id)
-                .ToList();
-            if (templateIds.Count > 0)
-            {
-                awaiting = await statistics.AwaitingConfirmationAsync(scope, templateIds, ListSize, cancellationToken).ConfigureAwait(false);
-            }
-        }
+        var awaiting = currentUser.HasPermission(Permissions.ConsentsSign)
+            ? await AwaitingMyConfirmationAsync(scope, cancellationToken).ConfigureAwait(false)
+            : new DashboardFormList(0, []);
 
         var mine = currentUser.UserId is { } userId
             ? await statistics.OpenFormsCreatedByAsync(userId, ListSize, cancellationToken).ConfigureAwait(false)
@@ -64,5 +56,55 @@ public sealed class DashboardService(
             .ToList();
 
         return new DashboardDto(drafts, pending, completedToday, revoked, awaiting, mine, days);
+    }
+
+    /// <summary>
+    /// Phiếu đang đến lượt người dùng xác nhận: người bệnh đã ký và bước đang chờ thuộc vai trò của người dùng. Bước đang chờ
+    /// là bước trung gian đầu tiên chưa xác nhận theo định nghĩa mẫu; hết bước trung gian thì là xác nhận cuối. Bỏ phiếu người
+    /// dùng đã xác nhận một bước (mỗi bước cần một người khác), cùng điều kiện hiện nút xác nhận trên trang phiếu.
+    /// </summary>
+    private async Task<DashboardFormList> AwaitingMyConfirmationAsync(ConsentFormSearch scope, CancellationToken cancellationToken)
+    {
+        // Chỉ các phiên bản mẫu mà người dùng có vai trò ở một bước nào đó (bước trung gian hoặc xác nhận cuối).
+        var versions = new Dictionary<Guid, (IReadOnlyList<TemplateConfirmationStep> Steps, string FinalRole)>();
+        foreach (var template in await templates.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
+        {
+            foreach (var version in template.Versions)
+            {
+                var steps = ConsentTemplateService.ReadDefinition(version).Signatures?.Steps ?? [];
+                if (currentUser.IsInRole(template.HospitalSignerRoleCode) || steps.Any(s => currentUser.IsInRole(s.RoleCode)))
+                {
+                    versions[version.Id] = (steps, template.HospitalSignerRoleCode);
+                }
+            }
+        }
+
+        if (versions.Count == 0)
+        {
+            return new DashboardFormList(0, []);
+        }
+
+        var candidates = await statistics.ListAwaitingConfirmationAsync(scope, versions.Keys, cancellationToken).ConfigureAwait(false);
+        var myTurn = candidates
+            .Where(c => versions.TryGetValue(c.TemplateVersionId, out var template) && IsMyTurn(c, template.Steps, template.FinalRole))
+            .OrderBy(c => c.PatientSignedAtUtc)
+            .ToList();
+        var shown = myTurn.Take(ListSize).Select(c => c.Id).ToList();
+        var items = shown.Count == 0
+            ? []
+            : await statistics.GetSignedFormItemsAsync(shown, cancellationToken).ConfigureAwait(false);
+        return new DashboardFormList(
+            myTurn.Count, [.. shown.Select(id => items.FirstOrDefault(i => i.Id == id)).OfType<DashboardFormItem>()]);
+    }
+
+    private bool IsMyTurn(AwaitingConfirmationCandidate form, IReadOnlyList<TemplateConfirmationStep> steps, string finalRole)
+    {
+        if (form.ConfirmedSteps.Any(s => s.UserId is { } userId && userId == currentUser.UserId))
+        {
+            return false;
+        }
+
+        var pending = steps.FirstOrDefault(step => !form.ConfirmedSteps.Any(s => s.StepKey == step.Key));
+        return currentUser.IsInRole(pending?.RoleCode ?? finalRole);
     }
 }

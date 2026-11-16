@@ -42,6 +42,7 @@ public sealed class DatabaseApiFactory(
                 ["Seed:DemoPassword"] = TestSettings.DemoPassword,
                 ["RateLimiting:AuthPermitLimit"] = "1000",
                 ["RateLimiting:RefreshPermitLimit"] = "1000",
+                ["RateLimiting:RemoteSigningPermitLimit"] = "1000",
                 // Kiểm thử phát hiện dùng lại token ngay lập tức (không có thời gian ân hạn).
                 ["Auth:RefreshReuseGraceSeconds"] = "0",
             };

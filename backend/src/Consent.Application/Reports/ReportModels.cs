@@ -67,6 +67,16 @@ public sealed record DashboardFormItem(
 
 public sealed record DashboardFormList(int Total, IReadOnlyList<DashboardFormItem> Items);
 
+/// <summary>
+/// Phiếu người bệnh đã ký, còn chờ phía bệnh viện, kèm các bước trung gian đã xác nhận và người xác nhận: tầng ứng dụng tìm
+/// bước đang chờ theo định nghĩa của đúng phiên bản mẫu.
+/// </summary>
+public sealed record AwaitingConfirmationCandidate(
+    Guid Id, Guid TemplateVersionId, DateTimeOffset PatientSignedAtUtc, IReadOnlyList<ConfirmedStep> ConfirmedSteps);
+
+/// <summary>Một bước xác nhận trung gian đã làm trên phiếu.</summary>
+public sealed record ConfirmedStep(string? StepKey, Guid? UserId);
+
 public sealed record DashboardDay(DateOnly Date, int Created, int Completed);
 
 /// <summary>Trang tổng quan (màn hình 2), trong phạm vi khoa của người dùng.</summary>

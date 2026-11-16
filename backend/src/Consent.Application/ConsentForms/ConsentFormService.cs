@@ -165,7 +165,7 @@ public sealed class ConsentFormService(
         var form = ConsentForm.Create(
             formNo, patient.Id, template.Id, version.Id, department.Id, data.ToJsonString(),
             currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng."), clock.UtcNow,
-            request.ReplacesFormId);
+            request.ReplacesFormId, inheritedFromFormId: inherited?.FormId);
         forms.Add(form);
         if (inherited is not null)
         {
@@ -173,8 +173,8 @@ public sealed class ConsentFormService(
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        var detail = await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
-        return inherited is null ? detail : detail with { Notices = [.. detail.Notices, FormInheritanceService.Notice(inherited)] };
+        // Lưu ý điền sẵn theo phiếu lần trước nằm trong Notices của phiếu nháp (BuildNoticesAsync), hiện trên trang phiếu.
+        return await BuildDetailAsync(form, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -228,7 +228,6 @@ public sealed class ConsentFormService(
         var bundleId = Guid.CreateVersion7();
         var userId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
         var days = await inheritance.GetDaysAsync(cancellationToken).ConfigureAwait(false);
-        var notices = new List<string>();
         foreach (var (template, version, definition) in prepared)
         {
             var data = Prefill(definition, patient);
@@ -241,18 +240,18 @@ public sealed class ConsentFormService(
 
             var formNo = await numbers.NextAsync(clock.UtcNow, cancellationToken).ConfigureAwait(false);
             var form = ConsentForm.Create(
-                formNo, patient.Id, template.Id, version.Id, department.Id, data.ToJsonString(), userId, clock.UtcNow, bundleId: bundleId);
+                formNo, patient.Id, template.Id, version.Id, department.Id, data.ToJsonString(), userId, clock.UtcNow,
+                bundleId: bundleId, inheritedFromFormId: inherited?.FormId);
             forms.Add(form);
             if (inherited is not null)
             {
                 AddAudit(AuditActions.ConsentFormInherited, form.Id, JsonSerializer.Serialize(new { from = inherited.FormNo }));
-                notices.Add($"{formNo}: {FormInheritanceService.Notice(inherited)}");
             }
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        var bundle = await GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false);
-        return bundle.IsFailure || notices.Count == 0 ? bundle : bundle.Value with { Notices = [.. bundle.Value.Notices, .. notices] };
+        // Lưu ý điền sẵn theo phiếu lần trước của từng phiếu nháp nằm trong Notices của bộ (GetBundleAsync).
+        return await GetBundleAsync(bundleId, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -304,6 +303,15 @@ public sealed class ConsentFormService(
         if (mixedSigners)
         {
             notices.Add(MixedSignersMessage);
+        }
+
+        // Quyết định 27: phiếu nháp nào điền sẵn theo phiếu lần trước thì nhắc kiểm tra lại, đến khi trình ký.
+        foreach (var form in bundle.Where(f => f.CanEdit))
+        {
+            if (await InheritedNoticeAsync(form, cancellationToken).ConfigureAwait(false) is { } inheritedNotice)
+            {
+                notices.Add($"{form.FormNo}: {inheritedNotice}");
+            }
         }
 
         var kioskIdentity = bundle.Select(f => f.KioskIdentity).FirstOrDefault(m => m is not null);
@@ -685,8 +693,8 @@ public sealed class ConsentFormService(
     }
 
     /// <summary>
-    /// Thông báo trên phiếu: khi còn sửa được (ví dụ hồ sơ còn số thẻ BHYT mã cũ 15 ký tự); khi chờ xác nhận mà phiếu do
-    /// người bệnh tự làm trên kiosk (nhắc đối chiếu CCCD).
+    /// Thông báo trên phiếu: khi còn sửa được (phiếu điền sẵn theo phiếu lần trước thì nhắc kiểm tra lại; hồ sơ còn số thẻ
+    /// BHYT mã cũ 15 ký tự); khi chờ xác nhận mà phiếu do người bệnh tự làm trên kiosk (nhắc đối chiếu CCCD).
     /// </summary>
     private async Task<IReadOnlyList<string>> BuildNoticesAsync(ConsentForm form, CancellationToken cancellationToken)
     {
@@ -697,9 +705,27 @@ public sealed class ConsentFormService(
                 : [];
         }
 
+        var notices = new List<string>();
+        if (await InheritedNoticeAsync(form, cancellationToken).ConfigureAwait(false) is { } inheritedNotice)
+        {
+            notices.Add(inheritedNotice);
+        }
+
         var patient = await patients.GetByIdAsync(form.PatientId, cancellationToken).ConfigureAwait(false);
-        return HealthInsuranceNumber.IsLegacy(patient?.HealthInsuranceNumber) ? [HealthInsuranceNumber.LegacyNotice] : [];
+        if (HealthInsuranceNumber.IsLegacy(patient?.HealthInsuranceNumber))
+        {
+            notices.Add(HealthInsuranceNumber.LegacyNotice);
+        }
+
+        return notices;
     }
+
+    /// <summary>Lưu ý "đã điền sẵn theo phiếu …" của phiếu lập có kế thừa phiếu lần trước (quyết định 27).</summary>
+    private async Task<string?> InheritedNoticeAsync(ConsentForm form, CancellationToken cancellationToken) =>
+        form.InheritedFromFormId is { } previousId
+        && await forms.GetByIdAsync(previousId, cancellationToken).ConfigureAwait(false) is { CompletedAtUtc: { } completedAt } previous
+            ? FormInheritanceService.Notice(previous.FormNo, completedAt)
+            : null;
 
     private static ConsentSignatureDto ToSignatureDto(ConsentSignature s) =>
         new(s.Role, s.Method, s.SignerName, s.SignerTitle, s.SignedAtUtc, s.StepKey, s.Statement);

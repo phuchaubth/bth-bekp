@@ -68,10 +68,13 @@ public sealed class FormInheritanceTests
             s.Ctx.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormInherited && a.EntityId == form.Id.ToString());
         Assert.Contains(latest, audit.Details, StringComparison.Ordinal);
 
-        // Mở lại phiếu: nội dung đã lưu, lưu ý chỉ hiện lúc vừa lập.
+        // Mở lại phiếu (tải lại trang): nội dung đã lưu, lưu ý vẫn hiện trên phiếu nháp đến khi trình ký.
         var reopened = (await s.Service.GetAsync(form.Id, Ct)).Value;
         Assert.Equal("Trạm Y tế Phường Mẫu", reopened.Data["primaryCareFacility"]!.GetValue<string>());
-        Assert.DoesNotContain(reopened.Notices, n => n.Contains(latest, StringComparison.Ordinal));
+        Assert.Equal(notice, Assert.Single(reopened.Notices, n => n.Contains(latest, StringComparison.Ordinal)));
+        var submitted = await s.Service.SubmitAsync(form.Id, Ct);
+        Assert.True(submitted.IsSuccess, submitted.Error?.Message);
+        Assert.DoesNotContain(submitted.Value.Notices, n => n.Contains(latest, StringComparison.Ordinal));
     }
 
     [Fact]
@@ -126,6 +129,14 @@ public sealed class FormInheritanceTests
         var notice = Assert.Single(bundle.Value.Notices, n => n.Contains(previous, StringComparison.Ordinal));
         Assert.StartsWith(ck01.FormNo, notice, StringComparison.Ordinal);
         Assert.Single(s.Ctx.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormInherited);
+
+        // Mở lại bộ phiếu và từng phiếu: lưu ý vẫn còn trên thanh bộ phiếu và trên trang phiếu CK-01 nháp.
+        var reloaded = await s.Service.GetBundleAsync(bundle.Value.BundleId, Ct);
+        Assert.Equal(notice, Assert.Single(reloaded.Value.Notices, n => n.Contains(previous, StringComparison.Ordinal)));
+        var ck01Page = (await s.Service.GetAsync(ck01.Id, Ct)).Value;
+        Assert.Single(ck01Page.Notices, n => n.Contains(previous, StringComparison.Ordinal));
+        var tn01Page = (await s.Service.GetAsync(bundle.Value.Forms.Single(f => f.TemplateId == s.Tn01.Id).Id, Ct)).Value;
+        Assert.DoesNotContain(tn01Page.Notices, n => n.Contains(previous, StringComparison.Ordinal));
     }
 
     [Fact]

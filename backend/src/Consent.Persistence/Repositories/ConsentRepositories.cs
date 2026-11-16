@@ -31,6 +31,17 @@ internal sealed class ConsentTemplateRepository(ConsentDbContext db) : IConsentT
     public void Add(ConsentTemplate template) => db.ConsentTemplates.Add(template);
 }
 
+internal sealed class RemoteSigningLinkRepository(ConsentDbContext db) : IRemoteSigningLinkRepository
+{
+    public Task<RemoteSigningLink?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        db.RemoteSigningLinks.FirstOrDefaultAsync(l => l.Id == id, cancellationToken);
+
+    public Task<RemoteSigningLink?> FindByCodeHashAsync(string codeHash, CancellationToken cancellationToken) =>
+        db.RemoteSigningLinks.FirstOrDefaultAsync(l => l.CodeHash == codeHash, cancellationToken);
+
+    public void Add(RemoteSigningLink link) => db.RemoteSigningLinks.Add(link);
+}
+
 internal sealed class ConsentFormRepository(ConsentDbContext db) : IConsentFormRepository
 {
     public Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>

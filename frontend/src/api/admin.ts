@@ -51,6 +51,8 @@ export interface UserListItem {
   isActive: boolean
   isLockedOut: boolean
   lastLoginAtUtc: string | null
+  /** Tài khoản kiosk đang tạm khóa tra cứu (người bệnh nhập sai ngày sinh nhiều lần); Mở khóa để tra cứu lại ngay. */
+  isKioskLookupLocked?: boolean
 }
 
 export interface UserDetail {

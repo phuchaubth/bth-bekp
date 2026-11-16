@@ -61,6 +61,16 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
     /// <summary>Tiếp đón lập một phiếu CK-01 hoàn tất (người bệnh ký tay, tiếp đón xác nhận).</summary>
     private async Task<string> CompletedCk01Async(string receptionist, string patientId, string templateId, string decision = "Agreed")
     {
+        var id = await SignedCk01Async(receptionist, patientId, templateId, decision);
+        var (completed, completedBody) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"/api/v1/consent-forms/{id}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
+        Assert.True(completed == HttpStatusCode.OK, completedBody.ToString());
+        return id;
+    }
+
+    /// <summary>Tiếp đón lập một phiếu CK-01, người bệnh đã ký tay, chờ tiếp đón xác nhận.</summary>
+    private async Task<string> SignedCk01Async(string receptionist, string patientId, string templateId, string decision = "Agreed")
+    {
         var (_, created) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId, templateId });
         var id = created.GetProperty("id").GetString()!;
         var form = $"/api/v1/consent-forms/{id}";
@@ -72,8 +82,6 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
             HttpMethod.Post, $"{form}/patient-signature", session.GetProperty("token").GetString(),
             new { decision, image = Convert.ToBase64String(TestPng.Signature()), statement = "Tôi đã nghe, hiểu và đồng ý" });
         Assert.True(signed == HttpStatusCode.OK, signedBody.ToString());
-        var (completed, completedBody) = await _client.SendJsonAsync(HttpMethod.Post, $"{form}/complete", receptionist, new { image = Convert.ToBase64String(TestPng.Signature()) });
-        Assert.True(completed == HttpStatusCode.OK, completedBody.ToString());
         return id;
     }
 
@@ -200,14 +208,18 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
         Assert.Equal(1, headReport.GetProperty("totals").GetProperty("total").GetInt32());
         Assert.Equal(HttpStatusCode.BadRequest, badRange);
 
-        // Trang tổng quan: tiếp đón thấy việc của mình.
+        // Trang tổng quan: tiếp đón thấy việc của mình, kể cả phiếu người bệnh đã ký đang chờ tiếp đón xác nhận.
+        var waitingId = await SignedCk01Async(receptionist, patientId, ck01);
         var (dashStatus, dashboard) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/dashboard", receptionist);
         Assert.Equal(HttpStatusCode.OK, dashStatus);
         Assert.Equal(2, dashboard.GetProperty("completedToday").GetInt32());
         Assert.Equal(1, dashboard.GetProperty("drafts").GetInt32());
-        Assert.Equal(1, dashboard.GetProperty("myOpenForms").GetProperty("total").GetInt32());
+        Assert.Equal(2, dashboard.GetProperty("myOpenForms").GetProperty("total").GetInt32());
+        var awaiting = dashboard.GetProperty("awaitingMyConfirmation");
+        Assert.Equal(1, awaiting.GetProperty("total").GetInt32());
+        Assert.Equal(waitingId, awaiting.GetProperty("items")[0].GetProperty("id").GetString());
         Assert.Equal(14, dashboard.GetProperty("last14Days").GetArrayLength());
-        Assert.Equal(3, dashboard.GetProperty("last14Days").EnumerateArray().Last().GetProperty("created").GetInt32());
+        Assert.Equal(4, dashboard.GetProperty("last14Days").EnumerateArray().Last().GetProperty("created").GetInt32());
     }
 
     /// <summary>Tiêu chí nghiệm thu: xuất 10.000 phiếu giả lập dưới 30 giây. Phiếu được chèn thẳng vào CSDL (đã mã hóa nội dung).</summary>

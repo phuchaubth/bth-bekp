@@ -75,6 +75,7 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
                 u.IsActive,
                 u.LockoutEndUtc,
                 u.LastLoginAtUtc,
+                u.KioskLookupLockedUntilUtc,
             })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -89,7 +90,8 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
             r.RoleNames,
             r.IsActive,
             r.LockoutEndUtc > nowUtc,
-            r.LastLoginAtUtc));
+            r.LastLoginAtUtc,
+            r.KioskLookupLockedUntilUtc > nowUtc));
         return new PagedResult<UserListItemDto>(items, query.Page, query.PageSize, total);
     }
 

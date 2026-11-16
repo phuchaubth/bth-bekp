@@ -2,7 +2,9 @@ import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Flex, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { BRAND } from '../app/theme'
 import { useAuth } from '../auth/authContext'
+import { BrandMark } from '../components/layout/BrandMark'
 import { FullPageSpinner } from '../auth/guards'
 import { safeRedirectPath } from '../auth/paths'
 import { errorMessage } from '../utils/formErrors'
@@ -45,11 +47,12 @@ export function LoginPage() {
     <Flex
       align="center"
       justify="center"
-      style={{ minHeight: '100vh', padding: 16, background: 'linear-gradient(135deg, #0a2540 0%, #0b6bcb 100%)' }}
+      // Cùng màu xanh ngọc của giao diện chính (nền đậm dần về màu chủ đạo).
+      style={{ minHeight: '100vh', padding: 16, background: `linear-gradient(135deg, #073b37 0%, ${BRAND} 100%)` }}
     >
       <Card style={{ width: '100%', maxWidth: 400 }}>
         <Flex vertical align="center" gap={4} style={{ marginBottom: 24 }}>
-          <img src="/favicon.svg" alt="" width={48} height={48} />
+          <BrandMark size={48} />
           <Typography.Title level={3} style={{ margin: '8px 0 0', textAlign: 'center' }}>
             Quản lý Phiếu đồng thuận
           </Typography.Title>

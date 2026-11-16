@@ -28,6 +28,7 @@ import {
   PatientIntakePage,
   PatientProfilePage,
   PatientsPage,
+  RemoteSigningPage,
   ReportsPage,
   RolesPage,
   SettingsPage,
@@ -35,6 +36,7 @@ import {
   UsersPage,
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
+import { REMOTE_SIGNING_PATH } from '../api/remoteSigning'
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
@@ -75,6 +77,16 @@ export const appRoutes: RouteObject[] = [
     element: (
       <Lazy>
         <SigningKioskPage />
+      </Lazy>
+    ),
+    errorElement: <ErrorPage />,
+  },
+  // Ký trên điện thoại riêng của người bệnh qua mã QR (quyết định 32): không đăng nhập, mở bằng ngày sinh của người bệnh.
+  {
+    path: REMOTE_SIGNING_PATH,
+    element: (
+      <Lazy>
+        <RemoteSigningPage />
       </Lazy>
     ),
     errorElement: <ErrorPage />,

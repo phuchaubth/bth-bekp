@@ -14,7 +14,7 @@ import { signingSession, type SigningSession } from './signingSession'
 import { Bilingual } from '../consents/Bilingual'
 import { StatementBox } from './StatementBox'
 import { BundleKiosk } from './BundleKiosk'
-import { readyHint } from './kioskText'
+import { endedHint, readyHint, signedHint } from './kioskText'
 import { StaffUnlock } from './StaffUnlock'
 
 type Stage = 'signing' | 'signed' | 'ended'
@@ -23,8 +23,9 @@ type Stage = 'signing' | 'signed' | 'ended'
  * Màn hình 6 – chế độ ký trên điện thoại (hoặc máy tính bảng). Phiên đăng nhập của nhân viên đã đóng; trang chỉ có token phiên ký để gửi
  * chữ ký cho đúng phiếu này. Muốn thoát phải đăng nhập lại bằng tài khoản nhân viên.
  */
-export function SigningKioskPage() {
-  const [session] = useState(() => signingSession.get())
+export function SigningKioskPage({ session: provided }: { session?: SigningSession } = {}) {
+  // Trang ký trên điện thoại riêng của người bệnh truyền phiên ký vào; chế độ ký trên máy bệnh viện lấy phiên đang mở.
+  const [session] = useState(() => provided ?? signingSession.get())
 
   if (!session) {
     return <NoSession />
@@ -68,6 +69,7 @@ function Kiosk({ session }: { session: SigningSession }) {
   // Điện thoại: giảm lề để phần nội dung và khung ký rộng hơn.
   const narrow = Grid.useBreakpoint().sm === false
   const cardSize = narrow ? 'small' : 'medium'
+  const remote = !!session.remote
 
   const representative = form.representative
   const signerLabel = representative ? 'người đại diện' : 'người bệnh'
@@ -94,6 +96,7 @@ function Kiosk({ session }: { session: SigningSession }) {
       })
       setSignedAt(result.signedAtUtc)
       setStage('signed')
+      session.onSigned?.()
     } catch (e) {
       if (e instanceof ApiError && (e.status === 401 || e.status === 409)) {
         setStage('ended')
@@ -132,7 +135,7 @@ function Kiosk({ session }: { session: SigningSession }) {
               title="Đã ghi nhận chữ ký"
               subTitle={`Ký lúc ${formatDateTime(signedAt)}${
                 asksDecision && decision ? ` · ${decision === 'Agreed' ? agreeLabel : refuseLabel}` : ''
-              }. Vui lòng đưa máy lại cho nhân viên y tế.`}
+              }. ${signedHint(remote)}`}
             />
           </Card>
         ) : stage === 'ended' ? (
@@ -140,7 +143,7 @@ function Kiosk({ session }: { session: SigningSession }) {
             type="warning"
             showIcon
             title="Phiên ký đã kết thúc"
-            description={error ?? 'Phiên ký đã hết hạn hoặc đã được thay bằng phiên khác. Nhân viên đăng nhập lại để mở phiên mới.'}
+            description={error ?? endedHint(remote)}
           />
         ) : (
           <>
@@ -208,7 +211,8 @@ function Kiosk({ session }: { session: SigningSession }) {
           </>
         )}
 
-        {stage === 'signing' && !unlockOpen ? (
+        {/* Điện thoại riêng của người bệnh: không có lối thoát cho nhân viên (máy không phải của bệnh viện). */}
+        {remote ? null : stage === 'signing' && !unlockOpen ? (
           <Button type="link" icon={<LockOutlined />} onClick={() => setUnlockOpen(true)} style={{ alignSelf: 'center' }}>
             Nhân viên: thoát chế độ ký
           </Button>

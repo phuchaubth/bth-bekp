@@ -104,8 +104,15 @@ export function SettingsPage() {
           <Card title="Cấu hình triển khai (chỉ đọc)" loading={settings.isPending}>
             {settings.data && (
               <Descriptions column={1} size="small" bordered>
-                <Descriptions.Item label="Kết nối HIS">
-                  {settings.data.hisEnabled ? <Tag color="green">Đang bật</Tag> : <Tag>Chưa kết nối</Tag>}
+                <Descriptions.Item label="API thông tin người bệnh (Lấy thông tin, lượt tiếp nhận, số liệu HIS)">
+                  {settings.data.patientInfoEnabled ? <Tag color="green">Đã kết nối</Tag> : <Tag>Chưa cấu hình</Tag>}
+                </Descriptions.Item>
+                <Descriptions.Item label="Tra cứu HIS tự động khi quét CCCD">
+                  {settings.data.hisEnabled ? (
+                    <Tag color="green">Đang bật</Tag>
+                  ) : (
+                    <Tag>{settings.data.patientInfoEnabled ? 'Không dùng – bấm Lấy thông tin' : 'Không dùng'}</Tag>
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Ký số VNPT SmartCA">
                   {settings.data.smartCaEnabled ? <Tag color="green">Đang bật</Tag> : <Tag>Tạm hoãn – ký tay trên điện thoại</Tag>}

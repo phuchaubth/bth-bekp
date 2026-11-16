@@ -7,8 +7,8 @@
 ## Mục lục
 
 1. [Phần chung (mọi người)](#phan-chung): đăng nhập, đổi mật khẩu lần đầu, menu, trang Tổng quan, tài khoản và chữ ký mẫu, đăng xuất
-2. [Tiếp đón, Điều dưỡng, Bác sĩ](#nhan-vien): người bệnh, lập phiếu, bộ phiếu, trình ký, xác nhận, PDF, hủy, phiếu thay thế
-3. [Người bệnh](#nguoi-benh): ký trên điện thoại, tự làm phiếu tại kiosk
+2. [Tiếp đón, Điều dưỡng, Bác sĩ](#nhan-vien): người bệnh, lập phiếu, bộ phiếu, trình ký (trên máy bệnh viện hoặc mã QR cho điện thoại người bệnh), xác nhận, PDF, hủy, phiếu thay thế
+3. [Người bệnh](#nguoi-benh): ký trên điện thoại (của bệnh viện hoặc của mình, quét mã QR), tự làm phiếu tại kiosk
 4. [Trưởng khoa](#truong-khoa): thu hồi phiếu, báo cáo, xuất dữ liệu
 5. [Quản lý mẫu phiếu](#quan-ly-mau-phieu): phiên bản, định nghĩa (JSON), cấu hình ký, phát hành
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
@@ -130,7 +130,7 @@ Trang **Tổng quan** mở ra ngay sau khi đăng nhập. Muốn quay lại tran
 Trang có:
 
 - **Phiếu nháp**, **Chờ ký**, **Hoàn tất hôm nay**, **Thu hồi 30 ngày qua**: số phiếu trong phạm vi bạn được xem (khoa của bạn và phiếu bạn lập; vai trò toàn viện thì cả bệnh viện).
-- **Chờ tôi xác nhận**: phiếu người bệnh đã ký, thuộc các mẫu mà vai trò của bạn là người **xác nhận cuối**. Bấm số phiếu để mở. Với phiếu có nhiều bước xác nhận, hãy mở phiếu để xem bước nào đang chờ: bước giữa chừng của bạn có thể chưa hiện trong danh sách này.
+- **Chờ tôi xác nhận**: phiếu người bệnh đã ký và **bước xác nhận đang chờ thuộc vai trò của bạn** (bước giữa hoặc bước cuối). Phiếu còn chờ một bước trước của vai trò khác chưa hiện ở đây; phiếu bạn đã xác nhận một bước cũng không hiện nữa (mỗi bước một người khác nhau). Bấm số phiếu để mở.
 - **Phiếu tôi lập chưa hoàn tất**: phiếu bạn lập còn ở trạng thái nháp hoặc chờ ký.
 - **14 ngày gần nhất**: số phiếu lập và số phiếu hoàn tất mỗi ngày.
 - **Trạng thái hệ thống**: **Máy chủ đang hoạt động** nghĩa là phần mềm kết nối bình thường.
@@ -338,14 +338,14 @@ Chức năng này chỉ chạy khi quản trị đã đặt số ngày ở **C�
 
 Khi người bệnh làm lại **cùng mẫu phiếu**, **ở cùng khoa**, trong số ngày đó, phiếu mới được điền sẵn câu trả lời của phiếu **đã hoàn tất** gần nhất. Áp dụng cả khi lập phiếu lẻ và lập bộ phiếu.
 
-- Ngay khi lập phiếu, ở đầu màn hình hiện thông báo màu vàng *"Đã điền sẵn theo phiếu … (hoàn tất …): kiểm tra lại trước khi trình ký."* Thông báo chỉ hiện vài giây, nên hãy để ý ngay khi phiếu mở ra.
+- Trên trang phiếu nháp có khung vàng *"Đã điền sẵn theo phiếu … (hoàn tất …): kiểm tra lại trước khi trình ký."* Khung còn đó khi mở lại phiếu hoặc tải lại trang, cho đến khi trình ký. Với bộ phiếu, thanh bộ phiếu cũng ghi phiếu nào được điền sẵn.
 - Hãy kiểm tra lại từng câu trước khi bấm **Trình ký**.
 - Không kế thừa: ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký. Người bệnh vẫn chọn và ký lại.
 - Phiếu nháp, phiếu đã hủy, phiếu đã thu hồi không được dùng để điền sẵn.
 
 ![Thông báo đã điền sẵn theo phiếu lần trước](huong-dan-su-dung/21-ke-thua-phieu.png)
 
-*Hình 2.12. Thông báo vàng ở đầu màn hình: phiếu mới được điền sẵn theo phiếu PDT-2026-000003 đã hoàn tất.*
+*Hình 2.12. Khung vàng trên phiếu nháp: phiếu mới được điền sẵn theo phiếu PDT-2026-000001 đã hoàn tất.*
 
 ### 2.8. Trình ký: cho người bệnh ký trên điện thoại
 
@@ -355,7 +355,12 @@ Sau khi trình ký, phiếu ở trạng thái **Chờ ký** và có khung *"Phi�
 
 *Hình 2.13. Cả bộ phiếu đã trình ký: nút **Ký cả bộ trên điện thoại (4 phiếu)** ở thanh bộ phiếu.*
 
-Người bệnh ký ngay trên máy bạn đang dùng (điện thoại, máy tính bảng hoặc máy tính). Bạn mở chế độ ký rồi đưa máy cho người bệnh.
+Có hai cách cho người bệnh ký:
+
+- **Cách 1: trên máy của bệnh viện.** Người bệnh ký ngay trên máy bạn đang dùng (điện thoại, máy tính bảng hoặc máy tính). Bạn mở chế độ ký rồi đưa máy cho người bệnh.
+- **Cách 2: trên điện thoại của người bệnh (mã QR).** Bạn hiện mã QR trên màn hình; người bệnh quét bằng điện thoại của mình, nhập ngày sinh rồi ký. Máy của bạn không phải chuyển chế độ (xem phần **Cách 2** bên dưới).
+
+#### Cách 1: ký trên máy của bệnh viện
 
 1. Mở phiếu trên máy sẽ đưa cho người bệnh (thường là điện thoại ký phiếu của khoa).
 2. Bấm:
@@ -380,6 +385,38 @@ Lưu ý:
 - Phiên ký có thời hạn (mặc định 30 phút). Nếu tải lại trang hoặc phiên hết hạn, màn hình báo *"Không có phiên ký đang mở"* hoặc *"Phiên ký đã kết thúc"*. Bấm **Đăng nhập**, mở lại phiếu và bấm **Ký trên điện thoại** (hoặc **Ký cả bộ trên điện thoại**) lần nữa.
 - Bộ phiếu chỉ ký chung được khi các phiếu chờ ký **cùng một người ký** (cùng là người bệnh tự ký, hoặc cùng một người đại diện). Nếu khác nhau, thanh bộ phiếu báo không ký chung được. Hãy trả phiếu về nháp để chọn cùng người ký, hoặc ký riêng từng phiếu bằng nút **Ký trên điện thoại**.
 - Phiếu còn nháp không có trong phiên ký của cả bộ. Thanh bộ phiếu nhắc *"Còn … phiếu nháp chưa trình ký…"*.
+
+#### Cách 2: người bệnh ký trên điện thoại của mình (mã QR)
+
+Dùng khi người bệnh muốn ký trên điện thoại riêng, hoặc khi không tiện đưa máy của bệnh viện. Điện thoại của người bệnh phải vào được địa chỉ của phần mềm (ví dụ bắt Wi-Fi của bệnh viện; xem với phòng CNTT).
+
+1. Mở phiếu (hoặc phiếu bất kỳ trong bộ) đang chờ ký. Bấm:
+   - **Mã QR cho người bệnh** nếu là phiếu lẻ;
+   - **Mã QR ký cả bộ** trên thanh bộ phiếu nếu là bộ phiếu. Người bệnh ký một lần cho mọi phiếu đang chờ ký của bộ.
+
+   ![Nút Mã QR cho người bệnh](huong-dan-su-dung/25-ma-qr-nut.png)
+
+   *Hình 2.15a. Phiếu đang chờ ký: nút **Mã QR cho người bệnh** cạnh nút **Ký trên điện thoại**.*
+
+2. Đọc hộp thông báo, bấm **Tạo mã QR**. Mã QR hiện ra.
+3. Mời người bệnh (hoặc người đại diện) mở camera điện thoại, quét mã, chạm vào đường dẫn hiện ra. Cách làm trên điện thoại: xem phần 3.1.
+
+   <img src="huong-dan-su-dung/38-ma-qr-hop-thoai.png" alt="Hộp mã QR cho người bệnh quét" width="320">
+
+   *Hình 2.15b. Mã QR dùng được 15 phút nếu chưa quét, mở được trên **một** điện thoại.*
+
+4. Hộp tự cập nhật: *"Đã mở trên điện thoại lúc …"* khi người bệnh đã nhập đúng ngày sinh, rồi *"Người bệnh đã ký xong"*. Bấm **Xong**. Trang phiếu hiện chữ ký của người bệnh; bạn xác nhận phiếu như thường lệ (mục 2.10).
+
+   <img src="huong-dan-su-dung/39-ma-qr-da-ky.png" alt="Người bệnh đã ký xong trên điện thoại" width="320">
+
+   *Hình 2.15c. Người bệnh đã ký xong trên điện thoại của mình.*
+
+Lưu ý:
+
+- Máy của bạn vẫn giữ phiên đăng nhập, không chuyển sang chế độ ký. Bạn có thể bấm **Đóng** để làm việc khác; mã vẫn dùng được đến giờ ghi trên hộp.
+- Muốn dừng (ví dụ người bệnh đổi ý, muốn ký trên máy của bệnh viện): bấm **Hủy mã**. Điện thoại đã mở mã cũng không ký được nữa. Mở phiên ký khác (tạo mã mới, hoặc bấm **Ký trên điện thoại**) thì mã cũ hết hiệu lực.
+- Người bệnh nhập sai ngày sinh 5 lần thì mã bị hủy: kiểm tra lại ngày sinh trong hồ sơ người bệnh, rồi bấm **Tạo mã mới**.
+- Mỗi lần tạo mã, mở mã (kèm địa chỉ IP và trình duyệt của điện thoại), nhập sai ngày sinh, hủy mã đều được ghi nhật ký hệ thống.
 
 ### 2.9. Sau khi người bệnh ký
 
@@ -424,7 +461,7 @@ Các bước xác nhận:
 
 <img src="huong-dan-su-dung/27-ky-bang-chu-ky-mau.png" alt="Ký xác nhận bằng chữ ký mẫu" width="640">
 
-*Hình 2.17. Ký xác nhận một bước bằng chữ ký mẫu: bấm **Ký và xác nhận**. Bấm **Ký tay lần này** nếu muốn ký tay.*
+*Hình 2.17. Ký xác nhận bằng chữ ký mẫu: bấm **Ký và hoàn tất** (bước giữa là **Ký và xác nhận**). Bấm **Ký tay lần này** nếu muốn ký tay.*
 
 Chữ ký của bạn được in vào ô của bạn trên phiếu, kèm họ tên và thời điểm theo tài khoản đang đăng nhập.
 
@@ -539,7 +576,23 @@ Phần này mô tả màn hình người bệnh (hoặc người đại diện) 
 
 ### 3.1. Ký trên điện thoại
 
-Nhân viên mở chế độ ký (mục 2.8) rồi đưa máy cho người bệnh. Màn hình ký không có menu. Có thể cầm dọc. Xoay ngang thì khung ký rộng hơn.
+Nhân viên mở chế độ ký (mục 2.8) rồi đưa máy cho người bệnh, hoặc hiện mã QR để người bệnh ký trên điện thoại của mình. Màn hình ký không có menu. Có thể cầm dọc. Xoay ngang thì khung ký rộng hơn.
+
+**Ký trên điện thoại của mình (quét mã QR)**
+
+1. Mở camera điện thoại, quét mã QR trên màn hình của nhân viên, chạm vào đường dẫn hiện ra.
+2. Nhập **ngày sinh của người bệnh** (người đại diện ký thay cũng nhập ngày sinh của người bệnh), ví dụ gõ 12031985 cho 12/03/1985. Chạm **Mở phiếu**. Nhập sai thì màn hình báo còn mấy lần thử; sai 5 lần thì mã bị hủy, nhờ nhân viên tạo mã mới.
+3. Đọc phiếu, chọn ý kiến (nếu phiếu có hỏi), ghi lời xác nhận và ký như hướng dẫn bên dưới.
+4. Màn hình *"Đã ghi nhận chữ ký"* hiện ra là xong. Có thể đóng trang. Mã chỉ dùng một lần; điện thoại khác quét lại mã cũng không mở được.
+
+<p>
+<img src="huong-dan-su-dung/48-dt-rieng-ngay-sinh.png" alt="Điện thoại người bệnh: nhập ngày sinh để mở phiếu" width="200">
+<img src="huong-dan-su-dung/48-dt-rieng-noi-dung.png" alt="Điện thoại người bệnh: nội dung phiếu" width="200">
+<img src="huong-dan-su-dung/49-dt-rieng-ky-ten.png" alt="Điện thoại người bệnh: lời xác nhận và chữ ký" width="200">
+<img src="huong-dan-su-dung/49-dt-rieng-ky-xong.png" alt="Điện thoại người bệnh: đã ký xong" width="200">
+</p>
+
+*Hình 3.1a. Trên điện thoại của người bệnh, từ trái sang: nhập ngày sinh; đọc phiếu; ghi lời xác nhận và ký; đã ký xong. Lỡ tải lại trang thì phiếu mở lại, không phải nhập lại ngày sinh.*
 
 **Ký một bộ phiếu (nhiều phiếu, ký một lần)**
 
@@ -659,7 +712,7 @@ Màn hình báo **Ông/bà đã ký xong … phiếu** và mời đến **quầy
 Lưu ý về kiosk:
 
 - **60 giây không chạm** thì máy tự xóa thông tin và về trang đầu. 10 giây cuối có dòng nhắc *"Màn hình sẽ tự về trang đầu sau … giây"*. Chạm vào màn hình để tiếp tục.
-- Nhập mã/CCCD kèm ngày sinh sai **5 lần** thì máy tạm khóa tra cứu **5 phút**. Trong lúc này, quét thẻ cũng phải chờ. Người bệnh vẫn chọn **Nhập thông tin** (không kèm số CCCD) được, hoặc đến quầy tiếp đón.
+- Nhập mã/CCCD kèm ngày sinh sai **5 lần** thì máy tạm khóa tra cứu **5 phút**. Trong lúc này, quét thẻ cũng phải chờ. Người bệnh vẫn chọn **Nhập thông tin** (không kèm số CCCD) được, hoặc đến quầy tiếp đón. Quản trị mở khóa sớm được: **Quản trị → Người dùng**, tài khoản kiosk có trạng thái **Tạm khóa tra cứu**, bấm **⋯** → **Mở khóa**.
 - Các phiếu chuyên môn khác (nếu có) do điều dưỡng làm cùng người bệnh tại phòng khám.
 
 **Dành cho nhân viên: đăng nhập và đăng xuất máy kiosk**
@@ -939,7 +992,7 @@ Sửa, khóa, mở khóa, đặt lại mật khẩu:
 - Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
 - Bấm nút **⋯** ở cột **Thao tác** để chọn:
   - **Khóa tài khoản**: người dùng bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho đến khi mở khóa. Khi nhân viên nghỉ việc, hãy khóa tài khoản thay vì xóa, để giữ nhật ký;
-  - **Mở khóa**: chỉ có khi tài khoản đang bị khóa hoặc tạm khóa;
+  - **Mở khóa**: chỉ có khi tài khoản đang bị khóa, tạm khóa (nhập sai mật khẩu), hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
   - **Đặt lại mật khẩu**: đặt mật khẩu tạm. Mọi phiên đăng nhập của người dùng bị đăng xuất. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.
 
 <img src="huong-dan-su-dung/92-thao-tac-nguoi-dung.png" alt="Menu thao tác khác của một người dùng" width="600">
@@ -1016,11 +1069,19 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 **Kế thừa phiếu lần trước.** Nhập số ngày (0–365, **0 là tắt**), bấm **Lưu**. Cách hoạt động: xem mục 2.7 và 3.2.
 
-**Cấu hình triển khai (chỉ đọc).** Thông tin do phòng CNTT đặt trên máy chủ (kết nối HIS, ký số, giới hạn xuất dữ liệu, lưu trữ). Không sửa được ở đây.
+![Cấu hình lượt tiếp nhận và kế thừa phiếu](huong-dan-su-dung/98-cau-hinh-luot-tiep-nhan-ke-thua.png)
 
-![Cấu hình lượt tiếp nhận, kế thừa phiếu và cấu hình triển khai](huong-dan-su-dung/98-cau-hinh-luot-tiep-nhan-ke-thua.png)
+*Hình 8.9. Công tắc gắn lượt tiếp nhận đang bật; kế thừa phiếu lần trước 30 ngày.*
 
-*Hình 8.9. Công tắc gắn lượt tiếp nhận đang bật; kế thừa phiếu lần trước 30 ngày; phần cấu hình triển khai chỉ đọc.*
+**Cấu hình triển khai (chỉ đọc).** Thông tin do phòng CNTT đặt trên máy chủ. Không sửa được ở đây.
+
+- **API thông tin người bệnh**: **Đã kết nối** thì có nút **Lấy thông tin**, chọn lượt tiếp nhận, lấy số liệu HIS cho báo cáo điều dưỡng; **Chưa cấu hình** thì các chức năng này ẩn hoặc nhập tay.
+- **Tra cứu HIS tự động khi quét CCCD**: cách kết nối cũ, đang tạm hoãn. Ghi **Không dùng** là bình thường, kể cả khi API thông tin người bệnh đã kết nối.
+- **Ký số VNPT SmartCA**, **Giới hạn mỗi lần xuất dữ liệu**, **Lưu trữ**.
+
+<img src="huong-dan-su-dung/98-cau-hinh-trien-khai.png" alt="Cấu hình triển khai (chỉ đọc)" width="440">
+
+*Hình 8.10. Cấu hình triển khai trên máy thử (chưa cấu hình API thông tin người bệnh).*
 
 ### 8.6. Chữ ký mẫu
 
@@ -1056,7 +1117,10 @@ Nhập trực tiếp vào phần **2. Thông tin người bệnh** ở trang **T
 Trình duyệt chỉ mở camera khi phần mềm chạy qua địa chỉ an toàn (HTTPS) và đã được cho phép dùng camera. Cho phép camera trong cài đặt trình duyệt, hoặc dùng máy quét 2D, hoặc nhập tay.
 
 **Người bệnh có ký trên điện thoại riêng của họ được không?**
-Hiện chưa. Người bệnh ký trên chính máy nhân viên đang dùng (điện thoại, máy tính bảng hoặc máy tính) sau khi nhân viên bấm **Ký trên điện thoại** (mục 2.8). Hoặc người bệnh tự làm phiếu tại kiosk (mục 3.2).
+Được. Bấm **Mã QR cho người bệnh** (hoặc **Mã QR ký cả bộ**), người bệnh quét mã, nhập ngày sinh của người bệnh rồi ký (mục 2.8, cách 2 và mục 3.1). Điện thoại phải vào được địa chỉ của phần mềm, ví dụ qua Wi-Fi của bệnh viện.
+
+**Người bệnh quét mã QR nhưng điện thoại không mở được trang?**
+Thường do điện thoại không vào được mạng của bệnh viện (đang dùng 4G). Nhờ người bệnh bắt Wi-Fi của bệnh viện rồi quét lại, hoặc dùng cách 1 (ký trên máy của bệnh viện).
 
 **Lỡ tải lại trang khi người bệnh đang ký?**
 Phiên ký kết thúc, màn hình báo *"Không có phiên ký đang mở"*. Bấm **Đăng nhập**, mở lại phiếu, bấm **Ký trên điện thoại** (hoặc **Ký cả bộ trên điện thoại**) để mở phiên mới. Phiếu chưa bị mất gì.
@@ -1068,7 +1132,7 @@ Nếu phiếu chưa hoàn tất: bấm **Trả về nháp**, sửa, rồi trình
 Kiểm tra: bạn có đúng vai trò của bước đang chờ không; các bước trước đã xác nhận xong chưa; bạn đã xác nhận một bước khác trên phiếu này chưa (mỗi bước một người khác nhau); phiếu có thuộc khoa của bạn không. Khung xanh trên trang phiếu ghi rõ đang chờ vai trò nào.
 
 **Phiếu có trong "Chờ tôi xác nhận" nhưng mở ra không có nút xác nhận?**
-Danh sách này dựa theo vai trò xác nhận cuối của mẫu. Với phiếu nhiều bước, có thể phiếu còn đang chờ một bước trước (của vai trò khác). Mở phiếu để xem bước nào đang chờ.
+Danh sách tính theo bước đang chờ của từng phiếu. Nếu vừa có người khác xác nhận bước đó (hoặc phiếu vừa được trả về nháp), hãy tải lại trang Tổng quan. Nếu vẫn thấy, kiểm tra quyền của bạn với phiếu đó (mục 2.10).
 
 **Hộp ký hoàn tất báo không lấy được danh sách tiếp nhận?**
 Bấm **Thử lại**. Nếu vẫn lỗi, báo quản trị. Quản trị có thể tạm tắt **Gắn phiếu với lượt tiếp nhận (HIS)** ở **Cấu hình hệ thống**. Sau khi tắt, bấm **Thử lại** là ký hoàn tất được, không cần tải lại trang.
@@ -1080,7 +1144,7 @@ Bạn chỉ thấy phiếu của khoa mình và phiếu do mình lập. Khi lậ
 Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút rồi thử lại.
 
 **Kiosk báo đã tạm khóa tra cứu?**
-Do nhập mã/CCCD kèm ngày sinh sai 5 lần. Máy mở lại sau 5 phút. Trong lúc chờ, người bệnh chọn **Nhập thông tin** (không kèm số CCCD) hoặc đến quầy tiếp đón.
+Do nhập mã/CCCD kèm ngày sinh sai 5 lần. Máy mở lại sau 5 phút, hoặc quản trị **Mở khóa** tài khoản kiosk ở **Quản trị → Người dùng** (trạng thái **Tạm khóa tra cứu**). Trong lúc chờ, người bệnh chọn **Nhập thông tin** (không kèm số CCCD) hoặc đến quầy tiếp đón.
 
 **Phiếu mới được điền sẵn câu trả lời cũ, có cần kiểm tra không?**
 Có. Đây là chức năng kế thừa phiếu lần trước (mục 2.7). Kiểm tra lại từng câu trước khi trình ký. Ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký không được điền sẵn.

@@ -102,6 +102,18 @@ public static class AuditActions
     public const string ConsentFormInherited = "ConsentForms.Inherited";
     public const string ConsentFormPdfViewed = "ConsentForms.PdfViewed";
     public const string ConsentFormSigningStarted = "ConsentForms.SigningStarted";
+
+    /// <summary>Nhân viên tạo mã QR để người bệnh ký trên điện thoại riêng (quyết định 32).</summary>
+    public const string ConsentFormRemoteSigningCreated = "ConsentForms.RemoteSigningCreated";
+
+    /// <summary>Người bệnh mở mã trên điện thoại riêng (đã nhập đúng ngày sinh); nhật ký giữ địa chỉ IP và trình duyệt của máy.</summary>
+    public const string ConsentFormRemoteSigningOpened = "ConsentForms.RemoteSigningOpened";
+
+    /// <summary>Nhập sai ngày sinh khi mở mã ký trên điện thoại riêng.</summary>
+    public const string ConsentFormRemoteSigningFailed = "ConsentForms.RemoteSigningFailed";
+
+    /// <summary>Mã ký trên điện thoại riêng bị hủy (nhân viên hủy, hoặc nhập sai ngày sinh quá số lần).</summary>
+    public const string ConsentFormRemoteSigningCancelled = "ConsentForms.RemoteSigningCancelled";
     public const string ConsentFormPatientSigned = "ConsentForms.PatientSigned";
     public const string ConsentFormStepConfirmed = "ConsentForms.StepConfirmed";
     public const string ConsentFormCompleted = "ConsentForms.Completed";

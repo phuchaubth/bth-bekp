@@ -497,6 +497,19 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 
 Đã kiểm thử tự động trên iPhone 13 và Pixel 7 giả lập (cầm dọc và ngang): lập phiếu, ký, xác nhận, không tràn ngang. Cần thử trên vài điện thoại thật của bệnh viện trước khi dùng chính thức.
 
+### 9a1. Người bệnh ký trên điện thoại của mình qua mã QR (quyết định 32)
+
+Nhân viên bấm **Mã QR cho người bệnh** (phiếu lẻ) hoặc **Mã QR ký cả bộ** (bộ phiếu); người bệnh quét mã bằng camera điện thoại của mình, nhập **ngày sinh của người bệnh**, đọc và ký. Không cần cài gì thêm trên máy chủ ngoài gói mới (có migration `AddRemoteSigningLinks`).
+
+1. **Địa chỉ trong mã QR** là địa chỉ nhân viên đang dùng để mở phần mềm (ví dụ `https://phieudongthuan.bth.org.vn/ky-tu-xa#…`). Nhân viên phải mở phần mềm bằng **tên miền chính thức**, không bằng `localhost` hay địa chỉ IP, thì điện thoại người bệnh mới mở được.
+2. **Mạng cho điện thoại người bệnh** (phòng CNTT quyết định):
+   - **Khuyến nghị:** Wi-Fi cho người bệnh (khách) được phép vào **đúng địa chỉ HTTPS của phần mềm** (DNS nội bộ trỏ tên miền về máy chủ IIS), không vào các máy khác trong mạng bệnh viện. Điện thoại dùng 4G thì không mở được: nhờ người bệnh bắt Wi-Fi, hoặc ký trên máy của bệnh viện.
+   - Không mở phần mềm ra Internet nếu chưa được phòng CNTT và lãnh đạo đồng ý.
+   - **Bắt buộc HTTPS** khi điện thoại người bệnh dùng: phiếu có thông tin sức khỏe đi qua Wi-Fi khách.
+3. **Bảo vệ mã:** mã 128 bit ngẫu nhiên, máy chủ chỉ lưu mã băm; mở trong 15 phút; mở được trên một điện thoại; phải nhập đúng ngày sinh, sai 5 lần thì mã bị hủy; mã nằm sau dấu `#` nên không có trong nhật ký truy cập của IIS. Nhân viên hủy mã được bất cứ lúc nào.
+4. **Giới hạn tần suất:** trang mở mã cho phép 30 lần/phút mỗi địa chỉ IP (`RateLimiting__RemoteSigningPermitLimit`). Nhiều điện thoại qua cùng một địa chỉ IP (NAT của Wi-Fi khách) mà hay gặp lỗi 429 thì tăng số này, ví dụ 120. Giới hạn và nhật ký chỉ có đúng địa chỉ IP của điện thoại khi API tin reverse proxy trên cùng máy (`ReverseProxy__TrustAllProxies = true`, mục 5.2).
+5. **Nhật ký:** mỗi lần tạo mã, mở mã (kèm địa chỉ IP, trình duyệt của điện thoại), nhập sai ngày sinh, hủy mã đều ghi nhật ký hệ thống (`ConsentForms.RemoteSigning*`). Chữ ký ghi trình duyệt của điện thoại đã ký.
+
 ## 9b. Máy kiosk cho người bệnh tự làm phiếu (quyết định 24)
 
 Người bệnh tự nhận diện, trả lời và ký một lần cho cả bộ phiếu trên kiosk; nhân viên tiếp đón kiểm tra rồi **Xác nhận cả bộ** như bình thường. Kiosk là một trang của chính phần mềm (`/kiosk`), không cài thêm gì trên máy chủ.
@@ -528,7 +541,7 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 1. Mỗi sáng nhân viên bật máy, đăng nhập **tài khoản kiosk** (lần đầu đổi mật khẩu). Phiên đăng nhập giữ trong ngày (12 giờ, `Auth:RefreshTokenLifetimeHours`).
 2. Đăng xuất máy: **giữ biểu tượng bệnh viện ở góc trên bên trái 3 giây** → *Đăng xuất*. Thoát Chrome toàn màn hình: `Alt + F4` bằng bàn phím rời.
 3. **60 giây không chạm** thì màn hình tự xóa thông tin và về trang đầu (10 giây cuối có nhắc).
-4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng → Mở khóa* tài khoản kiosk.
+4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng*, tài khoản kiosk có trạng thái **Tạm khóa tra cứu** → **⋯** → *Mở khóa*.
 5. Người bệnh đã làm cùng phiếu gần đây (trong số ngày đặt ở *Cấu hình hệ thống → Kế thừa phiếu lần trước*, quyết định 27): kiosk hỏi *"Thông tin có thay đổi so với lần trước không?"*; *Không thay đổi* thì không hỏi lại các câu đã trả lời (không hiện câu trả lời cũ), Đồng ý/Không đồng ý và chữ ký vẫn làm lại.
 6. Phiếu từ kiosk có nhãn **"Lập tại kiosk"** trong danh sách bộ phiếu và chi tiết phiếu. Nhân viên **đối chiếu CCCD** rồi bấm *Xác nhận cả bộ*; nhãn **"tự khai"** (màu cam) thì kiểm tra kỹ giấy tờ và thông tin hành chính trước khi xác nhận.
 
@@ -543,10 +556,11 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 7. Kiosk (mục 9b): quét thử vài thẻ CCCD thật (họ tên có dấu đọc đúng), làm trọn một bộ phiếu với người bệnh giả lập, nhân viên tiếp đón **Xác nhận cả bộ**; nhập sai ngày sinh 5 lần thấy máy tạm khóa tra cứu; để yên 60 giây thấy màn hình tự về trang đầu.
 8. Lượt tiếp nhận (mục 5.6, nếu dùng): bật công tắc ở Cấu hình hệ thống; hoàn tất một phiếu thử của người bệnh có lượt tiếp nhận hôm nay trên HIS; danh sách đúng thời gian, nơi tiếp nhận; chân PDF có số tiếp nhận và người tiếp nhận; mở lại hộp ký phiếu khác của người bệnh đó thấy phiếu vừa gắn ở cột *Các phiếu đã gắn vào*. Tắt thử công tắc: hộp ký không còn bảng lượt. Thu hồi phiếu thử.
 9. Báo cáo điều dưỡng (mục 5.7): Phòng Điều dưỡng cài khoa báo cáo và số giường; một điều dưỡng lập, lưu nháp, gửi báo cáo khoa mình (gửi xong thấy khóa); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, mở lại báo cáo thử kèm lý do; lấy hoặc nhập tay số liệu HIS.
-10. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
-11. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
-12. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
-13. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+10. Mã QR (mục 9a1): trên máy tính mở phần mềm bằng tên miền chính thức, bấm **Mã QR cho người bệnh** ở một phiếu thử; một điện thoại **bắt Wi-Fi dành cho người bệnh** quét mã, nhập ngày sinh, ký; màn hình nhân viên báo đã ký. Quét lại mã bằng điện thoại khác thấy bị từ chối. Thu hồi phiếu thử.
+11. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
+12. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
+13. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
+14. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 
 ## 11. Sự cố thường gặp
 
@@ -568,5 +582,5 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 | Không đọc được CCCD/PDF, lỗi "không khớp mã băm" sau khôi phục | Đặt sai khóa `FieldEncryptionKey` hoặc thư mục PDF khác thời điểm với CSDL | Đặt lại đúng khóa cũ; khôi phục thư mục PDF cùng thời điểm |
 | Camera không bật khi quét CCCD | Trang không chạy qua HTTPS hoặc trình duyệt chưa cấp quyền | Dùng HTTPS với chứng chỉ được tin cậy trên thiết bị; cấp quyền camera |
 | PDF không hiển thị trong ứng dụng (trang trắng) | Reverse proxy ghi đè CSP, thiếu `frame-src blob:` | Dùng CSP như `deploy/iis/web.frontend.config` / `frontend/nginx.conf` |
-| 429 "Bạn thao tác quá nhiều lần" | Vượt giới hạn đăng nhập (10 lần/phút/IP) hoặc xuất dữ liệu (10 lần/phút/người) | Chờ 1 phút; nếu nhiều máy chung IP qua NAT, tăng `RateLimiting__AuthPermitLimit` |
+| 429 "Bạn thao tác quá nhiều lần" | Vượt giới hạn đăng nhập (10 lần/phút/IP), xuất dữ liệu (10 lần/phút/người) hoặc mở mã QR ký trên điện thoại (30 lần/phút/IP) | Chờ 1 phút; nếu nhiều máy chung IP qua NAT, tăng `RateLimiting__AuthPermitLimit` (hoặc `RateLimiting__RemoteSigningPermitLimit` cho Wi-Fi người bệnh) |
 | Nhật ký ghi IP là `127.0.0.1` | Reverse proxy không gửi `X-Forwarded-For` hoặc `ReverseProxy__TrustAllProxies=false` | Cấu hình proxy gửi header và bật biến trên (chỉ khi API không mở cổng ra ngoài) |

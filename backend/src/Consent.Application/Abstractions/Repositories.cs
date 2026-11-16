@@ -109,6 +109,17 @@ public interface IConsentTemplateRepository
     void Add(ConsentTemplate template);
 }
 
+/// <summary>Mã ký trên điện thoại riêng của người bệnh (quyết định 32).</summary>
+public interface IRemoteSigningLinkRepository
+{
+    Task<RemoteSigningLink?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Tìm theo mã băm SHA-256 (hex) của mã trong QR.</summary>
+    Task<RemoteSigningLink?> FindByCodeHashAsync(string codeHash, CancellationToken cancellationToken);
+
+    void Add(RemoteSigningLink link);
+}
+
 public interface IConsentFormRepository
 {
     Task<ConsentForm?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
@@ -174,9 +185,15 @@ public interface IConsentStatisticsRepository
     Task<int> CountClosedAsync(
         ConsentFormSearch scope, bool revoked, DateTimeOffset fromUtc, DateTimeOffset toUtc, CancellationToken cancellationToken);
 
-    /// <summary>Phiếu chờ ký mà người bệnh đã ký, thuộc các mẫu <paramref name="templateIds"/>: chờ phía bệnh viện xác nhận.</summary>
-    Task<DashboardFormList> AwaitingConfirmationAsync(
-        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateIds, int take, CancellationToken cancellationToken);
+    /// <summary>
+    /// Phiếu chờ ký mà người bệnh đã ký, lập theo các phiên bản mẫu <paramref name="templateVersionIds"/>: chờ phía bệnh viện
+    /// xác nhận. Trả kèm các bước trung gian đã xác nhận để tầng ứng dụng tìm bước đang chờ.
+    /// </summary>
+    Task<IReadOnlyList<AwaitingConfirmationCandidate>> ListAwaitingConfirmationAsync(
+        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateVersionIds, CancellationToken cancellationToken);
+
+    /// <summary>Dòng hiển thị trên trang tổng quan của các phiếu <paramref name="formIds"/>, thời điểm là lúc người bệnh ký.</summary>
+    Task<IReadOnlyList<DashboardFormItem>> GetSignedFormItemsAsync(IReadOnlyCollection<Guid> formIds, CancellationToken cancellationToken);
 
     /// <summary>Phiếu nháp/chờ ký do người dùng <paramref name="userId"/> lập.</summary>
     Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken);

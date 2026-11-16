@@ -3,6 +3,7 @@ import {
   CopyOutlined,
   EditOutlined,
   FilePdfOutlined,
+  QrcodeOutlined,
   RollbackOutlined,
   SaveOutlined,
   SendOutlined,
@@ -41,6 +42,7 @@ import { FormStatusTag } from './FormStatusTag'
 import { KioskTag } from './KioskTag'
 import { BundleBar } from './BundleBar'
 import { EncounterSummary } from './EncounterPicker'
+import { RemoteSigningModal } from './RemoteSigningModal'
 import { FormHistory, RevokeFormModal, StaffSignModal, StartSigningModal } from './SigningActions'
 import { BRAND } from '../../app/theme'
 
@@ -56,6 +58,7 @@ export function ConsentFormDetailPage() {
   const [pdfOpen, setPdfOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [signingOpen, setSigningOpen] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)
   const [revokeOpen, setRevokeOpen] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -148,6 +151,11 @@ export function ConsentFormDetailPage() {
                 Ký trên điện thoại
               </Button>
             )}
+            {form.actions.canStartSigning && !signWholeBundle && (
+              <Button icon={<QrcodeOutlined />} onClick={() => setRemoteOpen(true)}>
+                Mã QR cho người bệnh
+              </Button>
+            )}
             {form.actions.canConfirmStep && nextStep && (
               <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setStaffSign('step')}>
                 Xác nhận: {nextStep.label}
@@ -209,6 +217,14 @@ export function ConsentFormDetailPage() {
       <PdfPreviewModal form={form} open={pdfOpen} onClose={() => setPdfOpen(false)} />
       {cancelOpen && <CancelFormModal form={form} onClose={() => setCancelOpen(false)} />}
       {signingOpen && <StartSigningModal form={form} onClose={() => setSigningOpen(false)} />}
+      {remoteOpen && (
+        <RemoteSigningModal
+          target={{ formId: form.id }}
+          count={1}
+          byRepresentative={form.signerKind === 'Representative'}
+          onClose={() => setRemoteOpen(false)}
+        />
+      )}
       {revokeOpen && <RevokeFormModal form={form} onClose={() => setRevokeOpen(false)} />}
       {staffSign === 'step' && nextStep && (
         <StaffSignModal
@@ -363,7 +379,7 @@ function StatusNotice({ form }: { form: ConsentFormDetail }) {
         showIcon
         style={{ marginTop: 12 }}
         title="Phiếu đang chờ ký"
-        description="Nội dung và thông tin người bệnh đã được khóa. Bấm “Ký trên điện thoại” để người bệnh (hoặc người đại diện) ký; muốn sửa nội dung, hãy trả phiếu về nháp."
+        description="Nội dung và thông tin người bệnh đã được khóa. Bấm “Ký trên điện thoại” để người bệnh (hoặc người đại diện) ký trên máy này, hoặc “Mã QR cho người bệnh” để ký trên điện thoại của họ; muốn sửa nội dung, hãy trả phiếu về nháp."
       />
     )
   }

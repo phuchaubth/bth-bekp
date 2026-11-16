@@ -222,4 +222,57 @@ public sealed class ConfirmationStepTests
         Assert.Equal("consent_templates.invalid_definition", result.Error!.Code);
         Assert.Contains("PHARMACIST", result.Error.FieldErrors!["definition"][0], StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task Dashboard_ListsTheForm_ForTheRoleOfThePendingStep_UntilThatStepIsDone()
+    {
+        var (s, formId) = await PatientSignedBm10();
+
+        // Chờ bước đầu (nhân viên hướng dẫn): tiếp đón thấy phiếu; điều dưỡng, bác sĩ chưa đến lượt.
+        var receptionist = s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+        var forReception = await AwaitingIds(s);
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        var nurseTooEarly = await AwaitingIds(s);
+        s.LogInAs(s.Kkb, SystemRoles.Doctor);
+        var doctorTooEarly = await AwaitingIds(s);
+
+        // Tiếp đón xác nhận xong: đến lượt điều dưỡng. Người đã xác nhận một bước không thấy phiếu nữa, kể cả khi có thêm
+        // vai trò điều dưỡng (mỗi bước cần một người khác).
+        ActAs(s, receptionist, SystemRoles.Receptionist);
+        Assert.True((await Confirm(s, formId, "screeningStaff")).IsSuccess);
+        ActAs(s, receptionist, SystemRoles.Receptionist, SystemRoles.Nurse);
+        var receptionistAlsoNurse = await AwaitingIds(s);
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        var forNurse = await AwaitingIds(s);
+        Assert.True((await Confirm(s, formId, "nurse")).IsSuccess);
+        var nurseAfter = await AwaitingIds(s);
+
+        // Hết bước trung gian: đến lượt bác sĩ xác nhận cuối.
+        s.LogInAs(s.Kkb, SystemRoles.Doctor);
+        var forDoctor = await AwaitingIds(s);
+
+        Assert.Equal([formId], forReception);
+        Assert.Empty(nurseTooEarly);
+        Assert.Empty(doctorTooEarly);
+        Assert.Empty(receptionistAlsoNurse);
+        Assert.Equal([formId], forNurse);
+        Assert.Empty(nurseAfter);
+        Assert.Equal([formId], forDoctor);
+    }
+
+    private static async Task<IReadOnlyList<Guid>> AwaitingIds(ConsentScenario s)
+    {
+        var dashboard = await s.Ctx.CreateDashboardService().GetAsync(CancellationToken.None);
+        Assert.Equal(dashboard.AwaitingMyConfirmation.Items.Count, dashboard.AwaitingMyConfirmation.Total);
+        return [.. dashboard.AwaitingMyConfirmation.Items.Select(i => i.Id)];
+    }
+
+    /// <summary>Quay lại tài khoản đã có (giữ quyền của lần đăng nhập trước), với các vai trò <paramref name="roles"/>.</summary>
+    private static void ActAs(ConsentScenario s, User user, params string[] roles)
+    {
+        s.Ctx.CurrentUser.UserId = user.Id;
+        s.Ctx.CurrentUser.UserName = user.UserName;
+        s.Ctx.CurrentUser.Roles.Clear();
+        s.Ctx.CurrentUser.Roles.UnionWith(roles);
+    }
 }

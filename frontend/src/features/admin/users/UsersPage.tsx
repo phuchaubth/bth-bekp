@@ -32,6 +32,9 @@ function UserStatus({ user }: { user: UserListItem }) {
   if (user.isLockedOut) {
     return <Tag color="orange">Tạm khóa</Tag>
   }
+  if (user.isKioskLookupLocked) {
+    return <Tag color="orange">Tạm khóa tra cứu</Tag>
+  }
   return <Tag color="green">Hoạt động</Tag>
 }
 
@@ -62,7 +65,9 @@ export function UsersPage() {
       title: lock ? `Khóa tài khoản ${user.userName}?` : `Mở khóa tài khoản ${user.userName}?`,
       content: lock
         ? 'Người dùng sẽ bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho tới khi được mở khóa.'
-        : 'Người dùng có thể đăng nhập lại ngay.',
+        : user.isKioskLookupLocked && user.isActive && !user.isLockedOut
+          ? 'Máy kiosk tra cứu lại được ngay (người bệnh nhập mã hoặc CCCD kèm ngày sinh).'
+          : 'Người dùng có thể đăng nhập lại ngay.',
       okText: lock ? 'Khóa' : 'Mở khóa',
       okButtonProps: { danger: lock },
       cancelText: 'Hủy',
@@ -127,7 +132,7 @@ export function UsersPage() {
                 ...(user.isActive
                   ? [{ key: 'lock', icon: <LockOutlined />, label: 'Khóa tài khoản', danger: true }]
                   : []),
-                ...(!user.isActive || user.isLockedOut
+                ...(!user.isActive || user.isLockedOut || user.isKioskLookupLocked
                   ? [{ key: 'unlock', icon: <UnlockOutlined />, label: 'Mở khóa' }]
                   : []),
                 { key: 'reset', icon: <KeyOutlined />, label: 'Đặt lại mật khẩu' },

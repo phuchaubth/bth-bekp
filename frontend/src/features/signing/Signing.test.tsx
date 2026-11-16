@@ -119,6 +119,7 @@ describe('Chuyển sang chế độ ký', () => {
     await user.click(await screen.findByRole('button', { name: /Ký trên điện thoại/ }))
     const dialog = await screen.findByRole('dialog', { name: 'Chuyển sang chế độ ký' })
     expect(within(dialog).getByText(/Phiên đăng nhập của bạn trên máy này sẽ được đóng/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/chọn Đồng ý hoặc Từ chối và ký tay/)).toBeInTheDocument()
     await user.click(within(dialog).getByRole('button', { name: 'Bắt đầu ký' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/ky-phieu'))
@@ -130,6 +131,21 @@ describe('Chuyển sang chế độ ký', () => {
     // Quay lại trang cũ (nút Back): vẫn bị giữ ở màn hình ký.
     await router.navigate('/nguoi-benh')
     await waitFor(() => expect(router.state.location.pathname).toBe('/ky-phieu'))
+  })
+
+  it('mẫu chỉ ký xác nhận (không hỏi ý kiến): hộp thoại không nhắc chọn Đồng ý hoặc Từ chối', async () => {
+    mockApi({
+      ...baseRoutes(receptionist()),
+      'GET /api/v1/consent-forms/f-1': pending({ definition: { ...definition, signatures: { decision: 'none' } } }),
+    })
+    renderApp('/phieu-dong-thuan/f-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Ký trên điện thoại/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Chuyển sang chế độ ký' })
+
+    expect(within(dialog).getByText(/đọc lại nội dung, rồi ký tay xác nhận/)).toBeInTheDocument()
+    expect(within(dialog).queryByText(/Đồng ý|Từ chối/)).not.toBeInTheDocument()
   })
 })
 
