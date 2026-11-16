@@ -1,6 +1,6 @@
 # Hướng dẫn sử dụng — Quản lý Phiếu đồng thuận
 
-> Dành cho nhân viên bệnh viện: tiếp đón, điều dưỡng, bác sĩ, trưởng khoa, quản lý mẫu phiếu, báo cáo, kiểm tra và quản trị hệ thống. Phần 1 dành cho mọi người. Các phần sau dành cho từng nhóm người dùng.
+> Dành cho nhân viên bệnh viện: tiếp đón, điều dưỡng, bác sĩ, trưởng khoa, quản lý mẫu phiếu, báo cáo, kiểm tra, Phòng Điều dưỡng và quản trị hệ thống. Phần 1 dành cho mọi người. Các phần sau dành cho từng nhóm người dùng.
 >
 > Ảnh minh họa được chụp trên máy thử nghiệm với **dữ liệu giả lập**: tên người bệnh có chữ "(giả lập)", số CCCD, số điện thoại, số tiếp nhận đều là số thử. Tên đơn vị trên phiếu đang là giá trị mẫu. Màn hình của bạn có thể khác một chút: có logo và khung chữ ký của bệnh viện, hoặc ít mục menu hơn tùy vai trò.
 
@@ -14,7 +14,7 @@
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
 8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
-9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong)
+9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, mở lại, in PDF, xuất Excel
 10. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
@@ -1093,7 +1093,115 @@ Mỗi nhân viên tự ký chữ ký mẫu của mình ở **Tài khoản của 
 
 ## 9. Báo cáo điều dưỡng hằng ngày
 
-*Phần này sẽ được bổ sung sau.*
+Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày theo mẫu giấy đang dùng, rồi gửi Phòng Điều dưỡng. Phòng Điều dưỡng xem **bảng tổng hợp** của các khoa theo mẫu giấy "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày", in PDF và xuất Excel.
+
+| Ai | Làm gì | Menu |
+|---|---|---|
+| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1) | **Điều dưỡng** → **Báo cáo của khoa** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và mở lại báo cáo của khoa; cài khoa báo cáo và số giường; số liệu HIS (mục 9.2–9.5) | **Điều dưỡng** → **Tổng hợp hằng ngày** |
+
+### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
+
+1. Bấm **Điều dưỡng** trên menu, chọn **Báo cáo của khoa**.
+
+   ![Menu Điều dưỡng của tài khoản điều dưỡng](huong-dan-su-dung/dd-00-menu.png)
+
+   *Hình 9.1. Menu **Điều dưỡng** chỉ hiện với tài khoản được lập hoặc xem báo cáo điều dưỡng.*
+
+2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
+3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay.
+
+   ![Báo cáo mới của khoa, có số điền sẵn](huong-dan-su-dung/dd-01-bao-cao-khoa.png)
+
+   *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn.*
+
+4. Ở **Phần tick**, mỗi dòng chọn **Có sự cố/ Không ổn** hoặc **Không có sự cố/ Ổn**. Phải chọn đủ mọi dòng mới gửi được.
+5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được.
+
+   ![Phần tick và phần báo cáo nhập thêm](huong-dan-su-dung/dd-02-phan-tick.png)
+
+   *Hình 9.3. Mỗi dòng của phần tick chọn một trong hai ô. Nút **Lưu nháp** và **Gửi báo cáo** ở cuối trang.*
+
+6. Chưa xong thì bấm **Lưu nháp**. Báo cáo nháp chưa được tính vào bảng tổng hợp.
+7. Xong thì bấm **Gửi báo cáo**, rồi bấm **Gửi** để xác nhận. Bấm **Xem lại** nếu muốn sửa tiếp.
+
+   ![Hộp xác nhận gửi báo cáo](huong-dan-su-dung/dd-03-xac-nhan-gui.png)
+
+   *Hình 9.4. Xác nhận gửi. Sau khi gửi, khoa không sửa được nữa.*
+
+8. Gửi xong, báo cáo bị khóa và có nhãn **Đã gửi** kèm giờ gửi, người gửi. Bấm **In PDF** để xem, in hoặc tải báo cáo.
+
+   ![Báo cáo đã gửi](huong-dan-su-dung/dd-04-da-gui.png)
+
+   *Hình 9.5. Báo cáo đã gửi: các ô không sửa được, có nút **In PDF**.*
+
+   <img src="huong-dan-su-dung/dd-11-pdf-bao-cao-khoa.png" alt="PDF báo cáo của khoa, trang 1" width="560">
+
+   *Hình 9.6. PDF báo cáo của khoa (trang 1) theo bố cục mẫu giấy. Chân trang ghi giờ gửi và người gửi.*
+
+Lưu ý:
+
+- Cần sửa báo cáo đã gửi: đề nghị Phòng Điều dưỡng **mở lại** (mục 9.3). Khi được mở lại, trang báo cáo hiện khung ghi lý do. Sửa rồi bấm **Gửi báo cáo** lại.
+- Trang báo **Khoa chưa có trong danh sách khoa báo cáo điều dưỡng**: liên hệ Phòng Điều dưỡng để được thêm vào danh sách (mục 9.4). Trong lúc chờ, bạn chỉ xem được, không lưu được.
+- Tài khoản ghi sai khoa: nhờ quản trị sửa khoa/phòng của tài khoản (mục 8.1).
+- Phần nhập thêm có thể ghi tên người bệnh. Phần này được mã hóa khi lưu, và nhật ký hệ thống không ghi nội dung của nó. Mỗi lần lưu, gửi, mở lại đều được ghi nhật ký.
+
+### 9.2. Bảng tổng hợp hằng ngày (Phòng Điều dưỡng)
+
+1. Bấm **Điều dưỡng** trên menu, chọn **Tổng hợp hằng ngày**. Chọn ngày ở góc trên bên phải.
+2. Ô trên cùng ghi **Khoa đã gửi** (số khoa đã gửi trên số khoa phải báo cáo), và số liệu HIS được lấy hay nhập tay lúc nào, bởi ai.
+3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
+
+   ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)
+
+   *Hình 9.7. Bảng tổng hợp, mục A–D. Ba nút **Lấy số liệu HIS**, **Nhập số liệu HIS**, **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
+
+5. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
+6. **Mục F** là phần báo cáo nhập thêm của các khoa, giữ nguyên xuống dòng như khoa đã ghi.
+
+   ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
+
+   *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa.*
+
+7. Bấm **In PDF** để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel.
+
+   <img src="huong-dan-su-dung/dd-12-pdf-tong-hop.png" alt="PDF bảng tổng hợp, trang 1" width="560">
+
+   *Hình 9.9. PDF bảng tổng hợp (trang 1). Chân trang ghi giờ in, số khoa đã gửi và lúc có số liệu HIS.*
+
+### 9.3. Xem và mở lại báo cáo của một khoa (Phòng Điều dưỡng)
+
+1. Trong mục A, bấm **tên khoa**. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
+
+   ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
+
+   *Hình 9.10. Báo cáo của một khoa. Nút **Mở lại** chỉ có khi khoa đã gửi.*
+
+2. Khoa cần sửa: bấm **Mở lại**, ghi lý do, bấm **Mở lại** trong hộp. Báo cáo trở về nháp; khoa thấy lý do, sửa rồi gửi lại.
+
+   ![Hộp mở lại báo cáo](huong-dan-su-dung/dd-08-mo-lai.png)
+
+   *Hình 9.11. Bắt buộc ghi lý do. Lý do được ghi vào nhật ký và hiện cho khoa.*
+
+### 9.4. Cài khoa báo cáo và số giường (Phòng Điều dưỡng, làm khi bắt đầu dùng)
+
+1. Trên trang **Tổng hợp hằng ngày**, bấm **Khoa báo cáo và số giường**.
+2. Tick các khoa phải gửi báo cáo, nhập **số giường thực kê** (không tính băng ca), bấm **Lưu**.
+3. Khi khoa đổi số giường hoặc có khoa mới phải báo cáo, vào lại đây sửa.
+
+   ![Hộp khoa báo cáo và số giường](huong-dan-su-dung/dd-09-khoa-bao-cao.png)
+
+   *Hình 9.12. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
+
+### 9.5. Số liệu HIS (mục B, mục D, cột "NB PK chờ nhập viện")
+
+- Khi phòng CNTT đã cài câu truy vấn số liệu, bấm **Lấy số liệu HIS**. Số liệu được lưu theo ngày. Số **NB PK chờ nhập viện** là số tại lúc bấm. Nếu có mã khoa trên HIS không khớp khoa nào, phần mềm báo để phòng CNTT kiểm tra.
+- HIS lỗi hoặc chưa cài câu truy vấn: bấm **Nhập số liệu HIS**, nhập số, bấm **Lưu**. Số nhập tay thay số đã lấy từ HIS của ngày đó.
+
+  ![Hộp nhập số liệu HIS](huong-dan-su-dung/dd-10-so-lieu-his.png)
+
+  *Hình 9.13. Nhập tay số liệu HIS. Ô để trống thì bảng tổng hợp để trống.*
 
 ---
 
@@ -1145,6 +1253,9 @@ Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút
 
 **Kiosk báo đã tạm khóa tra cứu?**
 Do nhập mã/CCCD kèm ngày sinh sai 5 lần. Máy mở lại sau 5 phút, hoặc quản trị **Mở khóa** tài khoản kiosk ở **Quản trị → Người dùng** (trạng thái **Tạm khóa tra cứu**). Trong lúc chờ, người bệnh chọn **Nhập thông tin** (không kèm số CCCD) hoặc đến quầy tiếp đón.
+
+**Không lập được báo cáo điều dưỡng của khoa?**
+Kiểm tra: tài khoản có vai trò Điều dưỡng và đúng khoa (quản trị sửa ở mục 8.1); khoa đã có trong danh sách khoa báo cáo (Phòng Điều dưỡng cài ở mục 9.4); ngày báo cáo không sau hôm nay và không quá một năm trước. Báo cáo đã gửi thì phải nhờ Phòng Điều dưỡng mở lại mới sửa được.
 
 **Phiếu mới được điền sẵn câu trả lời cũ, có cần kiểm tra không?**
 Có. Đây là chức năng kế thừa phiếu lần trước (mục 2.7). Kiểm tra lại từng câu trước khi trình ký. Ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký không được điền sẵn.
