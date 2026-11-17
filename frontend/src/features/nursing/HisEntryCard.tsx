@@ -10,7 +10,18 @@ import { formatDateTime } from '../../utils/format'
  * khoa (tổng số người bệnh đến khám, số liệu chẩn đoán hình ảnh). Lưu riêng, không khóa theo báo cáo của khoa. Phòng Điều
  * dưỡng chỉ tổng hợp: bảng tổng hợp dùng số lấy từ HIS trước, ô HIS không có số mới dùng số khoa nhập.
  */
-export function HisEntryCard({ report, entry, maxValue }: { report: NursingReport; entry: NursingHisEntry; maxValue: number }) {
+export function HisEntryCard({
+  report,
+  entry,
+  maxValue,
+  queryDepartmentId,
+}: {
+  report: NursingReport
+  entry: NursingHisEntry
+  maxValue: number
+  /** Khoa đã chọn ở đầu trang (khóa bộ nhớ đệm); chưa chọn là khoa chính. */
+  queryDepartmentId?: string
+}) {
   const [form] = Form.useForm<Record<string, number | null>>()
   const queryClient = useQueryClient()
   const { message } = App.useApp()
@@ -18,12 +29,13 @@ export function HisEntryCard({ report, entry, maxValue }: { report: NursingRepor
     mutationFn: () => {
       const values = form.getFieldsValue(true)
       return nursingReportsApi.saveHisEntry({
+        departmentId: report.departmentId,
         reportDate: report.reportDate,
         values: Object.fromEntries(entry.lines.map((l) => [l.key, values[l.key] ?? null])),
       })
     },
     onSuccess: (saved) => {
-      queryClient.setQueryData(nursingKeys.daily(report.reportDate), saved)
+      queryClient.setQueryData(nursingKeys.daily(report.reportDate, queryDepartmentId), saved)
       void queryClient.invalidateQueries({ queryKey: nursingKeys.summary(report.reportDate) })
       message.success('Đã lưu số liệu HIS của khoa.')
     },

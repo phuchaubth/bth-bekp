@@ -73,7 +73,7 @@ public sealed class ConsentFormService(
             page,
             pageSize,
             ScopeAll,
-            currentUser.DepartmentId,
+            currentUser.DepartmentIds,
             currentUser.UserId);
         return forms.SearchAsync(search, cancellationToken);
     }
@@ -597,8 +597,9 @@ public sealed class ConsentFormService(
         return form is not null && IsInScope(form) ? form : null;
     }
 
+    /// <summary>Phiếu trong phạm vi: xem toàn viện, phiếu của một khoa của người dùng (quyết định 41), hoặc phiếu mình lập.</summary>
     internal bool IsInScope(ConsentForm form) =>
-        ScopeAll || form.DepartmentId == currentUser.DepartmentId || form.CreatedByUserId == currentUser.UserId;
+        ScopeAll || currentUser.DepartmentIds.Contains(form.DepartmentId) || form.CreatedByUserId == currentUser.UserId;
 
     internal async Task<(ConsentTemplate Template, ConsentTemplateVersion Version)> LoadTemplateAsync(
         ConsentForm form, CancellationToken cancellationToken)

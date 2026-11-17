@@ -9,7 +9,14 @@ public interface ICurrentUser
 
     string? UserName { get; }
 
+    /// <summary>Khoa/phòng chính: khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng.</summary>
     Guid? DepartmentId { get; }
+
+    /// <summary>
+    /// Mọi khoa/phòng của người dùng (khoa chính và các khoa khác, quyết định 41): người dùng thấy dữ liệu của các khoa này.
+    /// Rỗng khi không có khoa chính.
+    /// </summary>
+    IReadOnlyList<Guid> DepartmentIds { get; }
 
     bool HasPermission(string permission);
 

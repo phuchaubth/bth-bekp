@@ -51,8 +51,11 @@ export interface UserListItem {
   userName: string
   fullName: string
   title: string | null
+  /** Khoa/phòng chính. */
   departmentId: string | null
   departmentName: string | null
+  /** Tên các khoa/phòng khác (quyết định 41). */
+  additionalDepartmentNames?: string[] | null
   roleNames: string[]
   isActive: boolean
   isLockedOut: boolean
@@ -68,8 +71,11 @@ export interface UserDetail {
   email: string | null
   phoneNumber: string | null
   title: string | null
+  /** Khoa/phòng chính. */
   departmentId: string | null
   departmentName: string | null
+  /** Khoa/phòng khác (quyết định 41). */
+  additionalDepartments: { id: string; name: string }[]
   smartCaUserId: string | null
   roles: { id: string; code: string; name: string }[]
   isActive: boolean
@@ -93,7 +99,10 @@ export interface UserProfileInput {
   email?: string | null
   phoneNumber?: string | null
   title?: string | null
+  /** Khoa/phòng chính. */
   departmentId?: string | null
+  /** Khoa/phòng khác (quyết định 41); gửi danh sách đầy đủ, rỗng là không có. */
+  additionalDepartmentIds?: string[]
   smartCaUserId?: string | null
   roleIds: string[]
 }

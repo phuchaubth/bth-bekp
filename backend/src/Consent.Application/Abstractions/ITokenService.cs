@@ -1,6 +1,8 @@
 namespace Consent.Application.Abstractions;
 
 /// <summary>Thông tin đưa vào access token.</summary>
+/// <param name="DepartmentId">Khoa/phòng chính.</param>
+/// <param name="AdditionalDepartmentIds">Khoa/phòng khác (quyết định 41).</param>
 public sealed record AccessTokenClaims(
     Guid UserId,
     string UserName,
@@ -8,7 +10,8 @@ public sealed record AccessTokenClaims(
     Guid? DepartmentId,
     IReadOnlyCollection<string> Roles,
     IReadOnlyCollection<string> Permissions,
-    bool MustChangePassword);
+    bool MustChangePassword,
+    IReadOnlyCollection<Guid>? AdditionalDepartmentIds = null);
 
 public sealed record AccessToken(string Value, DateTimeOffset ExpiresAtUtc);
 

@@ -16,20 +16,25 @@ export const doctorPermissions = [
 ]
 
 export function session(overrides: Partial<CurrentUser> = {}): AuthResponse {
+  const user = {
+    id: 'u-bacsi',
+    userName: 'bacsi.demo',
+    fullName: 'Bác sĩ Demo',
+    title: 'Bác sĩ',
+    departmentId: 'd-noi' as string | null,
+    departmentName: 'Khoa Nội tổng hợp' as string | null,
+    roles: [{ id: 'r-doctor', code: 'DOCTOR', name: 'Bác sĩ' }],
+    permissions: doctorPermissions,
+    mustChangePassword: false,
+    ...overrides,
+  }
   return {
     accessToken: `token-${Math.random().toString(36).slice(2)}`,
     accessTokenExpiresAtUtc: new Date(Date.now() + 15 * 60_000).toISOString(),
     user: {
-      id: 'u-bacsi',
-      userName: 'bacsi.demo',
-      fullName: 'Bác sĩ Demo',
-      title: 'Bác sĩ',
-      departmentId: 'd-noi',
-      departmentName: 'Khoa Nội tổng hợp',
-      roles: [{ id: 'r-doctor', code: 'DOCTOR', name: 'Bác sĩ' }],
-      permissions: doctorPermissions,
-      mustChangePassword: false,
-      ...overrides,
+      ...user,
+      // Như máy chủ: mọi khoa của tài khoản, khoa chính đứng đầu (quyết định 41).
+      departments: user.departments ?? (user.departmentId ? [{ id: user.departmentId, name: user.departmentName ?? '' }] : []),
     },
   }
 }

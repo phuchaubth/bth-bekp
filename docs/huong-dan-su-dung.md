@@ -139,7 +139,7 @@ Trang có:
 
 Bấm vào tên của bạn ở góc trên bên phải, chọn **Tài khoản của tôi**. Trang có ba phần:
 
-- **Thông tin tài khoản**: họ tên, tên đăng nhập, chức danh, khoa/phòng, vai trò.
+- **Thông tin tài khoản**: họ tên, tên đăng nhập, chức danh, khoa/phòng chính (và các khoa/phòng khác nếu bạn làm ở nhiều khoa), vai trò.
 - **Chữ ký mẫu**: chữ ký của bạn, dùng khi ký xác nhận phiếu.
 - **Đổi mật khẩu**: đổi mật khẩu như mục 1.2.
 
@@ -172,7 +172,7 @@ Máy dùng chung (ví dụ điện thoại ký phiếu của khoa): đăng xuấ
 
 ## 2. Tiếp đón, Điều dưỡng, Bác sĩ
 
-Ba vai trò này có cùng các chức năng: tìm và thêm người bệnh, lập phiếu, cho người bệnh ký, ký xác nhận phía bệnh viện. Bạn thấy phiếu của khoa mình và phiếu do chính mình lập.
+Ba vai trò này có cùng các chức năng: tìm và thêm người bệnh, lập phiếu, cho người bệnh ký, ký xác nhận phía bệnh viện. Bạn thấy phiếu của khoa mình và phiếu do chính mình lập. Tài khoản làm ở nhiều khoa (quản trị đặt ở mục 8.1) thấy phiếu của mọi khoa đó; khi lập phiếu, ô **Khoa của phiếu** mặc định là khoa chính.
 
 Quy trình thường gặp:
 
@@ -771,6 +771,8 @@ Mỗi phiếu thu hồi chỉ lập phiếu thay thế được một lần. Phi
 
 Cách dùng như phần 6. Khác biệt: trưởng khoa chỉ thấy số liệu của khoa mình. Trang **Báo cáo thống kê** ghi *"Số liệu trong phạm vi khoa của bạn."* Trang **Xuất dữ liệu** ghi *"Bạn chỉ xuất được phiếu của khoa mình và phiếu do mình lập."* Số CCCD, số điện thoại, số thẻ BHYT trong file xuất được che một phần.
 
+Trưởng khoa phụ trách nhiều khoa (tài khoản có **Khoa/phòng khác**, mục 8.1): số liệu gồm mọi khoa đó, trang ghi *"Số liệu trong phạm vi các khoa của bạn."* và có ô **Khoa/phòng (các khoa của bạn)** để xem hoặc xuất riêng từng khoa.
+
 ![Báo cáo thống kê của trưởng khoa](huong-dan-su-dung/68-bao-cao-truong-khoa.png)
 
 *Hình 4.4. Báo cáo của trưởng khoa: không có ô chọn khoa, số liệu chỉ của khoa mình.*
@@ -976,24 +978,24 @@ Bấm **Quản trị** → **Người dùng**. Tìm theo họ tên, tên đăng 
 
 ![Danh sách người dùng](huong-dan-su-dung/90-nguoi-dung.png)
 
-*Hình 8.1. Danh sách người dùng: vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải.*
+*Hình 8.1. Danh sách người dùng: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
 
 Thêm người dùng:
 
 1. Bấm **Thêm người dùng**.
 2. Nhập **Tên đăng nhập** (chữ không dấu, số, dấu chấm, gạch ngang, gạch dưới), **Họ tên**, **Chức danh**.
-3. Chọn **Khoa/phòng** và **Vai trò** (chọn được nhiều vai trò).
+3. Chọn **Khoa/phòng chính** (khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng) và **Vai trò** (chọn được nhiều vai trò). Nhân viên làm ở nhiều khoa: chọn thêm ở ô **Khoa/phòng khác** (tối đa 20 khoa).
 4. Nhập **Email**, **Số điện thoại** nếu có.
 5. Nhập **Mật khẩu ban đầu** (theo quy tắc mật khẩu ở mục 1.2). Người dùng phải đổi mật khẩu ở lần đăng nhập đầu tiên.
 6. Bấm **Lưu**. Báo tên đăng nhập và mật khẩu ban đầu cho người dùng theo cách an toàn.
 
 <img src="huong-dan-su-dung/91-them-nguoi-dung.png" alt="Hộp thêm người dùng" width="620">
 
-*Hình 8.2. Hộp **Thêm người dùng**.*
+*Hình 8.2. Hộp **Thêm người dùng**: điều dưỡng khoa chính Khoa Khám bệnh, làm thêm ở Khoa Nội tổng hợp.*
 
 Sửa, khóa, mở khóa, đặt lại mật khẩu:
 
-- Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
+- Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng chính, khoa/phòng khác, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
 - Bấm nút **⋯** ở cột **Thao tác** để chọn:
   - **Khóa tài khoản**: người dùng bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho đến khi mở khóa. Khi nhân viên nghỉ việc, hãy khóa tài khoản thay vì xóa, để giữ nhật ký;
   - **Mở khóa**: chỉ có khi tài khoản đang bị khóa, tạm khóa (nhập sai mật khẩu), hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
@@ -1003,12 +1005,20 @@ Sửa, khóa, mở khóa, đặt lại mật khẩu:
 
 *Hình 8.3. Menu **⋯**: **Khóa tài khoản**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang khóa).*
 
+Dữ liệu theo khoa:
+
+- Tài khoản thấy phiếu, trang Tổng quan, báo cáo thống kê, xuất dữ liệu và báo cáo điều dưỡng của **khoa chính và các khoa khác** của mình, cùng phiếu do mình lập. Hồ sơ người bệnh dùng chung toàn viện.
+- Danh sách người dùng ghi khoa chính, dưới đó là *Khoa khác: …*. Lọc theo **Khoa/phòng** tìm cả người có khoa đó là khoa khác.
+- Người cần xem mọi khoa (Kế hoạch tổng hợp, ban giám đốc, kiểm tra): không cần chọn hết các khoa, hãy gán vai trò có quyền **Xem dữ liệu toàn viện** (mục 8.3).
+- Đổi khoa của tài khoản có hiệu lực sau tối đa 15 phút, hoặc ngay khi người dùng đăng xuất rồi đăng nhập lại.
+- Khoa đang gán cho tài khoản nào (khoa chính hay khoa khác) thì không xóa được, chỉ chuyển sang ngừng sử dụng (mục 8.4).
+
 ### 8.2. Tài khoản cho máy kiosk
 
 Mỗi máy kiosk dùng một tài khoản riêng:
 
 1. **Thêm người dùng**, ví dụ tên đăng nhập `kiosk.kkb`.
-2. Chọn **Khoa/phòng** là khoa đặt máy. Phiếu lập trên kiosk thuộc khoa này.
+2. Chọn **Khoa/phòng chính** là khoa đặt máy. Phiếu lập trên kiosk thuộc khoa này. Tài khoản kiosk không có khoa/phòng khác.
 3. Chọn **chỉ một** vai trò **Kiosk người bệnh**. Phần mềm từ chối nếu thêm vai trò khác hoặc không chọn khoa.
 4. Đặt mật khẩu ban đầu, bấm **Lưu**. Nhân viên đăng nhập máy kiosk lần đầu và đổi mật khẩu.
 5. Chọn các mẫu dùng trên kiosk ở **Cấu hình hệ thống** (mục 8.5).
@@ -1048,7 +1058,7 @@ Mã vai trò được tạo tự động từ tên, bắt đầu bằng `VT_` (v
 
 Người dùng nhận quyền mới khi phiên đăng nhập được làm mới (tối đa 15 phút). Vai trò **Quản trị hệ thống** luôn có toàn bộ quyền. Vai trò **Kiosk người bệnh** có quyền cố định. Quyền của hai vai trò này không sửa được, và quyền **Dùng kiosk người bệnh tự làm phiếu** chỉ dành cho vai trò Kiosk người bệnh.
 
-Quyền **Xem dữ liệu toàn viện** cho phép xem phiếu của mọi khoa. Không có quyền này thì chỉ thấy phiếu của khoa mình và phiếu mình lập.
+Quyền **Xem dữ liệu toàn viện** cho phép xem phiếu của mọi khoa. Không có quyền này thì chỉ thấy phiếu của các khoa của mình (khoa chính và khoa khác, mục 8.1) và phiếu mình lập.
 
 <img src="huong-dan-su-dung/94a-them-vai-tro.png" alt="Hộp Thêm vai trò" width="420">
 
@@ -1064,7 +1074,7 @@ Bấm **Quản trị** → **Khoa/phòng**.
 
 - **Thêm khoa/phòng**: nhập **Mã khoa** (ví dụ KKB), **Tên khoa/phòng**, chọn **Trạng thái** (**Đang sử dụng** hoặc **Ngừng sử dụng**), bấm **Lưu**.
 - **Sửa**: đổi mã, tên, trạng thái.
-- **Xóa**: chỉ xóa được khoa chưa có người dùng. Khoa không dùng nữa thì đặt **Ngừng sử dụng**.
+- **Xóa**: chỉ xóa được khoa chưa có người dùng (không là khoa chính hay khoa khác của tài khoản nào). Khoa không dùng nữa thì đặt **Ngừng sử dụng**.
 
 ![Danh sách khoa/phòng](huong-dan-su-dung/95-khoa-phong.png)
 
@@ -1137,7 +1147,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 
    *Hình 9.1. Menu **Điều dưỡng** chỉ hiện với tài khoản được lập hoặc xem báo cáo điều dưỡng.*
 
-2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
+2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Tài khoản làm ở nhiều khoa có thêm ô chọn khoa cạnh ô ngày: mặc định khoa chính, chọn khoa khác để lập báo cáo của khoa đó. Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
 3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**, số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
 
    ![Báo cáo mới của khoa, có số điền sẵn](huong-dan-su-dung/dd-01-bao-cao-khoa.png)
@@ -1333,6 +1343,9 @@ Bấm **Thử lại**. Nếu vẫn lỗi, báo quản trị. Quản trị có th
 
 **Không thấy phiếu mà đồng nghiệp khoa khác lập?**
 Bạn chỉ thấy phiếu của khoa mình và phiếu do mình lập. Khi lập phiếu, người lập cần chọn đúng **Khoa của phiếu** (khoa điều trị người bệnh) để khoa đó thấy và xác nhận.
+
+**Tôi làm ở hai khoa, làm sao thấy phiếu của cả hai khoa?**
+Nhờ quản trị thêm khoa thứ hai vào ô **Khoa/phòng khác** của tài khoản (mục 8.1), rồi đăng xuất và đăng nhập lại. Sau đó bạn thấy phiếu, báo cáo của cả hai khoa; báo cáo điều dưỡng có ô chọn khoa.
 
 **Xuất dữ liệu báo "Bạn thao tác quá nhiều lần"?**
 Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút rồi thử lại.

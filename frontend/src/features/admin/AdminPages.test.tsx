@@ -136,6 +136,127 @@ describe('Người dùng', () => {
     expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ fullName: 'Bác sĩ Demo', smartCaUserId: 'SMARTCA0001' })
   })
 
+  // Quyết định 41: một tài khoản thuộc nhiều khoa.
+  it('danh sách hiện khoa chính và các khoa khác của tài khoản', async () => {
+    mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'GET /api/v1/users': {
+        items: [{ ...users[0], additionalDepartmentNames: ['Khoa Khám bệnh', 'Khoa Ngoại (giả lập)'] }, users[1]],
+        page: 1,
+        pageSize: 20,
+        totalCount: 2,
+        totalPages: 1,
+      },
+    })
+    renderApp('/quan-tri/nguoi-dung')
+
+    const row = (await screen.findByText('bacsi.demo')).closest('tr')!
+    expect(within(row).getByText('Khoa Nội tổng hợp')).toBeInTheDocument()
+    expect(within(row).getByText('Khoa khác: Khoa Khám bệnh, Khoa Ngoại (giả lập)')).toBeInTheDocument()
+    expect(within(screen.getByText('tiepdon.demo').closest('tr')!).queryByText(/Khoa khác/)).not.toBeInTheDocument()
+  })
+
+  it('sửa người dùng: thêm khoa/phòng khác; danh sách không có khoa chính; khoa ngừng sử dụng đang gán hiện đúng tên và bỏ ra được', async () => {
+    const doctor = {
+      id: 'u-bacsi',
+      userName: 'bacsi.demo',
+      fullName: 'Bác sĩ Demo',
+      email: null,
+      phoneNumber: null,
+      title: 'Bác sĩ',
+      departmentId: 'd-noi',
+      departmentName: 'Khoa Nội tổng hợp',
+      additionalDepartments: [{ id: 'd-cu', name: 'Khoa Cũ' }],
+      smartCaUserId: null,
+      roles: [{ id: 'r-doctor', code: 'DOCTOR', name: 'Bác sĩ' }],
+      isActive: true,
+      isLockedOut: false,
+      lockoutEndUtc: null,
+      mustChangePassword: false,
+      lastLoginAtUtc: null,
+      createdAtUtc: '2026-11-01T00:00:00Z',
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'GET /api/v1/roles': roles,
+      'GET /api/v1/users/u-bacsi': doctor,
+      'PUT /api/v1/users/u-bacsi': doctor,
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+
+    const row = (await screen.findByText('bacsi.demo')).closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /Sửa/ }))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByLabelText('Họ tên')).toHaveValue('Bác sĩ Demo'))
+    // Khoa đã ngừng sử dụng vẫn hiện đúng tên khi tài khoản đang thuộc khoa đó.
+    expect(within(dialog).getByText('Khoa Cũ (ngừng sử dụng)')).toBeInTheDocument()
+
+    // Khoa ngừng sử dụng (máy chủ không cho lưu) bỏ ra được.
+    const oldTag = within(dialog).getByTitle('Khoa Cũ (ngừng sử dụng)')
+    await user.click(within(oldTag).getByRole('img', { name: 'close', hidden: true }))
+    expect(within(dialog).queryByTitle('Khoa Cũ (ngừng sử dụng)')).not.toBeInTheDocument()
+
+    // Danh sách khoa khác không có khoa chính.
+    await user.click(within(dialog).getByRole('combobox', { name: 'Khoa/phòng khác' }))
+    const kkbOption = await screen.findByTitle('Khoa Khám bệnh')
+    const dropdown = kkbOption.closest<HTMLElement>('.ant-select-dropdown')!
+    expect(within(dropdown).queryByTitle('Khoa Nội tổng hợp')).not.toBeInTheDocument()
+    await user.click(kkbOption)
+
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
+    expect(calls.filter((c) => c.method === 'PUT').at(-1)!.body).toMatchObject({
+      departmentId: 'd-noi',
+      additionalDepartmentIds: ['d-kkb'],
+    })
+  })
+
+  it('đổi khoa chính sang một khoa đang ở danh sách khoa khác thì khoa đó rời danh sách khoa khác', async () => {
+    const doctor = {
+      id: 'u-bacsi',
+      userName: 'bacsi.demo',
+      fullName: 'Bác sĩ Demo',
+      email: null,
+      phoneNumber: null,
+      title: 'Bác sĩ',
+      departmentId: 'd-noi',
+      departmentName: 'Khoa Nội tổng hợp',
+      additionalDepartments: [{ id: 'd-kkb', name: 'Khoa Khám bệnh' }],
+      smartCaUserId: null,
+      roles: [{ id: 'r-doctor', code: 'DOCTOR', name: 'Bác sĩ' }],
+      isActive: true,
+      isLockedOut: false,
+      lockoutEndUtc: null,
+      mustChangePassword: false,
+      lastLoginAtUtc: null,
+      createdAtUtc: '2026-11-01T00:00:00Z',
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'GET /api/v1/roles': roles,
+      'GET /api/v1/users/u-bacsi': doctor,
+      'PUT /api/v1/users/u-bacsi': doctor,
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+    const lastPut = () => calls.filter((c) => c.method === 'PUT').at(-1)?.body
+
+    const row = (await screen.findByText('bacsi.demo')).closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /Sửa/ }))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(within(dialog).getByLabelText('Họ tên')).toHaveValue('Bác sĩ Demo'))
+
+    await user.click(within(dialog).getByRole('combobox', { name: 'Khoa/phòng chính' }))
+    const options = await screen.findAllByTitle('Khoa Khám bệnh')
+    await user.click(options.find((o) => o.classList.contains('ant-select-item-option'))!)
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+    await waitFor(() => expect(lastPut()).toMatchObject({ departmentId: 'd-kkb', additionalDepartmentIds: [] }))
+  })
+
   it('tài khoản kiosk đang tạm khóa tra cứu: hiện trạng thái và mở khóa được ngay', async () => {
     const kiosk: (typeof users)[number] = {
       id: 'u-kiosk',

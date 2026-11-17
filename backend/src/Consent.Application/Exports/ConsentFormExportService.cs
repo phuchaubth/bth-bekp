@@ -62,7 +62,7 @@ public sealed class ConsentFormExportService(
         }
 
         var filter = request.Filter ?? new ConsentFormExportFilter();
-        if (!ScopeAll && filter.DepartmentId is { } requestedDepartment && requestedDepartment != currentUser.DepartmentId)
+        if (!ScopeAll && filter.DepartmentId is { } requestedDepartment && !currentUser.DepartmentIds.Contains(requestedDepartment))
         {
             return Error.Forbidden("exports.department_forbidden", "Bạn chỉ xuất được dữ liệu của khoa mình.");
         }
@@ -96,7 +96,7 @@ public sealed class ConsentFormExportService(
             Page: 1,
             PageSize: MaxRows,
             ScopeAll,
-            currentUser.DepartmentId,
+            currentUser.DepartmentIds,
             currentUser.UserId);
         var total = await forms.CountAsync(search, cancellationToken).ConfigureAwait(false);
         if (total == 0)

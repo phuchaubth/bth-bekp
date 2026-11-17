@@ -305,6 +305,45 @@ public sealed class AuthServiceTests
         Assert.Contains(ctx.Store.AuditLogs, a => a.Action == AuditActions.PasswordChanged);
     }
 
+    // Quyết định 41: token mang khoa chính và các khoa khác; thông tin người dùng liệt kê mọi khoa, khoa chính đứng đầu.
+    [Fact]
+    public async Task Login_And_GetCurrentUser_CarryAllDepartments_PrimaryFirst()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var ngoai = ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        var capCuu = ctx.AddDepartment("CC", "Khoa Cấp cứu");
+        var user = ctx.AddUser("dieuduong", role: SystemRoles.Nurse, departmentId: ngoai.Id);
+        user.SetDepartments(ngoai.Id, [noi.Id, capCuu.Id]);
+        var service = ctx.CreateAuthService();
+
+        var login = await service.LoginAsync(new LoginRequest("dieuduong", Password), CancellationToken.None);
+        var me = await service.GetCurrentUserAsync(user.Id, CancellationToken.None);
+
+        Assert.Equal(ngoai.Id, ctx.Tokens.LastClaims!.DepartmentId);
+        Assert.Equal([noi.Id, capCuu.Id], ctx.Tokens.LastClaims.AdditionalDepartmentIds);
+        foreach (var dto in new[] { login.Value.User, me.Value })
+        {
+            Assert.Equal(ngoai.Id, dto.DepartmentId);
+            Assert.Equal("Khoa Ngoại", dto.DepartmentName);
+            Assert.Equal(["Khoa Ngoại", "Khoa Cấp cứu", "Khoa Nội"], dto.Departments.Select(d => d.Name));
+        }
+    }
+
+    [Fact]
+    public async Task Login_WithoutDepartment_HasNoDepartments()
+    {
+        var ctx = new AppTestContext();
+        ctx.AddUser("bacsi");
+        var service = ctx.CreateAuthService();
+
+        var login = await service.LoginAsync(new LoginRequest("bacsi", Password), CancellationToken.None);
+
+        Assert.Null(login.Value.User.DepartmentName);
+        Assert.Empty(login.Value.User.Departments);
+        Assert.Empty(ctx.Tokens.LastClaims!.AdditionalDepartmentIds!);
+    }
+
     [Fact]
     public async Task GetCurrentUser_ForDeactivatedUser_ReturnsSessionInvalid()
     {

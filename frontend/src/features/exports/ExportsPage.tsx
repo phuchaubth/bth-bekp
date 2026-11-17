@@ -4,6 +4,7 @@ import { Alert, App, Button, Card, Checkbox, Col, DatePicker, Divider, Flex, Rad
 import type { Dayjs } from 'dayjs'
 import { useMemo, useState } from 'react'
 import { useDepartments } from '../../api/admin'
+import { accountDepartments } from '../../api/auth'
 import { formStatusLabels, type ConsentFormStatus } from '../../api/consentForms'
 import { useConsentTemplates } from '../../api/consentTemplates'
 import {
@@ -45,11 +46,13 @@ function formatBytes(bytes: number): string {
 
 /** Màn hình 13: xuất Excel/CSV theo bộ lọc, chọn cột; dữ liệu nhạy cảm che mặc định; lịch sử xuất. */
 export function ExportsPage() {
-  const { hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const { message } = App.useApp()
   const queryClient = useQueryClient()
   const canSensitive = hasPermission(Permissions.ExportsSensitive)
   const scopeAll = hasPermission(Permissions.ScopeAllDepartments)
+  // Quyết định 41: tài khoản thuộc nhiều khoa chọn được từng khoa của mình.
+  const myDepartments = accountDepartments(user)
   const columns = useExportColumns()
   const templates = useConsentTemplates(true, hasPermission(Permissions.TemplatesRead))
   const departments = useDepartments(false)
@@ -130,6 +133,16 @@ export function ExportsPage() {
                   onChange={(departmentId?: string) => setFilter((f) => ({ ...f, departmentId }))}
                 />
               )}
+              {!scopeAll && myDepartments.length > 1 && (
+                <Select
+                  allowClear
+                  placeholder="Khoa/phòng (các khoa của bạn)"
+                  aria-label="Khoa/phòng"
+                  options={myDepartments.map((d) => ({ value: d.id, label: d.name }))}
+                  value={filter.departmentId}
+                  onChange={(departmentId?: string) => setFilter((f) => ({ ...f, departmentId }))}
+                />
+              )}
               <DatePicker.RangePicker
                 format="DD/MM/YYYY"
                 placeholder={['Lập từ ngày', 'Đến ngày']}
@@ -139,7 +152,11 @@ export function ExportsPage() {
                 }}
               />
               {!scopeAll && (
-                <Typography.Text type="secondary">Bạn chỉ xuất được phiếu của khoa mình và phiếu do mình lập.</Typography.Text>
+                <Typography.Text type="secondary">
+                  {myDepartments.length > 1
+                    ? 'Bạn chỉ xuất được phiếu của các khoa của mình và phiếu do mình lập.'
+                    : 'Bạn chỉ xuất được phiếu của khoa mình và phiếu do mình lập.'}
+                </Typography.Text>
               )}
             </Flex>
           </Card>

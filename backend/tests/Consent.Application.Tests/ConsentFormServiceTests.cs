@@ -166,6 +166,30 @@ public sealed class ConsentFormServiceTests
         Assert.Contains(s.Ctx.Store.AuditLogs, a => a.Action == AuditActions.ConsentFormViewed && a.EntityId == form.Id.ToString());
     }
 
+    // Quyết định 41: tài khoản thuộc nhiều khoa thấy phiếu của mọi khoa của mình, không thấy phiếu khoa khác.
+    [Fact]
+    public async Task User_WithSeveralDepartments_SeesFormsOfEachOfThem_ButNotOfOtherDepartments()
+    {
+        var s = Setup();
+        var ngoai = s.Ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        s.LogIn(s.Noi);
+        var noiForm = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+        s.LogIn(s.Kkb);
+        var kkbForm = (await s.Service.CreateAsync(new(s.Patient.Id, s.Ck01.Id, null), CancellationToken.None)).Value;
+
+        s.LogIn(ngoai);
+        s.Ctx.CurrentUser.AdditionalDepartmentIds.Add(s.Noi.Id);
+        var list = await s.Service.SearchAsync(new ConsentFormQuery(), CancellationToken.None);
+        var noiDetail = await s.Service.GetAsync(noiForm.Id, CancellationToken.None);
+        var kkbDetail = await s.Service.GetAsync(kkbForm.Id, CancellationToken.None);
+        var filteredToKkb = await s.Service.SearchAsync(new ConsentFormQuery() with { DepartmentId = s.Kkb.Id }, CancellationToken.None);
+
+        Assert.Equal([noiForm.Id], list.Items.Select(i => i.Id));
+        Assert.True(noiDetail.IsSuccess);
+        Assert.Equal(ErrorType.NotFound, kkbDetail.Error!.Type);
+        Assert.Equal(0, filteredToKkb.TotalCount);
+    }
+
     [Fact]
     public async Task Submit_Incomplete_ReturnsFieldErrors_AndStaysDraft()
     {

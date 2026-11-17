@@ -189,7 +189,8 @@ internal sealed partial class DatabaseSeeder(
         foreach (var demo in DemoUsers.Where(u => !existingUserNames.Contains(u.UserName)))
         {
             var user = User.Create(demo.UserName, demo.FullName, clock.UtcNow);
-            user.UpdateProfile(demo.FullName, null, null, demo.Title, departments[demo.DepartmentCode].Id, null);
+            user.UpdateProfile(demo.FullName, null, null, demo.Title, null);
+            user.SetDepartments(departments[demo.DepartmentCode].Id, []);
             user.SetRoles([roles[demo.Role].Id]);
             user.SetPassword(passwordHash, mustChangePassword: false);
             db.Users.Add(user);

@@ -84,6 +84,12 @@ internal sealed class FakeCurrentUser : ICurrentUser
 
     public Guid? DepartmentId { get; set; }
 
+    /// <summary>Khoa/phòng khác (quyết định 41), như claim <c>dept_other</c> của access token.</summary>
+    public List<Guid> AdditionalDepartmentIds { get; } = [];
+
+    public IReadOnlyList<Guid> DepartmentIds =>
+        DepartmentId is { } primary ? [primary, .. AdditionalDepartmentIds.Where(id => id != primary).Distinct()] : [];
+
     public HashSet<string> Permissions { get; } = [];
 
     public HashSet<string> Roles { get; } = [];
@@ -151,7 +157,7 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
         Task.FromResult(store.Users.Exists(u => u.UserName == normalizedUserName));
 
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
-        Task.FromResult(store.Users.Exists(u => u.DepartmentId == departmentId));
+        Task.FromResult(store.Users.Exists(u => u.DepartmentIds.Contains(departmentId)));
 
     public Task<bool> AnyAsync(CancellationToken cancellationToken) => Task.FromResult(store.Users.Count > 0);
 
@@ -490,7 +496,7 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
     private IEnumerable<ConsentForm> Filter(ConsentFormSearch query) => Filter(store, query);
 
     internal static IEnumerable<ConsentForm> Filter(InMemoryStore store, ConsentFormSearch query) => store.ConsentForms
-        .Where(f => query.ScopeAll || f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId)
+        .Where(f => query.ScopeAll || query.ScopeDepartmentIds.Contains(f.DepartmentId) || f.CreatedByUserId == query.ScopeUserId)
         .Where(f => query.Status is null || f.Status == query.Status)
         .Where(f => query.PatientId is null || f.PatientId == query.PatientId)
         .Where(f => query.TemplateId is null || f.TemplateId == query.TemplateId)

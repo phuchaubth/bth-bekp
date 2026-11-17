@@ -202,6 +202,89 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Forbidden, reporterCreate);
     }
 
+    /// <summary>
+    /// Quyết định 41: quản trị gán thêm khoa cho tài khoản; đăng nhập lại thì tài khoản thấy phiếu của khoa thêm, khoa chính
+    /// vẫn là khoa mặc định; khoa đang là khoa khác của ai đó thì không xóa được.
+    /// </summary>
+    [Fact]
+    public async Task AccountWithSeveralDepartments_SeesFormsOfEachOfThem()
+    {
+        var admin = await _client.LoginAsAdministratorAsync();
+        var receptionist = await LoginDemoAsync("tiepdon.demo");
+        var patientId = await DemoPatientIdAsync(receptionist);
+        var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", receptionist);
+        var (_, created) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId, templateId = TemplateId(available, "CK-01") });
+        var formId = created.GetProperty("id").GetString();
+        var (_, departments) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/departments", admin);
+        string DepartmentId(string code) =>
+            departments.EnumerateArray().Single(d => d.GetProperty("code").GetString() == code).GetProperty("id").GetString()!;
+        var (_, extra) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/departments", admin, new { code = "THU", name = "Khoa Thử nghiệm (giả lập)" });
+        var extraId = extra.GetProperty("id").GetString()!;
+
+        var before = await LoginDemoAsync("dieuduong.demo");
+        var (hiddenStatus, _) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formId}", before);
+        Assert.Equal(HttpStatusCode.NotFound, hiddenStatus);
+
+        var (_, users) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/users?keyword=dieuduong.demo", admin);
+        var nurseId = users.GetProperty("items")[0].GetProperty("id").GetString();
+        var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", admin);
+        var nurseRoleId = roles.EnumerateArray().Single(r => r.GetProperty("code").GetString() == "NURSE").GetProperty("id").GetString();
+        var (updatedStatus, updated) = await _client.SendJsonAsync(HttpMethod.Put, $"/api/v1/users/{nurseId}", admin, new
+        {
+            fullName = "Điều dưỡng Demo",
+            title = "Điều dưỡng",
+            departmentId = DepartmentId("NOI"),
+            roleIds = new[] { nurseRoleId },
+            additionalDepartmentIds = new[] { DepartmentId("KKB"), extraId, DepartmentId("NOI") },
+        });
+        Assert.True(updatedStatus == HttpStatusCode.OK, updated.ToString());
+        Assert.Equal(
+            ["Khoa Khám bệnh", "Khoa Thử nghiệm (giả lập)"],
+            updated.GetProperty("additionalDepartments").EnumerateArray().Select(d => d.GetProperty("name").GetString()));
+
+        // Đăng nhập lại: token mang các khoa mới.
+        var login = await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword);
+        var after = login.AccessToken!;
+        Assert.Equal(DepartmentId("NOI"), login.Body.GetProperty("user").GetProperty("departmentId").GetString());
+        Assert.Equal(
+            ["Khoa Nội tổng hợp", "Khoa Khám bệnh", "Khoa Thử nghiệm (giả lập)"],
+            login.Body.GetProperty("user").GetProperty("departments").EnumerateArray().Select(d => d.GetProperty("name").GetString()));
+        var (visibleStatus, _) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formId}", after);
+        var (_, list) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-forms", after);
+        Assert.Equal(HttpStatusCode.OK, visibleStatus);
+        Assert.Contains(list.GetProperty("items").EnumerateArray(), f => f.GetProperty("id").GetString() == formId);
+
+        // Danh sách người dùng lọc theo khoa khớp cả khoa khác, và hiện tên các khoa khác.
+        var (_, byExtra) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users?departmentId={extraId}", admin);
+        var row = Assert.Single(byExtra.GetProperty("items").EnumerateArray());
+        Assert.Equal("dieuduong.demo", row.GetProperty("userName").GetString());
+        Assert.Equal(
+            ["Khoa Khám bệnh", "Khoa Thử nghiệm (giả lập)"],
+            row.GetProperty("additionalDepartmentNames").EnumerateArray().Select(n => n.GetString()));
+
+        // Khoa đang là khoa khác của một tài khoản thì không xóa được (chỉ ngừng sử dụng).
+        var (inUse, inUseProblem) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/departments/{extraId}", admin);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, inUse);
+        Assert.Equal("departments.in_use", inUseProblem.GetProperty("code").GetString());
+
+        // Bỏ khoa khác: đăng nhập lại thì không còn thấy phiếu.
+        var (removedStatus, _) = await _client.SendJsonAsync(HttpMethod.Put, $"/api/v1/users/{nurseId}", admin, new
+        {
+            fullName = "Điều dưỡng Demo",
+            title = "Điều dưỡng",
+            departmentId = DepartmentId("NOI"),
+            roleIds = new[] { nurseRoleId },
+        });
+        Assert.Equal(HttpStatusCode.OK, removedStatus);
+        var again = await LoginDemoAsync("dieuduong.demo");
+        var (hiddenAgain, _) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-forms/{formId}", again);
+        Assert.Equal(HttpStatusCode.NotFound, hiddenAgain);
+        var (deleted, _) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/departments/{extraId}", admin);
+        Assert.Equal(HttpStatusCode.NoContent, deleted);
+    }
+
     [Fact]
     public async Task HospitalInsuranceConsent_IsSignedWithoutAgreeOrRefuse_AndCompletedByReception()
     {

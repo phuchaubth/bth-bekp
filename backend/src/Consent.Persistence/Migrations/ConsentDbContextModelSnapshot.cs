@@ -767,6 +767,21 @@ namespace Consent.Persistence.Migrations
                     b.ToTable("Users", (string)null);
                 });
 
+            modelBuilder.Entity("Consent.Domain.Identity.UserDepartment", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("UserId", "DepartmentId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.ToTable("UserDepartments", (string)null);
+                });
+
             modelBuilder.Entity("Consent.Domain.Identity.UserRole", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1267,6 +1282,21 @@ namespace Consent.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Consent.Domain.Identity.UserDepartment", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.Identity.User", null)
+                        .WithMany("AdditionalDepartments")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Consent.Domain.Identity.UserRole", b =>
                 {
                     b.HasOne("Consent.Domain.Identity.Role", null)
@@ -1326,6 +1356,8 @@ namespace Consent.Persistence.Migrations
 
             modelBuilder.Entity("Consent.Domain.Identity.User", b =>
                 {
+                    b.Navigation("AdditionalDepartments");
+
                     b.Navigation("Roles");
                 });
 

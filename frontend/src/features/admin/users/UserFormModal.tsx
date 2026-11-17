@@ -15,6 +15,9 @@ import { passwordHint, passwordRules } from '../../../utils/passwordRules'
 
 type UserFormValues = CreateUserInput
 
+/** Số khoa/phòng khác tối đa của một tài khoản (như máy chủ, quyết định 41). */
+const MAX_OTHER_DEPARTMENTS = 20
+
 interface Props {
   /** null: thêm mới. */
   userId: string | null
@@ -29,8 +32,9 @@ export function UserFormModal({ userId, onClose }: Props) {
   const { message } = App.useApp()
   const detail = useUser(userId)
   const roles = useRoles()
-  const departments = useDepartments(false)
+  const departments = useDepartments(true)
   const { smartCa } = useFeatures()
+  const primaryDepartmentId = Form.useWatch('departmentId', form)
 
   const save = useMutation({
     mutationFn: (values: UserFormValues) => {
@@ -40,6 +44,7 @@ export function UserFormModal({ userId, onClose }: Props) {
         phoneNumber: values.phoneNumber || null,
         title: values.title || null,
         departmentId: values.departmentId ?? null,
+        additionalDepartmentIds: values.departmentId ? (values.additionalDepartmentIds ?? []) : [],
         // Chưa tích hợp SmartCA thì ô bị ẩn: giữ nguyên giá trị đã lưu (nếu có), không xóa mất.
         smartCaUserId: smartCa ? values.smartCaUserId || null : (detail.data?.smartCaUserId ?? null),
         roleIds: values.roleIds,
@@ -63,6 +68,18 @@ export function UserFormModal({ userId, onClose }: Props) {
   const loading = (isEdit && detail.isPending) || roles.isPending || departments.isPending
   const loadError = detail.error ?? roles.error ?? departments.error
 
+  // Khoa đang ngừng sử dụng chỉ hiện khi tài khoản đang thuộc khoa đó, để thấy tên và đổi, bỏ ra được (lưu phải chọn khoa
+  // đang hoạt động).
+  const assigned = new Set([detail.data?.departmentId, ...(detail.data?.additionalDepartments ?? []).map((d) => d.id)])
+  const shownDepartments = (departments.data ?? []).filter((d) => d.isActive || assigned.has(d.id))
+  const optionOf = (d: { id: string; name: string; isActive: boolean }) => ({
+    value: d.id,
+    label: d.isActive ? d.name : `${d.name} (ngừng sử dụng)`,
+  })
+  const primaryOptions = shownDepartments.map((d) => ({ ...optionOf(d), disabled: !d.isActive }))
+  // Không khóa lựa chọn ở ô nhiều khoa: thẻ của lựa chọn bị khóa không có nút bỏ ra.
+  const otherOptions = shownDepartments.filter((d) => d.id !== primaryDepartmentId).map(optionOf)
+
   const initialValues: Partial<UserFormValues> = detail.data
     ? {
         fullName: detail.data.fullName,
@@ -70,6 +87,7 @@ export function UserFormModal({ userId, onClose }: Props) {
         phoneNumber: detail.data.phoneNumber,
         title: detail.data.title,
         departmentId: detail.data.departmentId,
+        additionalDepartmentIds: (detail.data.additionalDepartments ?? []).map((d) => d.id),
         smartCaUserId: detail.data.smartCaUserId,
         roleIds: detail.data.roles.map((r) => r.id),
       }
@@ -135,13 +153,45 @@ export function UserFormModal({ userId, onClose }: Props) {
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
-              <Form.Item label="Khoa/phòng" name="departmentId">
+              <Form.Item
+                label="Khoa/phòng chính"
+                name="departmentId"
+                extra="Khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng."
+              >
                 <Select
                   allowClear
                   showSearch
                   optionFilterProp="label"
                   placeholder="Chọn khoa/phòng"
-                  options={(departments.data ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                  options={primaryOptions}
+                  onChange={(departmentId?: string) => {
+                    // Khoa chính không nằm trong danh sách khoa khác; bỏ khoa chính thì bỏ luôn các khoa khác.
+                    const others = (form.getFieldValue('additionalDepartmentIds') as string[] | undefined) ?? []
+                    form.setFieldValue('additionalDepartmentIds', departmentId ? others.filter((id) => id !== departmentId) : [])
+                  }}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24}>
+              <Form.Item
+                label="Khoa/phòng khác"
+                name="additionalDepartmentIds"
+                extra="Tài khoản làm việc ở nhiều khoa: thấy phiếu, báo cáo của khoa chính và các khoa này. Người cần xem toàn viện thì gán vai trò có quyền Xem dữ liệu toàn viện."
+                rules={[
+                  {
+                    type: 'array',
+                    max: MAX_OTHER_DEPARTMENTS,
+                    message: `Một tài khoản có tối đa ${MAX_OTHER_DEPARTMENTS} khoa/phòng khác.`,
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  allowClear
+                  optionFilterProp="label"
+                  disabled={!primaryDepartmentId}
+                  placeholder={primaryDepartmentId ? 'Chọn thêm khoa/phòng (nếu có)' : 'Chọn khoa/phòng chính trước'}
+                  options={otherOptions}
                 />
               </Form.Item>
             </Col>

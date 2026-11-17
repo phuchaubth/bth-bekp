@@ -14,7 +14,15 @@ public sealed class User : Entity, IAuditableEntity
     public const int SmartCaUserIdMaxLength = 50;
     public const int PasswordHashMaxLength = 500;
 
+    /// <summary>
+    /// Số khoa/phòng khác tối đa (quyết định 41). Người cần xem dữ liệu nhiều khoa hơn thì gán vai trò có quyền xem dữ liệu
+    /// toàn viện; giới hạn giữ access token gọn (mỗi khoa một claim).
+    /// </summary>
+    public const int MaxAdditionalDepartments = 20;
+
     private readonly List<UserRole> _roles = [];
+
+    private readonly List<UserDepartment> _additionalDepartments = [];
 
     private User(Guid id, string userName, string fullName, DateTimeOffset createdAtUtc)
         : base(id)
@@ -37,7 +45,19 @@ public sealed class User : Entity, IAuditableEntity
     /// <summary>Chức danh, ví dụ "Bác sĩ CKI".</summary>
     public string? Title { get; private set; }
 
+    /// <summary>
+    /// Khoa/phòng chính: khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng, và khoa của phiếu làm trên kiosk.
+    /// </summary>
     public Guid? DepartmentId { get; private set; }
+
+    /// <summary>Khoa/phòng khác của tài khoản (quyết định 41), không gồm khoa chính.</summary>
+    public IReadOnlyCollection<UserDepartment> AdditionalDepartments => _additionalDepartments;
+
+    public IReadOnlyList<Guid> AdditionalDepartmentIds => _additionalDepartments.ConvertAll(d => d.DepartmentId);
+
+    /// <summary>Mọi khoa/phòng của tài khoản, khoa chính đứng đầu: tài khoản thấy dữ liệu của các khoa này.</summary>
+    public IReadOnlyList<Guid> DepartmentIds =>
+        DepartmentId is { } primary ? [primary, .. AdditionalDepartmentIds] : [];
 
     /// <summary>Định danh tài khoản VNPT SmartCA (thường là số CCCD). Không phải bí mật.</summary>
     public string? SmartCaUserId { get; private set; }
@@ -86,15 +106,45 @@ public sealed class User : Entity, IAuditableEntity
 
     public static string NormalizeUserName(string userName) => (userName ?? string.Empty).Trim().ToLowerInvariant();
 
-    public void UpdateProfile(
-        string fullName, string? email, string? phoneNumber, string? title, Guid? departmentId, string? smartCaUserId)
+    public void UpdateProfile(string fullName, string? email, string? phoneNumber, string? title, string? smartCaUserId)
     {
         FullName = RequireFullName(fullName);
         Email = Clean(email);
         PhoneNumber = Clean(phoneNumber);
         Title = Clean(title);
-        DepartmentId = departmentId;
         SmartCaUserId = Clean(smartCaUserId);
+    }
+
+    /// <summary>
+    /// Đặt khoa chính và các khoa/phòng khác (quyết định 41). Khoa trùng khoa chính hay lặp lại thì bỏ qua; có khoa khác thì
+    /// phải có khoa chính (khoa mặc định khi lập phiếu, báo cáo).
+    /// </summary>
+    public void SetDepartments(Guid? primaryDepartmentId, IEnumerable<Guid> additionalDepartmentIds)
+    {
+        ArgumentNullException.ThrowIfNull(additionalDepartmentIds);
+        var additional = additionalDepartmentIds.Where(id => id != primaryDepartmentId).Distinct().ToList();
+        if (additional.Count > 0 && primaryDepartmentId is null)
+        {
+            throw new DomainException("Chọn khoa/phòng chính trước khi thêm khoa/phòng khác.");
+        }
+
+        if (additional.Contains(Guid.Empty) || primaryDepartmentId == Guid.Empty)
+        {
+            throw new DomainException("Khoa/phòng không hợp lệ.");
+        }
+
+        if (additional.Count > MaxAdditionalDepartments)
+        {
+            throw new DomainException(
+                $"Một tài khoản có tối đa {MaxAdditionalDepartments} khoa/phòng khác. Người cần xem nhiều khoa hơn thì gán vai trò có quyền xem dữ liệu toàn viện.");
+        }
+
+        DepartmentId = primaryDepartmentId;
+        _additionalDepartments.RemoveAll(d => !additional.Contains(d.DepartmentId));
+        foreach (var departmentId in additional.Where(id => _additionalDepartments.TrueForAll(d => d.DepartmentId != id)))
+        {
+            _additionalDepartments.Add(new UserDepartment(Id, departmentId));
+        }
     }
 
     /// <summary>Thay toàn bộ danh sách vai trò.</summary>
@@ -222,6 +272,20 @@ public sealed class User : Entity, IAuditableEntity
     }
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}
+
+/// <summary>Khoa/phòng khác của người dùng (ngoài khoa chính), quyết định 41.</summary>
+public sealed class UserDepartment : IAuditableEntity
+{
+    internal UserDepartment(Guid userId, Guid departmentId)
+    {
+        UserId = userId;
+        DepartmentId = departmentId;
+    }
+
+    public Guid UserId { get; private set; }
+
+    public Guid DepartmentId { get; private set; }
 }
 
 /// <summary>Gán vai trò cho người dùng.</summary>

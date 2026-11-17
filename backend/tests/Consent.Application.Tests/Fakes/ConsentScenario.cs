@@ -37,10 +37,11 @@ internal sealed class ConsentScenario
     public User LogInAs(Department department, string roleCode, params string[] extraPermissions)
     {
         var user = Ctx.AddUser($"nv{Ctx.Store.Users.Count}", roleCode, departmentId: department.Id);
-        user.UpdateProfile(user.FullName, null, null, "Chức danh giả lập", department.Id, null);
+        user.UpdateProfile(user.FullName, null, null, "Chức danh giả lập", null);
         Ctx.CurrentUser.UserId = user.Id;
         Ctx.CurrentUser.UserName = user.UserName;
         Ctx.CurrentUser.DepartmentId = department.Id;
+        Ctx.CurrentUser.AdditionalDepartmentIds.Clear();
         Ctx.CurrentUser.SigningFormIds = [];
         Ctx.CurrentUser.SigningSessionId = null;
         Ctx.CurrentUser.Roles.Clear();

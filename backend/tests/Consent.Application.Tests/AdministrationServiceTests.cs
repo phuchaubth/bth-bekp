@@ -143,6 +143,105 @@ public sealed class UserAdminServiceTests
         Assert.All(ctx.Store.RefreshTokens, t => Assert.True(t.IsRevoked));
     }
 
+    // Quyết định 41: một tài khoản thuộc nhiều khoa.
+    [Fact]
+    public async Task Create_WithOtherDepartments_SavesThem_IgnoringPrimaryAndDuplicates_AndShowsNamesSorted()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var ngoai = ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        var capCuu = ctx.AddDepartment("CC", "Khoa Cấp cứu");
+        var service = ctx.CreateUserAdminService();
+        var request = NewUser(ctx.RoleByCode(SystemRoles.Nurse).Id, departmentId: noi.Id) with
+        {
+            AdditionalDepartmentIds = [ngoai.Id, noi.Id, capCuu.Id, ngoai.Id],
+        };
+
+        var result = await service.CreateAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess, result.Error?.Message);
+        Assert.Equal("Khoa Nội", result.Value.DepartmentName);
+        Assert.Equal(["Khoa Cấp cứu", "Khoa Ngoại"], result.Value.AdditionalDepartments.Select(d => d.Name));
+        var user = Assert.Single(ctx.Store.Users);
+        Assert.Equal([noi.Id, ngoai.Id, capCuu.Id], user.DepartmentIds);
+    }
+
+    [Fact]
+    public async Task Update_ReplacesOtherDepartments_AndEmptyOrMissingListRemovesThem()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var ngoai = ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        var capCuu = ctx.AddDepartment("CC", "Khoa Cấp cứu");
+        var nurse = ctx.AddUser("dieuduong", role: SystemRoles.Nurse, departmentId: noi.Id);
+        var service = ctx.CreateUserAdminService();
+        UpdateUserRequest Request(IReadOnlyList<Guid>? others) =>
+            new(nurse.FullName, null, null, null, noi.Id, null, [ctx.RoleByCode(SystemRoles.Nurse).Id], others);
+
+        var added = await service.UpdateAsync(nurse.Id, Request([ngoai.Id]), CancellationToken.None);
+        Assert.Equal([ngoai.Id], added.Value.AdditionalDepartments.Select(d => d.Id));
+
+        var replaced = await service.UpdateAsync(nurse.Id, Request([capCuu.Id]), CancellationToken.None);
+        Assert.Equal([capCuu.Id], replaced.Value.AdditionalDepartments.Select(d => d.Id));
+        Assert.Equal([noi.Id, capCuu.Id], nurse.DepartmentIds);
+
+        var removed = await service.UpdateAsync(nurse.Id, Request(null), CancellationToken.None);
+        Assert.Empty(removed.Value.AdditionalDepartments);
+        Assert.Equal([noi.Id], nurse.DepartmentIds);
+    }
+
+    [Fact]
+    public async Task OtherDepartments_WithoutPrimary_Inactive_Unknown_OrTooMany_ReturnFieldErrors_AndSaveNothing()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var closed = ctx.AddDepartment("CU", "Khoa cũ", active: false);
+        var service = ctx.CreateUserAdminService();
+        var nurseRole = ctx.RoleByCode(SystemRoles.Nurse).Id;
+        var many = Enumerable.Range(0, User.MaxAdditionalDepartments + 1)
+            .Select(i => ctx.AddDepartment($"K{i}", $"Khoa {i}").Id).ToList();
+
+        var withoutPrimary = await service.CreateAsync(
+            NewUser(nurseRole) with { AdditionalDepartmentIds = [noi.Id] }, CancellationToken.None);
+        var inactive = await service.CreateAsync(
+            NewUser(nurseRole, departmentId: noi.Id) with { AdditionalDepartmentIds = [closed.Id] }, CancellationToken.None);
+        var unknown = await service.CreateAsync(
+            NewUser(nurseRole, departmentId: noi.Id) with { AdditionalDepartmentIds = [Guid.NewGuid()] }, CancellationToken.None);
+        var tooMany = await service.CreateAsync(
+            NewUser(nurseRole, departmentId: noi.Id) with { AdditionalDepartmentIds = many }, CancellationToken.None);
+
+        Assert.Contains("chính", Assert.Single(withoutPrimary.Error!.FieldErrors!["additionalDepartmentIds"]), StringComparison.Ordinal);
+        Assert.Contains("additionalDepartmentIds", inactive.Error!.FieldErrors!.Keys);
+        Assert.Contains("additionalDepartmentIds", unknown.Error!.FieldErrors!.Keys);
+        Assert.Contains(
+            $"tối đa {User.MaxAdditionalDepartments}",
+            Assert.Single(tooMany.Error!.FieldErrors!["additionalDepartmentIds"]),
+            StringComparison.Ordinal);
+        Assert.Empty(ctx.Store.Users);
+
+        // Đúng giới hạn (khoa chính nằm trong danh sách thì không tính) thì được.
+        var atLimit = await service.CreateAsync(
+            NewUser(nurseRole, departmentId: many[0]) with { AdditionalDepartmentIds = many }, CancellationToken.None);
+        Assert.True(atLimit.IsSuccess, atLimit.Error?.Message);
+        Assert.Equal(User.MaxAdditionalDepartments, atLimit.Value.AdditionalDepartments.Count);
+    }
+
+    [Fact]
+    public async Task KioskAccount_CannotHaveOtherDepartments()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var ngoai = ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        var service = ctx.CreateUserAdminService();
+
+        var result = await service.CreateAsync(
+            NewUser(ctx.RoleByCode(SystemRoles.Kiosk).Id, "kiosk.noi", noi.Id) with { AdditionalDepartmentIds = [ngoai.Id] },
+            CancellationToken.None);
+
+        Assert.Contains("chỉ thuộc một khoa", Assert.Single(result.Error!.FieldErrors!["additionalDepartmentIds"]), StringComparison.Ordinal);
+        Assert.Empty(ctx.Store.Users);
+    }
+
     [Fact]
     public async Task Unlock_ReactivatesUser()
     {
@@ -194,6 +293,22 @@ public sealed class DepartmentServiceTests
 
         Assert.Equal("departments.in_use", result.Error!.Code);
         Assert.Single(ctx.Store.Departments);
+    }
+
+    [Fact]
+    public async Task Delete_DepartmentThatIsAnotherDepartmentOfSomeUser_IsNotAllowed()
+    {
+        var ctx = new AppTestContext();
+        var noi = ctx.AddDepartment("NOI", "Khoa Nội");
+        var ngoai = ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        var nurse = ctx.AddUser("dieuduong", departmentId: noi.Id);
+        nurse.SetDepartments(noi.Id, [ngoai.Id]);
+        var service = ctx.CreateDepartmentService();
+
+        var result = await service.DeleteAsync(ngoai.Id, CancellationToken.None);
+
+        Assert.Equal("departments.in_use", result.Error!.Code);
+        Assert.Equal(2, ctx.Store.Departments.Count);
     }
 
     [Fact]

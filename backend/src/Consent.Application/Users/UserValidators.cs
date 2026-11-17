@@ -26,6 +26,10 @@ internal static class UserProfileRules
             .When(x => !string.IsNullOrWhiteSpace(x.SmartCaUserId));
         validator.RuleFor(x => x.RoleIds)
             .NotEmpty().WithMessage("Vui lòng chọn ít nhất một vai trò.");
+        validator.RuleFor(x => x.AdditionalDepartmentIds)
+            .Must((request, ids) => ids is null
+                || ids.Where(id => id != request.DepartmentId).Distinct().Count() <= User.MaxAdditionalDepartments)
+            .WithMessage($"Một tài khoản có tối đa {User.MaxAdditionalDepartments} khoa/phòng khác. Người cần xem nhiều khoa hơn thì gán vai trò có quyền xem dữ liệu toàn viện.");
     }
 }
 

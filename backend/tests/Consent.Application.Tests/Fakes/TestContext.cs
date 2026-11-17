@@ -70,7 +70,7 @@ internal sealed class AppTestContext
         Guid? departmentId = null)
     {
         var user = User.Create(userName, userName + " Demo", Clock.UtcNow);
-        user.UpdateProfile(user.FullName, null, null, null, departmentId, null);
+        user.SetDepartments(departmentId, []);
         user.SetRoles([RoleByCode(role).Id]);
         user.SetPassword(Hasher.Hash(password), mustChangePassword);
         if (!active)

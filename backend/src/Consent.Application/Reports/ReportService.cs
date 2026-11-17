@@ -38,7 +38,7 @@ public sealed class ReportService(
             return Error.ValidationField("to", $"Báo cáo tối đa {MaxDays} ngày; hãy thu hẹp khoảng thời gian.");
         }
 
-        if (!ScopeAll && query.DepartmentId is { } departmentId && departmentId != currentUser.DepartmentId)
+        if (!ScopeAll && query.DepartmentId is { } departmentId && !currentUser.DepartmentIds.Contains(departmentId))
         {
             return Error.Forbidden("reports.department_forbidden", "Bạn chỉ xem được báo cáo của khoa mình.");
         }
@@ -46,7 +46,7 @@ public sealed class ReportService(
         var fromUtc = ConsentFormService.StartOfDayUtc(from)!.Value;
         var search = new ConsentFormSearch(
             Status: null, query.TemplateId, PatientId: null, query.DepartmentId, fromUtc, ConsentFormService.StartOfDayUtc(to.AddDays(1)),
-            Keyword: null, Page: 1, PageSize: 1, ScopeAll, currentUser.DepartmentId, currentUser.UserId);
+            Keyword: null, Page: 1, PageSize: 1, ScopeAll, currentUser.DepartmentIds, currentUser.UserId);
 
         var groups = await statistics.CountByGroupAsync(search, cancellationToken).ConfigureAwait(false);
         var daily = await statistics.CountByCreatedDayAsync(search, fromUtc, cancellationToken).ConfigureAwait(false);

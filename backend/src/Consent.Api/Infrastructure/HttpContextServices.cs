@@ -18,18 +18,26 @@ internal sealed class HttpCurrentUser(IHttpContextAccessor accessor) : ICurrentU
 
     public Guid? DepartmentId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.Department), out var id) ? id : null;
 
+    /// <summary>Khoa chính rồi các khoa khác. Token cấp trước khi có khoa khác (quyết định 41) chỉ có khoa chính.</summary>
+    public IReadOnlyList<Guid> DepartmentIds =>
+        DepartmentId is { } primary
+            ? [primary, .. ParseIds(AppClaimTypes.AdditionalDepartment).Where(id => id != primary)]
+            : [];
+
     public bool HasPermission(string permission) => Principal?.HasClaim(AppClaimTypes.Permission, permission) == true;
 
     public bool IsInRole(string roleCode) => Principal?.HasClaim(AppClaimTypes.Role, roleCode) == true;
 
-    public IReadOnlyList<Guid> SigningFormIds =>
-        Principal?.FindAll(AppClaimTypes.SigningForm)
+    public IReadOnlyList<Guid> SigningFormIds => ParseIds(AppClaimTypes.SigningForm);
+
+    public Guid? SigningSessionId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningSession), out var id) ? id : null;
+
+    private List<Guid> ParseIds(string claimType) =>
+        Principal?.FindAll(claimType)
             .Select(c => Guid.TryParse(c.Value, out var id) ? id : Guid.Empty)
             .Where(id => id != Guid.Empty)
             .Distinct()
             .ToList() ?? [];
-
-    public Guid? SigningSessionId => Guid.TryParse(Principal?.FindFirstValue(AppClaimTypes.SigningSession), out var id) ? id : null;
 }
 
 internal sealed class HttpRequestContext(IHttpContextAccessor accessor) : IRequestContext

@@ -6,7 +6,14 @@ public sealed record ChangePasswordRequest(string CurrentPassword, string NewPas
 
 public sealed record RoleRefDto(Guid Id, string Code, string Name);
 
+/// <summary>Khoa/phòng gắn với tài khoản (tên để hiển thị).</summary>
+public sealed record DepartmentRefDto(Guid Id, string Name);
+
 /// <summary>Thông tin người dùng đang đăng nhập, dùng để hiển thị và phân quyền giao diện.</summary>
+/// <param name="DepartmentId">Khoa/phòng chính: khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng.</param>
+/// <param name="Departments">
+/// Mọi khoa/phòng của tài khoản (quyết định 41), khoa chính đứng đầu: tài khoản thấy dữ liệu của các khoa này.
+/// </param>
 public sealed record CurrentUserDto(
     Guid Id,
     string UserName,
@@ -14,6 +21,7 @@ public sealed record CurrentUserDto(
     string? Title,
     Guid? DepartmentId,
     string? DepartmentName,
+    IReadOnlyList<DepartmentRefDto> Departments,
     IReadOnlyList<RoleRefDto> Roles,
     IReadOnlyList<string> Permissions,
     bool MustChangePassword,

@@ -85,12 +85,18 @@ Ví dụ lỗi kiểm tra dữ liệu:
     "title": "Bác sĩ",
     "departmentId": "01a1ca94-9e60-7c35-8f0b-0b8f2f0f4a11",
     "departmentName": "Khoa Nội tổng hợp",
+    "departments": [
+      { "id": "01a1ca94-9e60-7c35-8f0b-0b8f2f0f4a11", "name": "Khoa Nội tổng hợp" },
+      { "id": "…", "name": "Khoa Khám bệnh" }
+    ],
     "roles": [{ "id": "…", "code": "DOCTOR", "name": "Bác sĩ" }],
     "permissions": ["consents.create", "consents.read", "consents.sign", "patients.manage", "patients.read", "templates.read"],
     "mustChangePassword": false
   }
 }
 ```
+
+`departmentId`, `departmentName` là **khoa chính** (khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng); `departments` là **mọi khoa** của tài khoản, khoa chính đứng đầu (quyết định 41): người dùng thấy dữ liệu của các khoa này. Access token mang khoa chính ở claim `dept` và mỗi khoa khác một claim `dept_other`.
 
 `POST /api/v1/auth/change-password`: `{ "currentPassword": "…", "newPassword": "…" }` → `200` với cùng cấu trúc như đăng nhập.
 
@@ -129,10 +135,10 @@ Dữ liệu gửi: `{ "code": "KKB", "name": "Khoa Khám bệnh", "isActive": tr
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng") |
-| GET | `/api/v1/users/{id}` | `users.read` | Chi tiết |
+| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng"). `departmentId` khớp khoa chính hoặc khoa khác; mỗi dòng có `departmentName` (khoa chính) và `additionalDepartmentNames` |
+| GET | `/api/v1/users/{id}` | `users.read` | Chi tiết, có `additionalDepartments: [{ id, name }]` |
 | POST | `/api/v1/users` | `users.manage` | Tạo người dùng với mật khẩu tạm; người dùng phải đổi mật khẩu ở lần đăng nhập đầu |
-| PUT | `/api/v1/users/{id}` | `users.manage` | Sửa hồ sơ, khoa, vai trò, mã SmartCA |
+| PUT | `/api/v1/users/{id}` | `users.manage` | Sửa hồ sơ, khoa chính và khoa khác, vai trò, mã SmartCA (gửi đủ các trường; bỏ `additionalDepartmentIds` là không còn khoa khác) |
 | POST | `/api/v1/users/{id}/lock` | `users.manage` | Khóa tài khoản và thu hồi mọi phiên → `204` |
 | POST | `/api/v1/users/{id}/unlock` | `users.manage` | Mở khóa (kể cả khóa tạm do đăng nhập sai và khóa tra cứu của tài khoản kiosk) → `204`. Danh sách người dùng có `isLockedOut` (khóa tạm do đăng nhập sai) và `isKioskLookupLocked` (tài khoản kiosk đang tạm khóa tra cứu) |
 | POST | `/api/v1/users/{id}/reset-password` | `users.manage` | Đặt mật khẩu tạm `{ "newPassword": "…" }`, thu hồi mọi phiên, bắt buộc đổi ở lần đăng nhập sau → `204` |
@@ -145,6 +151,7 @@ Dữ liệu tạo người dùng:
   "fullName": "Điều dưỡng Mới",
   "title": "Điều dưỡng",
   "departmentId": "…",
+  "additionalDepartmentIds": ["…"],
   "roleIds": ["…"],
   "email": "dd@example.test",
   "phoneNumber": "0900000000",
@@ -153,7 +160,9 @@ Dữ liệu tạo người dùng:
 }
 ```
 
-Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists`.
+`departmentId` là khoa chính; `additionalDepartmentIds` là các khoa/phòng khác (quyết định 41): tối đa 20, khoa trùng khoa chính hay lặp lại thì bỏ qua; có khoa khác mà không có khoa chính, hoặc khoa không tồn tại/ngừng dùng → `400` ở `additionalDepartmentIds`; tài khoản kiosk không có khoa khác.
+
+Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists`. Đổi vai trò, khoa của tài khoản có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút) hoặc khi đăng nhập lại.
 
 ---
 
@@ -309,7 +318,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/api/v1/consent-templates?includeInactive=false` | `templates.read` | Danh sách mẫu (sắp theo mã), kèm phiên bản đang phát hành và phiên bản nháp |
-| GET | `/api/v1/consent-templates/available?departmentId=` | `consents.create` | Mẫu **đang phát hành** dùng được để lập phiếu cho khoa (mặc định: khoa của người dùng): mẫu toàn viện và mẫu riêng của khoa. Trả định nghĩa của phiên bản đang phát hành |
+| GET | `/api/v1/consent-templates/available?departmentId=` | `consents.create` | Mẫu **đang phát hành** dùng được để lập phiếu cho khoa (mặc định: khoa chính của người dùng): mẫu toàn viện và mẫu riêng của khoa. Trả định nghĩa của phiên bản đang phát hành |
 | GET | `/api/v1/consent-templates/{id}` | `templates.read` | Chi tiết mẫu và các phiên bản (mới nhất trước) |
 | GET | `/api/v1/consent-templates/{id}/versions/{versionNo}` | `templates.read` | Một phiên bản, kèm định nghĩa (`definition`) |
 | POST | `/api/v1/consent-templates` | `templates.manage` | Tạo mẫu `{ code, name, hospitalSignerRoleCode, departmentId }` → `201`, có sẵn phiên bản nháp 1. `code`: 2–20 ký tự (chữ không dấu, số, `-`), lưu chữ hoa; trùng → `409 consent_templates.duplicate_code` |
@@ -394,7 +403,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | GET | `/api/v1/consent-forms?status=&templateId=&patientId=&departmentId=&from=&to=&keyword=&page=1&pageSize=20` | `consents.read` | Tìm kiếm, phân trang ở máy chủ, mới nhất trước. `from`/`to` là ngày lập (`yyyy-MM-dd`, giờ Việt Nam, gồm cả ngày `to`). `keyword`: số phiếu, họ tên người bệnh (không phân biệt dấu) hoặc mã người bệnh |
 | GET | `/api/v1/consent-forms/{id}` | `consents.read` | Chi tiết phiếu, kèm định nghĩa của **đúng phiên bản mẫu** đã dùng, dữ liệu, điểm, các mục còn thiếu (`issues`) và thao tác được phép (`actions`); ghi nhật ký `ConsentForms.Viewed` |
 | GET | `/api/v1/consent-forms/{id}/pdf` | `consents.read` | File PDF khổ A4 (`application/pdf`, tên `PDT-2026-000001.pdf`). Phiếu chưa hoàn tất: bản xem trước dựng lại mỗi lần, có dòng **"BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ"**. Phiếu hoàn tất/thu hồi: trả **đúng file đã lưu lúc hoàn tất**, sau khi kiểm tra SHA-256 (file mất, hỏng hoặc bị sửa → `409 consent_forms.signed_pdf_unavailable`). Ghi nhật ký `ConsentForms.PdfViewed` |
-| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId?, replacesFormId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. **Kế thừa phiếu lần trước** (quyết định 27, quản trị đặt số ngày): nếu người bệnh có phiếu **đã hoàn tất** cùng mẫu, **cùng khoa**, trong số ngày đó, phiếu mới điền sẵn câu trả lời của phiếu gần nhất (chuẩn hóa theo phiên bản mẫu hiện hành; trường tự điền vẫn lấy theo hồ sơ; không kế thừa ý kiến, lời xác nhận, chữ ký), `notices` của phản hồi có câu "Đã điền sẵn theo phiếu … (hoàn tất dd/MM/yyyy): kiểm tra lại trước khi trình ký" và nhật ký ghi `ConsentForms.Inherited`. `departmentId` mặc định là khoa của người dùng; người lập chọn được **mọi khoa đang hoạt động** (quyết định 19: khoa điều trị người bệnh, nơi nhân viên sẽ xác nhận), khoa không tồn tại hoặc ngừng dùng → `400` ở trường `departmentId`. Người lập vẫn thấy phiếu mình lập; nhân viên khoa được chọn thấy phiếu để xác nhận |
+| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId?, replacesFormId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. **Kế thừa phiếu lần trước** (quyết định 27, quản trị đặt số ngày): nếu người bệnh có phiếu **đã hoàn tất** cùng mẫu, **cùng khoa**, trong số ngày đó, phiếu mới điền sẵn câu trả lời của phiếu gần nhất (chuẩn hóa theo phiên bản mẫu hiện hành; trường tự điền vẫn lấy theo hồ sơ; không kế thừa ý kiến, lời xác nhận, chữ ký), `notices` của phản hồi có câu "Đã điền sẵn theo phiếu … (hoàn tất dd/MM/yyyy): kiểm tra lại trước khi trình ký" và nhật ký ghi `ConsentForms.Inherited`. `departmentId` mặc định là khoa chính của người dùng; người lập chọn được **mọi khoa đang hoạt động** (quyết định 19: khoa điều trị người bệnh, nơi nhân viên sẽ xác nhận), khoa không tồn tại hoặc ngừng dùng → `400` ở trường `departmentId`. Người lập vẫn thấy phiếu mình lập; nhân viên khoa được chọn thấy phiếu để xác nhận |
 | PUT | `/api/v1/consent-forms/{id}` | `consents.create` | Lưu nháp `{ data, signerKind, representativeId }`. Chưa bắt buộc đầy đủ; các mục còn thiếu trả về trong `issues`. Chỉ phiếu nháp |
 | POST | `/api/v1/consent-forms/{id}/submit` | `consents.create` | Trình ký: kiểm tra đầy đủ theo định nghĩa mẫu (thiếu → `400 consent_forms.incomplete` kèm `errors` theo từng trường), bỏ giá trị của trường đang ẩn, **đóng băng** thông tin người bệnh và người ký (sửa hồ sơ sau đó không làm đổi phiếu) |
 | POST | `/api/v1/consent-forms/{id}/return-to-draft` | `consents.create` | Trả phiếu đang chờ ký về nháp để sửa (bỏ thông tin đã đóng băng) |
@@ -470,7 +479,7 @@ Body của `POST /exports/consent-forms`:
 ```
 
 - `format`: `Xlsx` (Excel, Office Open XML) hoặc `Csv` (UTF-8 có BOM, phân cách dấu phẩy, CRLF). Chuỗi bắt đầu bằng `= + - @` được thêm dấu nháy đơn (chống chèn công thức).
-- `filter`: theo **ngày lập** (giờ Việt Nam); người không có `scope.all_departments` chỉ xuất được phiếu khoa mình và phiếu mình lập (`departmentId` khác khoa mình → `403 exports.department_forbidden`).
+- `filter`: theo **ngày lập** (giờ Việt Nam); người không có `scope.all_departments` chỉ xuất được phiếu các khoa của mình (khoa chính và khoa khác) và phiếu mình lập (`departmentId` không phải khoa của mình → `403 exports.department_forbidden`).
 - `columns`: thứ tự trong file theo danh mục, không theo thứ tự gửi lên. Cột nhạy cảm (`citizenId`, `phoneNumber`, `representativeCitizenId`) **mặc định bị che** (`0790******12`); `includeSensitiveData: true` cần quyền `exports.sensitive` (không có → `403 exports.sensitive_forbidden`).
 - `includeContent: true`: thêm mỗi trường của mẫu một cột (nhãn tiếng Việt từ định nghĩa mẫu; lựa chọn in nhãn; trường điểm có cột tổng và cột mức); bắt buộc lọc theo đúng một `templateId`. Trường tự điền số thẻ BHYT/số điện thoại bị che trừ khi xuất đầy đủ; bảng nhiều dòng chỉ ghi số dòng khi che.
 - Lỗi: không có phiếu nào khớp → `422 exports.no_rows`; quá **100.000** phiếu → `422 exports.too_many_rows` (thu hẹp bộ lọc).
@@ -488,7 +497,7 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 | GET | `/api/v1/reports/summary?from=&to=&departmentId=&templateId=` | `reports.read` | Thống kê các phiếu **lập** trong khoảng ngày (mặc định: từ đầu tháng đến hôm nay, giờ Việt Nam; tối đa 366 ngày), trong phạm vi khoa |
 | GET | `/api/v1/dashboard` | `consents.read` | Số liệu trang tổng quan của người dùng hiện tại |
 
-`reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; khoa khác khoa mình (không có quyền toàn viện) → `403 reports.department_forbidden`.
+`reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; `departmentId` không phải khoa của mình (khoa chính hoặc khoa khác; không có quyền toàn viện) → `403 reports.department_forbidden`.
 
 `dashboard` trả: `drafts`, `pendingSignature`, `completedToday`, `revokedLast30Days`, `awaitingMyConfirmation` (phiếu người bệnh đã ký mà **bước xác nhận đang chờ** thuộc vai trò của người dùng: bước trung gian đầu tiên chưa xác nhận theo định nghĩa của đúng phiên bản mẫu, hết bước trung gian thì là xác nhận cuối; bỏ phiếu người dùng đã xác nhận một bước; `total` + tối đa 5 `items`, cũ nhất trước), `myOpenForms` (phiếu nháp/chờ ký do mình lập), `last14Days` (`date`, `created`, `completed`).
 
@@ -552,7 +561,7 @@ Khoa lập báo cáo theo bản giấy "Báo cáo công tác điều dưỡng"; 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/form` | Đăng nhập | Mẫu báo cáo khoa: `{ title, category, sections: [{ title, valueKey, items: [{ key, label, carryOver }] }], checks: [{ key, label, inSummary }], issueLabel, okLabel, notesLabel, maxValue, notesMaxLength }`. `valueKey`: dòng tiêu đề mục là ô nhập (mục IV. ADR) |
-| GET | `/daily?date=&departmentId=` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) hoặc `nursingreports.read`/`manage` (mọi khoa) | Báo cáo của khoa trong ngày; bỏ trống `departmentId` là khoa của người dùng. Chưa có thì `status: "New"`, `id: null`, điền sẵn các dòng `carryOver` (nhân sự, chỉ tiêu) theo báo cáo đã gửi gần nhất (`carriedOverKeys`). Trả `{ id, departmentId, departmentName, reportDate, status, values, checks, notes, canEdit, canReopen, updatedBy, updatedAtUtc, submittedBy, submittedAtUtc, reopenedBy, reopenedAtUtc, reopenReason, carriedOverKeys, isReportingDepartment, hisEntry }`. `hisEntry` (số liệu HIS khoa nhập khi HIS lỗi; `null` khi khoa không có dòng nào phải nhập): `{ lines: [{ key, label, value, hisValue }], canEdit, hisHasValues, hisUpdatedAtUtc, updatedBy, updatedAtUtc }`; `hisValue` là số lấy từ HIS của ngày (nếu có) |
+| GET | `/daily?date=&departmentId=` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) hoặc `nursingreports.read`/`manage` (mọi khoa) | Báo cáo của khoa trong ngày; bỏ trống `departmentId` là khoa chính của người dùng (tài khoản nhiều khoa chọn được từng khoa của mình). Chưa có thì `status: "New"`, `id: null`, điền sẵn các dòng `carryOver` (nhân sự, chỉ tiêu) theo báo cáo đã gửi gần nhất (`carriedOverKeys`). Trả `{ id, departmentId, departmentName, reportDate, status, values, checks, notes, canEdit, canReopen, updatedBy, updatedAtUtc, submittedBy, submittedAtUtc, reopenedBy, reopenedAtUtc, reopenReason, carriedOverKeys, isReportingDepartment, hisEntry }`. `hisEntry` (số liệu HIS khoa nhập khi HIS lỗi; `null` khi khoa không có dòng nào phải nhập): `{ lines: [{ key, label, value, hisValue }], canEdit, hisHasValues, hisUpdatedAtUtc, updatedBy, updatedAtUtc }`; `hisValue` là số lấy từ HIS của ngày (nếu có) |
 | PUT | `/his-entry` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) | `{ departmentId?, reportDate, values: { key: số \| null } }`: khoa nhập số liệu HIS của ngày khi HIS lỗi. Khoa phải báo cáo nhập `waitingAdmission` của khoa mình; khoa được giao (`PUT /departments`, `hisEntry`) nhập các chỉ số được giao. Lưu riêng, không khóa theo báo cáo đã gửi; ô `null` là xóa số đã nhập; ghi nhật ký. Trả báo cáo như `GET /daily`. Dòng không được giao hoặc số ngoài 0–99.999 → `400 values.{key}`; khoa không có dòng nào phải nhập → `422 nursing_reports.no_his_entry`; khoa khác khoa mình → `403`; ngày sau hôm nay hoặc quá 366 ngày → `400 reportDate` |
 | PUT | `/daily` | `nursingreports.submit` | `{ departmentId?, reportDate, values: { key: số \| null }, checks: { key: "ok" \| "issue" \| null }, notes, submit }`: tạo hoặc sửa báo cáo của khoa trong ngày; `submit: true` thì gửi luôn và khóa. Số từ 0 đến 99.999; gửi thì phải chọn đủ phần tick (`400 checks`). Khoa khác khoa mình → `403`; khoa chưa có trong danh sách báo cáo → `422 nursing_reports.department_not_reporting`; đã gửi → `422 nursing_reports.submitted`; ngày sau hôm nay hoặc quá 366 ngày → `400 reportDate` |
 | POST | `/{id}/reopen` | `nursingreports.manage` | `{ reason }` (bắt buộc, ≤ 500 ký tự): mở lại báo cáo đã gửi về nháp để khoa sửa và gửi lại (nút **Trả lại khoa** trên giao diện, quyết định 36). Chưa gửi → `422 nursing_reports.not_submitted` |
