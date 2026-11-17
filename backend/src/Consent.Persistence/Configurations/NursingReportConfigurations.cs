@@ -56,3 +56,16 @@ internal sealed class NursingDailyStatisticsConfiguration : IEntityTypeConfigura
         builder.HasRowVersion();
     }
 }
+
+internal sealed class NursingDepartmentStatisticsConfiguration : IEntityTypeConfiguration<NursingDepartmentStatistics>
+{
+    public void Configure(EntityTypeBuilder<NursingDepartmentStatistics> builder)
+    {
+        builder.ToTable("NursingDepartmentStatistics");
+        builder.HasKey(s => s.Id);
+        builder.Property(s => s.Id).ValueGeneratedNever();
+        builder.HasIndex(s => new { s.ReportDate, s.DepartmentId }).IsUnique();
+        builder.Property(s => s.ValuesJson).IsRequired().HasMaxLength(NursingDepartmentStatistics.ValuesMaxLength);
+        builder.HasRowVersion();
+    }
+}

@@ -58,43 +58,42 @@ internal sealed class ConsentStatisticsRepository(ConsentDbContext db) : IConsen
             : forms.CountAsync(f => f.CompletedAtUtc >= fromUtc && f.CompletedAtUtc < toUtc, cancellationToken);
     }
 
-    public async Task<IReadOnlyList<AwaitingConfirmationForm>> ListAwaitingConfirmationAsync(
-        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateVersionIds, CancellationToken cancellationToken) =>
-        await ConsentFormFilters.Apply(db, scope)
+    public async Task<IReadOnlyList<AwaitingConfirmationCandidate>> ListAwaitingConfirmationAsync(
+        ConsentFormSearch scope, IReadOnlyCollection<Guid> templateVersionIds, CancellationToken cancellationToken)
+    {
+        var rows = await ConsentFormFilters.Apply(db, scope)
             .Where(f => f.Status == ConsentFormStatus.PendingSignature
                         && templateVersionIds.Contains(f.TemplateVersionId)
                         && f.Signatures.Any(s => s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative))
-            .Select(f => new AwaitingConfirmationForm(
+            .Select(f => new
+            {
                 f.Id,
                 f.TemplateVersionId,
-                f.Signatures.Where(s => s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)
+                SignedAt = f.Signatures
+                    .Where(s => s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)
                     .Max(s => (DateTimeOffset?)s.SignedAtUtc) ?? f.UpdatedAtUtc,
-                f.Signatures.Where(s => s.Role == ConsentSignerRole.Staff)
-                    .Select(s => new StepConfirmationRecord(s.StepKey!, s.UserId))
-                    .ToList()))
+                Steps = f.Signatures.Where(s => s.Role == ConsentSignerRole.Staff).Select(s => new { s.StepKey, s.UserId }).ToList(),
+            })
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+        return [.. rows.Select(r => new AwaitingConfirmationCandidate(
+            r.Id, r.TemplateVersionId, r.SignedAt, [.. r.Steps.Select(s => new ConfirmedStep(s.StepKey, s.UserId))]))];
+    }
 
-    public async Task<IReadOnlyList<DashboardFormItem>> ListAwaitingConfirmationItemsAsync(
-        IReadOnlyCollection<Guid> formIds, CancellationToken cancellationToken)
-    {
-        if (formIds.Count == 0)
-        {
-            return [];
-        }
-
-        return await (
+    public async Task<IReadOnlyList<DashboardFormItem>> GetSignedFormItemsAsync(
+        IReadOnlyCollection<Guid> formIds, CancellationToken cancellationToken) =>
+        await (
                 from f in db.ConsentForms.AsNoTracking()
+                where formIds.Contains(f.Id)
                 join p in db.Patients on f.PatientId equals p.Id
                 join t in db.ConsentTemplates on f.TemplateId equals t.Id
                 join d in db.Departments on f.DepartmentId equals d.Id
-                where formIds.Contains(f.Id)
-                let signedAt = f.Signatures.Where(s => s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)
+                let signedAt = f.Signatures
+                    .Where(s => s.Role == ConsentSignerRole.Patient || s.Role == ConsentSignerRole.Representative)
                     .Max(s => (DateTimeOffset?)s.SignedAtUtc) ?? f.UpdatedAtUtc
                 select new DashboardFormItem(f.Id, f.FormNo, f.Status, p.FullName, t.Code, t.Name, d.Name, signedAt))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
-    }
 
     public async Task<DashboardFormList> OpenFormsCreatedByAsync(Guid userId, int take, CancellationToken cancellationToken)
     {

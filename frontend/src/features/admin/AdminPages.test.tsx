@@ -135,6 +135,39 @@ describe('Người dùng', () => {
     expect(calls.find((c) => c.method === 'PUT')!.body).toMatchObject({ fullName: 'Bác sĩ Demo', smartCaUserId: 'SMARTCA0001' })
   })
 
+  it('tài khoản kiosk đang tạm khóa tra cứu: hiện trạng thái và mở khóa được ngay', async () => {
+    const kiosk: (typeof users)[number] = {
+      id: 'u-kiosk',
+      userName: 'kiosk.kkb',
+      fullName: 'Kiosk Khoa Khám bệnh',
+      title: null,
+      departmentId: 'd-kkb',
+      departmentName: 'Khoa Khám bệnh',
+      roleNames: ['Kiosk người bệnh'],
+      isActive: true,
+      isLockedOut: false,
+      lastLoginAtUtc: '2026-11-16T01:00:00Z',
+      isKioskLookupLocked: true,
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'GET /api/v1/users': { items: [kiosk], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 },
+      'POST /api/v1/users/u-kiosk/unlock': () => noContent(),
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+
+    const row = (await screen.findByText('kiosk.kkb')).closest('tr')!
+    expect(within(row).getByText('Tạm khóa tra cứu')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Thao tác khác cho kiosk.kkb' }))
+    await user.click(await screen.findByRole('menuitem', { name: /Mở khóa/ }))
+    expect(await screen.findByText(/Máy kiosk tra cứu lại được ngay/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Mở khóa' }))
+
+    await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/users/u-kiosk/unlock')).toBe(true))
+  })
+
   it('khóa tài khoản sau khi xác nhận', async () => {
     const { calls } = mockApi({
       ...baseRoutes(adminSession()),

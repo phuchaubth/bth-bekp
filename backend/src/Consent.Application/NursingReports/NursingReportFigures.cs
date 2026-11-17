@@ -20,7 +20,14 @@ public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Value
     public bool AllChecksAnswered => NursingReportForm.CheckKeys.All(Checks.ContainsKey);
 
     /// <summary>
-    /// Đọc JSON đã lưu. Bỏ qua khóa không còn trong mẫu (mẫu bớt dòng) và giá trị sai kiểu, để báo cáo cũ luôn mở được.
+    /// Báo cáo lưu trước khi tách "Số ca nhập viện ngày hôm trước" (quyết định 38): có số tổng cũ, không có hai dòng mới.
+    /// </summary>
+    public bool HasOnlyLegacyAdmissions =>
+        Values.ContainsKey(NursingReportForm.LegacyAdmissionsKey) && !NursingReportForm.AdmissionKeys.Any(Values.ContainsKey);
+
+    /// <summary>
+    /// Đọc JSON đã lưu. Bỏ qua khóa không còn trong mẫu (mẫu bớt dòng) và giá trị sai kiểu, để báo cáo cũ luôn mở được. Riêng số
+    /// tổng "Số ca nhập viện ngày hôm trước" cũ được giữ để nhận ra báo cáo cũ (<see cref="HasOnlyLegacyAdmissions"/>).
     /// </summary>
     public static NursingReportFigures Parse(string? json)
     {
@@ -44,7 +51,8 @@ public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Value
         {
             foreach (var (key, node) in valueNodes)
             {
-                if (NursingReportForm.ValueKeys.Contains(key) && node is JsonValue value && value.TryGetValue<int>(out var number))
+                if ((NursingReportForm.ValueKeys.Contains(key) || key == NursingReportForm.LegacyAdmissionsKey)
+                    && node is JsonValue value && value.TryGetValue<int>(out var number))
                 {
                     values[key] = number;
                 }

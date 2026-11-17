@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { Gender } from '../../api/patients'
 import { kioskApi, type KioskConfig, type KioskIdentity, type KioskIdentityRequest } from '../../api/kiosk'
+import { cameraBlocked, cameraErrorName, canUseCamera, hasCamera } from '../patients/cameraSupport'
 import { citizenIdMismatch, isValidCitizenId } from '../patients/cccd'
-import { parseCccdQr } from '../patients/cccdQrParser'
+import { isUnreliableName, parseCccdQr } from '../patients/cccdQrParser'
 import { birthDateError, dateDigitsToIso, DATE_DIGITS, displayDate, formatDateDigits } from './kioskDates'
 import { NumberPad, TextKeyboard } from './KioskKeyboards'
 import { KioskFooter } from './KioskLayout'
@@ -19,18 +20,52 @@ const groupDigits = (value: string) => value.replace(/(\d{4})(?=\d)/g, '$1 ')
 /** Mã y tế ở bệnh viện chỉ gồm chữ số: trên kiosk chỉ nhập được số, tối đa bằng độ dài mã của hồ sơ người bệnh. */
 const PATIENT_CODE_MAX_LENGTH = 50
 
+/** Máy quét chưa đọc được chữ có dấu và bệnh viện chưa có hồ sơ: không lập hồ sơ mới bằng họ tên hỏng. */
+const UNREADABLE_NAME =
+  'Máy chưa đọc đúng họ tên có dấu trên thẻ. Mời ông/bà quay lại, chọn "Nhập thông tin", hoặc đến quầy tiếp đón.'
+
+/** Thư viện đọc mã QR bằng camera khá nặng: chỉ tải khi kiosk có camera. */
+const QrCameraView = lazy(() => import('../patients/QrCameraView'))
+
+/** Camera của kiosk: đang dò, đang mở, đang chạy, không có (chỉ dùng máy quét) hoặc không mở được (kèm lý do). */
+type KioskCamera = { state: 'checking' | 'starting' | 'on' | 'none' } | { state: 'failed'; reason: string }
+
+/** Lý do ngắn khi camera kiosk không mở được, để bộ phận CNTT biết cần chỉnh gì; người bệnh dùng máy quét. */
+function kioskCameraReason(error: unknown): string {
+  switch (cameraErrorName(error)) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'trình duyệt chưa cho phép dùng camera'
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'không tìm thấy camera'
+    case 'NotReadableError':
+      return 'camera đang bị ứng dụng khác dùng'
+    default:
+      return 'không mở được camera'
+  }
+}
+
 /** Gọi nhận diện, quản lý trạng thái đang gửi và lỗi cho từng màn hình. */
 function useIdentify(onIdentified: (request: KioskIdentityRequest, identity: KioskIdentity) => void) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const identify = async (request: KioskIdentityRequest) => {
+  /** `refuse`: lý do không dùng được kết quả nhận diện (hiện cho người bệnh), hoặc null nếu dùng được. */
+  const identify = async (request: KioskIdentityRequest, refuse?: (identity: KioskIdentity) => string | null) => {
     if (busy) {
       return
     }
     setBusy(true)
     setError(null)
     try {
-      onIdentified(request, await kioskApi.identify(request))
+      const identity = await kioskApi.identify(request)
+      const reason = refuse?.(identity) ?? null
+      if (reason) {
+        setError(reason)
+        setBusy(false)
+        return
+      }
+      onIdentified(request, identity)
     } catch (failure) {
       setError(kioskErrorMessage(failure))
       setBusy(false)
@@ -116,8 +151,9 @@ export function StartScreen({ config, onChoose }: { config: KioskConfig; onChoos
 }
 
 /**
- * Quét mã QR trên CCCD bằng máy quét gắn dưới màn hình (máy quét gõ nội dung như bàn phím rồi nhấn Enter vào một ô ẩn
- * luôn giữ con trỏ). Máy chỉ đọc chữ trong mã QR, không chụp ảnh thẻ.
+ * Quét mã QR trên CCCD. Máy quét gắn dưới màn hình gõ nội dung như bàn phím rồi nhấn Enter vào một ô ẩn luôn giữ con trỏ.
+ * Kiosk có camera thì hiện thêm khung hình camera và đọc mã từ camera; máy quét vẫn dùng được cùng lúc. Không có camera,
+ * trình duyệt chặn camera, hoặc camera không mở được thì chỉ dùng máy quét. Chỉ đọc chữ trong mã QR, không lưu ảnh thẻ.
  */
 export function ScanScreen({
   onIdentified,
@@ -128,22 +164,49 @@ export function ScanScreen({
 }) {
   const input = useRef<HTMLInputElement>(null)
   const [raw, setRaw] = useState('')
+  const [camera, setCamera] = useState<KioskCamera>(() => ({ state: canUseCamera() ? 'checking' : 'none' }))
   const { busy, error, setError, identify } = useIdentify(onIdentified)
   const refocus = () => window.setTimeout(() => input.current?.focus(), 0)
+  const cameraShown = camera.state === 'checking' || camera.state === 'starting' || camera.state === 'on'
 
   useEffect(() => {
     input.current?.focus()
+    if (!canUseCamera()) {
+      return undefined
+    }
+    // Dò camera không hỏi quyền; chỉ bật camera (có thể hỏi quyền lần đầu) khi máy có camera. Trình duyệt của kiosk
+    // chặn camera (bệnh viện chủ ý chỉ dùng máy quét dù máy có webcam) thì dùng máy quét như không có camera.
+    let active = true
+    void Promise.all([hasCamera(), cameraBlocked()]).then(([found, blocked]) => {
+      if (active) {
+        setCamera({ state: found && !blocked ? 'starting' : 'none' })
+      }
+    })
+    return () => {
+      active = false
+    }
   }, [])
 
-  const submit = () => {
-    const text = raw
-    setRaw('')
+  const submit = (text: string, source: 'scanner' | 'camera') => {
+    // Camera đọc liên tục: bỏ qua mã đọc được trong lúc đang lấy thông tin.
+    if (busy) {
+      return
+    }
     const parsed = parseCccdQr(text)
     if (!parsed.ok) {
-      setError('Chưa đọc được mã QR trên thẻ. Ông/bà lật thẻ, đưa mã QR lại gần đèn đỏ và giữ yên 1–2 giây.')
+      setError(
+        source === 'camera'
+          ? 'Chưa đọc được mã QR trên thẻ căn cước. Ông/bà lật thẻ, đưa mã QR vào khung vuông và giữ yên 1–2 giây.'
+          : 'Chưa đọc được mã QR trên thẻ. Ông/bà lật thẻ, đưa mã QR lại gần đèn đỏ và giữ yên 1–2 giây.',
+      )
       return
     }
     const { card } = parsed
+    // Máy quét chưa đọc được tiếng Việt thì họ tên trên thẻ bị hỏng: chỉ dùng tiếp khi bệnh viện đã có hồ sơ (họ tên lấy từ hồ
+    // sơ), không lập hồ sơ mới bằng họ tên hỏng.
+    const refuse = isUnreliableName(card.fullName)
+      ? (identity: KioskIdentity) => (identity.foundRecord ? null : UNREADABLE_NAME)
+      : undefined
     void identify({
       method: 'CitizenIdCard',
       dateOfBirth: card.dateOfBirth,
@@ -155,49 +218,80 @@ export function ScanScreen({
         issueDate: card.issueDate,
         oldIdNumber: card.oldIdNumber,
       },
-    })
+    }, refuse)
   }
 
   return (
     <>
       <main className="kiosk-main" onPointerDown={refocus}>
-        <h1>Đưa mã QR trên thẻ căn cước vào máy quét</h1>
-        <div className="kiosk-illustration">
-          <svg viewBox="0 0 640 560" role="img" aria-label="Hình minh họa: đưa mã QR trên thẻ vào máy quét bên dưới màn hình">
-            <rect x="80" y="24" width="420" height="260" rx="22" fill="#e2f3f1" stroke="#0d7c74" strokeWidth="4" />
-            <rect x="112" y="60" width="100" height="130" rx="8" fill="#ffffff" stroke="#9fc3c0" strokeWidth="3" />
-            <rect x="236" y="70" width="190" height="14" rx="7" fill="#9fc3c0" />
-            <rect x="236" y="102" width="150" height="14" rx="7" fill="#9fc3c0" />
-            <rect x="236" y="134" width="170" height="14" rx="7" fill="#9fc3c0" />
-            <rect x="396" y="180" width="84" height="84" rx="8" fill="#ffffff" stroke="#0d7c74" strokeWidth="4" />
-            <path d="M408 192h22v22h-22zM446 192h22v22h-22zM408 230h22v22h-22zM446 230h9v9h-9zM459 243h9v9h-9z" fill="#0d7c74" />
-            <path d="M438 282 V 388" fill="none" stroke="#0d7c74" strokeWidth="6" strokeLinecap="round" strokeDasharray="4 16" />
-            <path d="M414 372 l24 26 24 -26" fill="none" stroke="#0d7c74" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
-            <rect x="308" y="416" width="260" height="120" rx="18" fill="#16302e" />
-            <rect x="338" y="436" width="200" height="14" rx="7" fill="#d9534f" />
-            <text x="438" y="504" textAnchor="middle" fontSize="24" fill="#ffffff">
-              Máy quét
-            </text>
-            <text x="284" y="484" textAnchor="end" fontSize="22" fill="#5b7472">
-              Bên dưới màn hình
-            </text>
-          </svg>
-        </div>
-        <ol className="kiosk-list">
-          <li>Lật thẻ sang mặt có mã QR.</li>
-          <li>Đưa mã QR lại gần đèn đỏ của máy quét, giữ yên 1–2 giây.</li>
-          <li>Nghe tiếng “bíp” là đã đọc xong, máy tự chuyển sang bước sau.</li>
-        </ol>
+        <h1>{cameraShown ? 'Đưa mã QR trên thẻ căn cước vào trước camera' : 'Đưa mã QR trên thẻ căn cước vào máy quét'}</h1>
+        {cameraShown ? (
+          <div className="kiosk-camera">
+            {camera.state !== 'checking' && (
+              <Suspense fallback={null}>
+                <QrCameraView
+                  facingMode="user"
+                  onStarted={() => setCamera({ state: 'on' })}
+                  onError={(failure) => setCamera({ state: 'failed', reason: kioskCameraReason(failure) })}
+                  onDetected={(text) => submit(text, 'camera')}
+                />
+              </Suspense>
+            )}
+            <span className="kiosk-camera-target" aria-hidden="true" />
+          </div>
+        ) : (
+          <div className="kiosk-illustration">
+            <svg viewBox="0 0 640 560" role="img" aria-label="Hình minh họa: đưa mã QR trên thẻ vào máy quét bên dưới màn hình">
+              <rect x="80" y="24" width="420" height="260" rx="22" fill="#e2f3f1" stroke="#0d7c74" strokeWidth="4" />
+              <rect x="112" y="60" width="100" height="130" rx="8" fill="#ffffff" stroke="#9fc3c0" strokeWidth="3" />
+              <rect x="236" y="70" width="190" height="14" rx="7" fill="#9fc3c0" />
+              <rect x="236" y="102" width="150" height="14" rx="7" fill="#9fc3c0" />
+              <rect x="236" y="134" width="170" height="14" rx="7" fill="#9fc3c0" />
+              <rect x="396" y="180" width="84" height="84" rx="8" fill="#ffffff" stroke="#0d7c74" strokeWidth="4" />
+              <path d="M408 192h22v22h-22zM446 192h22v22h-22zM408 230h22v22h-22zM446 230h9v9h-9zM459 243h9v9h-9z" fill="#0d7c74" />
+              <path d="M438 282 V 388" fill="none" stroke="#0d7c74" strokeWidth="6" strokeLinecap="round" strokeDasharray="4 16" />
+              <path d="M414 372 l24 26 24 -26" fill="none" stroke="#0d7c74" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+              <rect x="308" y="416" width="260" height="120" rx="18" fill="#16302e" />
+              <rect x="338" y="436" width="200" height="14" rx="7" fill="#d9534f" />
+              <text x="438" y="504" textAnchor="middle" fontSize="24" fill="#ffffff">
+                Máy quét
+              </text>
+              <text x="284" y="484" textAnchor="end" fontSize="22" fill="#5b7472">
+                Bên dưới màn hình
+              </text>
+            </svg>
+          </div>
+        )}
+        {cameraShown ? (
+          <ol className="kiosk-list">
+            <li>Lật thẻ sang mặt có mã QR.</li>
+            <li>Đưa mã QR vào khung vuông trên màn hình, cách camera khoảng một gang tay, giữ yên 1–2 giây.</li>
+            <li>Đọc xong, máy tự chuyển sang bước sau.</li>
+          </ol>
+        ) : (
+          <ol className="kiosk-list">
+            <li>Lật thẻ sang mặt có mã QR.</li>
+            <li>Đưa mã QR lại gần đèn đỏ của máy quét, giữ yên 1–2 giây.</li>
+            <li>Nghe tiếng “bíp” là đã đọc xong, máy tự chuyển sang bước sau.</li>
+          </ol>
+        )}
         {error ? (
           <div className="kiosk-error" role="alert">
             {error}
           </div>
         ) : (
           <div className="kiosk-status" role="status">
-            {busy ? 'Đang lấy thông tin…' : 'Đang chờ quét thẻ…'}
+            {busy ? 'Đang lấy thông tin…' : camera.state === 'on' || !cameraShown ? 'Đang chờ quét thẻ…' : 'Đang mở camera…'}
           </div>
         )}
-        <p className="kiosk-hint">Máy chỉ đọc chữ trong mã QR để điền phiếu, không chụp hay lưu ảnh thẻ.</p>
+        {camera.state === 'failed' && (
+          <p className="kiosk-hint">Camera của kiosk chưa dùng được ({camera.reason}). Mời ông/bà dùng máy quét bên dưới màn hình.</p>
+        )}
+        <p className="kiosk-hint">
+          {cameraShown
+            ? 'Hình từ camera chỉ dùng để đọc mã QR ngay trên máy, không lưu và không gửi đi.'
+            : 'Máy chỉ đọc chữ trong mã QR để điền phiếu, không chụp hay lưu ảnh thẻ.'}
+        </p>
         <input
           ref={input}
           className="kiosk-hidden-input"
@@ -211,7 +305,9 @@ export function ScanScreen({
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault()
-              submit()
+              const text = raw
+              setRaw('')
+              submit(text, 'scanner')
             }
           }}
           onBlur={refocus}

@@ -29,12 +29,15 @@ export const LOGO_MAX_BYTES = 1024 * 1024
 export interface SystemSettings {
   hospital: HospitalSettings
   logo: LogoInfo | null
+  /** Tra cứu HIS trực tiếp ngay khi quét CCCD (đang tạm hoãn). */
   hisEnabled: boolean
   smartCaEnabled: boolean
   exportMaxRows: number
   retentionPolicy: string
   /** Ảnh khung chữ ký (nền thiết kế của bệnh viện quanh khung ký trên màn hình); chưa có thì null. */
   signatureFrame: LogoInfo | null
+  /** Đã cấu hình API thông tin người bệnh (nút Lấy thông tin, lượt tiếp nhận, số liệu HIS của báo cáo điều dưỡng). */
+  patientInfoEnabled?: boolean
 }
 
 export const settingsApi = {

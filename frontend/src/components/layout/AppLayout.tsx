@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router'
 import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
 import { BRAND } from '../../app/theme'
 import { useAuth } from '../../auth/authContext'
+import { BrandMark } from './BrandMark'
 
 const { Header, Content, Footer } = Layout
 
@@ -24,28 +25,6 @@ function openKeysFor(items: NavItem[], pathname: string): string[] {
   return items
     .filter((item) => item.children?.some((child) => pathname.startsWith(child.path)))
     .map((item) => item.path)
-}
-
-/** Dấu nhận diện: ô vuông xanh ngọc có chữ thập y tế. */
-function BrandMark() {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: 34,
-        height: 34,
-        borderRadius: 10,
-        background: BRAND,
-        display: 'grid',
-        placeItems: 'center',
-        flex: 'none',
-      }}
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinejoin="round">
-        <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z" />
-      </svg>
-    </span>
-  )
 }
 
 /** Nội dung căn giữa, rộng tối đa 1280 px (giống nhau giữa thanh trên, nội dung và chân trang). */

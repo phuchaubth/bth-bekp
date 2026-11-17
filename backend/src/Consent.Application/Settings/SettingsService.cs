@@ -26,6 +26,10 @@ public sealed record UploadSignatureFrameRequest(string? Image);
 public sealed record LogoInfoDto(string ContentType, int Width, int Height, DateTimeOffset UpdatedAtUtc);
 
 /// <summary>Cấu hình hệ thống đang có hiệu lực (phần sửa được và phần chỉ đọc lấy từ cấu hình triển khai).</summary>
+/// <param name="HisEnabled">Tra cứu HIS trực tiếp ngay khi quét CCCD (đang tạm hoãn, quyết định 9).</param>
+/// <param name="PatientInfoEnabled">
+/// Đã cấu hình API thông tin người bệnh (quyết định 22): nút Lấy thông tin, lượt tiếp nhận, số liệu điều dưỡng.
+/// </param>
 public sealed record SystemSettingsDto(
     HospitalSettingsDto Hospital,
     LogoInfoDto? Logo,
@@ -33,7 +37,8 @@ public sealed record SystemSettingsDto(
     bool SmartCaEnabled,
     int ExportMaxRows,
     string RetentionPolicy,
-    LogoInfoDto? SignatureFrame = null);
+    LogoInfoDto? SignatureFrame = null,
+    bool PatientInfoEnabled = false);
 
 public sealed class UpdateHospitalSettingsRequestValidator : AbstractValidator<UpdateHospitalSettingsRequest>
 {
@@ -59,7 +64,8 @@ public sealed class SettingsService(
     IHisGateway his,
     IOptions<HospitalOptions> hospitalDefaults,
     IValidator<UpdateHospitalSettingsRequest> validator,
-    IDocumentStore documents)
+    IDocumentStore documents,
+    IPatientSource patientSource)
 {
     public const string RetentionPolicy = "Theo thời hạn lưu trữ hồ sơ bệnh án; hệ thống không tự động xóa phiếu.";
 
@@ -90,7 +96,8 @@ public sealed class SettingsService(
             SmartCaEnabled: false,
             Exports.ConsentFormExportService.MaxRows,
             RetentionPolicy,
-            await ImageInfoAsync(stored, SettingKeys.SignatureFrameStorageKey, cancellationToken).ConfigureAwait(false));
+            await ImageInfoAsync(stored, SettingKeys.SignatureFrameStorageKey, cancellationToken).ConfigureAwait(false),
+            patientSource.IsEnabled);
     }
 
     /// <summary>

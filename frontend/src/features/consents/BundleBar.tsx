@@ -1,4 +1,4 @@
-import { CheckCircleFilled, CheckCircleOutlined, EditOutlined } from '@ant-design/icons'
+import { CheckCircleFilled, CheckCircleOutlined, EditOutlined, QrcodeOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Flex, Space, Typography } from 'antd'
 import { useState } from 'react'
@@ -16,6 +16,7 @@ import { fieldErrorMessage } from '../../utils/formErrors'
 import { FormStatusTag } from './FormStatusTag'
 import { StaffSignModal, StartBundleSigningModal } from './SigningActions'
 import { KioskTag } from './KioskTag'
+import { RemoteSigningModal } from './RemoteSigningModal'
 
 /**
  * Thanh bộ phiếu (quyết định 23) trên trang phiếu: các phiếu của bộ và trạng thái, chuyển nhanh giữa các phiếu, ký cả bộ
@@ -23,6 +24,7 @@ import { KioskTag } from './KioskTag'
  */
 export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: ConsentFormBundle }) {
   const [signingOpen, setSigningOpen] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
@@ -70,6 +72,11 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
               Ký cả bộ trên điện thoại ({toSign.length} phiếu)
             </Button>
           )}
+          {bundle.canStartSigning && (
+            <Button icon={<QrcodeOutlined />} onClick={() => setRemoteOpen(true)}>
+              Mã QR ký cả bộ
+            </Button>
+          )}
           {bundle.canConfirm && (
             <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setConfirmOpen(true)}>
               Xác nhận cả bộ ({myTurn.length} phiếu)
@@ -105,6 +112,14 @@ export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: C
           <Alert key={notice} type="info" showIcon title={notice} />
         ))}
       </Flex>
+      {remoteOpen && (
+        <RemoteSigningModal
+          target={{ bundleId: bundle.bundleId }}
+          count={toSign.length}
+          byRepresentative={form.signerKind === 'Representative'}
+          onClose={() => setRemoteOpen(false)}
+        />
+      )}
       {signingOpen && (
         <StartBundleSigningModal
           bundleId={bundle.bundleId}

@@ -13,6 +13,7 @@ import {
 } from '../../api/nursingReports'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
+import { HisEntryCard } from './HisEntryCard'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
 import { toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
 
@@ -20,7 +21,8 @@ const DATE = 'YYYY-MM-DD'
 
 /**
  * Báo cáo công tác điều dưỡng hằng ngày của khoa (quyết định 31): điều dưỡng chọn ngày, nhập theo bản giấy, lưu nháp hoặc
- * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại.
+ * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa. Khi HIS lỗi, khoa nhập số liệu HIS
+ * thuộc nhiệm vụ của khoa ở thẻ riêng (quyết định 35); khoa không phải báo cáo nhưng được giao chỉ số thì chỉ thấy thẻ này.
  */
 export function NursingReportPage() {
   const [date, setDate] = useState<Dayjs>(() => dayjs())
@@ -47,8 +49,33 @@ export function NursingReportPage() {
         <Alert type="error" showIcon title={errorMessage(definition.error ?? report.error)} />
       ) : !definition.data || !report.data ? (
         <Spin style={{ display: 'block', padding: 48 }} />
+      ) : !report.data.isReportingDepartment && report.data.hisEntry ? (
+        <>
+          <Alert
+            type="info"
+            showIcon
+            title={`${report.data.departmentName} không phải gửi báo cáo công tác điều dưỡng.`}
+            description="Khoa chỉ nhập các số liệu HIS được Phòng Điều dưỡng giao, khi HIS lỗi."
+          />
+          <HisEntryCard
+            key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+            report={report.data}
+            entry={report.data.hisEntry}
+            maxValue={definition.data.maxValue}
+          />
+        </>
       ) : (
-        <ReportEditor key={`${reportDate}-${report.data.id ?? 'new'}`} definition={definition.data} report={report.data} />
+        <>
+          <ReportEditor key={`${reportDate}-${report.data.id ?? 'new'}`} definition={definition.data} report={report.data} />
+          {report.data.hisEntry && (
+            <HisEntryCard
+              key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+              report={report.data}
+              entry={report.data.hisEntry}
+              maxValue={definition.data.maxValue}
+            />
+          )}
+        </>
       )}
     </>
   )
@@ -114,7 +141,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          title={`Phòng Điều dưỡng đã mở lại báo cáo${report.reopenedBy ? ` (${report.reopenedBy})` : ''}.`}
+          title={`Phòng Điều dưỡng đã trả lại báo cáo cho khoa${report.reopenedBy ? ` (${report.reopenedBy})` : ''}.`}
           description={`Lý do: ${report.reopenReason}. Sửa rồi bấm "Gửi báo cáo" lại.`}
         />
       )}
@@ -132,7 +159,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           showIcon
           style={{ marginBottom: 12 }}
           title="Báo cáo đã gửi Phòng Điều dưỡng."
-          description="Cần sửa thì đề nghị Phòng Điều dưỡng mở lại."
+          description="Cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa."
         />
       )}
 
@@ -145,7 +172,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           </Button>
           <Popconfirm
             title="Gửi báo cáo cho Phòng Điều dưỡng?"
-            description="Sau khi gửi, khoa không sửa được nữa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại."
+            description="Sau khi gửi, khoa không sửa được nữa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa."
             okText="Gửi"
             cancelText="Xem lại"
             onConfirm={submit}

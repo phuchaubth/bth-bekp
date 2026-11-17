@@ -14,6 +14,13 @@ export interface SigningSession {
   bundle?: { bundleId: string; forms: ConsentFormDetail[] }
   /** Nhân viên mở phiên (điền sẵn khi đăng nhập lại để thoát chế độ ký). */
   staffUserName: string
+  /**
+   * Ký trên điện thoại riêng của người bệnh qua mã QR (quyết định 32): không có nút "Nhân viên: thoát chế độ ký", ký xong thì
+   * người bệnh đóng trang.
+   */
+  remote?: boolean
+  /** Gọi khi ký xong (trang ký trên điện thoại riêng xóa dữ liệu tạm của mã). */
+  onSigned?: () => void
 }
 
 let current: SigningSession | null = null

@@ -69,7 +69,7 @@ public sealed class HospitalTemplateTests
     /// </summary>
     [Theory]
     [InlineData("QT-KNGT-BM02", false, true)]
-    [InlineData("TTNB-NGOAITRU", true, false)]
+    [InlineData("TTNB-NGOAITRU", true, true)]
     [InlineData("QT-KNGT-BM10", false, false)]
     [InlineData("TUVAN-CONGTT", true, true)]
     public void HeaderAndPatientSection_FollowThePaperForm(string code, bool hideDepartment, bool bilingual)
@@ -112,17 +112,51 @@ public sealed class HospitalTemplateTests
         Assert.Equal("Người thỏa thuận/ Declarant", definition.Signatures.Patient);
     }
 
+    /// <summary>TTNB theo bản giấy bệnh viện gửi 16/11/2026 (mã QT-KNGT/BM03, lần ban hành 08), quyết định 33.</summary>
     [Fact]
-    public void OutpatientInformation_SharesLinesLikeThePaperForm()
+    public void OutpatientInformation_FollowsThePaperForm()
     {
-        var blocks = Definition("TTNB-NGOAITRU").Sections.SelectMany(s => s.Blocks).ToList();
-        var occupation = blocks.FindIndex(b => b.Key == "occupation");
+        var definition = Definition("TTNB-NGOAITRU");
 
-        // Nghề nghiệp in cùng dòng với trình độ văn hóa đứng ngay trước; "Có"/"Không" của câu người liên hệ khẩn cấp cùng một dòng.
-        Assert.True(blocks[occupation].SameLine);
-        Assert.Equal("educationLevel", blocks[occupation - 1].Key);
-        Assert.Equal(["occupation"], blocks.Where(b => b.SameLine).Select(b => b.Key!));
-        Assert.Equal("inline", blocks.Single(b => b.Key == "familyIsEmergencyContact").Layout);
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QT-KNGT/BM03", "08", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue number)", EffectiveDateLabel: "Ngày hiệu lực (Effective date)"),
+            definition.DocumentControl);
+        Assert.Null(definition.Subtitle);
+        // 15 mục đánh số như bản giấy: thông tin hồ sơ xen với trường của phiếu; ba dòng phụ của mục 15 không đánh số.
+        Assert.True(definition.NumberedPatientLines);
+        Assert.Equal(
+            [
+                "fullName", "gender", "dateOfBirth", "field:ethnicity", "field:religion+religionOther", "field:educationLevel", "citizenId",
+                "field:occupation", "field:permanentAddress", "field:currentAddress", "phoneNumber", "field:familyName",
+                "field:familyRelationship", "field:familyPhone", "field:familyIsEmergencyContact", "indent:emergencyName",
+                "indent:emergencyRelationship", "indent:emergencyPhone",
+            ],
+            definition.PatientLines!.Select(line => line.Single() switch
+            {
+                { Indent: true, Field: { } field } => $"indent:{field}",
+                { Field: { } field, Other: { } other } => $"field:{field}+{other}",
+                { Field: { } field } => $"field:{field}",
+                var item => item.Patient!,
+            }));
+        Assert.Equal(["Kinh", "Khác, ghi rõ (Other, specify)"], definition.PatientLines![3][0].Options!);
+        // Mọi trường nhập liệu đã in ở 15 mục, thân phiếu chỉ còn lời cam đoan; không còn tiêu đề phần.
+        var printed = definition.PatientLines.SelectMany(l => l).SelectMany(i => new[] { i.Field, i.Other }).OfType<string>().ToHashSet();
+        Assert.All(definition.InputBlocks, b => Assert.Contains(b.Key!, printed));
+        Assert.All(definition.Sections, s => Assert.Null(s.Title));
+        Assert.Equal("paragraph", definition.Sections.SelectMany(s => s.Blocks).Last().Type);
+
+        // Nhân viên tiếp nhận bên trái, người khai bên phải; ghi chú như bản giấy, dòng "đã đối chiếu…" màu đỏ.
+        var signatures = definition.Signatures!;
+        Assert.True(signatures.HospitalFirst);
+        Assert.True(signatures.PlainTitles);
+        Assert.True(signatures.CenterDate);
+        Assert.True(signatures.PaperHints);
+        Assert.Equal("Nhân viên tiếp nhận", signatures.Hospital);
+        Assert.StartsWith("!(đã đối chiếu thông tin trên giấy tờ tùy thân)", signatures.HospitalHint, StringComparison.Ordinal);
+        Assert.Equal("Người khai (ký tên, ghi rõ họ tên)", signatures.Patient);
+        Assert.Contains("Nếu không phải người bệnh, ghi rõ quan hệ với người bệnh", signatures.PatientHint, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-import { CloudDownloadOutlined, EditOutlined, FileExcelOutlined, FilePdfOutlined, SettingOutlined, UnlockOutlined } from '@ant-design/icons'
+import { CloudDownloadOutlined, FileExcelOutlined, FilePdfOutlined, RollbackOutlined, SettingOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -15,6 +15,7 @@ import {
   InputNumber,
   Modal,
   Row,
+  Select,
   Spin,
   Table,
   Typography,
@@ -30,6 +31,7 @@ import {
   useNursingReportDepartments,
   useNursingReportForm,
   useNursingSummary,
+  type NursingHisEntryStatus,
   type NursingSummary,
   type NursingSummaryLine,
   type NursingSummaryRow,
@@ -48,7 +50,8 @@ const number = (value: number | null | undefined) => (value === null || value ==
 
 /**
  * Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (quyết định 31): mục A–F như bản giấy, lấy từ báo cáo các khoa đã gửi
- * và số liệu HIS. Phòng Điều dưỡng xem báo cáo từng khoa, mở lại, cài khoa báo cáo và số giường, lấy hoặc nhập số liệu HIS.
+ * và số liệu HIS. Phòng Điều dưỡng xem báo cáo từng khoa, trả lại khoa, cài khoa báo cáo, số giường và khoa nhập từng chỉ số, lấy
+ * số liệu HIS. Khi HIS lỗi, các khoa nhập số liệu của khoa; Phòng Điều dưỡng chỉ tổng hợp (quyết định 35).
  */
 export function NursingSummaryPage() {
   const { hasPermission } = useAuth()
@@ -59,7 +62,6 @@ export function NursingSummaryPage() {
   const [pdfOpen, setPdfOpen] = useState(false)
   const [selected, setSelected] = useState<NursingSummaryRow | null>(null)
   const [departmentsOpen, setDepartmentsOpen] = useState(false)
-  const [statisticsOpen, setStatisticsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
 
@@ -119,14 +121,12 @@ export function NursingSummaryPage() {
                   Khoa đã gửi: <b>{summary.data.submittedCount}</b>/{summary.data.reportingCount}
                 </Typography.Text>
                 <Typography.Text type="secondary">{statisticsText(summary.data)}</Typography.Text>
+                <HisEntryStatusLine summary={summary.data} />
               </Flex>
               {canManage && (
                 <Flex gap={8} wrap>
                   <Button icon={<CloudDownloadOutlined />} loading={refresh.isPending} onClick={() => refresh.mutate()}>
                     Lấy số liệu HIS
-                  </Button>
-                  <Button icon={<EditOutlined />} onClick={() => setStatisticsOpen(true)}>
-                    Nhập số liệu HIS
                   </Button>
                   <Button icon={<SettingOutlined />} onClick={() => setDepartmentsOpen(true)}>
                     Khoa báo cáo và số giường
@@ -148,9 +148,8 @@ export function NursingSummaryPage() {
         onClose={() => setPdfOpen(false)}
       />
       {selected && <DepartmentReportDrawer row={selected} reportDate={reportDate} onClose={() => setSelected(null)} />}
-      {departmentsOpen && <DepartmentsModal onClose={() => setDepartmentsOpen(false)} />}
-      {statisticsOpen && summary.data && (
-        <StatisticsModal summary={summary.data} onClose={() => setStatisticsOpen(false)} />
+      {departmentsOpen && summary.data && (
+        <DepartmentsModal lines={[...summary.data.outpatient, ...summary.data.imaging]} onClose={() => setDepartmentsOpen(false)} />
       )}
     </>
   )
@@ -160,12 +159,41 @@ function statisticsText(summary: NursingSummary) {
   const info = summary.statistics
   if (!info.hasValues) {
     return info.hisAvailable
-      ? 'Chưa có số liệu HIS của ngày này: bấm "Lấy số liệu HIS".'
-      : 'Chưa kết nối HIS: Phòng Điều dưỡng nhập tay số liệu HIS.'
+      ? 'Chưa có số liệu HIS của ngày này: bấm "Lấy số liệu HIS". HIS lỗi thì các khoa nhập tay số liệu của khoa.'
+      : 'Chưa kết nối HIS: các khoa nhập tay số liệu HIS của khoa.'
   }
   const at = info.updatedAtUtc ? formatDateTime(info.updatedAtUtc) : ''
   const by = info.updatedBy ? ` bởi ${info.updatedBy}` : ''
   return info.source === 'Manual' ? `Số liệu HIS nhập tay lúc ${at}${by}.` : `Số liệu HIS lấy lúc ${at}${by}.`
+}
+
+/**
+ * Khoa nào đã nhập tay số liệu HIS (quyết định 35), để Phòng Điều dưỡng nhắc: từng khoa được giao chỉ số mục B, D, và số khoa
+ * đã nhập "NB PK chờ nhập viện". Chỉ hiện khi chưa có số liệu HIS hoặc bảng có số do khoa nhập.
+ */
+function HisEntryStatusLine({ summary }: { summary: NursingSummary }) {
+  const info = summary.statistics
+  if (info.hasValues && !info.usesDepartmentEntries) {
+    return null
+  }
+  const labels = new Map([...summary.outpatient, ...summary.imaging].map((l) => [l.key, l.label]))
+  const assigned = info.entries.filter((e) => e.keys.some((k) => k !== WAITING_ADMISSION))
+  const waiting = info.entries.filter((e) => e.keys.includes(WAITING_ADMISSION))
+  const missingWaiting = waiting.filter((e) => !e.enteredAtUtc)
+  const status = (e: NursingHisEntryStatus) =>
+    e.enteredAtUtc ? `đã nhập lúc ${formatDateTime(e.enteredAtUtc)}${e.enteredBy ? ` (${e.enteredBy})` : ''}` : 'chưa nhập'
+  return (
+    <Typography.Text type="secondary">
+      Khoa nhập tay khi HIS lỗi:{' '}
+      {assigned.length === 0
+        ? 'chưa giao khoa nhập mục B, D. '
+        : assigned
+            .map((e) => `${e.departmentName} (${e.keys.filter((k) => k !== WAITING_ADMISSION).map((k) => labels.get(k) ?? k).join(', ')}): ${status(e)}`)
+            .join('; ') + '. '}
+      NB PK chờ nhập viện: {waiting.length - missingWaiting.length}/{waiting.length} khoa đã nhập
+      {missingWaiting.length > 0 ? ` (chưa nhập: ${missingWaiting.map((e) => e.departmentName).join(', ')})` : ''}.
+    </Typography.Text>
+  )
 }
 
 /** Mục A–F như bản giấy. */
@@ -189,7 +217,8 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: c.header,
       key: c.key,
       align: 'right' as const,
-      width: 96,
+      // 12 cột số (quyết định 38) vẫn vừa màn hình rộng 1366 điểm ảnh, không phải cuộn ngang.
+      width: 84,
       render: (_: unknown, row: NursingSummaryRow) => number(row.cells[c.key]),
     })),
   ]
@@ -286,7 +315,21 @@ function LineTable({ title, lines }: { title: string; lines: NursingSummaryLine[
         pagination={false}
         dataSource={lines}
         columns={[
-          { title: 'Nội dung', dataIndex: 'label' },
+          {
+            title: 'Nội dung',
+            dataIndex: 'label',
+            render: (label: string, line) =>
+              line.enteredBy ? (
+                <Flex vertical>
+                  <span>{label}</span>
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    {line.enteredBy} nhập tay
+                  </Typography.Text>
+                </Flex>
+              ) : (
+                label
+              ),
+          },
           { title: 'Số liệu', dataIndex: 'value', width: 90, align: 'right', render: number },
         ]}
         style={{ marginBottom: 16 }}
@@ -295,7 +338,7 @@ function LineTable({ title, lines }: { title: string; lines: NursingSummaryLine[
   )
 }
 
-/** Báo cáo của một khoa (chỉ đọc) trong bảng tổng hợp: in PDF, Phòng Điều dưỡng mở lại khi cần. */
+/** Báo cáo của một khoa (chỉ đọc) trong bảng tổng hợp: in PDF, Phòng Điều dưỡng trả lại khoa để sửa khi cần. */
 function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSummaryRow; reportDate: string; onClose: () => void }) {
   const definition = useNursingReportForm()
   const report = useNursingReport(reportDate, row.departmentId)
@@ -314,8 +357,8 @@ function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSumm
         data?.id && (
           <Flex gap={8}>
             {data.canReopen && (
-              <Button icon={<UnlockOutlined />} onClick={() => setReopenOpen(true)}>
-                Mở lại
+              <Button icon={<RollbackOutlined />} onClick={() => setReopenOpen(true)}>
+                Trả lại khoa
               </Button>
             )}
             <Button icon={<FilePdfOutlined />} onClick={() => setPdfOpen(true)}>
@@ -339,7 +382,7 @@ function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSumm
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              title={`Đã mở lại lúc ${data.reopenedAtUtc ? formatDateTime(data.reopenedAtUtc) : ''}${data.reopenedBy ? ` bởi ${data.reopenedBy}` : ''}`}
+              title={`Đã trả lại khoa lúc ${data.reopenedAtUtc ? formatDateTime(data.reopenedAtUtc) : ''}${data.reopenedBy ? ` bởi ${data.reopenedBy}` : ''}`}
               description={`Lý do: ${data.reopenReason}`}
             />
           )}
@@ -372,7 +415,7 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
     onSuccess: (report) => {
       queryClient.setQueryData(nursingKeys.daily(reportDate, departmentId), report)
       void queryClient.invalidateQueries({ queryKey: nursingKeys.summary(reportDate) })
-      message.success('Đã mở lại báo cáo. Khoa sửa và gửi lại.')
+      message.success('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')
       onClose()
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -380,8 +423,8 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
   return (
     <Modal
       open
-      title="Mở lại báo cáo cho khoa sửa"
-      okText="Mở lại"
+      title="Trả lại báo cáo cho khoa sửa"
+      okText="Trả lại khoa"
       cancelText="Đóng"
       okButtonProps={{ disabled: reason.trim().length === 0, loading: reopen.isPending }}
       onOk={() => reopen.mutate()}
@@ -389,8 +432,8 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
     >
       <Typography.Paragraph>Báo cáo trở lại dạng nháp; khoa sửa rồi gửi lại. Lý do được ghi vào nhật ký.</Typography.Paragraph>
       <Input.TextArea
-        aria-label="Lý do mở lại"
-        placeholder="Lý do mở lại (bắt buộc)"
+        aria-label="Lý do trả lại"
+        placeholder="Lý do trả lại (bắt buộc)"
         value={reason}
         maxLength={500}
         autoSize={{ minRows: 2, maxRows: 6 }}
@@ -408,19 +451,32 @@ interface DepartmentRow {
   bedCount: number | null
 }
 
-/** Phòng Điều dưỡng chọn khoa phải gửi báo cáo và cài số giường thực kê (không tính băng ca) của từng khoa. */
-function DepartmentsModal({ onClose }: { onClose: () => void }) {
+/**
+ * Phòng Điều dưỡng chọn khoa phải gửi báo cáo, cài số giường thực kê (không tính băng ca) của từng khoa, và giao khoa nhập tay
+ * từng chỉ số mục B, D khi HIS lỗi (quyết định 35).
+ */
+function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onClose: () => void }) {
   const departments = useNursingReportDepartments(true)
   const [edits, setEdits] = useState<Record<string, Pick<DepartmentRow, 'isReporting' | 'bedCount'>>>({})
+  const [assignmentEdits, setAssignmentEdits] = useState<Record<string, string | null>>({})
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   const rows: DepartmentRow[] = useMemo(
     () => (departments.data ?? []).map((d) => ({ ...d, ...edits[d.departmentId] })),
     [departments.data, edits],
   )
+  const assignments = useMemo(() => {
+    const current = Object.fromEntries(
+      (departments.data ?? []).flatMap((d) => d.hisIndicators.map((key) => [key, d.departmentId] as const)),
+    ) as Record<string, string>
+    return Object.fromEntries(lines.map((l) => [l.key, l.key in assignmentEdits ? assignmentEdits[l.key] : (current[l.key] ?? null)]))
+  }, [departments.data, assignmentEdits, lines])
   const save = useMutation({
     mutationFn: () =>
-      nursingReportsApi.updateDepartments(rows.filter((r) => r.isReporting).map((r) => ({ departmentId: r.departmentId, bedCount: r.bedCount ?? 0 }))),
+      nursingReportsApi.updateDepartments(
+        rows.filter((r) => r.isReporting).map((r) => ({ departmentId: r.departmentId, bedCount: r.bedCount ?? 0 })),
+        assignments,
+      ),
     onSuccess: (saved) => {
       queryClient.setQueryData(nursingKeys.departments, saved)
       void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
@@ -483,68 +539,30 @@ function DepartmentsModal({ onClose }: { onClose: () => void }) {
           ]}
         />
       )}
-    </Modal>
-  )
-}
-
-/** Phòng Điều dưỡng nhập tay số liệu HIS của ngày (HIS lỗi hoặc chưa có câu truy vấn). */
-function StatisticsModal({ summary, onClose }: { summary: NursingSummary; onClose: () => void }) {
-  const [form] = Form.useForm<{ hospital: Record<string, number | null>; waiting: Record<string, number | null> }>()
-  const queryClient = useQueryClient()
-  const { message } = App.useApp()
-  const reporting = summary.rows.filter((r) => r.isReporting)
-  const save = useMutation({
-    mutationFn: () => {
-      const values = form.getFieldsValue(true)
-      return nursingReportsApi.updateStatistics({
-        reportDate: summary.reportDate,
-        hospital: Object.fromEntries([...summary.outpatient, ...summary.imaging].map((l) => [l.key, values.hospital?.[l.key] ?? null])),
-        waitingAdmission: Object.fromEntries(reporting.map((r) => [r.departmentId, values.waiting?.[r.departmentId] ?? null])),
-      })
-    },
-    onSuccess: (updated) => {
-      queryClient.setQueryData(nursingKeys.summary(summary.reportDate), updated)
-      message.success('Đã lưu số liệu.')
-      onClose()
-    },
-    onError: (e) => message.error(errorMessage(e)),
-  })
-  const initialValues = {
-    hospital: Object.fromEntries([...summary.outpatient, ...summary.imaging].map((l) => [l.key, l.value])),
-    waiting: Object.fromEntries(reporting.map((r) => [r.departmentId, r.cells[WAITING_ADMISSION]])),
-  }
-  const field = (name: (string | number)[], label: string) => (
-    <Form.Item key={name.join('.')} name={name} label={label} labelCol={{ flex: 'auto' }} wrapperCol={{ flex: '120px' }} labelAlign="start" colon={false} style={{ marginBottom: 8 }}>
-      <InputNumber aria-label={label} min={0} max={99999} precision={0} style={{ width: '100%' }} />
-    </Form.Item>
-  )
-
-  return (
-    <Modal
-      open
-      width="min(760px, 96vw)"
-      title={`Nhập số liệu HIS ngày ${dayjs(summary.reportDate).format('DD/MM/YYYY')}`}
-      okText="Lưu"
-      cancelText="Đóng"
-      okButtonProps={{ loading: save.isPending }}
-      onOk={() => save.mutate()}
-      onCancel={onClose}
-    >
+      <Typography.Title level={5} style={{ marginTop: 20 }}>
+        Khoa nhập số liệu HIS khi HIS lỗi
+      </Typography.Title>
       <Typography.Paragraph type="secondary">
-        Dùng khi HIS lỗi hoặc chưa có câu truy vấn số liệu. Số nhập tay thay số đã lấy từ HIS của ngày này.
+        Khi không lấy được số liệu từ HIS, mỗi khoa nhập số thuộc nhiệm vụ của khoa ở trang Báo cáo của khoa; Phòng Điều dưỡng chỉ
+        tổng hợp. Khoa phải báo cáo tự nhập "NB PK chờ nhập viện" của khoa mình. Chọn khoa nhập từng chỉ số dưới đây.
       </Typography.Paragraph>
-      <Form form={form} initialValues={initialValues} layout="horizontal" labelWrap>
-        <Row gutter={24}>
-          <Col xs={24} md={12}>
-            <Typography.Text strong>B. Khoa khám bệnh và D. CĐHA</Typography.Text>
-            {[...summary.outpatient, ...summary.imaging].map((l) => field(['hospital', l.key], l.label))}
-          </Col>
-          <Col xs={24} md={12}>
-            <Typography.Text strong>NB PK chờ nhập viện</Typography.Text>
-            {reporting.map((r) => field(['waiting', r.departmentId], r.departmentName))}
-          </Col>
-        </Row>
-      </Form>
+      {lines.map((line) => (
+        <Flex key={line.key} align="center" gap={12} wrap style={{ marginBottom: 8 }}>
+          <span style={{ flex: '1 1 200px' }}>{line.label}</span>
+          <Select
+            aria-label={`Khoa nhập ${line.label}`}
+            style={{ flex: '1 1 260px' }}
+            allowClear
+            showSearch
+            optionFilterProp="label"
+            placeholder="Chưa giao khoa nào"
+            disabled={!departments.data}
+            value={assignments[line.key] ?? undefined}
+            options={rows.map((r) => ({ value: r.departmentId, label: r.name }))}
+            onChange={(value: string | undefined) => setAssignmentEdits((current) => ({ ...current, [line.key]: value ?? null }))}
+          />
+        </Flex>
+      ))}
     </Modal>
   )
 }

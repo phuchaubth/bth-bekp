@@ -34,7 +34,10 @@ public sealed class KioskApiTests(SqlServerFixture sql) : IAsyncLifetime
     private static string Image() => Convert.ToBase64String(TestPng.Signature());
 
     /// <summary>Tài khoản kiosk mới (tên riêng mỗi test) của Khoa Khám bệnh, đã đổi mật khẩu lần đầu.</summary>
-    private async Task<string> NewKioskAccountAsync()
+    private async Task<string> NewKioskAccountAsync() => (await NewNamedKioskAccountAsync()).Token;
+
+    /// <summary>Tài khoản kiosk mới (đã đổi mật khẩu lần đầu): token đăng nhập và tên đăng nhập.</summary>
+    private async Task<(string Token, string UserName)> NewNamedKioskAccountAsync()
     {
         var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", _admin);
         var kioskRole = roles.EnumerateArray().Single(r => r.GetProperty("code").GetString() == "KIOSK");
@@ -59,7 +62,7 @@ public sealed class KioskApiTests(SqlServerFixture sql) : IAsyncLifetime
             new { currentPassword = TemporaryPassword, newPassword = KioskPassword });
         Assert.True(changed == HttpStatusCode.OK, session.ToString());
         Assert.Equal(["kiosk.use"], session.GetProperty("user").GetProperty("permissions").EnumerateArray().Select(p => p.GetString()));
-        return session.GetProperty("accessToken").GetString()!;
+        return (session.GetProperty("accessToken").GetString()!, userName);
     }
 
     private async Task<Dictionary<string, string>> ConfigureKioskTemplatesAsync()
@@ -161,9 +164,9 @@ public sealed class KioskApiTests(SqlServerFixture sql) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task LookupByCitizenId_WithAWrongBirthDate_IsLockedAfterFiveTries()
+    public async Task LookupByCitizenId_WithAWrongBirthDate_IsLockedAfterFiveTries_UntilAnAdministratorUnlocks()
     {
-        var kiosk = await NewKioskAccountAsync();
+        var (kiosk, kioskUserName) = await NewNamedKioskAccountAsync();
         var wrong = new { method = "LookupCode", citizenId = "001085000001", dateOfBirth = "1985-03-13" };
 
         for (var attempt = 1; attempt < 5; attempt++)
@@ -178,9 +181,28 @@ public sealed class KioskApiTests(SqlServerFixture sql) : IAsyncLifetime
         Assert.Equal(HttpStatusCode.UnprocessableEntity, lockedStatus);
         Assert.Equal("kiosk.lookup_locked", locked.GetProperty("code").GetString());
 
-        var (rightStatus, right) = await _client.SendJsonAsync(
-            HttpMethod.Post, "/api/v1/kiosk/identify", kiosk, new { method = "LookupCode", citizenId = "001085000001", dateOfBirth = "1985-03-12" });
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, rightStatus);
-        Assert.Equal("kiosk.lookup_locked", right.GetProperty("code").GetString());
+        var right = new { method = "LookupCode", citizenId = "001085000001", dateOfBirth = "1985-03-12" };
+        var (stillLockedStatus, stillLocked) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/kiosk/identify", kiosk, right);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, stillLockedStatus);
+        Assert.Equal("kiosk.lookup_locked", stillLocked.GetProperty("code").GetString());
+
+        // Trang Người dùng cho quản trị thấy tài khoản kiosk đang khóa tra cứu; Mở khóa thì máy tra cứu lại được ngay.
+        var listed = await KioskUserAsync(kioskUserName);
+        Assert.True(listed.GetProperty("isKioskLookupLocked").GetBoolean());
+        Assert.True(listed.GetProperty("isActive").GetBoolean());
+        Assert.False(listed.GetProperty("isLockedOut").GetBoolean());
+        var (unlocked, unlockBody) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"/api/v1/users/{listed.GetProperty("id").GetString()}/unlock", _admin);
+        Assert.True(unlocked is HttpStatusCode.OK or HttpStatusCode.NoContent, unlockBody.ToString());
+        Assert.False((await KioskUserAsync(kioskUserName)).GetProperty("isKioskLookupLocked").GetBoolean());
+        var (afterStatus, after) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/kiosk/identify", kiosk, right);
+        Assert.True(afterStatus == HttpStatusCode.OK, after.ToString());
+    }
+
+    private async Task<JsonElement> KioskUserAsync(string userName)
+    {
+        var (status, page) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users?keyword={userName}", _admin);
+        Assert.Equal(HttpStatusCode.OK, status);
+        return page.GetProperty("items").EnumerateArray().Single(u => u.GetProperty("userName").GetString() == userName);
     }
 }

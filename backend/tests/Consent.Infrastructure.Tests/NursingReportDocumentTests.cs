@@ -54,7 +54,7 @@ public sealed class NursingReportDocumentTests
             new NursingStatisticsValues(
                 new Dictionary<string, int> { [NursingHisIndicators.OutpatientVisits] = 686 },
                 new Dictionary<Guid, int> { [Ward] = 2 }),
-            new NursingStatisticsInfoDto(true, true, NursingStatisticsSource.His, DateTimeOffset.UtcNow, "Phòng Điều dưỡng Demo"));
+            new NursingStatisticsInfoDto(true, true, NursingStatisticsSource.His, DateTimeOffset.UtcNow, "Phòng Điều dưỡng Demo", [], false));
         return new NursingSummaryDocument(Hospital, summary, "In lúc 08:00 16/11/2026 · Khoa đã gửi: 1/2");
     }
 
@@ -94,7 +94,7 @@ public sealed class NursingReportDocumentTests
             Paragraphs(document).Take(3));
 
         var figures = Rows(tables[1]);
-        Assert.Equal(1 + 4 + 1 + 8 + 1 + 30 + 1 + 1 + 4 + 1 + 8, figures.Count);
+        Assert.Equal(1 + 4 + 1 + 8 + 1 + 30 + 1 + 1 + 4 + 1 + 9, figures.Count);
         Assert.Equal(["I. NHÂN SỰ", ""], figures[0]);
         Assert.Equal(["Điều dưỡng", "18"], figures[1]);
         Assert.Equal(["KTV", ""], figures[2]);
@@ -102,6 +102,10 @@ public sealed class NursingReportDocumentTests
         Assert.Contains(["IV. PHẢN ỨNG CÓ HẠI THUỐC (ADR)", "2"], figures);
         Assert.Contains(["Số NB hiện tại", "47"], figures);
         Assert.Contains(["* Chưa có giường", ""], figures);
+        // "Số ca nhập viện ngày hôm trước" tách thành nhập khoa từ PK và do CK (quyết định 38).
+        var admissions = figures.FindIndex(r => r[0] == "Số ca nhập khoa từ PK ngày hôm trước");
+        Assert.Equal(["Số ca nhập khoa do CK ngày hôm trước", ""], figures[admissions + 1]);
+        Assert.DoesNotContain(figures, r => r[0] == "Số ca nhập viện ngày hôm trước");
         // Dòng tiêu đề mục gộp hai cột, trừ mục IV có ô nhập số.
         Assert.Equal(1, tables[1].Rows[0].Cells[0].MergeRight);
 
@@ -142,15 +146,16 @@ public sealed class NursingReportDocumentTests
             paragraphs);
 
         var inpatients = Rows(tables[1]);
-        Assert.Equal(12, inpatients[0].Length);
+        Assert.Equal(13, inpatients[0].Length);
         Assert.Equal("KHOA PHÒNG", inpatients[0][0]);
         Assert.Equal("Số giường thực kê (Không tính băng ca)", inpatients[0][1]);
-        Assert.Equal("Số ca đi ngoại viện", inpatients[0][11]);
+        Assert.Equal(["Nhập khoa từ PK", "Nhập khoa do CK"], inpatients[0][3..5]);
+        Assert.Equal("Số ca đi ngoại viện", inpatients[0][12]);
         Assert.True(tables[1].Rows[0].HeadingFormat);
         // Khoa sắp theo tên; khoa chưa gửi chỉ có số giường và số HIS.
-        Assert.Equal(["Khoa Ngoại B (giả lập)", "25", "20", "0", "0", "0", "0", "0", "", "0", "0", "1"], inpatients[1]);
-        Assert.Equal(["Khoa Nội A (giả lập)", "48", "", "", "", "", "", "", "2", "", "", ""], inpatients[2]);
-        Assert.Equal(["Tổng", "73", "20", "0", "0", "0", "0", "0", "2", "0", "0", "1"], inpatients[3]);
+        Assert.Equal(["Khoa Ngoại B (giả lập)", "25", "20", "0", "0", "0", "0", "0", "0", "", "0", "0", "1"], inpatients[1]);
+        Assert.Equal(["Khoa Nội A (giả lập)", "48", "", "", "", "", "", "", "", "2", "", "", ""], inpatients[2]);
+        Assert.Equal(["Tổng", "73", "20", "0", "0", "0", "0", "0", "0", "2", "0", "0", "1"], inpatients[3]);
 
         Assert.Equal([["NỘI DUNG", "SỐ LIỆU"], ["TSNB đến khám", "686"]], Rows(tables[2]));
         Assert.Equal(["Tủy xương", "3"], Rows(tables[3])[1]);
@@ -183,11 +188,14 @@ public sealed class NursingReportDocumentTests
         Assert.Equal("Phòng Điều dưỡng", Texts(1)[0]);
         Assert.Equal(NursingReportForm.SummaryTitle, Texts(3)[0]);
         Assert.Equal("Ngày 16 tháng 11 năm 2026", Texts(4)[0]);
-        Assert.Contains("A4:L4", merges);
-        Assert.Contains("A5:L5", merges);
+        // Cột khoa phòng và 12 cột số của bảng A (A–M).
+        Assert.Contains("A4:M4", merges);
+        Assert.Contains("A5:M5", merges);
         Assert.Equal("A. Số liệu người bệnh nội trú", Texts(6)[0]);
         Assert.Equal("KHOA PHÒNG", Texts(7)[0]);
-        Assert.Equal(12, rows[7].Cells.Count);
+        Assert.Equal(13, rows[7].Cells.Count);
+        Assert.Equal("Nhập khoa từ PK", Texts(7)[3]);
+        Assert.Equal("Nhập khoa do CK", Texts(7)[4]);
         Assert.Equal(20, rows[8].Cells[2].Value);
         Assert.Null(rows[9].Cells[2].Value);
         Assert.Equal("Tổng", Texts(10)[0]);

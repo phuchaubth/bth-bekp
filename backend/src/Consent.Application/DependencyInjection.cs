@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ConsentFormService>();
         services.AddScoped<FormInheritanceService>();
         services.AddScoped<ConsentSigningService>();
+        services.AddScoped<RemoteSigningService>();
         services.AddScoped<ConsentEncounterService>();
         services.AddScoped<ConsentFormExportService>();
         services.AddScoped<ReportService>();

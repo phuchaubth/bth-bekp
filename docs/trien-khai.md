@@ -192,6 +192,8 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
 1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
 
+**Khi bản mới đổi định nghĩa một mẫu khởi tạo sẵn** (ví dụ TTNB in theo bản giấy QT-KNGT/BM03, quyết định 33): máy chủ đang chạy vẫn giữ phiên bản mẫu cũ, nên sau khi cài gói, người quản lý mẫu vào **Mẫu phiếu → mẫu đó → Tạo phiên bản mới**, mở thẻ **Soạn định nghĩa (JSON)**, dán đè bằng nội dung file `backend/src/Consent.Application/ConsentTemplates/Defaults/<mã mẫu>.json` của bản mới, bấm **Lưu phiên bản nháp** rồi **Phát hành**. Phải cài gói trước: bản cũ không biết các tùy chọn mới và sẽ bỏ mất chúng khi lưu. Phiếu đã lập giữ phiên bản cũ; PDF đã ký giữ nguyên.
+
 ### 5.5. API thông tin người bệnh (tùy chọn, quyết định 22)
 
 Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL của bệnh viện (HIS) theo mã người bệnh hoặc CCCD. Phần mềm phiếu đồng thuận **chỉ gọi API này**, không giữ chuỗi kết nối CSDL bệnh viện. Không cài thì phần mềm vẫn chạy bình thường (nhập tay/quét CCCD).
@@ -357,12 +359,15 @@ Khi quản trị bật (bước 5), người ký hoàn tất phiếu (tiếp nh�
 
 ### 5.7. Báo cáo điều dưỡng hằng ngày (quyết định 31)
 
-Khoa lập "Báo cáo công tác điều dưỡng" mỗi ngày, Phòng Điều dưỡng tổng hợp (menu **Báo cáo điều dưỡng**). Bản phát hành có tính năng này kèm migration `AddNursingReports` (3 bảng mới; thêm quyền `nursingreports.submit` cho vai trò **Điều dưỡng** có sẵn): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khi khởi động, phần mềm tự tạo vai trò mới **Phòng Điều dưỡng**.
+Khoa lập "Báo cáo công tác điều dưỡng" mỗi ngày, Phòng Điều dưỡng tổng hợp (menu **Báo cáo điều dưỡng**). Bản phát hành có tính năng này kèm migration `AddNursingReports` (3 bảng mới; thêm quyền `nursingreports.submit` cho vai trò **Điều dưỡng** có sẵn): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khi khởi động, phần mềm tự tạo vai trò mới **Phòng Điều dưỡng**. Bản có quyết định 35 (khoa tự nhập số liệu HIS khi HIS lỗi) kèm thêm migration `AddNursingDepartmentStatistics` (1 bảng mới), chạy cùng cách.
 
-1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, mở lại báo cáo, cài khoa báo cáo, số giường và số liệu HIS. Ban giám đốc chỉ cần xem: tạo vai trò riêng chỉ có quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp*.
+Từ quyết định 38, mục VI của báo cáo khoa nhập riêng **số ca nhập khoa từ PK** và **số ca nhập khoa do CK** ngày hôm trước, và bảng tổng hợp mục A có hai cột **Nhập khoa từ PK**, **Nhập khoa do CK** thay cột "Số ca nhập viện ngày hôm trước" (màn hình, PDF, Excel). Không có migration. Báo cáo đã gửi trước khi cài gói chỉ có số tổng: hai cột mới của khoa đó để trống; cần đủ số thì Phòng Điều dưỡng **Trả lại khoa** để khoa nhập lại.
+
+1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, trả lại báo cáo cho khoa sửa (nút **Trả lại khoa**), cài khoa báo cáo, số giường, khoa nhập số liệu HIS và bấm lấy số liệu HIS. Phòng Điều dưỡng không nhập số liệu thay khoa. Ban giám đốc chỉ cần xem: phần mềm chưa tạo được vai trò mới, nên thêm quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp* vào vai trò ban giám đốc đang dùng (*Quản trị → Vai trò và quyền*; mọi người có vai trò đó cùng xem được).
 2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa của người dùng). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
 3. **Khoa báo cáo và số giường:** Phòng Điều dưỡng vào *Báo cáo điều dưỡng → Tổng hợp hằng ngày*, bấm **Khoa báo cáo và số giường**, chọn các khoa phải gửi báo cáo và nhập số giường thực kê (không tính băng ca). Khoa chưa được chọn thì chưa lập được báo cáo.
-4. **Số liệu HIS (tùy chọn):** mục B (TSNB đến khám), mục D (số liệu CĐHA) và cột "NB PK chờ nhập viện" lấy từ HIS qua API thông tin người bệnh (mục 5.5). Chưa làm bước này thì Phòng Điều dưỡng bấm **Nhập số liệu HIS** để nhập tay.
+4. **Khoa nhập số liệu HIS khi HIS lỗi:** trong hộp **Khoa báo cáo và số giường**, phần *Khoa nhập số liệu HIS khi HIS lỗi*, Phòng Điều dưỡng chọn khoa nhập từng chỉ số mục B, D (ví dụ TSNB đến khám: Khoa Khám bệnh; siêu âm, X-quang, CT, MRI: Khoa Chẩn đoán hình ảnh; siêu âm tim, điện tâm đồ: Khoa Thăm dò chức năng). Mỗi khoa phải báo cáo tự nhập "NB PK chờ nhập viện" của khoa mình. Mỗi khoa được giao cần **ít nhất một tài khoản đúng khoa có quyền** *Lập và gửi báo cáo điều dưỡng của khoa* (ví dụ vai trò **Điều dưỡng**); khoa được giao không cần nằm trong danh sách khoa báo cáo. Khoa nhập ở trang **Báo cáo của khoa** (hướng dẫn sử dụng mục 9.5).
+5. **Số liệu HIS (tùy chọn):** mục B (TSNB đến khám), mục D (số liệu CĐHA) và cột "NB PK chờ nhập viện" lấy từ HIS qua API thông tin người bệnh (mục 5.5). Chưa làm bước này, hoặc HIS lỗi, thì các khoa nhập tay như bước 4; bảng tổng hợp dùng số HIS trước, ô HIS không có số mới dùng số khoa nhập.
    - **Quyền đọc:** cấp `SELECT` cho `patientinfo_reader` trên các bảng câu truy vấn dùng (xem phần *báo cáo điều dưỡng* cuối `deploy\sql\04-patientinfo-reader.sql`).
    - **Câu truy vấn:** một câu `SELECT` (thường nhiều câu nối bằng `UNION ALL`), mỗi dòng một số liệu, tham số `@From` (đầu ngày) và `@To` (đầu ngày hôm sau), lọc thời gian bằng `>= @From AND < @To`.
 
@@ -497,6 +502,19 @@ Nhân viên lập phiếu và mở chế độ ký ngay trên điện thoại, r
 
 Đã kiểm thử tự động trên iPhone 13 và Pixel 7 giả lập (cầm dọc và ngang): lập phiếu, ký, xác nhận, không tràn ngang. Cần thử trên vài điện thoại thật của bệnh viện trước khi dùng chính thức.
 
+### 9a1. Người bệnh ký trên điện thoại của mình qua mã QR (quyết định 32)
+
+Nhân viên bấm **Mã QR cho người bệnh** (phiếu lẻ) hoặc **Mã QR ký cả bộ** (bộ phiếu); người bệnh quét mã bằng camera điện thoại của mình, nhập **ngày sinh của người bệnh**, đọc và ký. Không cần cài gì thêm trên máy chủ ngoài gói mới (có migration `AddRemoteSigningLinks`).
+
+1. **Địa chỉ trong mã QR** là địa chỉ nhân viên đang dùng để mở phần mềm (ví dụ `https://phieudongthuan.bth.org.vn/ky-tu-xa#…`). Nhân viên phải mở phần mềm bằng **tên miền chính thức**, không bằng `localhost` hay địa chỉ IP, thì điện thoại người bệnh mới mở được.
+2. **Mạng cho điện thoại người bệnh** (phòng CNTT quyết định):
+   - **Khuyến nghị:** Wi-Fi cho người bệnh (khách) được phép vào **đúng địa chỉ HTTPS của phần mềm** (DNS nội bộ trỏ tên miền về máy chủ IIS), không vào các máy khác trong mạng bệnh viện. Điện thoại dùng 4G thì không mở được: nhờ người bệnh bắt Wi-Fi, hoặc ký trên máy của bệnh viện.
+   - Không mở phần mềm ra Internet nếu chưa được phòng CNTT và lãnh đạo đồng ý.
+   - **Bắt buộc HTTPS** khi điện thoại người bệnh dùng: phiếu có thông tin sức khỏe đi qua Wi-Fi khách.
+3. **Bảo vệ mã:** mã 128 bit ngẫu nhiên, máy chủ chỉ lưu mã băm; mở trong 15 phút; mở được trên một điện thoại; phải nhập đúng ngày sinh, sai 5 lần thì mã bị hủy; mã nằm sau dấu `#` nên không có trong nhật ký truy cập của IIS. Nhân viên hủy mã được bất cứ lúc nào.
+4. **Giới hạn tần suất:** trang mở mã cho phép 30 lần/phút mỗi địa chỉ IP (`RateLimiting__RemoteSigningPermitLimit`). Nhiều điện thoại qua cùng một địa chỉ IP (NAT của Wi-Fi khách) mà hay gặp lỗi 429 thì tăng số này, ví dụ 120. Giới hạn và nhật ký chỉ có đúng địa chỉ IP của điện thoại khi API tin reverse proxy trên cùng máy (`ReverseProxy__TrustAllProxies = true`, mục 5.2).
+5. **Nhật ký:** mỗi lần tạo mã, mở mã (kèm địa chỉ IP, trình duyệt của điện thoại), nhập sai ngày sinh, hủy mã đều ghi nhật ký hệ thống (`ConsentForms.RemoteSigning*`). Chữ ký ghi trình duyệt của điện thoại đã ký.
+
 ## 9b. Máy kiosk cho người bệnh tự làm phiếu (quyết định 24)
 
 Người bệnh tự nhận diện, trả lời và ký một lần cho cả bộ phiếu trên kiosk; nhân viên tiếp đón kiểm tra rồi **Xác nhận cả bộ** như bình thường. Kiosk là một trang của chính phần mềm (`/kiosk`), không cài thêm gì trên máy chủ.
@@ -504,8 +522,22 @@ Người bệnh tự nhận diện, trả lời và ký một lần cho cả b�
 **Phần cứng**
 
 1. **Màn hình cảm ứng 32 inch đặt dọc** (Full HD 1080×1920 hoặc 4K đặt tỉ lệ hiển thị 200%), máy tính Windows 10/11 chạy Chrome hoặc Edge bản mới. Trong Windows: *Settings → System → Display → Display orientation: Portrait*.
-2. **Máy quét mã 2D (đọc được QR) cổng USB**, gắn bên dưới màn hình, đặt ở **chế độ bàn phím (USB HID Keyboard)**, **thêm phím Enter sau mỗi lần quét**, và **xuất ký tự Unicode/UTF-8** để đọc đúng họ tên có dấu trong mã QR (xem tài liệu máy quét; nhiều máy có mã vạch cấu hình in sẵn). Thử với vài thẻ thật: CCCD gắn chip và thẻ căn cước mẫu mới.
-3. Không cần camera: quét bằng camera để sau, vì trình duyệt chỉ mở camera khi trang chạy HTTPS.
+2. **Máy quét mã 2D (đọc được QR) cổng USB**, gắn bên dưới màn hình, đặt ở **chế độ bàn phím (USB HID Keyboard)**, **thêm phím Enter sau mỗi lần quét**, và **xuất ký tự Unicode/UTF-8** để đọc đúng họ tên có dấu trong mã QR (xem tài liệu máy quét; nhiều máy có mã vạch cấu hình in sẵn). Thử với vài thẻ thật: CCCD gắn chip, thẻ căn cước mẫu mới và mã QR căn cước trên ứng dụng VNeID; màn hình **Đây có phải thông tin của ông/bà?** phải ghi đúng dấu ở **Nơi thường trú**. Máy quét chưa cài tiếng Việt gõ chữ có dấu thành ký tự lạ (kiểu "Ä‘Æ°á»ng"): phần mềm tự sửa khi máy gõ đủ từng byte (bảng mã Windows-1252 hoặc 1258); máy bỏ mất ký tự, hoặc bỏ hẳn chữ có dấu ("ng" thay cho "Đường"), thì phần mềm không sửa được: bỏ địa chỉ (kiosk ghi **Chưa có** hoặc **Đã có trong hồ sơ** thay cho địa chỉ), và họ tên hỏng thì kiosk chỉ dùng tiếp khi bệnh viện đã có hồ sơ, chưa có thì mời người bệnh chọn **Nhập thông tin**. Kiểm tra máy quét: bật **Num Lock** (nhiều máy gõ chữ có dấu bằng phím Alt + số, chỉ chạy khi Num Lock bật; đặt Num Lock bật khi khởi động máy), mở Notepad trên kiosk và quét mã QR thử vào Notepad: phải hiện đúng dấu. Vì vậy vẫn phải cài máy quét xuất Unicode; camera (mục 3) đọc đúng chữ có dấu.
+3. **Camera (không bắt buộc, quyết định 34):** kiosk có webcam (gắn trên đỉnh màn hình, hướng về người bệnh) thì màn hình **Quét CCCD** tự hiện khung hình camera và đọc mã QR từ camera; máy quét 2D vẫn dùng được cùng lúc. Kiosk không có camera thì chỉ dùng máy quét như cũ. Điều kiện:
+   - Trang kiosk chạy **HTTPS** (trình duyệt không mở camera ở địa chỉ `http://`).
+   - Trình duyệt của kiosk **đã được cho phép dùng camera** cho địa chỉ phần mềm, để người bệnh không gặp hộp hỏi quyền. Cách 1: trên máy kiosk mở `/kiosk`, chạm **Quét CCCD**, chọn **Cho phép** (trình duyệt nhớ lựa chọn). Cách 2 (khuyến nghị): đặt chính sách trình duyệt `VideoCaptureAllowedUrls` bằng PowerShell *Run as administrator*, rồi mở `chrome://policy` (hoặc `edge://policy`) bấm *Reload policies*:
+
+     ```powershell
+     # Chrome; Edge thay 'Google\Chrome' bằng 'Microsoft\Edge'
+     $k = 'HKLM:\SOFTWARE\Policies\Google\Chrome\VideoCaptureAllowedUrls'
+     New-Item -Path $k -Force | Out-Null
+     Set-ItemProperty -Path $k -Name '1' -Value 'https://<địa chỉ phần mềm>'
+     ```
+
+   - Camera không mở được (người dùng vừa chọn Chặn ở hộp hỏi quyền, không thấy camera, ứng dụng khác đang dùng camera) thì màn hình quét ghi *"Camera của kiosk chưa dùng được (lý do)"* và người bệnh dùng máy quét.
+   - **Chọn thiết bị quét** (không có cài đặt trong phần mềm, kiosk tự nhận): chỉ cắm **máy quét 2D** → màn hình máy quét như cũ; chỉ có **camera** → màn hình camera; có **cả hai** → màn hình camera, máy quét vẫn nhận cùng lúc. Máy có sẵn webcam mà bệnh viện **chỉ muốn dùng máy quét**: chặn camera trong trình duyệt của kiosk (biểu tượng bên trái thanh địa chỉ → *Camera* → *Chặn*, hoặc chính sách `VideoCaptureAllowed` = 0); kiosk hiện màn hình máy quét, không báo lỗi.
+   - Hình từ camera chỉ dùng để đọc mã ngay trên máy kiosk, không lưu, không gửi lên máy chủ. Thẻ còn nằm trong khung hình thì máy không gửi lại, để không tự tính nhiều lần sai.
+   - **Chọn webcam** (cả kiosk và máy tiếp đón, quyết định 39): mã QR trên thẻ CCCD nhỏ (khoảng 1,4 cm). Nên dùng webcam **Full HD (1920×1080) có tự lấy nét**; phần mềm xin độ phân giải 1920×1080, webcam không có thì trình duyệt dùng mức gần nhất. Webcam lấy nét cố định chỉ rõ nét khi thẻ ở xa, lúc đó mã trên thẻ rất nhỏ trong khung hình nên đọc chậm hoặc không đọc được. Thử với vài thẻ thật (CCCD và mã QR trên VNeID) trước khi đưa vào dùng; máy quét 2D vẫn là cách nhanh và chắc chắn nhất.
 
 **Tài khoản và mẫu phiếu** (làm một lần)
 
@@ -528,7 +560,7 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 1. Mỗi sáng nhân viên bật máy, đăng nhập **tài khoản kiosk** (lần đầu đổi mật khẩu). Phiên đăng nhập giữ trong ngày (12 giờ, `Auth:RefreshTokenLifetimeHours`).
 2. Đăng xuất máy: **giữ biểu tượng bệnh viện ở góc trên bên trái 3 giây** → *Đăng xuất*. Thoát Chrome toàn màn hình: `Alt + F4` bằng bàn phím rời.
 3. **60 giây không chạm** thì màn hình tự xóa thông tin và về trang đầu (10 giây cuối có nhắc).
-4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng → Mở khóa* tài khoản kiosk.
+4. Người bệnh nhập mã/CCCD sai ngày sinh **5 lần** thì máy tạm khóa tra cứu **5 phút** (quét thẻ cũng phải chờ; tự khai không kèm CCCD vẫn làm được). Mở khóa sớm: *Quản trị → Người dùng*, tài khoản kiosk có trạng thái **Tạm khóa tra cứu** → **⋯** → *Mở khóa*.
 5. Người bệnh đã làm cùng phiếu gần đây (trong số ngày đặt ở *Cấu hình hệ thống → Kế thừa phiếu lần trước*, quyết định 27): kiosk hỏi *"Thông tin có thay đổi so với lần trước không?"*; *Không thay đổi* thì không hỏi lại các câu đã trả lời (không hiện câu trả lời cũ), Đồng ý/Không đồng ý và chữ ký vẫn làm lại.
 6. Phiếu từ kiosk có nhãn **"Lập tại kiosk"** trong danh sách bộ phiếu và chi tiết phiếu. Nhân viên **đối chiếu CCCD** rồi bấm *Xác nhận cả bộ*; nhãn **"tự khai"** (màu cam) thì kiểm tra kỹ giấy tờ và thông tin hành chính trước khi xác nhận.
 
@@ -542,11 +574,12 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 6. Trên điện thoại (mục 9a): quét QR CCCD bằng camera (cần HTTPS), lập một phiếu thử với người bệnh giả lập, ký, hoàn tất, xem PDF, rồi **thu hồi** phiếu thử (ghi lý do "kiểm tra triển khai").
 7. Kiosk (mục 9b): quét thử vài thẻ CCCD thật (họ tên có dấu đọc đúng), làm trọn một bộ phiếu với người bệnh giả lập, nhân viên tiếp đón **Xác nhận cả bộ**; nhập sai ngày sinh 5 lần thấy máy tạm khóa tra cứu; để yên 60 giây thấy màn hình tự về trang đầu.
 8. Lượt tiếp nhận (mục 5.6, nếu dùng): bật công tắc ở Cấu hình hệ thống; hoàn tất một phiếu thử của người bệnh có lượt tiếp nhận hôm nay trên HIS; danh sách đúng thời gian, nơi tiếp nhận; chân PDF có số tiếp nhận và người tiếp nhận; mở lại hộp ký phiếu khác của người bệnh đó thấy phiếu vừa gắn ở cột *Các phiếu đã gắn vào*. Tắt thử công tắc: hộp ký không còn bảng lượt. Thu hồi phiếu thử.
-9. Báo cáo điều dưỡng (mục 5.7): Phòng Điều dưỡng cài khoa báo cáo và số giường; một điều dưỡng lập, lưu nháp, gửi báo cáo khoa mình (gửi xong thấy khóa); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, mở lại báo cáo thử kèm lý do; lấy hoặc nhập tay số liệu HIS.
-10. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
-11. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
-12. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
-13. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+9. Báo cáo điều dưỡng (mục 5.7): Phòng Điều dưỡng cài khoa báo cáo và số giường; một điều dưỡng lập, lưu nháp, gửi báo cáo khoa mình (gửi xong thấy khóa); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, bấm **Trả lại khoa** một báo cáo thử kèm lý do (khoa thấy ai trả lại và lý do); giao khoa nhập số liệu HIS, một khoa được giao nhập thử ở trang Báo cáo của khoa và bảng tổng hợp hiện số đó kèm tên khoa; lấy số liệu HIS (nếu đã cài).
+10. Mã QR (mục 9a1): trên máy tính mở phần mềm bằng tên miền chính thức, bấm **Mã QR cho người bệnh** ở một phiếu thử; một điện thoại **bắt Wi-Fi dành cho người bệnh** quét mã, nhập ngày sinh, ký; màn hình nhân viên báo đã ký. Quét lại mã bằng điện thoại khác thấy bị từ chối. Thu hồi phiếu thử.
+11. Chạy sao lưu đầu tiên (CSDL + thư mục PDF) và **khôi phục thử** sang máy chủ thử nghiệm.
+12. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
+13. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
+14. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 
 ## 11. Sự cố thường gặp
 
@@ -566,7 +599,11 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 | `Named Pipes Provider, error: 40` / `The network path was not found` (khi chạy `efbundle.exe` hoặc API) | Không tới được SQL Server: sai tên máy, bản cài theo tên riêng, TCP/IP tắt, tường lửa chặn 1433, dịch vụ SQL chưa chạy | Dùng `Server=tcp:<máy>,1433` (hoặc `<máy>\<TÊN>` + SQL Server Browser); `Get-Service *SQL*`; bật TCP/IP, cổng 1433 trong SQL Server Configuration Manager; `Test-NetConnection <máy-SQL> -Port 1433` |
 | `Process should have elevated status to access IIS configuration data`, rồi `Cannot find drive 'IIS'` và `No mapping between account names and security IDs` | PowerShell không chạy bằng quyền quản trị nên không tạo được Application Pool; `icacls` lỗi theo vì tài khoản `IIS AppPool\…` chưa tồn tại | Mở PowerShell bằng *Run as administrator*, chạy lại nguyên khối lệnh |
 | Không đọc được CCCD/PDF, lỗi "không khớp mã băm" sau khôi phục | Đặt sai khóa `FieldEncryptionKey` hoặc thư mục PDF khác thời điểm với CSDL | Đặt lại đúng khóa cũ; khôi phục thư mục PDF cùng thời điểm |
-| Camera không bật khi quét CCCD | Trang không chạy qua HTTPS hoặc trình duyệt chưa cấp quyền | Dùng HTTPS với chứng chỉ được tin cậy trên thiết bị; cấp quyền camera |
+| Camera không bật khi quét CCCD trên máy tính (khung đen, không báo lỗi) | Lỗi phần mềm ở các gói cài trước ngày 16/11/2026: camera không bao giờ bật (quyết định 34) | Cài gói mới. Từ gói mới, hộp thoại ghi *"Đang mở camera…"* rồi bật camera, hoặc ghi rõ lý do như dòng dưới |
+| Hộp thoại quét bằng camera báo lỗi | *"…chỉ hoạt động khi truy cập qua HTTPS"*: trang mở bằng `http://`. *"Bạn chưa cho phép…"*: trình duyệt hoặc Windows chặn camera. *"Không tìm thấy camera"*: máy không có webcam hoặc webcam chưa nhận. *"…ứng dụng khác sử dụng"*: Zalo, Teams, Zoom… đang giữ camera. *"Không mở được camera (tên lỗi)"*: lỗi khác của trình duyệt | Dùng HTTPS với chứng chỉ được tin cậy. Cho phép camera: biểu tượng bên trái thanh địa chỉ → *Camera* → *Cho phép*, tải lại trang; Windows: *Settings → Privacy & security → Camera*, bật cả *Let desktop apps access your camera*. Kiểm tra webcam trong *Device Manager → Cameras*. Đóng ứng dụng đang dùng camera |
+| Camera bật nhưng lâu không nhận mã QR, nhất là mã trên thẻ CCCD | Gói cài trước ngày 17/11/2026: bộ đọc chỉ thử khoảng 2 khung hình mỗi giây ở 1280×720 và không phóng to mã nhỏ (quyết định 39). Webcam độ phân giải thấp hoặc lấy nét cố định; thẻ để quá xa (mã quá nhỏ) hoặc quá gần (mờ); mặt thẻ lóa đèn | Cài gói mới. Đưa mã vào khung vuông, cách camera khoảng một gang tay, giữ yên; hình mờ thì đưa thẻ ra xa hơn một chút. Dùng webcam Full HD có tự lấy nét (mục 9b, *Phần cứng* bước 3), hoặc máy quét 2D. Mã trên VNeID: tăng độ sáng màn hình điện thoại |
+| Kiosk ghi *"Camera của kiosk chưa dùng được (…)"* | Trình duyệt kiosk chưa được cho phép dùng camera, không thấy camera, hoặc camera đang bị ứng dụng khác dùng | Cho phép camera cho địa chỉ phần mềm (mục 9b, *Phần cứng* bước 3); người bệnh vẫn dùng máy quét |
+| Kiosk có webcam nhưng màn hình **Quét CCCD** chỉ hiện hướng dẫn máy quét | Trang không chạy HTTPS, hoặc trình duyệt đang chặn camera cho trang (đã có người chọn *Chặn*, hoặc chính sách trình duyệt) | Mở kiosk bằng địa chỉ `https://`; bỏ chặn: biểu tượng bên trái thanh địa chỉ → *Camera* → *Cho phép*, hoặc đặt `VideoCaptureAllowedUrls` (mục 9b) để không bị hỏi lại |
 | PDF không hiển thị trong ứng dụng (trang trắng) | Reverse proxy ghi đè CSP, thiếu `frame-src blob:` | Dùng CSP như `deploy/iis/web.frontend.config` / `frontend/nginx.conf` |
-| 429 "Bạn thao tác quá nhiều lần" | Vượt giới hạn đăng nhập (10 lần/phút/IP) hoặc xuất dữ liệu (10 lần/phút/người) | Chờ 1 phút; nếu nhiều máy chung IP qua NAT, tăng `RateLimiting__AuthPermitLimit` |
+| 429 "Bạn thao tác quá nhiều lần" | Vượt giới hạn đăng nhập (10 lần/phút/IP), xuất dữ liệu (10 lần/phút/người) hoặc mở mã QR ký trên điện thoại (30 lần/phút/IP) | Chờ 1 phút; nếu nhiều máy chung IP qua NAT, tăng `RateLimiting__AuthPermitLimit` (hoặc `RateLimiting__RemoteSigningPermitLimit` cho Wi-Fi người bệnh) |
 | Nhật ký ghi IP là `127.0.0.1` | Reverse proxy không gửi `X-Forwarded-For` hoặc `ReverseProxy__TrustAllProxies=false` | Cấu hình proxy gửi header và bật biến trên (chỉ khi API không mở cổng ra ngoài) |

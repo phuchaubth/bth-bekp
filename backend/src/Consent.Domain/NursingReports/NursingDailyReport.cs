@@ -108,18 +108,18 @@ public sealed class NursingDailyReport : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi để khoa sửa và gửi lại; bắt buộc ghi lý do.</summary>
+    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi (nút "Trả lại khoa") để khoa sửa và gửi lại; bắt buộc ghi lý do.</summary>
     public void Reopen(string reason, Guid userId, DateTimeOffset nowUtc)
     {
         if (!IsSubmitted)
         {
-            throw new DomainException("Chỉ mở lại được báo cáo đã gửi.");
+            throw new DomainException("Chỉ báo cáo đã gửi mới trả lại khoa được.");
         }
 
         var normalized = (reason ?? string.Empty).Trim();
         if (normalized.Length == 0 || normalized.Length > ReopenReasonMaxLength)
         {
-            throw new DomainException($"Lý do mở lại phải có từ 1 đến {ReopenReasonMaxLength} ký tự.");
+            throw new DomainException($"Lý do trả lại phải có từ 1 đến {ReopenReasonMaxLength} ký tự.");
         }
 
         Status = NursingReportStatus.Draft;
@@ -134,7 +134,7 @@ public sealed class NursingDailyReport : Entity, IAuditableEntity
     {
         if (IsSubmitted)
         {
-            throw new DomainException("Báo cáo đã gửi, không sửa được. Cần sửa thì đề nghị Phòng Điều dưỡng mở lại.");
+            throw new DomainException("Báo cáo đã gửi, không sửa được. Cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa.");
         }
     }
 

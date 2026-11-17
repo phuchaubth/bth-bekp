@@ -47,6 +47,7 @@ public static class DependencyInjection
         services.AddScoped<IPatientRepository, PatientRepository>();
         services.AddScoped<IConsentTemplateRepository, ConsentTemplateRepository>();
         services.AddScoped<IConsentFormRepository, ConsentFormRepository>();
+        services.AddScoped<IRemoteSigningLinkRepository, RemoteSigningLinkRepository>();
         services.AddScoped<IConsentFormNumberGenerator, ConsentFormNumberGenerator>();
         services.AddScoped<IExportJobRepository, ExportJobRepository>();
         services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();

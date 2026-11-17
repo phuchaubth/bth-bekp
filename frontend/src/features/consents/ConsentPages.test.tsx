@@ -270,7 +270,7 @@ describe('Lập phiếu (màn hình 4–5)', () => {
     expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/consent-forms')!.body).toMatchObject({ departmentId: 'd-kkb' })
   })
 
-  it('hồ sơ còn số thẻ BHYT mã cũ 15 ký tự: báo cho người dùng khi lập phiếu và trên phiếu nháp', async () => {
+  it('lưu ý của phiếu (ví dụ số thẻ BHYT mã cũ 15 ký tự) hiện cố định trên phiếu nháp vừa lập, không lặp thông báo nổi', async () => {
     const notice = 'Số thẻ BHYT trong hồ sơ người bệnh là mã cũ 15 ký tự. Mã cũ vẫn được chấp nhận, nhưng nên cập nhật hồ sơ sang mã thẻ mới 17 ký tự.'
     mockApi({
       ...baseRoutes(nurse()),
@@ -288,7 +288,8 @@ describe('Lập phiếu (màn hình 4–5)', () => {
     await user.click(await screen.findByRole('button', { name: 'Lập phiếu CK-01' }))
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/phieu-dong-thuan/f-1'))
-    await waitFor(() => expect(screen.getAllByText(notice).length).toBeGreaterThanOrEqual(2))
+    expect(await screen.findByText(notice)).toBeInTheDocument()
+    expect(screen.getAllByText(notice)).toHaveLength(1)
   })
 })
 

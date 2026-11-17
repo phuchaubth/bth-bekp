@@ -53,13 +53,18 @@ public sealed class TemplateDefinitionTests
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"paragraph\",\"text\":\"P\",\"sameLine\":true}]}]}", "\"sameLine\"")]
     [InlineData("{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\",\"printOptionsOnly\":true}]}]}", "\"printOptionsOnly\"")]
     [InlineData("{\"title\":\"T\",\"documentControl\":{\"code\":\"" + LongText + "\"},\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"documentControl\"")]
-    [InlineData("{\"title\":\"T\",\"patientLines\":[],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "từ 1 đến 8 dòng")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "từ 1 đến 20 dòng")]
     [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\"},{\"patient\":\"gender\"},{\"patient\":\"address\"}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "có 1 hoặc 2 mục")]
     [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"religion\"}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"religion\" không in được")]
     [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\",\"field\":\"a\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "đúng một trong hai")]
-    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"c\"}]],\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]}]}]}", "\"c\" phải là trường văn bản")]
-    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"a\"}],[{\"field\":\"a\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "đã in ở dòng khác")]
-    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\",\"options\":[\"A\",\"B\"]}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "\"options\" chỉ dùng cho giới tính")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"c\"}]],\"sections\":[{\"blocks\":[{\"type\":\"confirm\",\"key\":\"c\",\"label\":\"C\"}]}]}", "\"c\" phải là trường văn bản")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"a\",\"other\":\"b\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"},{\"type\":\"text\",\"key\":\"b\",\"label\":\"B\"}]}]}", "\"other\" chỉ dùng kèm một câu hỏi chọn")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"c\",\"other\":\"d\"}]],\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]},{\"type\":\"date\",\"key\":\"d\",\"label\":\"D\"}]}]}", "\"other\" phải là trường văn bản")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"c\",\"other\":\"b\"}],[{\"field\":\"b\"}]],\"sections\":[{\"blocks\":[{\"type\":\"choice\",\"key\":\"c\",\"label\":\"C\",\"options\":[{\"value\":\"x\",\"label\":\"X\"}]},{\"type\":\"text\",\"key\":\"b\",\"label\":\"B\"}]}]}", "\"b\" đã in ở dòng khác")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"d\",\"options\":[\"A\",\"B\"]}]],\"sections\":[{\"blocks\":[{\"type\":\"date\",\"key\":\"d\",\"label\":\"D\"}]}]}", "\"options\" của trường chỉ dùng cho trường văn bản")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"a\",\"options\":[\"Kinh\"]}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "từ 2 đến 6 nhãn")]
+    [InlineData("{\"title\":\"T\",\"documentControl\":{\"codeLabel\":\"" + LongText + "\"},\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "các nhãn mỗi mục tối đa")]    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"field\":\"a\"}],[{\"field\":\"a\"}]],\"sections\":[{\"blocks\":[{\"type\":\"text\",\"key\":\"a\",\"label\":\"A\"}]}]}", "đã in ở dòng khác")]
+    [InlineData("{\"title\":\"T\",\"patientLines\":[[{\"patient\":\"fullName\",\"options\":[\"A\",\"B\"]}]],\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}]}", "chỉ dùng cho giới tính")]
     public void InvalidDefinitions_AreRejected_WithVietnameseMessage(string json, string expectedFragment)
     {
         var (definition, errors) = TemplateDefinitionValidator.Parse(json);
@@ -264,10 +269,55 @@ public sealed class TemplateDefinitionTests
         Assert.DoesNotContain("hideDepartment", plain, StringComparison.Ordinal);
         Assert.DoesNotContain("bilingual", plain, StringComparison.Ordinal);
         Assert.DoesNotContain("sameLine", plain, StringComparison.Ordinal);
-        foreach (var option in new[] { "documentControl", "patientLines", "printOptionsOnly", "hospitalFirst", "plainTitles" })
+        foreach (var option in new[]
+                 {
+                     "documentControl", "patientLines", "printOptionsOnly", "hospitalFirst", "plainTitles", "numberedPatientLines", "patientHint",
+                     "centerDate", "paperHints", "\"indent\":", "\"other\":",
+                 })
         {
             Assert.DoesNotContain(option, plain, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void PatientHint_IsLimitedLikeTheOtherSignatureLabels()
+    {
+        var json = "{\"title\":\"T\",\"sections\":[{\"blocks\":[{\"type\":\"paragraph\",\"text\":\"P\"}]}],\"signatures\":{\"patientHint\":\""
+            + new string('x', TemplateDefinitionValidator.MaxLabelLength + 1) + "\"}}";
+
+        var (_, errors) = TemplateDefinitionValidator.Parse(json);
+
+        Assert.Contains(errors, e => e.Contains("nhãn quá dài", StringComparison.Ordinal));
+    }
+
+    /// <summary>Tùy chọn in theo bản giấy TTNB (quyết định 33) giữ nguyên khi lưu và đọc lại.</summary>
+    [Fact]
+    public void OutpatientPaperOptions_AreKeptWhenSaved()
+    {
+        const string json = """
+            {"title":"T","numberedPatientLines":true,
+             "documentControl":{"code":"QT-01","titleInHead":true,"codeLabel":"Mã số (Code)","issueNoLabel":"Lần (Issue)","effectiveDateLabel":"Ngày (Date)"},
+             "patientLines":[[{"patient":"fullName"}],[{"field":"eth","options":["Kinh","Khác"]}],[{"field":"rel","other":"relOther"}],[{"field":"x","indent":true}]],
+             "sections":[{"blocks":[
+               {"type":"text","key":"eth","label":"Dân tộc"},
+               {"type":"choice","key":"rel","label":"Tôn giáo","options":[{"value":"a","label":"A"},{"value":"other","label":"Khác"}]},
+               {"type":"text","key":"relOther","label":"Khác, ghi rõ"},
+               {"type":"text","key":"x","label":"X"}]}],
+             "signatures":{"patientHint":"(Declarant)","centerDate":true,"paperHints":true}}
+            """;
+
+        var (definition, errors) = TemplateDefinitionValidator.Parse(json);
+        var saved = TemplateDefinitionValidator.Parse(TemplateJson.Serialize(definition!)).Definition!;
+
+        Assert.Empty(errors);
+        Assert.True(saved.NumberedPatientLines);
+        Assert.Equal(new TemplateDocumentControl("QT-01", null, null, true, "Mã số (Code)", "Lần (Issue)", "Ngày (Date)"), saved.DocumentControl);
+        Assert.Equal(["Kinh", "Khác"], saved.PatientLines![1][0].Options!);
+        Assert.Equal("relOther", saved.PatientLines[2][0].Other);
+        Assert.True(saved.PatientLines[3][0].Indent);
+        Assert.Equal("(Declarant)", saved.Signatures!.PatientHint);
+        Assert.True(saved.Signatures.CenterDate);
+        Assert.True(saved.Signatures.PaperHints);
     }
 
     [Fact]

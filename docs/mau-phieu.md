@@ -10,12 +10,13 @@
 | Mã mẫu | Bản Word gốc | Tên phiếu | Phía bệnh viện xác nhận | Người bệnh chọn ý kiến? |
 |---|---|---|---|---|
 | `QT-KNGT-BM02` | 19. SONG NGỮ QT-KNGT-BM02 | Giấy đồng thuận về chế độ thanh toán và quyền lợi khám chữa bệnh BHYT | Tiếp đón ("Nhân viên hướng dẫn") | Không, chỉ ký xác nhận |
-| `TTNB-NGOAITRU` | 27. BV Phiếu thông tin người bệnh ngoại trú | Phiếu thông tin người bệnh ngoại trú | Tiếp đón ("Nhân viên tiếp nhận") | Không, chỉ ký xác nhận |
+| `TTNB-NGOAITRU` | 27. BV Phiếu thông tin người bệnh ngoại trú; bản giấy PDF mã QT-KNGT/BM03 (16/11/2026) | Phiếu thông tin người bệnh ngoại trú | Tiếp đón ("Nhân viên tiếp nhận") | Không, chỉ ký xác nhận |
 | `QT-KNGT-BM10` | 30. JCI Phiếu nhận định ban đầu NB ngoại trú (02.08.2024) | Lần lượt: nhân viên hướng dẫn (Tiếp đón) → điều dưỡng → **bác sĩ xác nhận cuối** | Không, chỉ ký xác nhận |
 | `TUVAN-CONGTT` | 24. JCI Phiếu tư vấn tham gia và sử dụng cổng thông tin | Lần lượt: người tư vấn (Tiếp đón) → **điều dưỡng khoa xác nhận cuối** | Có: "Đồng ý (Agree)" / "Không đồng ý (Disagree)" |
 
 Mã `TTNB-NGOAITRU` và `TUVAN-CONGTT` do nhóm phát triển đặt vì bản Word không ghi mã biểu mẫu; bệnh viện đã đồng ý dùng
-hai mã này (13/11/2026).
+hai mã này (13/11/2026). Bản giấy TTNB gửi ngày 16/11/2026 có mã tài liệu QT-KNGT/BM03: mã này in ở đầu PDF; mã mẫu trong
+phần mềm vẫn là `TTNB-NGOAITRU` để giữ các phiếu đã lập và cấu hình kiosk.
 
 ## 1. Cách chuyển từ bản giấy
 
@@ -81,13 +82,30 @@ hai mã này (13/11/2026).
 
 ### 2.2. TTNB-NGOAITRU – Phiếu thông tin người bệnh ngoại trú
 
-- Dân tộc, tôn giáo (Phật giáo / Thiên chúa giáo / Khác, ghi rõ), trình độ văn hóa, nghề nghiệp, địa chỉ thường trú,
-  chỗ ở hiện nay.
-- Người nhà: họ tên, quan hệ, số điện thoại. Hỏi "Đây có phải người liên hệ khẩn cấp không?". Chọn "Không" thì bắt
-  buộc họ tên, quan hệ, số điện thoại của người liên hệ khẩn cấp.
-- Lời cam đoan của người khai. Nhãn ký bên bệnh viện kèm ghi chú "đã đối chiếu thông tin trên giấy tờ tùy thân".
-- Trên PDF (15/11/2026): trình độ văn hóa và nghề nghiệp in cùng một dòng (`sameLine` ở trường nghề nghiệp); hai ô "Có" và
-  "Không, điền thêm thông tin dưới đây" của câu người liên hệ khẩn cấp in trên cùng một dòng (`layout: "inline"`).
+- Nhập liệu: dân tộc (tự điền từ hồ sơ), tôn giáo (Phật giáo / Thiên chúa giáo / Khác, ghi rõ), trình độ văn hóa, nghề
+  nghiệp, địa chỉ thường trú, chỗ ở hiện nay (tự điền từ hồ sơ). Người nhà: họ tên, quan hệ, số điện thoại. Hỏi "Đây có phải
+  người liên hệ khẩn cấp không?"; chọn "Không" thì bắt buộc họ tên, quan hệ, số điện thoại của người liên hệ khẩn cấp. Lời
+  cam đoan của người khai.
+- **PDF in theo bản giấy bệnh viện gửi 16/11/2026** (mã QT-KNGT/BM03, lần ban hành 08; quyết định 33):
+  - đầu phiếu một hàng: logo bên trái, tên phiếu ở giữa ("PHIẾU THÔNG TIN NGƯỜI BỆNH NGOẠI TRÚ", dòng tiếng Anh màu xanh), ô
+    "Mã số (Code): QT-KNGT/BM03 / Lần ban hành (Issue number): 08 / Ngày hiệu lực (Effective date):" bên phải; không có quốc
+    hiệu, tên đơn vị, dòng khoa (`documentControl` với `titleInHead`; ngày hiệu lực bản giấy để trống);
+  - 15 mục đánh số như bản giấy (`patientLines`, `numberedPatientLines`): họ tên, giới tính (ô Nam/Nữ), ngày sinh, số căn
+    cước và số điện thoại lấy từ hồ sơ; dân tộc in ô "Kinh" / "Khác, ghi rõ" theo giá trị đã nhập; tôn giáo in ba ô và phần
+    ghi rõ sau ô "Khác"; mục 15 in hai ô Có/Không và ba dòng của người liên hệ khẩn cấp thụt vào, để chấm khi người nhà là
+    người liên hệ khẩn cấp; không còn mục "I. Thông tin người bệnh" và tiêu đề phần;
+  - dòng ngày tháng canh giữa, chữ đứng, kèm "(day)", "(month)", "(year)";
+  - ô ký: "Nhân viên tiếp nhận" bên trái với ghi chú "(đã đối chiếu thông tin trên giấy tờ tùy thân)", "(Patient Admission
+    Staff)", "(verified against identification documents)" (dòng đối chiếu màu đỏ như bản giấy, giữ nguyên sau khi xác nhận);
+    "Người khai (ký tên, ghi rõ họ tên)" bên phải với "(Declarant (signature, full name))", "Nếu không phải người bệnh, ghi rõ
+    quan hệ với người bệnh", "(If not the patient, state relationship to the patient)". Người đại diện ký thì họ tên kèm quan
+    hệ in dưới chữ ký.
+  - Phiếu đã ký (kể cả người đại diện ký, có khung chữ ký) vừa một trang A4 như bản giấy.
+  - Khác bản giấy: lề trang của phiếu điện tử rộng hơn nên tên phiếu cỡ 12 (bản giấy cỡ 14), ô mã tài liệu cỡ 9 (bản giấy cỡ
+    10), ghi chú ô ký cỡ 11; không in các dòng chấm để viết tay mà in giá trị đã nhập (ô trống thì in dòng chấm); thêm dấu
+    ")" còn thiếu ở "(Date of Birth (as per ID Card / Citizen ID))"; dấu ngoặc của phần tiếng Anh cùng màu xanh với chữ (bản
+    giấy để ngoặc màu đen); dòng "(đã đối chiếu…)" in nghiêng; người đại diện ký thì in thêm một dòng "Người ký thay mặt người
+    bệnh" (họ tên, quan hệ, số CCCD) dưới mục 15, như các mẫu khác.
 
 ### 2.3. QT-KNGT-BM10 – Phiếu nhận định ban đầu và nhu cầu GDSK
 
@@ -135,7 +153,7 @@ rất cao).
 |---|---|---|---|
 | Nhập liệu theo từng phần (BM10) | Mỗi người tự ghi phần của mình vào phiếu giấy | Nội dung điền ở bản nháp (nhân viên cùng khoa đều sửa được), khóa khi trình ký; sau khi người bệnh ký, từng người xác nhận phần của mình bằng tài khoản | Khóa riêng từng phần theo vai trò nếu bệnh viện cần |
 | Phạm vi khoa | | Người xác nhận phải thấy được phiếu: cùng khoa với phiếu, hoặc có quyền toàn viện. Nhân viên hướng dẫn, điều dưỡng, bác sĩ cần thuộc cùng khoa (ví dụ Khoa Khám bệnh) | |
-| Mã QR, logo trên phiếu | Có | Logo tải ở *Quản trị → Cấu hình hệ thống* in ở đầu phiếu; mẫu có `documentControl` (BM02) in thêm ô mã tài liệu như bản giấy. Mã QR chưa in | Bổ sung khối hình ảnh nếu cần |
+| Mã QR, logo trên phiếu | Có | Logo tải ở *Quản trị → Cấu hình hệ thống* in ở đầu phiếu; mẫu có `documentControl` (BM02, TTNB) in thêm ô mã tài liệu như bản giấy. Mã QR chưa in | Bổ sung khối hình ảnh nếu cần |
 | Bố cục bảng, ô vuông | Bảng nhiều cột | Danh sách câu hỏi tuần tự; PDF dùng ô ☐, ô đã chọn có dấu X ☒ như đánh dấu trên giấy (quyết định 30) | |
 | Số trang PDF | BM02, phiếu tư vấn: 1 trang | 2 trang, vì khối chữ ký luôn nằm trọn một trang | Thu gọn bố cục nếu bệnh viện yêu cầu 1 trang |
 
@@ -152,14 +170,16 @@ rất cao).
 5. **BM10, trạng thái tinh thần:** bản giấy ghi "Đáp ứng phù hợp: ☐ Không ☐ Có, ghi rõ". Ứng dụng giữ nguyên (chọn "Có"
    thì ghi rõ). Nếu ý đúng là "Không thì ghi rõ", cần sửa mẫu.
 6. Mã chính thức cho hai phiếu chưa có mã (`TTNB-NGOAITRU`, `TUVAN-CONGTT`), và lần ban hành, ngày hiệu lực in trên PDF.
-   BM02 đã in mã số, lần ban hành theo bản giấy (`documentControl`); mẫu khác in được khi bệnh viện gửi bản giấy.
+   BM02 và TTNB (QT-KNGT/BM03, lần ban hành 08) đã in mã số, lần ban hành theo bản giấy (`documentControl`); mẫu khác in được
+   khi bệnh viện gửi bản giấy.
 
 ## 5. Khi bệnh viện muốn sửa
 
 - Sửa câu chữ, thêm/bớt câu hỏi, đổi ngưỡng điểm: người quản lý mẫu tạo **phiên bản mới** ở màn hình *Mẫu phiếu* (soạn
   JSON, xem trước), rồi phát hành. Phiếu đã lập giữ đúng phiên bản cũ.
-- Cách in trên PDF (bỏ dòng khoa ở đầu phiếu, mục I song ngữ, in hai trường cùng dòng): thêm `hideDepartment`,
-  `bilingual`, `sameLine` khi soạn JSON của phiên bản mới (xem [API, mục 6b](api.md)).
+- Cách in trên PDF (bỏ dòng khoa ở đầu phiếu, mục I song ngữ, in hai trường cùng dòng, in theo bản giấy có mã tài liệu):
+  thêm `hideDepartment`, `bilingual`, `sameLine`, `documentControl`, `patientLines`… khi soạn JSON của phiên bản mới (xem
+  [API, mục 6b](api.md)).
 - **Cấu hình ký** (thẻ *Cấu hình ký* của phiên bản nháp, không cần sửa JSON): thêm, xóa, đổi thứ tự các bước xác nhận
   (tối đa 5, mỗi bước chọn vai trò và tên ô ký), chọn hỏi Đồng ý/Không đồng ý hay chỉ ký xác nhận, câu hỏi và nhãn lựa
   chọn, tên các ô ký trên PDF. Ô để trống dùng nhãn mặc định. Lưu xong phải **phát hành** phiên bản thì phiếu mới mới áp

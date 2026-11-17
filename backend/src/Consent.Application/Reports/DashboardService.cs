@@ -3,15 +3,13 @@ using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
 using Consent.Domain.Authorization;
 using Consent.Domain.ConsentForms;
-using Consent.Domain.ConsentTemplates;
 
 namespace Consent.Application.Reports;
 
 /// <summary>
 /// Trang tổng quan (màn hình 2) trong phạm vi khoa của người dùng: số phiếu nháp, chờ ký, hoàn tất hôm nay, thu hồi
-/// 30 ngày qua; phiếu đang đến lượt người dùng xác nhận (người bệnh đã ký; bước trung gian kế tiếp hoặc xác nhận cuối
-/// thuộc vai trò của người dùng); phiếu người dùng lập chưa hoàn tất; số phiếu lập và hoàn tất từng ngày trong 14 ngày
-/// gần nhất.
+/// 30 ngày qua; phiếu chờ người dùng xác nhận (người bệnh đã ký, bước xác nhận đang chờ thuộc vai trò của người dùng); phiếu người
+/// dùng lập chưa hoàn tất; số phiếu lập và hoàn tất từng ngày trong 14 ngày gần nhất.
 /// </summary>
 public sealed class DashboardService(
     IConsentFormRepository forms,
@@ -61,58 +59,52 @@ public sealed class DashboardService(
     }
 
     /// <summary>
-    /// Phiếu đang đến lượt người dùng xác nhận, cùng quy tắc với nút xác nhận trên phiếu (<see cref="ConfirmationTurn"/>):
-    /// bước trung gian kế tiếp thuộc vai trò của người dùng, hoặc đã xong mọi bước và người dùng có vai trò xác nhận cuối;
-    /// người đã xác nhận một bước của phiếu thì không còn lượt. Các bước nằm trong định nghĩa của phiên bản mẫu mà phiếu lập
-    /// theo, nên CSDL chỉ lọc phiếu chờ xác nhận (trong phạm vi khoa) thuộc các phiên bản mà người dùng có vai trò ở một bước
-    /// hoặc ở xác nhận cuối; lượt được xét ở đây. Chỉ đọc thông tin hiển thị của các phiếu được hiện.
+    /// Phiếu đang đến lượt người dùng xác nhận: người bệnh đã ký và bước đang chờ thuộc vai trò của người dùng. Bước đang chờ
+    /// là bước trung gian đầu tiên chưa xác nhận theo định nghĩa mẫu; hết bước trung gian thì là xác nhận cuối. Bỏ phiếu người
+    /// dùng đã xác nhận một bước (mỗi bước cần một người khác), cùng điều kiện hiện nút xác nhận trên trang phiếu.
     /// </summary>
     private async Task<DashboardFormList> AwaitingMyConfirmationAsync(ConsentFormSearch scope, CancellationToken cancellationToken)
     {
-        var flows = new Dictionary<Guid, ConfirmationFlow>();
+        // Chỉ các phiên bản mẫu mà người dùng có vai trò ở một bước nào đó (bước trung gian hoặc xác nhận cuối).
+        var versions = new Dictionary<Guid, (IReadOnlyList<TemplateConfirmationStep> Steps, string FinalRole)>();
         foreach (var template in await templates.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
         {
-            // Phiếu chỉ lập theo phiên bản đã phát hành (đang dùng hoặc đã ngừng dùng), không theo bản nháp.
-            foreach (var version in template.Versions.Where(v => v.Status != TemplateVersionStatus.Draft))
+            foreach (var version in template.Versions)
             {
                 var steps = ConsentTemplateService.ReadDefinition(version).Signatures?.Steps ?? [];
                 if (currentUser.IsInRole(template.HospitalSignerRoleCode) || steps.Any(s => currentUser.IsInRole(s.RoleCode)))
                 {
-                    flows[version.Id] = new ConfirmationFlow(steps, template.HospitalSignerRoleCode);
+                    versions[version.Id] = (steps, template.HospitalSignerRoleCode);
                 }
             }
         }
 
-        if (flows.Count == 0)
+        if (versions.Count == 0)
         {
             return new DashboardFormList(0, []);
         }
 
-        var waiting = await statistics.ListAwaitingConfirmationAsync(scope, [.. flows.Keys], cancellationToken).ConfigureAwait(false);
-        var mine = waiting
-            .Where(form => flows.TryGetValue(form.TemplateVersionId, out var flow) && IsMyTurn(form, flow))
-            .OrderBy(form => form.PatientSignedAtUtc)
-            .ThenBy(form => form.FormId)
-            .Select(form => form.FormId)
+        var candidates = await statistics.ListAwaitingConfirmationAsync(scope, versions.Keys, cancellationToken).ConfigureAwait(false);
+        var myTurn = candidates
+            .Where(c => versions.TryGetValue(c.TemplateVersionId, out var template) && IsMyTurn(c, template.Steps, template.FinalRole))
+            .OrderBy(c => c.PatientSignedAtUtc)
             .ToList();
-        var shown = mine.Take(ListSize).ToList();
-        var items = (await statistics.ListAwaitingConfirmationItemsAsync(shown, cancellationToken).ConfigureAwait(false))
-            .ToDictionary(item => item.Id);
-        return new DashboardFormList(mine.Count, [.. shown.Where(items.ContainsKey).Select(id => items[id])]);
+        var shown = myTurn.Take(ListSize).Select(c => c.Id).ToList();
+        var items = shown.Count == 0
+            ? []
+            : await statistics.GetSignedFormItemsAsync(shown, cancellationToken).ConfigureAwait(false);
+        return new DashboardFormList(
+            myTurn.Count, [.. shown.Select(id => items.FirstOrDefault(i => i.Id == id)).OfType<DashboardFormItem>()]);
     }
 
-    private bool IsMyTurn(AwaitingConfirmationForm form, ConfirmationFlow flow)
+    private bool IsMyTurn(AwaitingConfirmationCandidate form, IReadOnlyList<TemplateConfirmationStep> steps, string finalRole)
     {
-        var next = ConfirmationTurn.NextStep(flow.Steps, form.Steps.Select(s => s.StepKey));
-        var (canConfirmStep, canConfirm) = ConfirmationTurn.For(
-            currentUser,
-            awaitingConfirmation: true,
-            next?.RoleCode,
-            flow.FinalRoleCode,
-            confirmedAStep: form.Steps.Any(s => s.UserId == currentUser.UserId));
-        return canConfirmStep || canConfirm;
-    }
+        if (form.ConfirmedSteps.Any(s => s.UserId is { } userId && userId == currentUser.UserId))
+        {
+            return false;
+        }
 
-    /// <summary>Các bước trung gian của một phiên bản mẫu và vai trò xác nhận cuối của mẫu.</summary>
-    private sealed record ConfirmationFlow(IReadOnlyList<TemplateConfirmationStep> Steps, string FinalRoleCode);
+        var pending = steps.FirstOrDefault(step => !form.ConfirmedSteps.Any(s => s.StepKey == step.Key));
+        return currentUser.IsInRole(pending?.RoleCode ?? finalRole);
+    }
 }

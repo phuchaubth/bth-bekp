@@ -23,7 +23,26 @@ import { SpecimenImage } from '../account/SignatureSpecimen'
 import { SignatureFrameBox } from '../signing/SignatureFrame'
 import { SignaturePad, type SignaturePadHandle } from '../signing/SignaturePad'
 import { SIGNING_PATH, signingSession } from '../signing/signingSession'
+import { splitBilingual } from './bilingual'
 import { EncounterPicker } from './EncounterPicker'
+
+/** Mẫu có hỏi ý kiến (Đồng ý/Từ chối) khi người bệnh ký; mẫu chỉ ký xác nhận nội dung thì không. */
+const asksDecision = (form: ConsentFormDetail) => form.definition.signatures?.decision !== 'none'
+
+/** Phần tiếng Việt của nhãn song ngữ ("Đồng ý (Agree)", "Đồng ý/ Agree" → "Đồng ý"). */
+const vietnameseOnly = (text: string) =>
+  splitBilingual(text)
+    .filter((segment) => !segment.english)
+    .map((segment) => segment.text)
+    .join('')
+    .replace(/[\s/]+$/, '')
+    .trim()
+
+/** "Đồng ý hoặc Từ chối" theo nhãn của mẫu. */
+const decisionChoices = (form: ConsentFormDetail) =>
+  `${vietnameseOnly(form.definition.signatures?.agreeLabel ?? decisionLabels.Agreed)} hoặc ${vietnameseOnly(
+    form.definition.signatures?.refuseLabel ?? decisionLabels.Refused,
+  )}`
 
 /**
  * Chuyển máy sang chế độ ký: lấy token phiên ký, đóng phiên đăng nhập của nhân viên trên máy này rồi mở màn hình ký.
@@ -66,8 +85,8 @@ export function StartSigningModal({ form, onClose }: { form: ConsentFormDetail; 
       onCancel={onClose}
     >
       <Typography.Paragraph>
-        Máy này sẽ chuyển sang màn hình ký để {form.representative ? 'người đại diện' : 'người bệnh'} đọc lại nội dung, chọn
-        Đồng ý hoặc Từ chối và ký tay.
+        Máy này sẽ chuyển sang màn hình ký để {form.representative ? 'người đại diện' : 'người bệnh'} đọc lại nội dung,{' '}
+        {asksDecision(form) ? `chọn ${decisionChoices(form)} và ký tay.` : 'rồi ký tay xác nhận.'}
       </Typography.Paragraph>
       <Typography.Paragraph>
         <Typography.Text strong>Phiên đăng nhập của bạn trên máy này sẽ được đóng.</Typography.Text> Sau khi ký xong, bạn
@@ -202,6 +221,10 @@ export function StaffSignModal({
       okText={okText}
       cancelText="Đóng"
       width={encounterSource ? 800 : 640}
+      // Sát mép trên, khung ký thấp hơn, phần nội dung cuộn bên trong hộp: màn hình máy tính thấp (768 điểm ảnh) vẫn thấy
+      // nút ký mà không phải cuộn cả trang.
+      style={{ top: 16 }}
+      styles={{ body: { maxHeight: 'calc(100vh - 190px)', overflowY: 'auto' } }}
       okButtonProps={{ disabled: specimen.isPending || (!useSpecimen && !hasInk) || missingEncounter, loading }}
       onOk={() => {
         if (missingEncounter) {
@@ -240,7 +263,7 @@ export function StaffSignModal({
       ) : useSpecimen ? (
         <Flex vertical gap={8}>
           <Typography.Text strong>Ký bằng chữ ký mẫu của bạn:</Typography.Text>
-          <SignatureFrameBox>
+          <SignatureFrameBox plainHeight={104} maxFrameHeight="24vh">
             <SpecimenImage fill />
           </SignatureFrameBox>
           <Typography.Text type="secondary">
@@ -265,7 +288,7 @@ export function StaffSignModal({
               <Link to="/tai-khoan">Tài khoản của tôi</Link> để lần sau không phải ký lại.
             </Typography.Paragraph>
           )}
-          <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} />
+          <SignaturePad ref={pad} onInkChange={setHasInk} disabled={loading} maxFrameHeight="30vh" />
           {(!hasInk || missingEncounter) && (
             <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
               {missingEncounter && !hasInk

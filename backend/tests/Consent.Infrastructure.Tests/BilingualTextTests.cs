@@ -20,10 +20,19 @@ public class BilingualTextTests
         "Đăng ký khám (Register via the mobile application named “BV Truyền máu Huyết học” or “BTH”)",
         "(Register via the mobile application named “BV Truyền máu Huyết học” or “BTH”)")]
     [InlineData("Nếu trả lời “CÓ” (If you answered “YES” (any question), please ask).", "(If you answered “YES” (any question), please ask)")]
+    // Bản giấy TTNB (16/11/2026): ngoặc tiếng Việt có dấu "/" giữ màu đen; "(theo CCCD)" là tiếng Việt; ngoặc lồng nhau.
+    [InlineData("Họ và Tên (theo Chứng minh /Căn cước) (Full Name (as per ID Card / Citizen ID))", "(Full Name (as per ID Card / Citizen ID))")]
+    [InlineData("Ngày sinh (theo CCCD) (Date of Birth (as per ID Card / Citizen ID))", "(Date of Birth (as per ID Card / Citizen ID))")]
+    [InlineData(
+        "Số căn cước/mã số định danh cá nhân/số hộ chiếu (Identity Card/Citizen ID/Personal Identification Number/Passport Number)",
+        "(Identity Card/Citizen ID/Personal Identification Number/Passport Number)")]
     public void Parentheses_InEnglish_AreEnglish(string text, string expected) =>
         Assert.Equal(expected, English(text));
 
     [Theory]
+    [InlineData("Ngày sinh (theo CCCD)")]
+    [InlineData("Số thẻ (BHYT)")]
+    [InlineData("Họ và Tên (theo Chứng minh /Căn cước)")]
     [InlineData("Nguy cơ (0 điểm)")]
     [InlineData("Địa chỉ (theo hộ khẩu)")]
     [InlineData("Cân nặng (kg)")]

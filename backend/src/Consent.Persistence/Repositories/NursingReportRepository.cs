@@ -34,4 +34,10 @@ internal sealed class NursingReportRepository(ConsentDbContext db) : INursingRep
         db.NursingDailyStatistics.FirstOrDefaultAsync(s => s.ReportDate == reportDate, cancellationToken);
 
     public void AddStatistics(NursingDailyStatistics statistics) => db.NursingDailyStatistics.Add(statistics);
+
+    public async Task<IReadOnlyList<NursingDepartmentStatistics>> ListDepartmentStatisticsAsync(
+        DateOnly reportDate, CancellationToken cancellationToken) =>
+        await db.NursingDepartmentStatistics.Where(s => s.ReportDate == reportDate).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public void AddDepartmentStatistics(NursingDepartmentStatistics statistics) => db.NursingDepartmentStatistics.Add(statistics);
 }

@@ -16,6 +16,8 @@ interface Props {
   disabled?: boolean
   /** Tỉ lệ khung ký (ví dụ "2 / 1" cho kiosk màn hình dọc); mặc định theo cỡ màn hình. */
   aspectRatio?: string
+  /** Chiều cao tối đa của khung ký (ví dụ "30vh" trong hộp thoại, để không phải cuộn trên màn hình thấp). */
+  maxFrameHeight?: string
 }
 
 type Point = { x: number; y: number }
@@ -27,7 +29,7 @@ const MIN_INK_LENGTH = 40
  * Khung ký tay dùng Pointer Events: ký được bằng ngón tay, bút cảm ứng hoặc chuột. Nét ký chỉ nằm trong bộ nhớ để vẽ lại
  * khi xoay màn hình; thứ gửi đi chỉ là ảnh PNG (không gửi tọa độ, thời gian từng nét).
  */
-export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }: Props) {
+export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio, maxFrameHeight }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // Điện thoại cầm dọc: khung ký cao hơn (2:1 thay vì 3:1) để đủ chỗ ký bằng ngón tay, và gợi ý xoay ngang.
   const screens = Grid.useBreakpoint()
@@ -160,10 +162,11 @@ export function SignaturePad({ ref, onInkChange, disabled = false, aspectRatio }
         onPointerLeave={onPointerUp}
         style={{
           ...(frame
-            ? { ...frameStyle(frame), display: 'block' }
+            ? { ...frameStyle(frame, maxFrameHeight), display: 'block' }
             : {
                 width: '100%',
                 aspectRatio: aspectRatio ?? (narrow ? '2 / 1' : '3 / 1'),
+                maxHeight: maxFrameHeight,
                 border: '2px dashed #94a3b8',
                 borderRadius: 8,
                 background: '#ffffff',

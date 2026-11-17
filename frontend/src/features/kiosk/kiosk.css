@@ -453,6 +453,37 @@
   height: auto;
 }
 
+/* Camera đọc mã QR (khi kiosk có camera): hình lật như soi gương, khung vuông chỉ chỗ đưa mã. */
+.kiosk-camera {
+  position: relative;
+  flex: none;
+  align-self: center;
+  width: 100%;
+  max-width: calc(var(--k) * 860);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: calc(var(--k) * 6) solid var(--brand);
+  border-radius: calc(var(--k) * 28);
+  background: #000;
+}
+
+.kiosk-camera video {
+  height: 100%;
+}
+
+.kiosk-camera-target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: calc(var(--k) * 6) dashed rgba(255, 255, 255, 0.9);
+  border-radius: calc(var(--k) * 20);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
 /* Ô nhập */
 .kiosk-field {
   display: flex;

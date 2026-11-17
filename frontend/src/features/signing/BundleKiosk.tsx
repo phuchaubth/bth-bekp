@@ -15,7 +15,7 @@ import { formatDate, formatDateTime } from '../../utils/format'
 import { Bilingual } from '../consents/Bilingual'
 import { DynamicForm } from '../consents/DynamicForm'
 import { relationshipLabels } from '../patients/labels'
-import { readyHint } from './kioskText'
+import { endedHint, readyHint, signedHint } from './kioskText'
 import { SignaturePad, type SignaturePadHandle } from './SignaturePad'
 import type { SigningSession } from './signingSession'
 import { StaffUnlock } from './StaffUnlock'
@@ -64,6 +64,7 @@ export function BundleKiosk({
   const [unlockOpen, setUnlockOpen] = useState(false)
   const narrow = Grid.useBreakpoint().sm === false
   const cardSize = narrow ? 'small' : 'medium'
+  const remote = !!session.remote
 
   const representative = first.representative
   const signerLabel = representative ? 'người đại diện' : 'người bệnh'
@@ -87,6 +88,7 @@ export function BundleKiosk({
       })
       setSignedAt(result.signedAtUtc)
       setStage('signed')
+      session.onSigned?.()
     } catch (e) {
       if (e instanceof ApiError && (e.status === 401 || e.status === 409)) {
         setStage('ended')
@@ -123,7 +125,7 @@ export function BundleKiosk({
             <Result
               status="success"
               title={`Đã ký xong ${forms.length} phiếu`}
-              subTitle={`Ký lúc ${formatDateTime(signedAt)}. Vui lòng đưa máy lại cho nhân viên y tế.`}
+              subTitle={`Ký lúc ${formatDateTime(signedAt)}. ${signedHint(remote)}`}
             />
           </Card>
         ) : stage === 'ended' ? (
@@ -131,13 +133,13 @@ export function BundleKiosk({
             type="warning"
             showIcon
             title="Phiên ký đã kết thúc"
-            description={error ?? 'Phiên ký đã hết hạn hoặc đã được thay bằng phiên khác. Nhân viên đăng nhập lại để mở phiên mới.'}
+            description={error ?? endedHint(remote)}
           />
         ) : (
           <>
             <Card title={`Các phiếu cần ký (${forms.length})`} size={cardSize}>
               <Flex vertical gap={12}>
-                <Typography.Text type="secondary">Chạm “Xem nội dung” để đọc từng phiếu.</Typography.Text>
+                <Typography.Text type="secondary">Chạm “Xem nội dung phiếu” để đọc từng phiếu.</Typography.Text>
                 {forms.map((form, index) => (
                   <BundleFormItem
                     key={form.id}
@@ -183,7 +185,8 @@ export function BundleKiosk({
           </>
         )}
 
-        {stage === 'signing' && !unlockOpen ? (
+        {/* Điện thoại riêng của người bệnh: không có lối thoát cho nhân viên (máy không phải của bệnh viện). */}
+        {remote ? null : stage === 'signing' && !unlockOpen ? (
           <Button type="link" icon={<LockOutlined />} onClick={() => setUnlockOpen(true)} style={{ alignSelf: 'center' }}>
             Nhân viên: thoát chế độ ký
           </Button>

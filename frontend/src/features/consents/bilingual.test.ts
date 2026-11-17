@@ -19,11 +19,14 @@ describe('splitBilingual', () => {
       '(Register via the mobile application named “BV Truyền máu Huyết học” or “BTH”)',
     ],
     ['Nếu trả lời “CÓ” (If you answered “YES” (any question), please ask).', '(If you answered “YES” (any question), please ask)'],
+    // Bản giấy TTNB (16/11/2026): ngoặc tiếng Việt có dấu "/" giữ màu đen; "(theo CCCD)" là tiếng Việt; ngoặc lồng nhau.
+    ['Họ và Tên (theo Chứng minh /Căn cước) (Full Name (as per ID Card / Citizen ID))', '(Full Name (as per ID Card / Citizen ID))'],
+    ['Ngày sinh (theo CCCD) (Date of Birth (as per ID Card / Citizen ID))', '(Date of Birth (as per ID Card / Citizen ID))'],
   ])('tiếng Anh trong ngoặc: %s', (text, expected) => {
     expect(english(text)).toBe(expected)
   })
 
-  it.each(['Nguy cơ (0 điểm)', 'Địa chỉ (theo hộ khẩu)', 'Cân nặng (kg)', 'Ông (bà)', 'Chỉ số (BMI)', 'Email: ctxh_bth@bth.org.vn', 'Wong – Baker', 'Ngoặc chưa đóng (Yes'])(
+  it.each(['Ngày sinh (theo CCCD)', 'Số thẻ (BHYT)', 'Họ và Tên (theo Chứng minh /Căn cước)', 'Nguy cơ (0 điểm)', 'Địa chỉ (theo hộ khẩu)', 'Cân nặng (kg)', 'Ông (bà)', 'Chỉ số (BMI)', 'Email: ctxh_bth@bth.org.vn', 'Wong – Baker', 'Ngoặc chưa đóng (Yes'])(
     'giữ màu thường: %s',
     (text) => {
       expect(english(text)).toBe('')

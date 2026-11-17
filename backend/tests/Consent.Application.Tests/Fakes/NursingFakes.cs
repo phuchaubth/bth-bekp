@@ -34,6 +34,11 @@ internal sealed class InMemoryNursingReportRepository(InMemoryStore store) : INu
         Task.FromResult(store.NursingStatistics.Find(s => s.ReportDate == reportDate));
 
     public void AddStatistics(NursingDailyStatistics statistics) => store.NursingStatistics.Add(statistics);
+
+    public Task<IReadOnlyList<NursingDepartmentStatistics>> ListDepartmentStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NursingDepartmentStatistics>>([.. store.NursingDepartmentStatistics.Where(s => s.ReportDate == reportDate)]);
+
+    public void AddDepartmentStatistics(NursingDepartmentStatistics statistics) => store.NursingDepartmentStatistics.Add(statistics);
 }
 
 internal sealed class StubDailyStatisticsSource : IDailyStatisticsSource

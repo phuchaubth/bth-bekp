@@ -189,7 +189,8 @@ internal sealed class AppTestContext
         His,
         Microsoft.Extensions.Options.Options.Create(new HospitalOptions()),
         new UpdateHospitalSettingsRequestValidator(),
-        Documents);
+        Documents,
+        PatientSource);
 
     public ConsentSigningService CreateConsentSigningService() => new(
         CreateConsentFormService(),
@@ -206,6 +207,16 @@ internal sealed class AppTestContext
         new PatientSignatureRequestValidator(),
         new RevokeConsentFormRequestValidator(),
         CreateConsentEncounterService());
+
+    public RemoteSigningService CreateRemoteSigningService() => new(
+        CreateConsentFormService(),
+        new InMemoryConsentFormRepository(Store),
+        new InMemoryRemoteSigningLinkRepository(Store),
+        new InMemoryUserRepository(Store),
+        Tokens,
+        Store,
+        Clock,
+        CurrentUser);
 
     public StubEncounterSource EncounterSource { get; } = new();
 
@@ -233,7 +244,8 @@ internal sealed class AppTestContext
         CurrentUser,
         Clock,
         CreateSettingsService(),
-        NursingDocuments);
+        NursingDocuments,
+        new InMemorySystemSettingRepository(Store));
 
     public NursingSummaryService CreateNursingSummaryService() => new(
         new InMemoryNursingReportRepository(Store),
@@ -245,7 +257,8 @@ internal sealed class AppTestContext
         Clock,
         CreateSettingsService(),
         NursingDocuments,
-        NursingDocuments);
+        NursingDocuments,
+        new InMemorySystemSettingRepository(Store));
 
     /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
     public void TurnOnEncounters()

@@ -36,6 +36,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<ConsentForm> ConsentForms => Set<ConsentForm>();
 
+    public DbSet<RemoteSigningLink> RemoteSigningLinks => Set<RemoteSigningLink>();
+
     public DbSet<ExportJob> ExportJobs => Set<ExportJob>();
 
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
@@ -45,6 +47,8 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
     public DbSet<NursingReportDepartment> NursingReportDepartments => Set<NursingReportDepartment>();
 
     public DbSet<NursingDailyStatistics> NursingDailyStatistics => Set<NursingDailyStatistics>();
+
+    public DbSet<NursingDepartmentStatistics> NursingDepartmentStatistics => Set<NursingDepartmentStatistics>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

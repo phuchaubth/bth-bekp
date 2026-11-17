@@ -187,6 +187,20 @@ public sealed class ConsentFormTests
     }
 
     [Fact]
+    public void EndSigning_ClosesOnlyThatSession()
+    {
+        var form = FormIn(Stage.AwaitingPatient);
+        var replaced = Guid.NewGuid();
+
+        form.EndSigning(replaced, Now);
+        Assert.Equal(Session, form.SigningSessionId);
+
+        form.EndSigning(Session, Now);
+        Assert.Null(form.SigningSessionId);
+        Assert.Throws<DomainException>(() => PatientSigns(form));
+    }
+
+    [Fact]
     public void PatientSignature_WithoutDecision_ForConfirmOnlyForms_AndRejectsUnknownDecision()
     {
         var form = FormIn(Stage.AwaitingPatient);

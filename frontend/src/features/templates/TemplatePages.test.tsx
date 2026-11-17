@@ -315,10 +315,17 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
     expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['nurse', 'screeningStaff'])
   })
 
-  it('cấu hình ký: lưu giữ nguyên cách in ô ký trên PDF đặt trong JSON (nhân viên bên trái, tên ô ký như đã ghi)', async () => {
+  it('cấu hình ký: lưu giữ nguyên cách in ô ký trên PDF đặt trong JSON (nhân viên bên trái, tên ô ký như đã ghi, ghi chú như bản giấy TTNB)', async () => {
     const paperStyle: TemplateDefinition = {
       ...definition,
-      signatures: { hospital: 'Nhân viên hướng dẫn/ Counseling Staff', hospitalFirst: true, plainTitles: true },
+      signatures: {
+        hospital: 'Nhân viên hướng dẫn/ Counseling Staff',
+        hospitalFirst: true,
+        plainTitles: true,
+        patientHint: '(Declarant (signature, full name))',
+        centerDate: true,
+        paperHints: true,
+      },
     }
     const { calls } = mockApi({
       ...baseRoutes(manager()),
@@ -341,6 +348,9 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
       hospital: 'Nhân viên hướng dẫn/ Counseling Staff',
       hospitalFirst: true,
       plainTitles: true,
+      patientHint: '(Declarant (signature, full name))',
+      centerDate: true,
+      paperHints: true,
     })
   })
 

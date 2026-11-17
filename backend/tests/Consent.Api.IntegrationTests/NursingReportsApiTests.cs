@@ -158,7 +158,7 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
     }
 
     [Fact]
-    public async Task HisFigures_CanBeTypedIn_WhenThePatientInfoApiIsNotConfigured()
+    public async Task HisFigures_AreTypedInByEachDepartment_WhenHisIsUnavailable()
     {
         var (nurse, office, _) = await LoginAsync();
         var noi = await InternalMedicineIdAsync(office);
@@ -168,23 +168,51 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(HttpStatusCode.UnprocessableEntity, refreshStatus);
         Assert.Equal("nursing_reports.his_disabled", refresh.GetProperty("code").GetString());
 
+        // Phòng Điều dưỡng giao khoa Nội nhập tổng số người bệnh đến khám (quyết định 35); khoa Nội phải báo cáo.
+        var (assignStatus, assigned) = await _client.SendJsonAsync(
+            HttpMethod.Put,
+            "/api/v1/nursing-reports/departments",
+            office,
+            new { items = new[] { new { departmentId = noi, bedCount = 40 } }, hisEntry = new Dictionary<string, string?> { ["outpatientVisits"] = noi } });
+        Assert.True(assignStatus == HttpStatusCode.OK, assigned.ToString());
+        Assert.Equal(
+            ["outpatientVisits"],
+            assigned.EnumerateArray().Single(d => d.GetProperty("departmentId").GetString() == noi)
+                .GetProperty("hisIndicators").EnumerateArray().Select(i => i.GetString()));
+
+        // Phòng Điều dưỡng không nhập thay khoa; lệnh nhập tay của Phòng Điều dưỡng không còn.
         Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(
-            HttpMethod.Put, "/api/v1/nursing-reports/statistics", nurse, new { reportDate = Today, hospital = new { outpatientVisits = 1 } })).Status);
+            HttpMethod.Put, "/api/v1/nursing-reports/his-entry", office,
+            new { departmentId = noi, reportDate = Today, values = new { waitingAdmission = 1 } })).Status);
+        var (removedStatus, _) = await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/nursing-reports/statistics", office, new { reportDate = Today, hospital = new { outpatientVisits = 1 } });
+        Assert.Contains(removedStatus, new[] { HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed });
+
         var (savedStatus, saved) = await _client.SendJsonAsync(
             HttpMethod.Put,
-            "/api/v1/nursing-reports/statistics",
-            office,
-            new
-            {
-                reportDate = Today,
-                hospital = new Dictionary<string, int?> { ["outpatientVisits"] = 686, ["xray"] = 65 },
-                waitingAdmission = new Dictionary<string, int?> { [noi] = 2 },
-            });
-
+            "/api/v1/nursing-reports/his-entry",
+            nurse,
+            new { reportDate = Today, values = new Dictionary<string, int?> { ["waitingAdmission"] = 2, ["outpatientVisits"] = 686 } });
         Assert.True(savedStatus == HttpStatusCode.OK, saved.ToString());
-        Assert.Equal(686, saved.GetProperty("outpatient")[0].GetProperty("value").GetInt32());
-        Assert.Equal("Manual", saved.GetProperty("statistics").GetProperty("source").GetString());
-        Assert.False(saved.GetProperty("statistics").GetProperty("hisAvailable").GetBoolean());
+        var entry = saved.GetProperty("hisEntry");
+        Assert.Equal(
+            [("waitingAdmission", 2), ("outpatientVisits", 686)],
+            entry.GetProperty("lines").EnumerateArray().Select(l => (l.GetProperty("key").GetString(), l.GetProperty("value").GetInt32())));
+        Assert.Equal("Điều dưỡng Demo", entry.GetProperty("updatedBy").GetString());
+
+        var (summaryStatus, summary) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
+        Assert.Equal(HttpStatusCode.OK, summaryStatus);
+        Assert.Equal(686, summary.GetProperty("outpatient")[0].GetProperty("value").GetInt32());
+        Assert.False(string.IsNullOrEmpty(summary.GetProperty("outpatient")[0].GetProperty("enteredBy").GetString()));
+        var row = summary.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("departmentId").GetString() == noi);
+        Assert.Equal(2, row.GetProperty("cells").GetProperty("waitingAdmission").GetInt32());
+        var statistics = summary.GetProperty("statistics");
+        Assert.False(statistics.GetProperty("hasValues").GetBoolean());
+        Assert.True(statistics.GetProperty("usesDepartmentEntries").GetBoolean());
+        Assert.Equal(
+            "Điều dưỡng Demo",
+            statistics.GetProperty("entries").EnumerateArray().Single(e => e.GetProperty("departmentId").GetString() == noi)
+                .GetProperty("enteredBy").GetString());
     }
 
     [Fact]

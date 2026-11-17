@@ -20,7 +20,8 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
     private const string PackageRelNs = "http://schemas.openxmlformats.org/package/2006/relationships";
 
     /// <summary>Số cột của trang: tên khoa và 11 cột số của bảng A.</summary>
-    private const int LastColumn = 11;
+    /// <summary>Cột cuối (đánh số từ 0): cột khoa phòng rồi các cột số của bảng A.</summary>
+    private static readonly int LastColumn = NursingReportForm.SummaryColumns.Count;
 
     private static readonly XmlWriterSettings XmlSettings = new()
     {

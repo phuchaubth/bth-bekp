@@ -132,6 +132,12 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     public Guid? ReplacesFormId { get; private set; }
 
     /// <summary>
+    /// Phiếu đã hoàn tất lần trước mà phiếu này được điền sẵn câu trả lời theo (quyết định 27), để trang phiếu nháp luôn nhắc
+    /// kiểm tra lại.
+    /// </summary>
+    public Guid? InheritedFromFormId { get; private set; }
+
+    /// <summary>
     /// Bộ phiếu (quyết định 23): các phiếu của cùng một người bệnh lập cùng lúc, người bệnh ký một lần cho cả bộ. Rỗng
     /// với phiếu lập lẻ.
     /// </summary>
@@ -199,7 +205,8 @@ public sealed class ConsentForm : Entity, IAuditableEntity
         DateTimeOffset nowUtc,
         Guid? replacesFormId = null,
         Guid? bundleId = null,
-        KioskIdentityMethod? kioskIdentity = null)
+        KioskIdentityMethod? kioskIdentity = null,
+        Guid? inheritedFromFormId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(formNo);
         ArgumentNullException.ThrowIfNull(dataJson);
@@ -214,6 +221,7 @@ public sealed class ConsentForm : Entity, IAuditableEntity
             ReplacesFormId = replacesFormId,
             BundleId = bundleId,
             KioskIdentity = kioskIdentity,
+            InheritedFromFormId = inheritedFromFormId,
         };
     }
 
@@ -267,6 +275,21 @@ public sealed class ConsentForm : Entity, IAuditableEntity
     {
         Ensure(CanStartSigning, "Chỉ mở phiên ký được cho phiếu đang chờ ký mà người bệnh chưa ký.");
         SigningSessionId = sessionId;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>
+    /// Đóng phiên ký đang mở (ví dụ nhân viên hủy mã ký trên điện thoại riêng của người bệnh): token của phiên không ký được
+    /// nữa. Phiên đã được thay bằng phiên khác thì giữ nguyên.
+    /// </summary>
+    public void EndSigning(Guid sessionId, DateTimeOffset nowUtc)
+    {
+        if (SigningSessionId != sessionId)
+        {
+            return;
+        }
+
+        SigningSessionId = null;
         UpdatedAtUtc = nowUtc;
     }
 

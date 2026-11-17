@@ -72,6 +72,21 @@ public static class NursingReportForm
 
     public const string AdrKey = "adr";
 
+    /// <summary>Số ca nhập khoa từ phòng khám (PK) ngày hôm trước.</summary>
+    public const string AdmissionsFromClinicKey = "admissionsFromClinic";
+
+    /// <summary>Số ca nhập khoa do chuyển khoa (CK) ngày hôm trước.</summary>
+    public const string AdmissionsByTransferKey = "admissionsByTransfer";
+
+    /// <summary>
+    /// Khóa cũ "Số ca nhập viện ngày hôm trước", trước khi tách thành nhập khoa từ PK và do CK (quyết định 38). Báo cáo đã lưu
+    /// với khóa này vẫn đọc được để nhận ra là báo cáo cũ; không nhập mới được.
+    /// </summary>
+    public const string LegacyAdmissionsKey = "admissionsYesterday";
+
+    /// <summary>Hai dòng tách từ "Số ca nhập viện ngày hôm trước" (quyết định 38).</summary>
+    public static IReadOnlyList<string> AdmissionKeys { get; } = [AdmissionsFromClinicKey, AdmissionsByTransferKey];
+
     public static IReadOnlyList<NursingReportSection> Sections { get; } =
     [
         new("I. NHÂN SỰ",
@@ -140,7 +155,8 @@ public static class NursingReportForm
             new("expectedDischarges", "Dự kiến xuất viện"),
             new("scheduledAdmissions", "Hẹn nhập viện"),
             new("newAdmissions", "Nhận mới"),
-            new("admissionsYesterday", "Số ca nhập viện ngày hôm trước"),
+            new(AdmissionsFromClinicKey, "Số ca nhập khoa từ PK ngày hôm trước"),
+            new(AdmissionsByTransferKey, "Số ca nhập khoa do CK ngày hôm trước"),
             new("dischargesYesterday", "Số ca xuất viện ngày hôm trước"),
             new("noBed", "* Chưa có giường"),
         ]),
@@ -163,17 +179,24 @@ public static class NursingReportForm
     /// <summary>Các dòng mục V: "Số ca đi ngoại viện" trên bảng tổng hợp là tổng các dòng này (giả định, ghi ở quyết định 31).</summary>
     public static IReadOnlyList<string> OutsideVisitKeys { get; } = ["outsideExams", "consultations", "specialistExams", "transfers"];
 
-    /// <summary>Cột số của bảng A, theo thứ tự bản giấy.</summary>
+    /// <summary>Tên cột "NB PK chờ nhập viện" (người bệnh phòng khám chờ nhập viện) trên bảng tổng hợp.</summary>
+    public const string WaitingAdmissionLabel = "NB PK chờ nhập viện";
+
+    /// <summary>
+    /// Cột số của bảng A, theo thứ tự bản giấy; cột "Số ca nhập viện ngày hôm trước" của bản giấy tách thành nhập khoa từ PK và
+    /// do CK (quyết định 38).
+    /// </summary>
     public static IReadOnlyList<NursingSummaryColumn> SummaryColumns { get; } =
     [
         new(BedsColumn, "Số giường thực kê (Không tính băng ca)"),
         new("currentPatients", "Số NB hiện tại"),
-        new("admissionsYesterday", "Số ca nhập viện ngày hôm trước"),
+        new(AdmissionsFromClinicKey, "Nhập khoa từ PK"),
+        new(AdmissionsByTransferKey, "Nhập khoa do CK"),
         new("dischargesYesterday", "Số ca Xuất viện ngày hôm trước"),
         new("expectedDischarges", "Dự kiến xuất viện"),
         new("scheduledAdmissions", "Hẹn nhập viện"),
         new("newAdmissions", "Dự kiến Nhận mới"),
-        new(NursingHisIndicators.WaitingAdmission, "NB PK chờ nhập viện"),
+        new(NursingHisIndicators.WaitingAdmission, WaitingAdmissionLabel),
         new("noBed", "*Chưa có giường"),
         new(AdrKey, "Phản ứng có hại thuốc ADR"),
         new(OutsideVisitsColumn, "Số ca đi ngoại viện"),

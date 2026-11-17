@@ -32,6 +32,20 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public async Task ReadOnlyPart_ShowsThePatientInformationApiSeparatelyFromTheDirectHisLookup()
+    {
+        var ctx = new AppTestContext();
+        ctx.PatientSource.IsEnabled = true;
+        var configured = await ctx.CreateSettingsService().GetAsync(CancellationToken.None);
+        ctx.PatientSource.IsEnabled = false;
+        var notConfigured = await ctx.CreateSettingsService().GetAsync(CancellationToken.None);
+
+        Assert.True(configured.PatientInfoEnabled);
+        Assert.False(notConfigured.PatientInfoEnabled);
+        Assert.Equal(configured.HisEnabled, notConfigured.HisEnabled);
+    }
+
+    [Fact]
     public async Task Logo_Upload_IsStoredInDocumentStore_UsedForPdf_AndCanBeRemoved()
     {
         var ctx = new AppTestContext();

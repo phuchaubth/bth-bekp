@@ -98,11 +98,18 @@ public static class SettingKeys
     /// </summary>
     public const string FormInheritanceDays = "Forms.InheritanceDays";
 
+    /// <summary>
+    /// Khoa nhập tay từng chỉ số toàn viện của bảng tổng hợp điều dưỡng khi HIS lỗi (quyết định 35), do Phòng Điều dưỡng giao:
+    /// <c>chỉ số:mã khoa (Guid)</c> phân tách bằng dấu phẩy, ví dụ <c>outpatientVisits:…,ultrasound:…</c>. Chỉ số chưa giao thì
+    /// chưa khoa nào nhập được.
+    /// </summary>
+    public const string NursingHisEntryDepartments = "NursingReports.HisEntryDepartments";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
             [
                 HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled,
-                SignatureFrameStorageKey, SignatureFrameContentType, FormInheritanceDays,
+                SignatureFrameStorageKey, SignatureFrameContentType, FormInheritanceDays, NursingHisEntryDepartments,
             ],
             StringComparer.Ordinal);
 

@@ -88,21 +88,38 @@ export interface TemplateDefinition {
   hideDepartment?: boolean
   /** Mẫu song ngữ: phần hệ thống in trên PDF (mục I, dòng ngày tháng, ghi chú ô ký) kèm tiếng Anh. */
   bilingual?: boolean
-  /** Mã tài liệu: đầu PDF in như bản giấy (logo, quốc hiệu ở giữa, ô mã số – lần ban hành – ngày hiệu lực). */
-  documentControl?: { code?: string; issueNo?: string; effectiveDate?: string }
+  /**
+   * Mã tài liệu: đầu PDF in như bản giấy (logo, quốc hiệu ở giữa, ô mã số – lần ban hành – ngày hiệu lực). `titleInHead`:
+   * tên phiếu ở giữa thay cho quốc hiệu (bản giấy TTNB); các nhãn bỏ trống thì dùng nhãn của bản giấy BM02.
+   */
+  documentControl?: {
+    code?: string
+    issueNo?: string
+    effectiveDate?: string
+    titleInHead?: boolean
+    codeLabel?: string
+    issueNoLabel?: string
+    effectiveDateLabel?: string
+  }
   /** Dòng thông tin người bệnh in như bản giấy, thay cho mục "I. Thông tin người bệnh"; mỗi dòng 1–2 mục. */
   patientLines?: PatientLineItem[][]
+  /** Đánh số 1, 2, 3… các dòng thông tin người bệnh (bản giấy TTNB); dòng `indent` không đánh số. */
+  numberedPatientLines?: boolean
   sections: TemplateSection[]
   signatures?: TemplateSignatures
 }
 
-/** Một mục trên dòng thông tin người bệnh: thông tin hồ sơ (`patient`) hoặc trường của phiếu (`field`). */
+/** Một mục trên dòng thông tin người bệnh: thông tin hồ sơ (`patient`) hoặc trường của phiếu (`field`). Chỉ ảnh hưởng PDF. */
 export interface PatientLineItem {
   patient?: 'fullName' | 'dateOfBirth' | 'gender' | 'patientCode' | 'citizenId' | 'phoneNumber' | 'address'
   field?: string
   label?: string
-  /** Giới tính: nhãn ô Nam, ô Nữ (ví dụ "Nam/Male", "Nữ/Female"). */
+  /** Giới tính: nhãn ô Nam, ô Nữ; trường chữ (ví dụ dân tộc): các ô như bản giấy, ô cuối là "Khác". */
   options?: string[]
+  /** Dòng phụ của dòng trên: không đánh số, thụt vào. */
+  indent?: boolean
+  /** Câu hỏi chọn: trường chữ in tiếp sau các ô (ví dụ "Khác (Other): …"). */
+  other?: string
 }
 
 /**
@@ -126,6 +143,12 @@ export interface TemplateSignatures {
   hospitalFirst?: boolean
   /** PDF in tên ô ký đúng như đã ghi (không viết hoa toàn bộ, không in đậm). */
   plainTitles?: boolean
+  /** Ghi chú dưới ô ký của người bệnh/người đại diện trên PDF; dòng bắt đầu bằng "!" in màu đỏ. */
+  patientHint?: string
+  /** Dòng ngày tháng trên PDF canh giữa, chữ đứng (bản giấy TTNB). */
+  centerDate?: boolean
+  /** Ghi chú dưới tên ô ký in gần bằng cỡ tên ô ký và giữ nguyên sau khi nhân viên xác nhận. */
+  paperHints?: boolean
 }
 
 export interface TemplateStatement {

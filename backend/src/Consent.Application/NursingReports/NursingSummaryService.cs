@@ -4,14 +4,16 @@ using Consent.Application.Common;
 using Consent.Application.ConsentForms;
 using Consent.Application.Settings;
 using Consent.Domain.NursingReports;
+using Consent.Domain.Settings;
 using Consent.Shared;
 
 namespace Consent.Application.NursingReports;
 
 /// <summary>
 /// Bảng tổng hợp báo cáo điều dưỡng hằng ngày của Phòng Điều dưỡng (quyết định 31): xem, in PDF, xuất Excel; cài khoa phải
-/// báo cáo và số giường; lấy số liệu HIS (người bệnh đến khám, chẩn đoán hình ảnh, chờ nhập viện) hoặc nhập tay khi HIS lỗi.
-/// Quyền được kiểm tra ở API (<c>nursingreports.read</c> để xem, <c>nursingreports.manage</c> để sửa).
+/// báo cáo, số giường và khoa nhập tay từng chỉ số toàn viện khi HIS lỗi; lấy số liệu HIS (người bệnh đến khám, chẩn đoán
+/// hình ảnh, chờ nhập viện). Khi HIS lỗi, các khoa nhập số liệu thuộc nhiệm vụ của khoa, Phòng Điều dưỡng chỉ tổng hợp
+/// (quyết định 35). Quyền được kiểm tra ở API (<c>nursingreports.read</c> để xem, <c>nursingreports.manage</c> để sửa).
 /// </summary>
 public sealed class NursingSummaryService(
     INursingReportRepository reports,
@@ -23,7 +25,8 @@ public sealed class NursingSummaryService(
     IClock clock,
     SettingsService settings,
     INursingReportPdfRenderer pdf,
-    INursingSummaryWorkbookWriter workbook)
+    INursingSummaryWorkbookWriter workbook,
+    ISystemSettingRepository systemSettings)
 {
     private DateOnly Today => DateOnly.FromDateTime(clock.UtcNow.ToOffset(ConsentFormService.VietnamOffset).DateTime);
 
@@ -34,27 +37,55 @@ public sealed class NursingSummaryService(
             .ToDictionary(d => d.DepartmentId);
         var dayReports = await reports.ListByDateAsync(reportDate, cancellationToken).ConfigureAwait(false);
         var statistics = await reports.FindStatisticsAsync(reportDate, cancellationToken).ConfigureAwait(false);
+        var entries = await reports.ListDepartmentStatisticsAsync(reportDate, cancellationToken).ConfigureAwait(false);
+        var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
+        var merged = NursingHisEntry.Merge(NursingStatisticsValues.Parse(statistics?.ValuesJson), entries);
 
         var names = await NamesAsync(
-            dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedByUserId).Append(statistics?.UpdatedByUserId),
+            dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedByUserId)
+                .Append(statistics?.UpdatedByUserId)
+                .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId)),
             cancellationToken).ConfigureAwait(false);
+        var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
         var summaryDepartments = allDepartments
             .Select(d => new NursingSummaryDepartment(
                 d.Id, d.Name, d.IsActive && configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))
+            .ToList();
+
+        // Khoa phải nhập tay khi HIS lỗi: khoa phải báo cáo (NB PK chờ nhập viện) và khoa được giao chỉ số toàn viện.
+        var expected = summaryDepartments.Where(d => d.IsReporting).Select(d => d.Id)
+            .Concat(assignments.Values.Where(departmentNames.ContainsKey))
+            .Distinct()
+            .Select(id => (Id: id, Keys: NursingHisEntry.LinesFor(id, summaryDepartments.Any(d => d.Id == id && d.IsReporting), assignments)))
+            .Where(d => d.Keys.Count > 0)
+            .Select(d =>
+            {
+                var entry = entries.FirstOrDefault(e => e.DepartmentId == d.Id);
+                return new NursingHisEntryStatusDto(
+                    d.Id,
+                    departmentNames[d.Id],
+                    [.. d.Keys.Select(k => k.Key)],
+                    entry?.UpdatedAtUtc,
+                    entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId));
+            })
+            .OrderBy(d => d.DepartmentName, VietnameseComparer.Instance)
             .ToList();
         var info = new NursingStatisticsInfoDto(
             statisticsSource.IsEnabled,
             statistics is not null,
             statistics?.Source,
             statistics?.UpdatedAtUtc,
-            statistics is null ? null : names.GetValueOrDefault(statistics.UpdatedByUserId));
+            statistics is null ? null : names.GetValueOrDefault(statistics.UpdatedByUserId),
+            expected,
+            merged.UsesDepartmentEntries);
         return NursingSummaryBuilder.Build(
             reportDate,
             summaryDepartments,
             dayReports,
             names,
-            NursingStatisticsValues.Parse(statistics?.ValuesJson),
-            info);
+            merged.Values,
+            info,
+            merged.HospitalEnteredBy.ToDictionary(p => p.Key, p => departmentNames.GetValueOrDefault(p.Value) ?? string.Empty, StringComparer.Ordinal));
     }
 
     public async Task<NursingReportFile> RenderPdfAsync(DateOnly reportDate, CancellationToken cancellationToken)
@@ -94,7 +125,7 @@ public sealed class NursingSummaryService(
         {
             return Error.BusinessRule(
                 "nursing_reports.his_disabled",
-                "Chưa cấu hình API thông tin người bệnh (PatientSource__Provider = Api) nên chưa lấy được số liệu HIS. Có thể nhập tay.");
+                "Chưa cấu hình API thông tin người bệnh (PatientSource__Provider = Api) nên chưa lấy được số liệu HIS. Các khoa nhập tay số liệu của khoa.");
         }
 
         var result = await statisticsSource.GetAsync(request.ReportDate, cancellationToken).ConfigureAwait(false);
@@ -102,7 +133,7 @@ public sealed class NursingSummaryService(
         {
             return Error.BusinessRule(
                 "nursing_reports.his_unavailable",
-                "Không lấy được số liệu từ HIS (HIS lỗi hoặc chưa có câu truy vấn số liệu). Có thể nhập tay.");
+                "Không lấy được số liệu từ HIS (HIS lỗi hoặc chưa có câu truy vấn số liệu). Các khoa nhập tay số liệu của khoa.");
         }
 
         var allDepartments = await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false);
@@ -136,77 +167,31 @@ public sealed class NursingSummaryService(
         return new NursingStatisticsRefreshDto(summary, [.. unmatched]);
     }
 
-    /// <summary>Phòng Điều dưỡng nhập tay số liệu HIS của ngày (thay toàn bộ số liệu cũ của ngày).</summary>
-    public async Task<Result<NursingSummaryDto>> UpdateStatisticsAsync(UpdateNursingStatisticsRequest request, CancellationToken cancellationToken)
-    {
-        ArgumentNullException.ThrowIfNull(request);
-        if (currentUser.UserId is not { } userId)
-        {
-            return Error.Unauthorized("auth.required", "Vui lòng đăng nhập.");
-        }
-
-        if (request.ReportDate > Today)
-        {
-            return Error.ValidationField("reportDate", "Không nhập số liệu cho ngày sau hôm nay.");
-        }
-
-        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        foreach (var (key, value) in request.Hospital ?? new Dictionary<string, int?>())
-        {
-            if (!NursingHisIndicators.HospitalWide.Contains(key))
-            {
-                errors[$"hospital.{key}"] = ["Chỉ số không có trên bảng tổng hợp."];
-            }
-            else if (value is < 0 or > NursingReportForm.MaxValue)
-            {
-                errors[$"hospital.{key}"] = [$"Nhập số từ 0 đến {NursingReportForm.MaxValue}."];
-            }
-        }
-
-        var knownDepartments = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
-            .Select(d => d.Id)
-            .ToHashSet();
-        foreach (var (departmentId, value) in request.WaitingAdmission ?? new Dictionary<Guid, int?>())
-        {
-            if (!knownDepartments.Contains(departmentId))
-            {
-                errors[$"waitingAdmission.{departmentId}"] = ["Không tìm thấy khoa."];
-            }
-            else if (value is < 0 or > NursingReportForm.MaxValue)
-            {
-                errors[$"waitingAdmission.{departmentId}"] = [$"Nhập số từ 0 đến {NursingReportForm.MaxValue}."];
-            }
-        }
-
-        if (errors.Count > 0)
-        {
-            return Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);
-        }
-
-        var values = new NursingStatisticsValues(
-            (request.Hospital ?? new Dictionary<string, int?>())
-                .Where(p => p.Value is not null)
-                .ToDictionary(p => p.Key, p => p.Value!.Value, StringComparer.Ordinal),
-            (request.WaitingAdmission ?? new Dictionary<Guid, int?>())
-                .Where(p => p.Value is not null)
-                .ToDictionary(p => p.Key, p => p.Value!.Value));
-        await StoreAsync(request.ReportDate, values, NursingStatisticsSource.Manual, userId, cancellationToken).ConfigureAwait(false);
-        return await GetAsync(request.ReportDate, cancellationToken).ConfigureAwait(false);
-    }
-
-    /// <summary>Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo), kèm phải báo cáo không và số giường.</summary>
+    /// <summary>
+    /// Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo hoặc còn được giao chỉ số), kèm phải báo cáo không, số
+    /// giường và các chỉ số toàn viện khoa nhập tay khi HIS lỗi.
+    /// </summary>
     public async Task<IReadOnlyList<NursingReportDepartmentDto>> ListDepartmentsAsync(CancellationToken cancellationToken)
     {
         var configured = (await reports.ListDepartmentsAsync(cancellationToken).ConfigureAwait(false))
             .ToDictionary(d => d.DepartmentId);
+        var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
         return [.. (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
-            .Where(d => d.IsActive || configured.ContainsKey(d.Id))
+            .Where(d => d.IsActive || configured.ContainsKey(d.Id) || assignments.Values.Contains(d.Id))
             .OrderBy(d => d.Name, VietnameseComparer.Instance)
             .Select(d => new NursingReportDepartmentDto(
-                d.Id, d.Code, d.Name, configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))];
+                d.Id,
+                d.Code,
+                d.Name,
+                configured.ContainsKey(d.Id),
+                configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
+                [.. NursingHisEntry.HospitalLines.Where(l => assignments.TryGetValue(l.Key, out var assigned) && assigned == d.Id).Select(l => l.Key)]))];
     }
 
-    /// <summary>Đặt danh sách khoa phải báo cáo và số giường; khoa bỏ ra khỏi danh sách thì không phải báo cáo nữa.</summary>
+    /// <summary>
+    /// Đặt danh sách khoa phải báo cáo và số giường (khoa bỏ ra khỏi danh sách thì không phải báo cáo nữa), và khoa nhập tay
+    /// từng chỉ số toàn viện khi HIS lỗi (khi có <see cref="UpdateNursingReportDepartmentsRequest.HisEntry"/>).
+    /// </summary>
     public async Task<Result<IReadOnlyList<NursingReportDepartmentDto>>> UpdateDepartmentsAsync(
         UpdateNursingReportDepartmentsRequest request, CancellationToken cancellationToken)
     {
@@ -233,9 +218,34 @@ public sealed class NursingSummaryService(
             }
         }
 
+        var hisEntry = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        foreach (var (key, departmentId) in request.HisEntry ?? new Dictionary<string, Guid?>())
+        {
+            if (!NursingHisIndicators.HospitalWide.Contains(key))
+            {
+                errors[$"hisEntry.{key}"] = ["Chỉ số không có trên bảng tổng hợp."];
+            }
+            else if (departmentId is { } id)
+            {
+                if (!active.Contains(id))
+                {
+                    errors[$"hisEntry.{key}"] = ["Khoa không tồn tại hoặc đã ngừng sử dụng."];
+                }
+                else
+                {
+                    hisEntry[key] = id;
+                }
+            }
+        }
+
         if (errors.Count > 0)
         {
             return Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);
+        }
+
+        if (request.HisEntry is not null)
+        {
+            await StoreAssignmentsAsync(hisEntry, cancellationToken).ConfigureAwait(false);
         }
 
         var now = clock.UtcNow;
@@ -262,6 +272,35 @@ public sealed class NursingSummaryService(
         return Result<IReadOnlyList<NursingReportDepartmentDto>>.Success(await ListDepartmentsAsync(cancellationToken).ConfigureAwait(false));
     }
 
+    private async Task<IReadOnlyDictionary<string, Guid>> AssignmentsAsync(CancellationToken cancellationToken) =>
+        NursingHisEntry.ParseAssignments((await FindAssignmentSettingAsync(cancellationToken).ConfigureAwait(false))?.Value);
+
+    private async Task<SystemSetting?> FindAssignmentSettingAsync(CancellationToken cancellationToken) =>
+        (await systemSettings.GetAllAsync(cancellationToken).ConfigureAwait(false))
+            .FirstOrDefault(s => s.Key == SettingKeys.NursingHisEntryDepartments);
+
+    /// <summary>Ghi cấu hình khoa nhập từng chỉ số (lưu cùng lần lưu danh sách khoa); không giao chỉ số nào thì xóa cấu hình.</summary>
+    private async Task StoreAssignmentsAsync(IReadOnlyDictionary<string, Guid> assignments, CancellationToken cancellationToken)
+    {
+        var value = NursingHisEntry.FormatAssignments(assignments);
+        var existing = await FindAssignmentSettingAsync(cancellationToken).ConfigureAwait(false);
+        if (value is null)
+        {
+            if (existing is not null)
+            {
+                systemSettings.Remove(existing);
+            }
+        }
+        else if (existing is null)
+        {
+            systemSettings.Add(SystemSetting.Create(SettingKeys.NursingHisEntryDepartments, value, clock.UtcNow));
+        }
+        else if (existing.Value != value)
+        {
+            existing.Update(value, clock.UtcNow);
+        }
+    }
+
     private async Task StoreAsync(
         DateOnly reportDate, NursingStatisticsValues values, NursingStatisticsSource source, Guid userId, CancellationToken cancellationToken)
     {
@@ -284,8 +323,11 @@ public sealed class NursingSummaryService(
         var hospital = await settings.ResolveHospitalAsync(cancellationToken).ConfigureAwait(false);
         var source = summary.Statistics switch
         {
+            { HasValues: false, UsesDepartmentEntries: true } => "số liệu HIS do khoa nhập tay",
             { HasValues: false } => "chưa có số liệu HIS",
             { Source: NursingStatisticsSource.Manual, UpdatedAtUtc: { } at } => $"số liệu HIS nhập tay lúc {NursingReportService.Local(at)}",
+            { UpdatedAtUtc: { } at, UsesDepartmentEntries: true } =>
+                $"số liệu HIS lấy lúc {NursingReportService.Local(at)}, phần HIS không có do khoa nhập tay",
             { UpdatedAtUtc: { } at } => $"số liệu HIS lấy lúc {NursingReportService.Local(at)}",
             _ => string.Empty,
         };

@@ -30,7 +30,7 @@ describe('Cấu hình hệ thống (màn hình 19)', () => {
     const user = userEvent.setup()
 
     expect(await screen.findByText(/Đang dùng giá trị mẫu/)).toBeInTheDocument()
-    expect(screen.getByText('Chưa kết nối')).toBeInTheDocument()
+    expect(screen.getByText('Chưa cấu hình')).toBeInTheDocument()
     expect(screen.getByText('100.000 phiếu')).toBeInTheDocument()
 
     const name = screen.getByLabelText('Tên bệnh viện')
@@ -41,6 +41,17 @@ describe('Cấu hình hệ thống (màn hình 19)', () => {
     expect(await screen.findByText(/Cập nhật lần cuối/)).toBeInTheDocument()
     const put = calls.find((c) => c.method === 'PUT')!
     expect(put.body).toEqual({ parentAgency: 'SỞ Y TẾ [TỈNH/THÀNH PHỐ]', name: 'BỆNH VIỆN GIẢ LẬP', place: '[Địa danh]' })
+  })
+
+  it('API thông tin người bệnh đã kết nối thì không ghi "chưa kết nối" cho HIS', async () => {
+    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/settings': { ...settings, patientInfoEnabled: true } })
+    renderApp('/quan-tri/cau-hinh')
+
+    const patientInfo = (await screen.findByText(/API thông tin người bệnh/)).closest('tr')!
+    expect(within(patientInfo).getByText('Đã kết nối')).toBeInTheDocument()
+    const directLookup = screen.getByText('Tra cứu HIS tự động khi quét CCCD').closest('tr')!
+    expect(within(directLookup).getByText('Không dùng – bấm Lấy thông tin')).toBeInTheDocument()
+    expect(screen.queryByText(/Chưa kết nối/)).not.toBeInTheDocument()
   })
 
   it('hiển thị lỗi theo trường từ máy chủ', async () => {

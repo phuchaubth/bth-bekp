@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import dayjs from 'dayjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NursingReport, NursingReportDepartment, NursingReportFormDefinition, NursingSummary } from '../../api/nursingReports'
 import { Permissions } from '../../auth/permissions'
@@ -8,6 +9,9 @@ import { json, mockApi, problem, type ApiCall } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
 // Dữ liệu giả lập cho test (không phải dữ liệu thật). Mẫu thu gọn: đủ các kiểu dòng của bản giấy.
+// Trang mở ở ngày hôm nay: báo cáo giả lập cũng là của hôm nay (không phụ thuộc ngày chạy test).
+const TODAY = dayjs().format('YYYY-MM-DD')
+
 const definition: NursingReportFormDefinition = {
   title: 'BÁO CÁO CÔNG TÁC ĐIỀU DƯỠNG',
   category: 'Khoa Lâm sàng',
@@ -38,7 +42,7 @@ const report = (overrides: Partial<NursingReport> = {}): NursingReport => ({
   id: null,
   departmentId: 'd-noi',
   departmentName: 'Khoa Nội tổng hợp',
-  reportDate: '2026-11-16',
+  reportDate: TODAY,
   status: 'New',
   values: { nurses: 18 },
   checks: {},
@@ -54,6 +58,7 @@ const report = (overrides: Partial<NursingReport> = {}): NursingReport => ({
   reopenReason: null,
   carriedOverKeys: ['nurses'],
   isReportingDepartment: true,
+  hisEntry: null,
   ...overrides,
 })
 
@@ -78,7 +83,7 @@ const officeSession = () =>
   })
 
 const summary: NursingSummary = {
-  reportDate: '2026-11-16',
+  reportDate: TODAY,
   columns: [
     { key: 'beds', header: 'Số giường thực kê (Không tính băng ca)' },
     { key: 'currentPatients', header: 'Số NB hiện tại' },
@@ -115,16 +120,35 @@ const summary: NursingSummary = {
     { key: 'drugSupply', label: 'Tình hình cung cấp thuốc', text: 'Không ổn: Khoa Nội tổng hợp', issueDepartments: ['Khoa Nội tổng hợp'] },
   ],
   incidents: [{ departmentId: 'd-noi', departmentName: 'Khoa Nội tổng hợp', text: 'Người bệnh A (giả lập) sốt về đêm\nĐã báo bác sĩ trực' }],
-  statistics: { hisAvailable: true, hasValues: true, source: 'His', updatedAtUtc: '2026-11-16T00:50:00Z', updatedBy: 'Phòng Điều dưỡng Demo' },
+  statistics: {
+    hisAvailable: true,
+    hasValues: true,
+    source: 'His',
+    updatedAtUtc: '2026-11-16T00:50:00Z',
+    updatedBy: 'Phòng Điều dưỡng Demo',
+    entries: [],
+    usesDepartmentEntries: false,
+  },
   submittedCount: 1,
   reportingCount: 2,
 }
 
 const departments: NursingReportDepartment[] = [
-  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', isReporting: false, bedCount: null },
-  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', isReporting: true, bedCount: 25 },
-  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', isReporting: true, bedCount: 40 },
+  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', isReporting: false, bedCount: null, hisIndicators: ['outpatientVisits'] },
+  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', isReporting: true, bedCount: 25, hisIndicators: [] },
+  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', isReporting: true, bedCount: 40, hisIndicators: [] },
 ]
+
+/** Số liệu HIS khoa nhập khi HIS lỗi (quyết định 35). */
+const hisEntry = (overrides: Partial<NonNullable<NursingReport['hisEntry']>> = {}): NonNullable<NursingReport['hisEntry']> => ({
+  lines: [{ key: 'waitingAdmission', label: 'NB PK chờ nhập viện', value: null, hisValue: null }],
+  canEdit: true,
+  hisHasValues: false,
+  hisUpdatedAtUtc: null,
+  updatedBy: null,
+  updatedAtUtc: null,
+  ...overrides,
+})
 
 const lastCall = (calls: ApiCall[], method: string, path: string) =>
   calls.filter((c) => c.method === method && c.path === path).at(-1)
@@ -214,6 +238,86 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
   })
 
+  it('Phòng Điều dưỡng trả lại khoa: khoa thấy ai trả lại và lý do, sửa được để gửi lại', async () => {
+    mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/daily': report({
+        id: 'r-noi',
+        status: 'Draft',
+        carriedOverKeys: [],
+        updatedAtUtc: '2026-11-16T01:00:00Z',
+        reopenedBy: 'Phòng Điều dưỡng Demo',
+        reopenedAtUtc: '2026-11-16T01:00:00Z',
+        reopenReason: 'Sai số NB hiện tại',
+      }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText('Phòng Điều dưỡng đã trả lại báo cáo cho khoa (Phòng Điều dưỡng Demo).')).toBeInTheDocument()
+    expect(screen.getByText('Lý do: Sai số NB hiện tại. Sửa rồi bấm "Gửi báo cáo" lại.')).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Điều dưỡng' })).toBeEnabled()
+  })
+
+  it('HIS lỗi: khoa nhập "NB PK chờ nhập viện" của khoa ở thẻ riêng, lưu riêng với báo cáo', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/daily': report({ hisEntry: hisEntry() }),
+      'PUT /api/v1/nursing-reports/his-entry': report({
+        hisEntry: hisEntry({
+          lines: [{ key: 'waitingAdmission', label: 'NB PK chờ nhập viện', value: 3, hisValue: null }],
+          updatedBy: 'Điều dưỡng Demo',
+          updatedAtUtc: '2026-11-16T02:00:00Z',
+        }),
+      }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText('Số liệu HIS khoa nhập khi HIS lỗi')).toBeInTheDocument()
+    expect(screen.getByText('Khoa chưa nhập số liệu HIS ngày này.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Lưu nháp/ })).toBeInTheDocument()
+    await user.type(screen.getByRole('spinbutton', { name: 'NB PK chờ nhập viện' }), '3')
+    await user.click(screen.getByRole('button', { name: /Lưu số liệu HIS/ }))
+
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/his-entry')?.body).toEqual({
+        reportDate: TODAY,
+        values: { waitingAdmission: 3 },
+      }),
+    )
+    expect(await screen.findByText(/Đã nhập lúc .* bởi Điều dưỡng Demo/)).toBeInTheDocument()
+    expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/daily')).toBeUndefined()
+  })
+
+  it('khoa không phải báo cáo nhưng được giao chỉ số: chỉ thấy thẻ số liệu HIS, thấy số HIS nếu đã có', async () => {
+    mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/daily': report({
+        departmentName: 'Khoa Khám bệnh',
+        isReportingDepartment: false,
+        canEdit: false,
+        carriedOverKeys: [],
+        hisEntry: hisEntry({
+          lines: [{ key: 'outpatientVisits', label: 'TSNB đến khám', value: 412, hisValue: 686 }],
+          hisHasValues: true,
+          hisUpdatedAtUtc: '2026-11-16T01:00:00Z',
+        }),
+      }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText('Khoa Khám bệnh không phải gửi báo cáo công tác điều dưỡng.')).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'TSNB đến khám' })).toHaveValue('412')
+    expect(screen.getByText('Số lấy từ HIS: 686')).toBeInTheDocument()
+    expect(screen.getByText(/Ngày này đã có số liệu HIS/)).toBeInTheDocument()
+    expect(screen.queryByText('Khoa chưa có trong danh sách khoa báo cáo điều dưỡng.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton', { name: 'Điều dưỡng' })).not.toBeInTheDocument()
+  })
+
   it('Phòng Điều dưỡng không có quyền lập báo cáo khoa', async () => {
     mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/summary': summary })
     renderApp('/dieu-duong/bao-cao-khoa')
@@ -236,7 +340,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     objectUrls.length = 0
   })
 
-  it('hiện mục A–F như bản giấy, xem báo cáo một khoa và mở lại kèm lý do', { timeout: 20_000 }, async () => {
+  it('hiện mục A–F như bản giấy, xem báo cáo một khoa và trả lại khoa kèm lý do', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
       ...baseRoutes(officeSession()),
@@ -282,20 +386,22 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain('departmentId=d-noi')
     expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
 
-    await user.click(within(drawer).getByRole('button', { name: /Mở lại/ }))
+    await user.click(within(drawer).getByRole('button', { name: /Trả lại khoa/ }))
     // Hộp thoại mở trên ngăn kéo: AntD trong môi trường test đặt cùng id tiêu đề, nên tìm theo chữ thay vì theo tên.
-    const modal = (await screen.findByText('Mở lại báo cáo cho khoa sửa')).closest<HTMLElement>('[role="dialog"]')!
-    expect(within(modal).getByRole('button', { name: 'Mở lại' })).toBeDisabled()
-    await user.type(within(modal).getByRole('textbox', { name: 'Lý do mở lại' }), 'Sai số NB hiện tại')
-    await user.click(within(modal).getByRole('button', { name: 'Mở lại' }))
+    const modal = (await screen.findByText('Trả lại báo cáo cho khoa sửa')).closest<HTMLElement>('[role="dialog"]')!
+    expect(within(modal).getByRole('button', { name: 'Trả lại khoa' })).toBeDisabled()
+    await user.type(within(modal).getByRole('textbox', { name: 'Lý do trả lại' }), 'Sai số NB hiện tại')
+    await user.click(within(modal).getByRole('button', { name: 'Trả lại khoa' }))
 
     await waitFor(() =>
       expect(lastCall(calls, 'POST', '/api/v1/nursing-reports/r-noi/reopen')?.body).toEqual({ reason: 'Sai số NB hiện tại' }),
     )
-    expect(await screen.findByText('Đã mở lại báo cáo. Khoa sửa và gửi lại.')).toBeInTheDocument()
+    expect(await screen.findByText('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')).toBeInTheDocument()
+    expect(await within(drawer).findByText(/^Đã trả lại khoa lúc .* bởi Phòng Điều dưỡng Demo$/)).toBeInTheDocument()
+    expect(within(drawer).getByText('Lý do: Sai số NB hiện tại')).toBeInTheDocument()
   })
 
-  it('xuất Excel, lấy số liệu HIS (báo mã khoa không khớp), lỗi HIS thì báo để nhập tay', { timeout: 20_000 }, async () => {
+  it('xuất Excel, lấy số liệu HIS (báo mã khoa không khớp), lỗi HIS thì báo các khoa nhập tay', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     let refreshes = 0
     const { calls } = mockApi({
@@ -305,7 +411,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
       'POST /api/v1/nursing-reports/statistics/refresh': () =>
         ++refreshes === 1
           ? json({ summary, unmatchedDepartmentCodes: ['KHONGCO'] })
-          : problem(422, 'Không lấy được số liệu từ HIS (HIS lỗi hoặc chưa có câu truy vấn số liệu). Có thể nhập tay.', {
+          : problem(422, 'Không lấy được số liệu từ HIS (HIS lỗi hoặc chưa có câu truy vấn số liệu). Các khoa nhập tay số liệu của khoa.', {
               code: 'nursing_reports.his_unavailable',
             }),
     })
@@ -318,25 +424,30 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     await user.click(screen.getByRole('button', { name: /Lấy số liệu HIS/ }))
     expect(await screen.findByText(/Mã khoa không khớp khoa nào: KHONGCO/)).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /Lấy số liệu HIS/ }))
-    expect(await screen.findByText(/Có thể nhập tay/)).toBeInTheDocument()
+    expect(await screen.findByText(/Các khoa nhập tay số liệu của khoa/)).toBeInTheDocument()
   })
 
-  it('cài khoa báo cáo, số giường và nhập tay số liệu HIS', { timeout: 20_000 }, async () => {
+  it('cài khoa báo cáo, số giường và khoa nhập từng chỉ số khi HIS lỗi; Phòng Điều dưỡng không nhập tay số liệu HIS', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
       ...baseRoutes(officeSession()),
       'GET /api/v1/nursing-reports/summary': summary,
       'GET /api/v1/nursing-reports/departments': departments,
       'PUT /api/v1/nursing-reports/departments': departments,
-      'PUT /api/v1/nursing-reports/statistics': summary,
     })
     renderApp('/dieu-duong/tong-hop')
 
     await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
+    expect(screen.queryByRole('button', { name: /Nhập số liệu HIS/ })).not.toBeInTheDocument()
     const modal = await screen.findByRole('dialog', { name: 'Khoa báo cáo và số giường thực kê' })
     await user.click(await within(modal).findByRole('checkbox', { name: 'Khoa Khám bệnh phải báo cáo' }))
     await user.type(within(modal).getByRole('spinbutton', { name: 'Số giường Khoa Khám bệnh' }), '10')
     await user.click(within(modal).getByRole('checkbox', { name: 'Khoa Ngoại B (giả lập) phải báo cáo' }))
+
+    // Đang giao Khoa Khám bệnh nhập TSNB đến khám; giao thêm Khoa Nội tổng hợp nhập X-quang.
+    expect(within(modal).getByRole('combobox', { name: 'Khoa nhập TSNB đến khám' }).closest('.ant-select')).toHaveTextContent('Khoa Khám bệnh')
+    await user.click(within(modal).getByRole('combobox', { name: 'Khoa nhập TS X-quang' }))
+    await user.click(await screen.findByTitle('Khoa Nội tổng hợp'))
     await user.click(within(modal).getByRole('button', { name: 'Lưu' }))
 
     await waitFor(() =>
@@ -345,23 +456,39 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
           { departmentId: 'd-kkb', bedCount: 10 },
           { departmentId: 'd-noi', bedCount: 40 },
         ],
+        hisEntry: { outpatientVisits: 'd-kkb', xray: 'd-noi' },
       }),
     )
+  })
 
-    await user.click(screen.getByRole('button', { name: /Nhập số liệu HIS/ }))
-    const statistics = await screen.findByRole('dialog', { name: /Nhập số liệu HIS ngày/ })
-    const visits = within(statistics).getByRole('spinbutton', { name: 'TSNB đến khám' })
-    await user.clear(visits)
-    await user.type(visits, '700')
-    await user.clear(within(statistics).getByRole('spinbutton', { name: 'TS X-quang' }))
-    await user.click(within(statistics).getByRole('button', { name: 'Lưu' }))
+  it('HIS lỗi: số do khoa nhập có ghi tên khoa, và cho biết khoa nào chưa nhập', async () => {
+    mockApi({
+      ...baseRoutes(officeSession()),
+      'GET /api/v1/nursing-reports/summary': {
+        ...summary,
+        outpatient: [{ key: 'outpatientVisits', label: 'TSNB đến khám', value: 412, enteredBy: 'Khoa Khám bệnh' }],
+        imaging: [{ key: 'xray', label: 'TS X-quang', value: null }],
+        statistics: {
+          hisAvailable: true,
+          hasValues: false,
+          source: null,
+          updatedAtUtc: null,
+          updatedBy: null,
+          usesDepartmentEntries: true,
+          entries: [
+            { departmentId: 'd-kkb', departmentName: 'Khoa Khám bệnh', keys: ['outpatientVisits', 'xray'], enteredAtUtc: '2026-11-16T02:10:00Z', enteredBy: 'Điều dưỡng KKB' },
+            { departmentId: 'd-ngoai', departmentName: 'Khoa Ngoại B (giả lập)', keys: ['waitingAdmission'], enteredAtUtc: null, enteredBy: null },
+            { departmentId: 'd-noi', departmentName: 'Khoa Nội tổng hợp', keys: ['waitingAdmission'], enteredAtUtc: '2026-11-16T02:00:00Z', enteredBy: 'Điều dưỡng Demo' },
+          ],
+        },
+      },
+    })
+    renderApp('/dieu-duong/tong-hop')
 
-    await waitFor(() =>
-      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/statistics')?.body).toEqual({
-        reportDate: '2026-11-16',
-        hospital: { outpatientVisits: 700, xray: null },
-        waitingAdmission: { 'd-ngoai': 1, 'd-noi': 2 },
-      }),
-    )
+    expect(await screen.findByText(/HIS lỗi thì các khoa nhập tay số liệu của khoa/)).toBeInTheDocument()
+    expect(screen.getByText(/Khoa Khám bệnh \(TSNB đến khám, TS X-quang\): đã nhập lúc 16\/11\/2026 \d\d:\d\d \(Điều dưỡng KKB\)/)).toBeInTheDocument()
+    expect(screen.getByText(/NB PK chờ nhập viện: 1\/2 khoa đã nhập \(chưa nhập: Khoa Ngoại B \(giả lập\)\)/)).toBeInTheDocument()
+    expect(screen.getByText('Khoa Khám bệnh nhập tay')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Nhập số liệu HIS/ })).not.toBeInTheDocument()
   })
 })

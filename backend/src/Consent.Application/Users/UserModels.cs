@@ -4,6 +4,10 @@ namespace Consent.Application.Users;
 
 public sealed record UserQuery(string? Keyword = null, Guid? DepartmentId = null, bool? IsActive = null, int Page = 1, int PageSize = 20);
 
+/// <param name="IsKioskLookupLocked">
+/// Tài khoản kiosk đang tạm khóa tra cứu (người bệnh nhập sai ngày sinh nhiều lần, quyết định 24); quản trị mở khóa sớm bằng
+/// thao tác Mở khóa.
+/// </param>
 public sealed record UserListItemDto(
     Guid Id,
     string UserName,
@@ -14,7 +18,8 @@ public sealed record UserListItemDto(
     IReadOnlyList<string> RoleNames,
     bool IsActive,
     bool IsLockedOut,
-    DateTimeOffset? LastLoginAtUtc);
+    DateTimeOffset? LastLoginAtUtc,
+    bool IsKioskLookupLocked = false);
 
 public sealed record UserDetailDto(
     Guid Id,
