@@ -33,6 +33,28 @@ public sealed class Department : Entity, IAuditableEntity
         IsActive = isActive;
     }
 
+    /// <summary>
+    /// Cập nhật theo danh mục khoa/phòng của HIS (quyết định 42): mã, tên như HIS và đang sử dụng. Trả về <c>true</c> nếu có
+    /// thay đổi.
+    /// </summary>
+    public bool SyncFromHis(string code, string name)
+    {
+        var normalizedCode = NormalizeCode(code);
+        var normalizedName = NormalizeName(name);
+        if (Code == normalizedCode && Name == normalizedName && IsActive)
+        {
+            return false;
+        }
+
+        Code = normalizedCode;
+        Name = normalizedName;
+        IsActive = true;
+        return true;
+    }
+
+    /// <summary>Ngừng sử dụng, ví dụ khi khoa/phòng không còn trong danh mục HIS. Không xóa vì phiếu, người dùng còn gắn.</summary>
+    public void Deactivate() => IsActive = false;
+
     public static string NormalizeCode(string code)
     {
         var normalized = (code ?? string.Empty).Trim().ToUpperInvariant();

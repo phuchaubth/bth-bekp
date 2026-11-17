@@ -22,6 +22,20 @@ export interface DepartmentInput {
   isActive: boolean
 }
 
+/** Kết quả lấy danh mục khoa/phòng từ HIS (quyết định 42). */
+export interface DepartmentSyncResult {
+  /** Số khoa/phòng HIS trả về (sau khi bỏ dòng lỗi, mã lặp). */
+  total: number
+  added: number
+  /** Đổi tên, nhận mã HIS hoặc dùng lại khoa đã ngừng sử dụng. */
+  updated: number
+  unchanged: number
+  /** Tên khoa/phòng chuyển sang ngừng sử dụng vì không còn trên HIS. */
+  deactivated: string[]
+  /** Mã các dòng bị bỏ qua (mã rỗng hoặc dài quá 20 ký tự). */
+  skipped: string[]
+}
+
 export interface PermissionDefinition {
   code: string
   name: string
@@ -131,6 +145,7 @@ export const adminApi = {
   updateDepartment: (id: string, input: DepartmentInput) =>
     apiRequest<Department>(`/api/v1/departments/${id}`, { method: 'PUT', body: input }),
   deleteDepartment: (id: string) => apiRequest<void>(`/api/v1/departments/${id}`, { method: 'DELETE' }),
+  syncDepartmentsFromHis: () => apiRequest<DepartmentSyncResult>('/api/v1/departments/sync-his', { method: 'POST' }),
 
   listRoles: (signal?: AbortSignal) => apiRequest<Role[]>('/api/v1/roles', { signal }),
   listPermissions: (signal?: AbortSignal) => apiRequest<PermissionDefinition[]>('/api/v1/permissions', { signal }),

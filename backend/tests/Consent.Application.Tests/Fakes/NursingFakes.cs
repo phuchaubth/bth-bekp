@@ -56,6 +56,30 @@ internal sealed class StubDailyStatisticsSource : IDailyStatisticsSource
     }
 }
 
+/// <summary>Danh mục khoa/phòng của HIS giả lập (quyết định 42); mặc định chưa cấu hình API thông tin người bệnh.</summary>
+internal sealed class StubDepartmentSource : IDepartmentSource
+{
+    public bool IsEnabled { get; set; }
+
+    public DepartmentSourceResult Result { get; set; } = DepartmentSourceResult.Unavailable;
+
+    public int Calls { get; private set; }
+
+    /// <summary>Đã kết nối API, HIS trả về danh mục <paramref name="departments"/> (mã, tên).</summary>
+    public void Returns(params (string Code, string Name)[] departments)
+    {
+        IsEnabled = true;
+        Result = new DepartmentSourceResult(
+            DepartmentSourceStatus.Found, [.. departments.Select(d => new ExternalDepartment(d.Code, d.Name))]);
+    }
+
+    public Task<DepartmentSourceResult> GetAsync(CancellationToken cancellationToken)
+    {
+        Calls++;
+        return Task.FromResult(Result);
+    }
+}
+
 /// <summary>Ghi lại dữ liệu đưa vào PDF/Excel để test kiểm tra; nội dung file là vài byte giả.</summary>
 internal sealed class CapturingNursingDocuments : INursingReportPdfRenderer, INursingSummaryWorkbookWriter
 {

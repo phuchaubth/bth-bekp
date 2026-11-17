@@ -1074,13 +1074,21 @@ Quyền **Xem dữ liệu toàn viện** cho phép xem phiếu của mọi khoa.
 
 Bấm **Quản trị** → **Khoa/phòng**.
 
+**Khi phần mềm đã kết nối API thông tin người bệnh**, danh mục khoa/phòng **lấy từ HIS**. Trang có dòng *"Danh mục khoa/phòng lấy từ HIS: không thêm, sửa, xóa ở đây."* và không có nút thêm, sửa, xóa. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm **Lấy danh mục từ HIS**:
+
+- Khoa/phòng trùng mã trên HIS: cập nhật tên theo HIS. Khoa/phòng nhập tay trước đây có tên trùng tên trên HIS: nhận mã HIS, người dùng và phiếu đã gắn giữ nguyên. Khoa/phòng chỉ có trên HIS: thêm mới.
+- Khoa/phòng không còn trên HIS: chuyển sang **Ngừng sử dụng**. Màn hình ghi tên các khoa này; chuyển người dùng của khoa đó sang khoa mới ở **Người dùng** (mục 8.1).
+- Màn hình báo lỗi (API chưa có câu truy vấn danh mục khoa/phòng, HIS không trả lời) thì danh mục giữ nguyên. Báo phòng CNTT (`docs/trien-khai.md` mục 5.9).
+
+**Khi chưa kết nối API thông tin người bệnh**, quản trị tự quản lý danh mục:
+
 - **Thêm khoa/phòng**: nhập **Mã khoa** (ví dụ KKB), **Tên khoa/phòng**, chọn **Trạng thái** (**Đang sử dụng** hoặc **Ngừng sử dụng**), bấm **Lưu**.
 - **Sửa**: đổi mã, tên, trạng thái.
 - **Xóa**: chỉ xóa được khoa chưa có người dùng (không là khoa chính hay khoa khác của tài khoản nào). Khoa không dùng nữa thì đặt **Ngừng sử dụng**.
 
 ![Danh sách khoa/phòng](huong-dan-su-dung/95-khoa-phong.png)
 
-*Hình 8.6. Danh sách khoa/phòng.*
+*Hình 8.6. Danh sách khoa/phòng khi chưa kết nối API thông tin người bệnh (có nút thêm, sửa, xóa).*
 
 ### 8.5. Cấu hình hệ thống
 
@@ -1351,6 +1359,9 @@ Danh sách người bệnh chỉ có người bệnh có phiếu ở khoa của 
 
 **Tôi làm ở hai khoa, làm sao thấy phiếu của cả hai khoa?**
 Nhờ quản trị thêm khoa thứ hai vào ô **Khoa/phòng khác** của tài khoản (mục 8.1), rồi đăng xuất và đăng nhập lại. Sau đó bạn thấy phiếu, báo cáo của cả hai khoa; báo cáo điều dưỡng có ô chọn khoa.
+
+**Không thấy nút thêm khoa/phòng?**
+Danh mục khoa/phòng lấy từ HIS (mục 8.4). Khoa mới phải có trên HIS trước; sau đó quản trị bấm **Lấy danh mục từ HIS**. HIS có khoa mà vẫn không lấy về được thì nhờ phòng CNTT kiểm tra câu truy vấn danh mục khoa/phòng.
 
 **Xuất dữ liệu báo "Bạn thao tác quá nhiều lần"?**
 Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút rồi thử lại.

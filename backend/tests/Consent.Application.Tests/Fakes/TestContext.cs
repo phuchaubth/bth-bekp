@@ -59,6 +59,9 @@ internal sealed class AppTestContext
 
     public HisOptions HisOptions { get; } = new() { TimeoutSeconds = 1 };
 
+    /// <summary>Danh mục khoa/phòng của HIS (quyết định 42): mặc định chưa kết nối, khoa/phòng thêm, sửa trong phần mềm.</summary>
+    public StubDepartmentSource DepartmentSource { get; } = new();
+
     public Role RoleByCode(string code) => Store.Roles.Single(r => r.Code == code);
 
     public User AddUser(
@@ -126,7 +129,8 @@ internal sealed class AppTestContext
         new InMemoryDepartmentRepository(Store),
         new InMemoryUserRepository(Store),
         Store,
-        new DepartmentRequestValidator());
+        new DepartmentRequestValidator(),
+        DepartmentSource);
 
     public RoleService CreateRoleService() => new(
         new InMemoryRoleRepository(Store), new InMemoryUserRepository(Store), new InMemoryConsentTemplateRepository(Store), Store);

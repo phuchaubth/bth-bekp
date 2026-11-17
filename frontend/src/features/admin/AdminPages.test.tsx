@@ -71,6 +71,66 @@ describe('Khoa/phòng', () => {
 
     expect(await within(dialog).findByText('Mã khoa "KKB" đã tồn tại.')).toBeInTheDocument()
   })
+
+  it('chưa kết nối API thông tin người bệnh: thêm, sửa, xóa trong phần mềm, không có nút lấy từ HIS', async () => {
+    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/departments': departments })
+    renderApp('/quan-tri/khoa-phong')
+
+    expect(await screen.findByText('Khoa Khám bệnh')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Thêm khoa\/phòng/ })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /Sửa/ })).toHaveLength(departments.length)
+    expect(screen.queryByRole('button', { name: /Lấy danh mục từ HIS/ })).not.toBeInTheDocument()
+  })
+
+  it('danh mục lấy từ HIS: không thêm, sửa, xóa; bấm Lấy danh mục từ HIS thì báo kết quả và tải lại danh sách', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/features': { his: false, smartCa: false, patientSource: true, departmentsFromHis: true },
+      'GET /api/v1/departments': departments,
+      'POST /api/v1/departments/sync-his': () =>
+        json({ total: 4, added: 1, updated: 2, unchanged: 1, deactivated: ['Phòng Kế hoạch tổng hợp'], skipped: ['MA-KHOA-DAI-HON-HAI-MUOI'] }),
+    })
+    renderApp('/quan-tri/khoa-phong')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Danh mục khoa/phòng lấy từ HIS: không thêm, sửa, xóa ở đây.')).toBeInTheDocument()
+    expect(await screen.findByText('Khoa Khám bệnh')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Thêm khoa\/phòng/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sửa/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Xóa/ })).not.toBeInTheDocument()
+    const listCalls = () => calls.filter((c) => c.method === 'GET' && c.path === '/api/v1/departments').length
+    const before = listCalls()
+
+    await user.click(screen.getByRole('button', { name: /Lấy danh mục từ HIS/ }))
+
+    expect(
+      (await screen.findAllByText('Đã lấy 4 khoa/phòng từ HIS: thêm 1, cập nhật 2, giữ nguyên 1.')).length,
+    ).toBeGreaterThan(0)
+    expect(screen.getByText(/Chuyển sang ngừng sử dụng vì không còn trên HIS: Phòng Kế hoạch tổng hợp\./)).toBeInTheDocument()
+    expect(screen.getByText(/Bỏ qua 1 dòng có mã rỗng hoặc dài quá 20 ký tự: MA-KHOA-DAI-HON-HAI-MUOI/)).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/v1/departments/sync-his')).toHaveLength(1)
+    await waitFor(() => expect(listCalls()).toBeGreaterThan(before))
+  })
+
+  it('lấy danh mục từ HIS không được thì báo lỗi của máy chủ, danh sách giữ nguyên', async () => {
+    mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/features': { his: false, smartCa: false, patientSource: true, departmentsFromHis: true },
+      'GET /api/v1/departments': departments,
+      'POST /api/v1/departments/sync-his': () =>
+        problem(422, 'API thông tin người bệnh chưa có câu truy vấn danh mục khoa/phòng.', {
+          code: 'departments.his_not_configured',
+        }),
+    })
+    renderApp('/quan-tri/khoa-phong')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Lấy danh mục từ HIS/ }))
+
+    expect(await screen.findByText('API thông tin người bệnh chưa có câu truy vấn danh mục khoa/phòng.')).toBeInTheDocument()
+    expect(screen.queryByText(/Đã lấy/)).not.toBeInTheDocument()
+    expect(screen.getByText('Khoa Khám bệnh')).toBeInTheDocument()
+  })
 })
 
 describe('Người dùng', () => {

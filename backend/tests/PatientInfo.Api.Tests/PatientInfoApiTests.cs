@@ -42,6 +42,10 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
         "UNION ALL SELECT 'waitingAdmission', MaKhoa, COUNT(*) FROM dbo.ChoNhapVien WHERE ThoiGian >= @From AND ThoiGian < @To GROUP BY MaKhoa " +
         "UNION ALL SELECT LoaiChiDinh, NULL, COUNT(*) FROM dbo.ChiDinhCLS WHERE ThoiGian >= @From AND ThoiGian < @To GROUP BY LoaiChiDinh";
 
+    /// <summary>Danh mục khoa/phòng (quyết định 42): chỉ khoa/phòng đang hoạt động.</summary>
+    private const string DepartmentQuery =
+        "SELECT MaKhoa AS Code, TenKhoa AS Name FROM dbo.KhoaPhong WHERE HoatDong = 1";
+
     private static readonly string SqlServerImage =
         Environment.GetEnvironmentVariable("CONSENT_TEST_SQL_IMAGE") is { Length: > 0 } image ? image : "mcr.microsoft.com/mssql/server:2025-latest";
 
@@ -51,10 +55,14 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
 
     public HttpClient Client => _client ?? throw new InvalidOperationException("API thử nghiệm chưa khởi động.");
 
+    /// <summary>Chuỗi kết nối tới CSDL "bệnh viện" giả lập, cho các kịch bản cần cấu hình API khác.</summary>
+    public string ConnectionString { get; private set; } = string.Empty;
+
     public async Task InitializeAsync()
     {
         var sql = _sql = await SqlServerContainers.StartAsync(() => new MsSqlBuilder(SqlServerImage).Build());
-        var connectionString = new SqlConnectionStringBuilder(sql.GetConnectionString()) { InitialCatalog = "BenhVienGiaLap" }.ConnectionString;
+        var connectionString = ConnectionString =
+            new SqlConnectionStringBuilder(sql.GetConnectionString()) { InitialCatalog = "BenhVienGiaLap" }.ConnectionString;
         await using (var master = new SqlConnection(sql.GetConnectionString()))
         {
             await master.OpenAsync();
@@ -89,6 +97,10 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
                 INSERT INTO dbo.ChiDinhCLS (LoaiChiDinh, ThoiGian) VALUES
                     (N'xray', '2026-11-11T10:00:00'), (N'xray', '2026-11-11T11:00:00'), (N'mri', '2026-11-11T12:00:00'),
                     (N'xray', '2026-11-10T10:00:00');
+                CREATE TABLE dbo.KhoaPhong (MaKhoa nvarchar(20) PRIMARY KEY, TenKhoa nvarchar(200), HoatDong bit);
+                INSERT INTO dbo.KhoaPhong VALUES
+                    (N'K01', N'Khoa Khám bệnh (giả lập)', 1), (N'K02', N' Khoa Nội tổng hợp (giả lập) ', 1),
+                    (N'K99', N'Khoa đã giải thể (giả lập)', 0), (N' k03 ', NULL, 1);
                 """,
                 source);
             await setup.ExecuteNonQueryAsync();
@@ -102,6 +114,7 @@ public sealed class PatientInfoApiFixture : IAsyncLifetime
             ["PatientInfo:Query"] = Query,
             ["PatientInfo:EncounterQuery"] = EncounterQuery,
             ["PatientInfo:DailyStatisticsQuery"] = DailyStatisticsQuery,
+            ["PatientInfo:DepartmentQuery"] = DepartmentQuery,
             ["PatientInfo:ApiKeys:0"] = ApiKey,
         });
         var app = _app = PatientInfoProgram.Build(builder);
@@ -130,6 +143,7 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
 {
     private const string ApiKey = PatientInfoApiFixture.ApiKey;
     private readonly HttpClient _client = fixture.Client;
+    private readonly string _connectionString = fixture.ConnectionString;
 
     [Fact]
     public async Task Lookup_ByPatientCodeOrCitizenId_ReturnsAdministrativeInfo()
@@ -302,6 +316,96 @@ public sealed class PatientInfoApiTests(PatientInfoApiFixture fixture) : IClassF
         {
             Content = JsonContent.Create(new { date = "2026-11-11" }),
         };
+        request.Headers.Add("X-Api-Key", ApiKey);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task Departments_ReturnTheActiveHospitalDepartments_TrimmedWithTheCodeAsAMissingName()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/departments");
+        request.Headers.Add("X-Api-Key", ApiKey);
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+        var items = body.GetProperty("items").EnumerateArray()
+            .Select(i => (i.GetProperty("code").GetString(), i.GetProperty("name").GetString()))
+            .OrderBy(i => i.Item1, StringComparer.Ordinal)
+            .ToList();
+        Assert.Equal(
+            [("K01", "Khoa Khám bệnh (giả lập)"), ("K02", "Khoa Nội tổng hợp (giả lập)"), ("k03", "k03")],
+            items);
+    }
+
+    [Fact]
+    public async Task Departments_RequireAValidApiKey()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/departments");
+        request.Headers.Add("X-Api-Key", "khoa-sai-gia-lap-chi-dung-trong-kiem-thu-0002");
+
+        using var response = await _client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.DoesNotContain("Khoa", await response.Content.ReadAsStringAsync(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(PatientInfoProgram.MaxDepartments, HttpStatusCode.OK)]
+    [InlineData(PatientInfoProgram.MaxDepartments + 1, HttpStatusCode.UnprocessableEntity)]
+    public async Task Departments_OverTheLimit_AreRefused_NotTruncated(int rows, HttpStatusCode expected)
+    {
+        // Cắt bớt thì phần mềm phiếu sẽ coi các khoa bị cắt là ngừng sử dụng: quá giới hạn thì báo lỗi.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PatientInfo:ConnectionString"] = _connectionString,
+            ["PatientInfo:Query"] = "SELECT MaBN AS PatientCode FROM dbo.BenhNhan WHERE MaBN = @PatientCode",
+            ["PatientInfo:DepartmentQuery"] =
+                $"SELECT TOP ({rows}) CONCAT(N'K', n) AS Code, CONCAT(N'Khoa giả lập ', n) AS Name " +
+                "FROM (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS n FROM sys.all_objects a CROSS JOIN sys.all_objects b) t",
+            ["PatientInfo:ApiKeys:0"] = ApiKey,
+        });
+        await using var app = PatientInfoProgram.Build(builder);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/departments");
+        request.Headers.Add("X-Api-Key", ApiKey);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(expected, response.StatusCode);
+        if (expected == HttpStatusCode.OK)
+        {
+            var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+            Assert.Equal(rows, body.GetProperty("items").GetArrayLength());
+        }
+
+        await app.StopAsync();
+    }
+
+    [Fact]
+    public async Task Departments_WithoutAConfiguredQuery_AreNotImplemented()
+    {
+        // Phòng CNTT chưa đặt PatientInfo__DepartmentQuery: phần mềm phiếu báo chưa cấu hình, danh mục khoa giữ nguyên.
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { EnvironmentName = "Development" });
+        builder.WebHost.UseTestServer();
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["PatientInfo:ConnectionString"] = "Server=khong-dung.gia-lap.local;Database=BenhVienGiaLap",
+            ["PatientInfo:Query"] = "SELECT MaBN AS PatientCode FROM dbo.BenhNhan WHERE MaBN = @PatientCode",
+            ["PatientInfo:ApiKeys:0"] = ApiKey,
+        });
+        await using var app = PatientInfoProgram.Build(builder);
+        await app.StartAsync();
+        using var client = app.GetTestClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/v1/departments");
         request.Headers.Add("X-Api-Key", ApiKey);
 
         using var response = await client.SendAsync(request);

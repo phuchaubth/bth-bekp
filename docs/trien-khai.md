@@ -251,6 +251,7 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
    | `ASPNETCORE_ENVIRONMENT` | `Production` |
    | `PatientInfo__ConnectionString` | `Server=tcp:SQLHIS,1433;Database=…;User Id=patientinfo_reader;Password=…;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly` |
    | `PatientInfo__Query` | Câu truy vấn ở bước 2 (một dòng) |
+   | `PatientInfo__EncounterQuery`, `PatientInfo__DailyStatisticsQuery`, `PatientInfo__DepartmentQuery` | (Tùy chọn) lượt tiếp nhận (mục 5.6), số liệu trong ngày cho báo cáo điều dưỡng (mục 5.7), danh mục khoa/phòng (mục 5.9) |
    | `PatientInfo__ApiKeys__0` | Khóa API ngẫu nhiên ≥ 32 ký tự, tạo như `Jwt__SigningKey` ở mục 3 (bộ sinh số ngẫu nhiên an toàn, không dùng `Get-Random`) |
    | `PatientInfo__MaleValues__0`…, `PatientInfo__FemaleValues__0`… | (Tùy chọn) khi cột giới tính không theo mặc định (`Nam/M/Male/1` là Nam, `Nữ/F/Female/0/2` là Nữ). Đặt **cả hai** danh sách, danh sách đặt thay hẳn mặc định. Ví dụ CSDL lưu 0 = Nam, 1 = Nữ: `PatientInfo__MaleValues__0 = 0`, `PatientInfo__FemaleValues__0 = 1`. Cũng có thể đổi ngay trong câu truy vấn: `CASE GioiTinh WHEN 0 THEN N'Nam' WHEN 1 THEN N'Nữ' END AS Gender` |
 
@@ -425,6 +426,47 @@ Tài khoản khoa nào thấy dữ liệu khoa đó: phiếu, tổng quan, báo 
 2. **Khoa khác:** nhân viên làm ở nhiều khoa (ví dụ điều dưỡng luân phiên, bác sĩ khám ở hai khoa), chọn thêm ở ô **Khoa/phòng khác** (tối đa 20). Tài khoản thấy dữ liệu của khoa chính và các khoa này; ở Báo cáo, Xuất dữ liệu và Báo cáo điều dưỡng chọn được từng khoa.
 3. **Xem toàn viện:** người cần xem mọi khoa (phòng Kế hoạch tổng hợp, ban giám đốc, kiểm tra) không cần chọn hết các khoa: gán vai trò có quyền *Xem dữ liệu toàn viện* (vai trò **Báo cáo / Xuất dữ liệu**, **Kiểm tra**, **Quản lý mẫu phiếu** có sẵn quyền này, hoặc thêm quyền cho vai trò tự tạo ở *Vai trò và quyền*).
 4. Đổi khoa của tài khoản có hiệu lực khi phiên tự làm mới (tối đa 15 phút) hoặc khi người dùng đăng nhập lại. Khoa đang được gán cho tài khoản nào (khoa chính hay khoa khác) thì không xóa được, chỉ chuyển sang ngừng sử dụng.
+
+### 5.9. Danh mục khoa/phòng lấy từ HIS (quyết định 42)
+
+Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 5.5, `PatientSource__Provider` là `Api`), danh mục khoa/phòng **lấy từ HIS**: trang *Quản trị → Khoa/phòng* không còn nút thêm, sửa, xóa, thay bằng nút **Lấy danh mục từ HIS**. Chưa kết nối API thì danh mục vẫn thêm, sửa, xóa trong phần mềm như trước. Không có migration.
+
+1. **Câu truy vấn** (phòng CNTT viết, chạy thử trong SSMS trước): một câu `SELECT` (hoặc `WITH … SELECT`), không tham số, trả về cột `Code` (mã khoa trên HIS, tối đa 20 ký tự) và `Name` (tên khoa/phòng). Chỉ lấy khoa/phòng **đang hoạt động** mà phần mềm phiếu cần (khoa lâm sàng, phòng khám, phòng chức năng có nhân viên dùng phần mềm, cả Phòng Điều dưỡng, Phòng Kế hoạch tổng hợp nếu có tài khoản thuộc phòng đó): khoa/phòng không có trong kết quả sẽ chuyển sang *ngừng sử dụng*. Ví dụ (tên bảng/cột thay theo CSDL thật):
+
+   ```sql
+   SELECT MaKhoa AS Code, TenKhoa AS Name FROM dbo.KhoaPhong WHERE HoatDong = 1
+   ```
+
+   Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, thì API dừng khi khởi động (HTTP 500.30).
+2. **Đặt biến** cho Application Pool `PatientInfoApi` (hàm `Set-PoolEnv` ở mục 5.5 bước 4):
+
+   ```powershell
+   $departmentQuery = @'
+   <dán câu truy vấn đã chạy thử>
+   '@
+   $departmentQuery = ($departmentQuery -replace '\s+', ' ').Trim()
+   Set-PoolEnv PatientInfoApi 'PatientInfo__DepartmentQuery' $departmentQuery
+   Restart-WebAppPool PatientInfoApi
+   ```
+
+3. **Kiểm tra** (in mã và tên khoa, không có thông tin người bệnh):
+
+   ```powershell
+   $key = (Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add[@name='PatientInfo__ApiKeys__0']").value
+   $r = Invoke-RestMethod -Uri http://127.0.0.1:5081/api/v1/departments -Headers @{ 'X-Api-Key' = $key }
+   $r.items.Count
+   $r.items | Format-Table code, name
+   ```
+
+   `(404)`: `PatientInfoApi` còn bản cũ (thay thư mục như mục 5.4 bước 5). `(501)`: chưa đặt `PatientInfo__DepartmentQuery`. `(503)`: câu truy vấn lỗi hoặc thiếu quyền đọc. `(422)`: kết quả hơn 2.000 dòng, cần lọc lại.
+4. **Lấy danh mục:** quản trị vào *Quản trị → Khoa/phòng*, bấm **Lấy danh mục từ HIS**:
+   - khoa/phòng có **mã trùng** mã trên HIS: cập nhật tên theo HIS (đang ngừng sử dụng thì dùng lại);
+   - khoa/phòng nhập tay trước đây có **tên trùng** tên trên HIS (không phân biệt hoa thường, khoảng trắng thừa): nhận mã HIS, giữ nguyên người dùng, phiếu, báo cáo đã gắn;
+   - khoa/phòng chỉ có trên HIS: thêm mới;
+   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*).
+
+   HIS lỗi, API chưa có câu truy vấn hoặc HIS trả về rỗng thì danh mục giữ nguyên. Mỗi thay đổi ghi nhật ký hệ thống. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm lại nút này.
+5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

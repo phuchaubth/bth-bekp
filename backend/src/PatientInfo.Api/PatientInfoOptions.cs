@@ -41,6 +41,14 @@ public sealed class PatientInfoOptions
     public string? DailyStatisticsQuery { get; set; }
 
     /// <summary>
+    /// Tùy chọn (quyết định 42): câu SELECT trả về <b>danh mục khoa/phòng</b> của HIS, không tham số. Tên cột kết quả: Code
+    /// (mã khoa trên HIS, tối đa 20 ký tự), Name (tên khoa/phòng). Chỉ lấy khoa/phòng đang hoạt động mà phần mềm phiếu cần
+    /// (lọc bằng WHERE): khoa/phòng không có trong kết quả sẽ thành "ngừng sử dụng" trong phần mềm phiếu. Để trống thì API
+    /// không có chức năng này.
+    /// </summary>
+    public string? DepartmentQuery { get; set; }
+
+    /// <summary>
     /// Các khóa API được phép gọi (mỗi phần mềm một khóa, đổi khóa không gián đoạn bằng cách thêm khóa mới rồi bỏ khóa cũ):
     /// biến môi trường <c>PatientInfo__ApiKeys__0</c>, <c>PatientInfo__ApiKeys__1</c>…
     /// </summary>
@@ -90,6 +98,11 @@ public sealed class PatientInfoOptions
         || (IsSingleSelect(DailyStatisticsQuery, out var query)
             && query.Contains("@From", StringComparison.OrdinalIgnoreCase)
             && query.Contains("@To", StringComparison.OrdinalIgnoreCase));
+
+    public bool HasDepartmentQuery => !string.IsNullOrWhiteSpace(DepartmentQuery);
+
+    /// <summary>Câu truy vấn danh mục khoa/phòng (nếu đặt): một câu SELECT, không cần tham số.</summary>
+    public bool HasValidDepartmentQuery => !HasDepartmentQuery || IsSingleSelect(DepartmentQuery, out _);
 
     private static bool IsSingleSelect(string? value, out string query)
     {

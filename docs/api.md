@@ -126,8 +126,11 @@ Ví dụ lỗi kiểm tra dữ liệu:
 | POST | `/api/v1/departments` | `departments.manage` | Thêm; `201` + `Location` |
 | PUT | `/api/v1/departments/{id}` | `departments.manage` | Sửa (gồm ngừng/tiếp tục sử dụng) |
 | DELETE | `/api/v1/departments/{id}` | `departments.manage` | Xóa khoa chưa có người dùng → `204`; khoa đang dùng → `422 departments.in_use` |
+| POST | `/api/v1/departments/sync-his` | `departments.manage` | **Lấy danh mục khoa/phòng từ HIS** (quyết định 42) qua API thông tin người bệnh → `200 { total, added, updated, unchanged, deactivated: [tên khoa], skipped: [mã] }`. `422`: `departments.his_disabled` (chưa cấu hình `PatientSource:Provider = Api`), `departments.his_not_configured` (API chưa đặt `PatientInfo:DepartmentQuery`), `departments.his_unavailable` (không gọi được API hoặc CSDL bệnh viện lỗi), `departments.his_empty` (không có dòng hợp lệ); khi đó danh mục giữ nguyên |
 
 Dữ liệu gửi: `{ "code": "KKB", "name": "Khoa Khám bệnh", "isActive": true }`. Mã khoa được chuẩn hóa chữ hoa, duy nhất (`409 departments.code_exists`).
+
+**Danh mục lấy từ HIS** (quyết định 42): khi đã cấu hình API thông tin người bệnh (`/api/v1/features` trả `departmentsFromHis: true`), thêm, sửa, xóa trả `422 departments.managed_by_his`; danh mục chỉ đổi qua `sync-his`. Cách ghép: mã khoa HIS (chuẩn hóa chữ hoa) trùng mã khoa → cập nhật tên, dùng lại nếu đang ngừng; khoa có mã không có trên HIS mà trùng tên (cùng dạng Unicode, không phân biệt hoa thường, bỏ khoảng trắng thừa) → nhận mã HIS, giữ `id` (người dùng, phiếu, báo cáo đã gắn giữ nguyên); còn lại thêm mới. Khoa không còn trên HIS → ngừng sử dụng (`deactivated`), không xóa. Dòng có mã rỗng hoặc dài quá 20 ký tự bị bỏ (`skipped`); mã lặp lấy dòng đầu; tên thiếu lấy mã, dài quá 200 ký tự thì cắt. Mỗi thay đổi ghi nhật ký hệ thống (`Department`).
 
 ---
 
@@ -274,11 +277,12 @@ Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth
 | GET | `/api/v1/features` | Đăng nhập | Tích hợp đang bật, để giao diện ẩn/hiện phần tương ứng |
 
 ```json
-{ "his": false, "smartCa": false, "patientSource": false }
+{ "his": false, "smartCa": false, "patientSource": false, "departmentsFromHis": false }
 ```
 
 - `his`: đã kết nối HIS (theo `His:Provider`). `false` → giao diện ẩn khung kết quả HIS, cột/nhãn "Đối chiếu HIS"; mã người bệnh nhập tay.
 - `patientSource`: đã cấu hình API thông tin người bệnh (`PatientSource:Provider = Api`). `true` → màn hình tiếp nhận và bước 1 của lập phiếu có ô "Lấy thông tin" theo mã người bệnh hoặc CCCD; quét CCCD cũng tự lấy thêm thông tin còn thiếu.
+- `departmentsFromHis`: danh mục khoa/phòng lấy từ HIS (quyết định 42; cùng điều kiện với `patientSource`). `true` → trang *Khoa/phòng* không có thêm, sửa, xóa, có nút **Lấy danh mục từ HIS**.
 - `smartCa`: đã tích hợp ký số VNPT SmartCA. Hiện luôn `false` (tạm hoãn) → ẩn ô "Mã tài khoản SmartCA" ở màn hình người dùng (giá trị đã lưu được giữ nguyên khi sửa).
 
 ## 6a1. API thông tin người bệnh (dịch vụ riêng `PatientInfo.Api`)
@@ -290,6 +294,7 @@ Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của
 | GET | `/health` | Không | `{"status":"Healthy"}` |
 | POST | `/api/v1/patients/lookup` | Header `X-Api-Key` | `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một; mã ≤ 50 ký tự, CCCD 12 chữ số) → `200` thông tin hành chính; `404` không có; `400` sai dữ liệu; `401` thiếu/sai khóa; `503` lỗi CSDL |
 | POST | `/api/v1/daily-statistics` | Header `X-Api-Key` | **Số liệu trong ngày cho bảng tổng hợp điều dưỡng** (quyết định 31): `{ "date": "yyyy-MM-dd" }` → `200 { items: [{ indicator, departmentCode, value }] }` (tối đa 1.000 dòng; dòng thiếu mã chỉ số hoặc giá trị không phải số nguyên ≥ 0 bị bỏ); `400` thiếu ngày; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:DailyStatisticsQuery`; `503` lỗi CSDL. Chỉ là số đếm, không có thông tin người bệnh |
+| GET | `/api/v1/departments` | Header `X-Api-Key` | **Danh mục khoa/phòng** (quyết định 42) → `200 { items: [{ code, name }] }` (dòng không có mã bị bỏ; thiếu tên thì lấy mã); `401` thiếu/sai khóa; `422` hơn 2.000 dòng (báo lỗi, không cắt bớt, vì phần mềm phiếu coi khoa không có trong danh mục là ngừng sử dụng); `501` chưa đặt `PatientInfo:DepartmentQuery`; `503` lỗi CSDL. Không có thông tin người bệnh |
 | POST | `/api/v1/encounters/search` | Header `X-Api-Key` | **Lượt tiếp nhận** (quyết định 25): `{ "patientCode" \| "citizenId", "from": "yyyy-MM-dd", "to": "yyyy-MM-dd" }` (đúng một trong mã/CCCD; `from` ≤ `to`, tối đa 366 ngày, tính cả ngày `to`) → `200 { items: [{ encounterNo, receivedAt, place, receivedBy }] }`, mới nhất trước, tối đa 200 lượt; `400` sai dữ liệu; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:EncounterQuery`; `503` lỗi CSDL |
 
 ```json

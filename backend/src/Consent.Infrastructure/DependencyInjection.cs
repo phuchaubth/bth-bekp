@@ -88,6 +88,10 @@ public static class DependencyInjection
         services.AddSingleton<IDailyStatisticsSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
             ? ActivatorUtilities.CreateInstance<ApiDailyStatisticsSource>(sp)
             : new DisabledDailyStatisticsSource());
+        // Danh mục khoa/phòng (quyết định 42): đã cấu hình API thì chỉ cập nhật từ HIS, không thêm/sửa/xóa trong phần mềm.
+        services.AddSingleton<IDepartmentSource>(sp => sp.GetRequiredService<IOptions<PatientSourceOptions>>().Value.IsApi
+            ? ActivatorUtilities.CreateInstance<ApiDepartmentSource>(sp)
+            : new DisabledDepartmentSource());
 
         return services;
     }

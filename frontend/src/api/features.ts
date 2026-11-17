@@ -7,10 +7,12 @@ export interface Features {
   smartCa: boolean
   /** Đã cấu hình API thông tin người bệnh: lấy thông tin hành chính theo mã người bệnh hoặc CCCD. */
   patientSource: boolean
+  /** Danh mục khoa/phòng lấy từ HIS (quyết định 42): không thêm, sửa, xóa khoa/phòng trong phần mềm. */
+  departmentsFromHis: boolean
 }
 
 // Trong lúc chờ (hoặc lỗi) coi như chưa kết nối: không hiển thị thông tin HIS.
-const notConnected: Features = { his: false, smartCa: false, patientSource: false }
+const notConnected: Features = { his: false, smartCa: false, patientSource: false, departmentsFromHis: false }
 
 export const featuresApi = {
   get: (signal?: AbortSignal) => apiRequest<Features>('/api/v1/features', { signal }),
