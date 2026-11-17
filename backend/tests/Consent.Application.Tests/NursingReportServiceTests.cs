@@ -231,6 +231,9 @@ public sealed class NursingReportServiceTests
 
         var twice = await service.ReopenAsync(sent.Id.Value, new ReopenNursingReportRequest("lần nữa"), CancellationToken.None);
         Assert.Equal("nursing_reports.not_submitted", twice.Error?.Code);
+        // Bệnh viện gọi việc mở lại là "trả lại khoa": thông báo dùng đúng chữ trên nút.
+        Assert.Equal("Báo cáo chưa gửi nên không cần trả lại khoa.", twice.Error?.Message);
+        Assert.Equal(["Nhập lý do trả lại (tối đa 500 ký tự)."], noReason.Error.FieldErrors["reason"]);
 
         ActAs(_nurse, Permissions.NursingReportsSubmit);
         var fixedReport = await service.SaveAsync(Request(new() { ["currentPatients"] = 46 }, AllOk(), submit: true), CancellationToken.None);

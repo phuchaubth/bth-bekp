@@ -1,5 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import dayjs from 'dayjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NursingReport, NursingReportDepartment, NursingReportFormDefinition, NursingSummary } from '../../api/nursingReports'
 import { Permissions } from '../../auth/permissions'
@@ -8,6 +9,9 @@ import { json, mockApi, problem, type ApiCall } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
 // Dữ liệu giả lập cho test (không phải dữ liệu thật). Mẫu thu gọn: đủ các kiểu dòng của bản giấy.
+// Trang mở ở ngày hôm nay: báo cáo giả lập cũng là của hôm nay (không phụ thuộc ngày chạy test).
+const TODAY = dayjs().format('YYYY-MM-DD')
+
 const definition: NursingReportFormDefinition = {
   title: 'BÁO CÁO CÔNG TÁC ĐIỀU DƯỠNG',
   category: 'Khoa Lâm sàng',
@@ -38,7 +42,7 @@ const report = (overrides: Partial<NursingReport> = {}): NursingReport => ({
   id: null,
   departmentId: 'd-noi',
   departmentName: 'Khoa Nội tổng hợp',
-  reportDate: '2026-11-16',
+  reportDate: TODAY,
   status: 'New',
   values: { nurses: 18 },
   checks: {},
@@ -79,7 +83,7 @@ const officeSession = () =>
   })
 
 const summary: NursingSummary = {
-  reportDate: '2026-11-16',
+  reportDate: TODAY,
   columns: [
     { key: 'beds', header: 'Số giường thực kê (Không tính băng ca)' },
     { key: 'currentPatients', header: 'Số NB hiện tại' },
@@ -234,6 +238,27 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
   })
 
+  it('Phòng Điều dưỡng trả lại khoa: khoa thấy ai trả lại và lý do, sửa được để gửi lại', async () => {
+    mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/daily': report({
+        id: 'r-noi',
+        status: 'Draft',
+        carriedOverKeys: [],
+        updatedAtUtc: '2026-11-16T01:00:00Z',
+        reopenedBy: 'Phòng Điều dưỡng Demo',
+        reopenedAtUtc: '2026-11-16T01:00:00Z',
+        reopenReason: 'Sai số NB hiện tại',
+      }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText('Phòng Điều dưỡng đã trả lại báo cáo cho khoa (Phòng Điều dưỡng Demo).')).toBeInTheDocument()
+    expect(screen.getByText('Lý do: Sai số NB hiện tại. Sửa rồi bấm "Gửi báo cáo" lại.')).toBeInTheDocument()
+    expect(screen.getByRole('spinbutton', { name: 'Điều dưỡng' })).toBeEnabled()
+  })
+
   it('HIS lỗi: khoa nhập "NB PK chờ nhập viện" của khoa ở thẻ riêng, lưu riêng với báo cáo', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
@@ -258,7 +283,7 @@ describe('Báo cáo điều dưỡng của khoa', () => {
 
     await waitFor(() =>
       expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/his-entry')?.body).toEqual({
-        reportDate: '2026-11-16',
+        reportDate: TODAY,
         values: { waitingAdmission: 3 },
       }),
     )
@@ -315,7 +340,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     objectUrls.length = 0
   })
 
-  it('hiện mục A–F như bản giấy, xem báo cáo một khoa và mở lại kèm lý do', { timeout: 20_000 }, async () => {
+  it('hiện mục A–F như bản giấy, xem báo cáo một khoa và trả lại khoa kèm lý do', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
       ...baseRoutes(officeSession()),
@@ -361,17 +386,19 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain('departmentId=d-noi')
     expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
 
-    await user.click(within(drawer).getByRole('button', { name: /Mở lại/ }))
+    await user.click(within(drawer).getByRole('button', { name: /Trả lại khoa/ }))
     // Hộp thoại mở trên ngăn kéo: AntD trong môi trường test đặt cùng id tiêu đề, nên tìm theo chữ thay vì theo tên.
-    const modal = (await screen.findByText('Mở lại báo cáo cho khoa sửa')).closest<HTMLElement>('[role="dialog"]')!
-    expect(within(modal).getByRole('button', { name: 'Mở lại' })).toBeDisabled()
-    await user.type(within(modal).getByRole('textbox', { name: 'Lý do mở lại' }), 'Sai số NB hiện tại')
-    await user.click(within(modal).getByRole('button', { name: 'Mở lại' }))
+    const modal = (await screen.findByText('Trả lại báo cáo cho khoa sửa')).closest<HTMLElement>('[role="dialog"]')!
+    expect(within(modal).getByRole('button', { name: 'Trả lại khoa' })).toBeDisabled()
+    await user.type(within(modal).getByRole('textbox', { name: 'Lý do trả lại' }), 'Sai số NB hiện tại')
+    await user.click(within(modal).getByRole('button', { name: 'Trả lại khoa' }))
 
     await waitFor(() =>
       expect(lastCall(calls, 'POST', '/api/v1/nursing-reports/r-noi/reopen')?.body).toEqual({ reason: 'Sai số NB hiện tại' }),
     )
-    expect(await screen.findByText('Đã mở lại báo cáo. Khoa sửa và gửi lại.')).toBeInTheDocument()
+    expect(await screen.findByText('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')).toBeInTheDocument()
+    expect(await within(drawer).findByText(/^Đã trả lại khoa lúc .* bởi Phòng Điều dưỡng Demo$/)).toBeInTheDocument()
+    expect(within(drawer).getByText('Lý do: Sai số NB hiện tại')).toBeInTheDocument()
   })
 
   it('xuất Excel, lấy số liệu HIS (báo mã khoa không khớp), lỗi HIS thì báo các khoa nhập tay', { timeout: 20_000 }, async () => {

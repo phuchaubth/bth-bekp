@@ -7,7 +7,7 @@ import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { statusTag, toFormValues, type NursingReportFormValues } from './nursingReportUtils'
 
-/** Dòng trạng thái: ai gửi lúc nào; lần mở lại gần nhất và lý do. */
+/** Dòng trạng thái: ai gửi lúc nào, ai lưu nháp lúc nào. */
 export function ReportStatus({ report }: { report: NursingReport }) {
   return (
     <Typography.Paragraph style={{ marginBottom: 12 }}>

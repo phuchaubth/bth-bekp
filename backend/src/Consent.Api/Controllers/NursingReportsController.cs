@@ -45,7 +45,7 @@ public sealed class NursingReportsController(NursingReportService reports, Nursi
     public async Task<IActionResult> SaveHisEntry(SaveNursingHisEntryRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await reports.SaveHisEntryAsync(request, cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi để khoa sửa (bắt buộc ghi lý do).</summary>
+    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi để khoa sửa (nút "Trả lại khoa", bắt buộc ghi lý do).</summary>
     [HttpPost("{id:guid}/reopen")]
     [HasPermission(Permissions.NursingReportsManage)]
     public async Task<IActionResult> Reopen(Guid id, ReopenNursingReportRequest request, CancellationToken cancellationToken) =>

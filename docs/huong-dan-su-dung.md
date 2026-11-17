@@ -14,7 +14,7 @@
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
 8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
-9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, mở lại, in PDF, xuất Excel
+9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel
 10. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
@@ -211,7 +211,7 @@ Không có máy quét: bấm **Quét bằng camera**. Lần đầu, trình duy�
 
 Khi bệnh viện đã kết nối hệ thống thông tin người bệnh, sau khi quét thẻ, phần mềm tự lấy thêm thông tin còn thiếu (mã người bệnh, số điện thoại…). Phần mềm chỉ điền vào ô còn trống, thông tin trên thẻ được ưu tiên.
 
-Nếu thấy khung vàng **Cần kiểm tra lại** (ví dụ *"Họ tên có ký tự lạ"*), máy quét có thể chưa đọc đúng tiếng Việt có dấu. Hãy đối chiếu với thẻ và sửa lại.
+Máy quét chưa cài đọc tiếng Việt thường gõ chữ có dấu thành ký tự lạ (kiểu *"Ä‘Æ°á»ng"* thay cho *"đường"*). Phần mềm tự sửa lại các chữ này. Địa chỉ không sửa được thì phần mềm để trống, kèm cảnh báo *"Địa chỉ trong mã QR bị lỗi chữ có dấu…"*: nhập bổ sung. Nếu thấy khung vàng **Cần kiểm tra lại** (ví dụ *"Họ tên có ký tự lạ"*), hãy đối chiếu với thẻ và sửa lại, rồi báo bộ phận CNTT cài lại máy quét. Camera (**Quét bằng camera**) đọc đúng chữ có dấu trong mã QR.
 
 **Cách 2: Lấy thông tin từ hệ thống bệnh viện**
 
@@ -645,6 +645,7 @@ Máy kiosk là màn hình cảm ứng 32 inch đặt dọc, có máy quét mã Q
 
 - **Quét CCCD** (nhanh nhất): lật thẻ sang mặt có mã QR, đưa mã QR lại gần đèn đỏ của máy quét, giữ yên 1–2 giây. Nghe tiếng "bíp" là xong, máy tự chuyển sang bước sau. Máy chỉ đọc chữ trong mã QR, không chụp hay lưu ảnh thẻ.
   Kiosk có camera thì màn hình hiện khung hình camera: đưa mã QR vào khung vuông trên màn hình, cách camera khoảng một gang tay, giữ yên 1–2 giây. Đọc xong máy tự chuyển sang bước sau. Máy quét bên dưới (nếu có) vẫn dùng được cùng lúc. Hình từ camera chỉ dùng để đọc mã ngay trên máy, không lưu, không gửi đi.
+  Mã QR căn cước trên ứng dụng VNeID cũng quét được như mã trên thẻ. Máy quét gõ sai chữ có dấu thì kiosk tự sửa; địa chỉ không sửa được thì kiosk bỏ qua, không lưu chữ hỏng vào hồ sơ và phiếu.
 - **Nhập mã y tế hoặc số CCCD**: chọn **Mã y tế** hoặc **Số CCCD**, nhập bằng bàn phím số trên màn hình, chạm **Ô tiếp**, nhập **Ngày sinh (ngày/tháng/năm)**, chạm **Lấy thông tin**. Máy chỉ hiện thông tin khi ngày sinh khớp hồ sơ.
 - **Nhập thông tin** (khi không mang CCCD hoặc chưa có mã y tế): nhập **Họ và tên**, **Ngày sinh**, **Giới tính**, **Số điện thoại**, **Số CCCD** (nếu có), **Chỗ ở hiện nay**, rồi chạm **Tiếp tục**. Bàn phím tiếng Việt có hàng phím dấu: gõ chữ rồi chạm dấu.
 
@@ -1102,7 +1103,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 |---|---|---|
 | Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và mở lại báo cáo của khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1145,11 +1146,11 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 
 Lưu ý:
 
-- Cần sửa báo cáo đã gửi: đề nghị Phòng Điều dưỡng **mở lại** (mục 9.3). Khi được mở lại, trang báo cáo hiện khung ghi lý do. Sửa rồi bấm **Gửi báo cáo** lại.
+- Cần sửa báo cáo đã gửi: đề nghị Phòng Điều dưỡng **trả lại khoa** (mục 9.3). Khi được trả lại, trang báo cáo hiện khung ghi ai trả lại và lý do. Sửa rồi bấm **Gửi báo cáo** lại.
 - Dưới báo cáo có thẻ **Số liệu HIS khoa nhập khi HIS lỗi**. Chỉ nhập khi HIS lỗi (mục 9.5).
 - Trang báo **Khoa chưa có trong danh sách khoa báo cáo điều dưỡng**: liên hệ Phòng Điều dưỡng để được thêm vào danh sách (mục 9.4). Trong lúc chờ, bạn chỉ xem được, không lưu được.
 - Tài khoản ghi sai khoa: nhờ quản trị sửa khoa/phòng của tài khoản (mục 8.1).
-- Phần nhập thêm có thể ghi tên người bệnh. Phần này được mã hóa khi lưu, và nhật ký hệ thống không ghi nội dung của nó. Mỗi lần lưu, gửi, mở lại đều được ghi nhật ký.
+- Phần nhập thêm có thể ghi tên người bệnh. Phần này được mã hóa khi lưu, và nhật ký hệ thống không ghi nội dung của nó. Mỗi lần lưu, gửi, trả lại khoa đều được ghi nhật ký.
 
 ### 9.2. Bảng tổng hợp hằng ngày (Phòng Điều dưỡng)
 
@@ -1178,17 +1179,17 @@ Lưu ý:
 
    *Hình 9.9. PDF bảng tổng hợp (trang 1). Chân trang ghi giờ in, số khoa đã gửi và nguồn số liệu HIS: lấy từ HIS lúc nào, hoặc do khoa nhập tay.*
 
-### 9.3. Xem và mở lại báo cáo của một khoa (Phòng Điều dưỡng)
+### 9.3. Xem và trả lại báo cáo cho khoa (Phòng Điều dưỡng)
 
 1. Trong mục A, bấm **tên khoa**. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
 
    ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
 
-   *Hình 9.10. Báo cáo của một khoa. Nút **Mở lại** chỉ có khi khoa đã gửi.*
+   *Hình 9.10. Báo cáo của một khoa. Nút **Trả lại khoa** chỉ có khi khoa đã gửi.*
 
-2. Khoa cần sửa: bấm **Mở lại**, ghi lý do, bấm **Mở lại** trong hộp. Báo cáo trở về nháp; khoa thấy lý do, sửa rồi gửi lại.
+2. Khoa cần sửa: bấm **Trả lại khoa**, ghi lý do, bấm **Trả lại khoa** trong hộp. Báo cáo trở về nháp; khoa thấy ai trả lại và lý do, sửa rồi gửi lại.
 
-   ![Hộp mở lại báo cáo](huong-dan-su-dung/dd-08-mo-lai.png)
+   ![Hộp trả lại báo cáo cho khoa](huong-dan-su-dung/dd-08-tra-lai-khoa.png)
 
    *Hình 9.11. Bắt buộc ghi lý do. Lý do được ghi vào nhật ký và hiện cho khoa.*
 
@@ -1303,11 +1304,14 @@ Bạn chỉ thấy phiếu của khoa mình và phiếu do mình lập. Khi lậ
 **Xuất dữ liệu báo "Bạn thao tác quá nhiều lần"?**
 Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút rồi thử lại.
 
+**Quét CCCD (hoặc mã QR trên VNeID), địa chỉ hoặc họ tên bị mất dấu, hiện ký tự lạ?**
+Máy quét 2D chưa cài chế độ đọc tiếng Việt. Phần mềm tự sửa các chữ máy quét gõ thành ký tự lạ (kiểu *Ä‘Æ°á»ng*). Địa chỉ không sửa được thì để trống (màn hình nhân viên có cảnh báo, kiosk ghi **Chưa có**) để nhập lại. Khắc phục hẳn: bộ phận CNTT cài máy quét xuất ký tự Unicode (tài liệu triển khai, mục 9b), hoặc dùng camera: camera đọc đúng chữ có dấu.
+
 **Kiosk báo đã tạm khóa tra cứu?**
 Do nhập mã/CCCD kèm ngày sinh sai 5 lần. Máy mở lại sau 5 phút, hoặc quản trị **Mở khóa** tài khoản kiosk ở **Quản trị → Người dùng** (trạng thái **Tạm khóa tra cứu**). Trong lúc chờ, người bệnh chọn **Nhập thông tin** (không kèm số CCCD) hoặc đến quầy tiếp đón.
 
 **Không lập được báo cáo điều dưỡng của khoa?**
-Kiểm tra: tài khoản có vai trò Điều dưỡng và đúng khoa (quản trị sửa ở mục 8.1); khoa đã có trong danh sách khoa báo cáo (Phòng Điều dưỡng cài ở mục 9.4); ngày báo cáo không sau hôm nay và không quá một năm trước. Báo cáo đã gửi thì phải nhờ Phòng Điều dưỡng mở lại mới sửa được.
+Kiểm tra: tài khoản có vai trò Điều dưỡng và đúng khoa (quản trị sửa ở mục 8.1); khoa đã có trong danh sách khoa báo cáo (Phòng Điều dưỡng cài ở mục 9.4); ngày báo cáo không sau hôm nay và không quá một năm trước. Báo cáo đã gửi thì phải nhờ Phòng Điều dưỡng trả lại khoa mới sửa được.
 
 **HIS lỗi, mục B hoặc mục D trên bảng tổng hợp để trống?**
 Khoa được giao chưa nhập. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô trên cùng bảng tổng hợp, nhắc khoa còn ghi **chưa nhập** (mục 9.5). Nếu dòng ghi *chưa giao khoa nhập mục B, D*: Phòng Điều dưỡng giao khoa ở mục 9.4.

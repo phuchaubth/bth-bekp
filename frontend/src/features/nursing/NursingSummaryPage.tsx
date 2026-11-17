@@ -1,4 +1,4 @@
-import { CloudDownloadOutlined, FileExcelOutlined, FilePdfOutlined, SettingOutlined, UnlockOutlined } from '@ant-design/icons'
+import { CloudDownloadOutlined, FileExcelOutlined, FilePdfOutlined, RollbackOutlined, SettingOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -50,7 +50,7 @@ const number = (value: number | null | undefined) => (value === null || value ==
 
 /**
  * Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (quyết định 31): mục A–F như bản giấy, lấy từ báo cáo các khoa đã gửi
- * và số liệu HIS. Phòng Điều dưỡng xem báo cáo từng khoa, mở lại, cài khoa báo cáo, số giường và khoa nhập từng chỉ số, lấy
+ * và số liệu HIS. Phòng Điều dưỡng xem báo cáo từng khoa, trả lại khoa, cài khoa báo cáo, số giường và khoa nhập từng chỉ số, lấy
  * số liệu HIS. Khi HIS lỗi, các khoa nhập số liệu của khoa; Phòng Điều dưỡng chỉ tổng hợp (quyết định 35).
  */
 export function NursingSummaryPage() {
@@ -337,7 +337,7 @@ function LineTable({ title, lines }: { title: string; lines: NursingSummaryLine[
   )
 }
 
-/** Báo cáo của một khoa (chỉ đọc) trong bảng tổng hợp: in PDF, Phòng Điều dưỡng mở lại khi cần. */
+/** Báo cáo của một khoa (chỉ đọc) trong bảng tổng hợp: in PDF, Phòng Điều dưỡng trả lại khoa để sửa khi cần. */
 function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSummaryRow; reportDate: string; onClose: () => void }) {
   const definition = useNursingReportForm()
   const report = useNursingReport(reportDate, row.departmentId)
@@ -356,8 +356,8 @@ function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSumm
         data?.id && (
           <Flex gap={8}>
             {data.canReopen && (
-              <Button icon={<UnlockOutlined />} onClick={() => setReopenOpen(true)}>
-                Mở lại
+              <Button icon={<RollbackOutlined />} onClick={() => setReopenOpen(true)}>
+                Trả lại khoa
               </Button>
             )}
             <Button icon={<FilePdfOutlined />} onClick={() => setPdfOpen(true)}>
@@ -381,7 +381,7 @@ function DepartmentReportDrawer({ row, reportDate, onClose }: { row: NursingSumm
               type="info"
               showIcon
               style={{ marginBottom: 12 }}
-              title={`Đã mở lại lúc ${data.reopenedAtUtc ? formatDateTime(data.reopenedAtUtc) : ''}${data.reopenedBy ? ` bởi ${data.reopenedBy}` : ''}`}
+              title={`Đã trả lại khoa lúc ${data.reopenedAtUtc ? formatDateTime(data.reopenedAtUtc) : ''}${data.reopenedBy ? ` bởi ${data.reopenedBy}` : ''}`}
               description={`Lý do: ${data.reopenReason}`}
             />
           )}
@@ -414,7 +414,7 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
     onSuccess: (report) => {
       queryClient.setQueryData(nursingKeys.daily(reportDate, departmentId), report)
       void queryClient.invalidateQueries({ queryKey: nursingKeys.summary(reportDate) })
-      message.success('Đã mở lại báo cáo. Khoa sửa và gửi lại.')
+      message.success('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')
       onClose()
     },
     onError: (e) => message.error(errorMessage(e)),
@@ -422,8 +422,8 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
   return (
     <Modal
       open
-      title="Mở lại báo cáo cho khoa sửa"
-      okText="Mở lại"
+      title="Trả lại báo cáo cho khoa sửa"
+      okText="Trả lại khoa"
       cancelText="Đóng"
       okButtonProps={{ disabled: reason.trim().length === 0, loading: reopen.isPending }}
       onOk={() => reopen.mutate()}
@@ -431,8 +431,8 @@ function ReopenModal({ reportId, departmentId, reportDate, onClose }: { reportId
     >
       <Typography.Paragraph>Báo cáo trở lại dạng nháp; khoa sửa rồi gửi lại. Lý do được ghi vào nhật ký.</Typography.Paragraph>
       <Input.TextArea
-        aria-label="Lý do mở lại"
-        placeholder="Lý do mở lại (bắt buộc)"
+        aria-label="Lý do trả lại"
+        placeholder="Lý do trả lại (bắt buộc)"
         value={reason}
         maxLength={500}
         autoSize={{ minRows: 2, maxRows: 6 }}

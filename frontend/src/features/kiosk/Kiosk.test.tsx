@@ -498,6 +498,29 @@ describe('Kiosk quét CCCD bằng camera', () => {
     expect(fakeCameras[0].stop).toHaveBeenCalled()
   })
 
+  it.each([
+    ['sửa lại họ tên và địa chỉ', false, 'Số 1 Đường Thử Nghiệm, Phường Mẫu'],
+    ['địa chỉ không sửa được thì không gửi', true, null],
+  ])('máy quét gõ chữ có dấu thành ký tự lạ (Windows-1252): %s', async (_, dropUnassigned, permanentAddress) => {
+    removeCamera = installFakeMediaDevices(['audioinput'])
+    const { user, identifyCalls } = await openScan()
+    // Máy quét chưa cài đọc tiếng Việt gõ từng byte UTF-8 thành một ký tự Windows-1252; có máy bỏ mất byte chưa gán ký tự.
+    const decoder = new TextDecoder('windows-1252')
+    const typed = [...new TextEncoder().encode(QR)]
+      .map((byte) => decoder.decode(Uint8Array.of(byte)))
+      .filter((char) => !dropUnassigned || !/[\u0080-\u009f]/.test(char))
+      .join('')
+    expect(typed).toContain('Nguyá»…n')
+
+    await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${typed}{Enter}`)
+
+    expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
+    expect(identifyCalls()[0].body).toMatchObject({
+      citizenId: '079085000123',
+      card: { fullName: 'Nguyễn Văn Kiosk', permanentAddress },
+    })
+  })
+
   it('kiosk không có camera: chỉ dùng máy quét như trước, không bật camera', async () => {
     removeCamera = installFakeMediaDevices(['audioinput'])
     await openScan()

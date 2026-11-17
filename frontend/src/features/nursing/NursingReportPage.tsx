@@ -21,7 +21,7 @@ const DATE = 'YYYY-MM-DD'
 
 /**
  * Báo cáo công tác điều dưỡng hằng ngày của khoa (quyết định 31): điều dưỡng chọn ngày, nhập theo bản giấy, lưu nháp hoặc
- * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại. Khi HIS lỗi, khoa nhập số liệu HIS
+ * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa. Khi HIS lỗi, khoa nhập số liệu HIS
  * thuộc nhiệm vụ của khoa ở thẻ riêng (quyết định 35); khoa không phải báo cáo nhưng được giao chỉ số thì chỉ thấy thẻ này.
  */
 export function NursingReportPage() {
@@ -141,7 +141,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          title={`Phòng Điều dưỡng đã mở lại báo cáo${report.reopenedBy ? ` (${report.reopenedBy})` : ''}.`}
+          title={`Phòng Điều dưỡng đã trả lại báo cáo cho khoa${report.reopenedBy ? ` (${report.reopenedBy})` : ''}.`}
           description={`Lý do: ${report.reopenReason}. Sửa rồi bấm "Gửi báo cáo" lại.`}
         />
       )}
@@ -159,7 +159,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           showIcon
           style={{ marginBottom: 12 }}
           title="Báo cáo đã gửi Phòng Điều dưỡng."
-          description="Cần sửa thì đề nghị Phòng Điều dưỡng mở lại."
+          description="Cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa."
         />
       )}
 
@@ -172,7 +172,7 @@ function ReportEditor({ definition, report }: { definition: NursingReportFormDef
           </Button>
           <Popconfirm
             title="Gửi báo cáo cho Phòng Điều dưỡng?"
-            description="Sau khi gửi, khoa không sửa được nữa; cần sửa thì đề nghị Phòng Điều dưỡng mở lại."
+            description="Sau khi gửi, khoa không sửa được nữa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa."
             okText="Gửi"
             cancelText="Xem lại"
             onConfirm={submit}

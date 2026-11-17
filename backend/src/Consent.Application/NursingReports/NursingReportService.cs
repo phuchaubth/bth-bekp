@@ -135,7 +135,7 @@ public sealed class NursingReportService(
         {
             return Error.BusinessRule(
                 "nursing_reports.submitted",
-                "Báo cáo đã gửi, không sửa được. Cần sửa thì đề nghị Phòng Điều dưỡng mở lại.");
+                "Báo cáo đã gửi, không sửa được. Cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa.");
         }
 
         if (report is null)
@@ -239,19 +239,19 @@ public sealed class NursingReportService(
         return await GetAsync(id, request.ReportDate, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi để khoa sửa và gửi lại (bắt buộc ghi lý do, ghi nhật ký).</summary>
+    /// <summary>Phòng Điều dưỡng mở lại báo cáo đã gửi (nút "Trả lại khoa") để khoa sửa và gửi lại (bắt buộc ghi lý do, ghi nhật ký).</summary>
     public async Task<Result<NursingReportDto>> ReopenAsync(Guid id, ReopenNursingReportRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (!CanManage || currentUser.UserId is not { } userId)
         {
-            return Error.Forbidden("nursing_reports.forbidden", "Chỉ Phòng Điều dưỡng mở lại được báo cáo đã gửi.");
+            return Error.Forbidden("nursing_reports.forbidden", "Chỉ Phòng Điều dưỡng được trả lại báo cáo cho khoa.");
         }
 
         var reason = request.Reason?.Trim();
         if (string.IsNullOrEmpty(reason) || reason.Length > NursingDailyReport.ReopenReasonMaxLength)
         {
-            return Error.ValidationField("reason", $"Nhập lý do mở lại (tối đa {NursingDailyReport.ReopenReasonMaxLength} ký tự).");
+            return Error.ValidationField("reason", $"Nhập lý do trả lại (tối đa {NursingDailyReport.ReopenReasonMaxLength} ký tự).");
         }
 
         var report = await reports.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
@@ -262,7 +262,7 @@ public sealed class NursingReportService(
 
         if (!report.IsSubmitted)
         {
-            return Error.BusinessRule("nursing_reports.not_submitted", "Báo cáo chưa gửi nên không cần mở lại.");
+            return Error.BusinessRule("nursing_reports.not_submitted", "Báo cáo chưa gửi nên không cần trả lại khoa.");
         }
 
         report.Reopen(reason, userId, clock.UtcNow);
