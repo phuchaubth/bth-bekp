@@ -419,7 +419,7 @@ Từ quyết định 38, mục VI của báo cáo khoa nhập riêng **số ca n
 
 ### 5.8. Dữ liệu theo khoa, tài khoản nhiều khoa (quyết định 41)
 
-Tài khoản khoa nào thấy dữ liệu khoa đó: phiếu, tổng quan, báo cáo thống kê, xuất dữ liệu, báo cáo điều dưỡng (cùng phiếu do mình lập, quyết định 19). Hồ sơ người bệnh dùng chung toàn viện. Bản có tính năng này kèm migration `AddUserDepartments` (1 bảng mới, không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khoa hiện có của mỗi tài khoản trở thành **khoa chính**, không phải nhập lại.
+Tài khoản khoa nào thấy dữ liệu khoa đó: phiếu, tổng quan, báo cáo thống kê, xuất dữ liệu, báo cáo điều dưỡng (cùng phiếu do mình lập, quyết định 19). Hồ sơ người bệnh dùng chung toàn viện (bệnh viện xác nhận). Bản có tính năng này kèm migration `AddUserDepartments` (1 bảng mới, không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khoa hiện có của mỗi tài khoản trở thành **khoa chính**, không phải nhập lại.
 
 1. **Khoa chính:** *Quản trị → Người dùng → Sửa*, ô **Khoa/phòng chính**: khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng. Tài khoản kiosk chỉ có khoa chính (phiếu làm trên kiosk thuộc khoa này).
 2. **Khoa khác:** nhân viên làm ở nhiều khoa (ví dụ điều dưỡng luân phiên, bác sĩ khám ở hai khoa), chọn thêm ở ô **Khoa/phòng khác** (tối đa 20). Tài khoản thấy dữ liệu của khoa chính và các khoa này; ở Báo cáo, Xuất dữ liệu và Báo cáo điều dưỡng chọn được từng khoa.
