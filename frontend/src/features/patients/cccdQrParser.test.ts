@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { citizenIdMismatch, maskCitizenId, maskInsurance, maskPhone } from './cccd'
-import { parseCccdQr, type CccdParseResult } from './cccdQrParser'
+import { isUnreliableName, parseCccdQr, type CccdParseResult } from './cccdQrParser'
 
 // Dữ liệu giả lập, không phải người thật.
 const TODAY = new Date('2026-11-11T03:00:00Z')
@@ -130,6 +130,36 @@ describe('parseCccdQr', () => {
         ])
       }
       expect(lossy.ok && lossy.card.fullName).toBe('Phạm Thị Dung')
+    })
+
+    it('máy quét bỏ hẳn chữ có dấu: bỏ địa chỉ, cảnh báo họ tên, "N" là Nữ', () => {
+      // Như máy quét không gõ được ký tự ngoài bảng chữ ASCII: "Đường" thành "ng", "Nữ" thành "N".
+      const result = parseCccdQr(VALID.replace(/[^\u0020-\u007e]/g, ''), TODAY)
+
+      expect(result.ok && result.card).toMatchObject({ fullName: 'Phm Th Dung', gender: 'Female', permanentAddress: '' })
+      expect(result.ok && result.warnings).toEqual([
+        'Họ tên có ký tự lạ hoặc mất chữ có dấu. Máy quét có thể chưa đọc được tiếng Việt có dấu: vui lòng đối chiếu với thẻ và sửa lại.',
+        'Địa chỉ trong mã QR bị lỗi chữ có dấu (máy quét chưa đọc được tiếng Việt) nên được bỏ qua: vui lòng nhập bổ sung.',
+      ])
+    })
+
+    it.each([
+      ['Nguyễn Văn An', false],
+      ['LÝ A PAO', false],
+      ['LY A PAO', false],
+      ['NGUYN VN AN', true],
+      ['Nguyn Vn An', true],
+      ['Ph?m Th? Dung', true],
+      ['PhÆ°á»£ng', true],
+    ])('họ tên "%s" không đáng tin: %s', (name, expected) => {
+      expect(isUnreliableName(name)).toBe(expected)
+    })
+
+    it.each(['KP 2, TP HCM', '12b Le Loi, Q 1'])('giữ địa chỉ không dấu nhưng đủ nguyên âm hoặc viết tắt in hoa: %s', (address) => {
+      const result = parseCccdQr(VALID.replace(ADDRESS, address), TODAY)
+
+      expect(result.ok && result.card.permanentAddress).toBe(address)
+      expect(result.ok && result.warnings).toEqual([])
     })
 
     it('ghép địa chỉ dạng Unicode tổ hợp thành chữ dựng sẵn', () => {

@@ -44,7 +44,8 @@ function parseGender(value: string): Gender | null {
   if (normalized === 'nam') {
     return 'Male'
   }
-  return normalized === 'nu' ? 'Female' : null
+  // "n": máy quét bỏ mất chữ "ữ" của "Nữ" ("Nam" không có chữ có dấu nên không bị mất chữ).
+  return normalized === 'nu' || normalized === 'n' ? 'Female' : null
 }
 
 function isoToday(today: Date): string {
@@ -117,10 +118,38 @@ const MOJIBAKE_CONTINUATION =
 const BROKEN_TEXT = new RegExp(`[?\\ufffd\\u0080-\\u009f]|[${MOJIBAKE_LEAD}][${MOJIBAKE_CONTINUATION}]`, 'u')
 
 /**
+ * Máy quét không gõ được chữ có dấu thì bỏ hẳn các chữ đó: "Đường" thành "ng", "Hồ Chí Minh" thành "H Ch Minh". Chuỗi như
+ * vậy không còn chữ có dấu nào và có chữ không có nguyên âm, điều không có trong tiếng Việt. Trong địa chỉ, chữ viết tắt in
+ * hoa (TP, KP) và một chữ cái lẻ (số nhà 12b) không tính.
+ */
+function lostAccentedLetters(text: string, isAddress: boolean): boolean {
+  if (/[\u0080-\uffff]/.test(text)) {
+    return false
+  }
+  return text
+    .split(/[^A-Za-z]+/)
+    .some((word) => word !== '' && !/[aeiouy]/i.test(word) && (!isAddress || (word.length > 1 && /[a-z]/.test(word))))
+}
+
+/**
+ * Họ tên đọc từ mã QR có ký tự lạ hoặc bị mất chữ có dấu (máy quét chưa đọc được tiếng Việt). Họ tên như vậy chỉ để đối
+ * chiếu: không dùng để lập hồ sơ người bệnh mới.
+ */
+export function isUnreliableName(fullName: string): boolean {
+  return (
+    fullName.includes('\ufffd') ||
+    fullName.includes('?') ||
+    !/^[\p{L}\p{M} .'-]+$/u.test(fullName) ||
+    lostAccentedLetters(fullName, false)
+  )
+}
+
+/**
  * Phân tích chuỗi QR trên CCCD gắn chip (cả mã QR trên ứng dụng VNeID):
  * `Số CCCD|Số CMND cũ|Họ và tên|Ngày sinh (ddMMyyyy)|Giới tính|Nơi thường trú|Ngày cấp (ddMMyyyy)`.
- * Trường thừa phía sau (nếu có) được bỏ qua. Chữ có dấu bị máy quét gõ thành ký tự lạ thì sửa lại; địa chỉ vẫn hỏng thì bỏ
- * (không lưu chữ hỏng vào hồ sơ và phiếu). Không lưu chuỗi QR gốc.
+ * Trường thừa phía sau (nếu có) được bỏ qua. Chữ có dấu bị máy quét gõ thành ký tự lạ thì sửa lại. Địa chỉ vẫn hỏng, hoặc
+ * bị máy quét bỏ mất chữ có dấu, thì bỏ (không lưu chữ hỏng vào hồ sơ và phiếu); họ tên như vậy thì cảnh báo. Không lưu
+ * chuỗi QR gốc.
  */
 export function parseCccdQr(raw: string, today: Date = new Date()): CccdParseResult {
   // Bỏ ký tự điều khiển (máy quét có thể gửi kèm CR/LF/TAB), sửa chữ có dấu bị gõ thành ký tự lạ, rồi chuẩn hóa Unicode
@@ -146,9 +175,9 @@ export function parseCccdQr(raw: string, today: Date = new Date()): CccdParseRes
 
   if (!fullName) {
     errors.push('Mã QR không có họ tên.')
-  } else if (fullName.includes('�') || fullName.includes('?') || !/^[\p{L}\p{M} .'-]+$/u.test(fullName)) {
+  } else if (isUnreliableName(fullName)) {
     warnings.push(
-      'Họ tên có ký tự lạ. Máy quét có thể chưa hỗ trợ tiếng Việt có dấu: vui lòng đối chiếu với thẻ và sửa lại.',
+      'Họ tên có ký tự lạ hoặc mất chữ có dấu. Máy quét có thể chưa đọc được tiếng Việt có dấu: vui lòng đối chiếu với thẻ và sửa lại.',
     )
   }
 
@@ -180,7 +209,7 @@ export function parseCccdQr(raw: string, today: Date = new Date()): CccdParseRes
   let permanentAddress = address
   if (!address) {
     warnings.push('Mã QR không có địa chỉ thường trú: vui lòng nhập bổ sung.')
-  } else if (BROKEN_TEXT.test(address)) {
+  } else if (BROKEN_TEXT.test(address) || lostAccentedLetters(address, true)) {
     warnings.push(
       'Địa chỉ trong mã QR bị lỗi chữ có dấu (máy quét chưa đọc được tiếng Việt) nên được bỏ qua: vui lòng nhập bổ sung.',
     )

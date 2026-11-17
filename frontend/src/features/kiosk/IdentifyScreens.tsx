@@ -3,7 +3,7 @@ import type { Gender } from '../../api/patients'
 import { kioskApi, type KioskConfig, type KioskIdentity, type KioskIdentityRequest } from '../../api/kiosk'
 import { cameraBlocked, cameraErrorName, canUseCamera, hasCamera } from '../patients/cameraSupport'
 import { citizenIdMismatch, isValidCitizenId } from '../patients/cccd'
-import { parseCccdQr } from '../patients/cccdQrParser'
+import { isUnreliableName, parseCccdQr } from '../patients/cccdQrParser'
 import { birthDateError, dateDigitsToIso, DATE_DIGITS, displayDate, formatDateDigits } from './kioskDates'
 import { NumberPad, TextKeyboard } from './KioskKeyboards'
 import { KioskFooter } from './KioskLayout'
@@ -19,6 +19,10 @@ const groupDigits = (value: string) => value.replace(/(\d{4})(?=\d)/g, '$1 ')
 
 /** Mã y tế ở bệnh viện chỉ gồm chữ số: trên kiosk chỉ nhập được số, tối đa bằng độ dài mã của hồ sơ người bệnh. */
 const PATIENT_CODE_MAX_LENGTH = 50
+
+/** Máy quét chưa đọc được chữ có dấu và bệnh viện chưa có hồ sơ: không lập hồ sơ mới bằng họ tên hỏng. */
+const UNREADABLE_NAME =
+  'Máy chưa đọc đúng họ tên có dấu trên thẻ. Mời ông/bà quay lại, chọn "Nhập thông tin", hoặc đến quầy tiếp đón.'
 
 /** Thư viện đọc mã QR bằng camera khá nặng: chỉ tải khi kiosk có camera. */
 const QrCameraView = lazy(() => import('../patients/QrCameraView'))
@@ -46,14 +50,22 @@ function kioskCameraReason(error: unknown): string {
 function useIdentify(onIdentified: (request: KioskIdentityRequest, identity: KioskIdentity) => void) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const identify = async (request: KioskIdentityRequest) => {
+  /** `refuse`: lý do không dùng được kết quả nhận diện (hiện cho người bệnh), hoặc null nếu dùng được. */
+  const identify = async (request: KioskIdentityRequest, refuse?: (identity: KioskIdentity) => string | null) => {
     if (busy) {
       return
     }
     setBusy(true)
     setError(null)
     try {
-      onIdentified(request, await kioskApi.identify(request))
+      const identity = await kioskApi.identify(request)
+      const reason = refuse?.(identity) ?? null
+      if (reason) {
+        setError(reason)
+        setBusy(false)
+        return
+      }
+      onIdentified(request, identity)
     } catch (failure) {
       setError(kioskErrorMessage(failure))
       setBusy(false)
@@ -190,6 +202,11 @@ export function ScanScreen({
       return
     }
     const { card } = parsed
+    // Máy quét chưa đọc được tiếng Việt thì họ tên trên thẻ bị hỏng: chỉ dùng tiếp khi bệnh viện đã có hồ sơ (họ tên lấy từ hồ
+    // sơ), không lập hồ sơ mới bằng họ tên hỏng.
+    const refuse = isUnreliableName(card.fullName)
+      ? (identity: KioskIdentity) => (identity.foundRecord ? null : UNREADABLE_NAME)
+      : undefined
     void identify({
       method: 'CitizenIdCard',
       dateOfBirth: card.dateOfBirth,
@@ -201,7 +218,7 @@ export function ScanScreen({
         issueDate: card.issueDate,
         oldIdNumber: card.oldIdNumber,
       },
-    })
+    }, refuse)
   }
 
   return (

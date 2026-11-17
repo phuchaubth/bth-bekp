@@ -521,6 +521,27 @@ describe('Kiosk quét CCCD bằng camera', () => {
     })
   })
 
+  it.each([
+    ['bệnh viện đã có hồ sơ: dùng họ tên trong hồ sơ, không gửi địa chỉ hỏng', true],
+    ['chưa có hồ sơ: không lập hồ sơ bằng họ tên hỏng, mời nhập thông tin', false],
+  ])('máy quét bỏ hẳn chữ có dấu: %s', async (_, foundRecord) => {
+    removeCamera = installFakeMediaDevices(['audioinput'])
+    const { user, identifyCalls } = await openScan({ ...cardIdentity, foundRecord })
+    // Máy quét không gõ được ký tự ngoài bảng chữ ASCII: "Nguyễn" thành "Nguyn", "Đường" thành "ng".
+    const typed = QR.replace(/[^\u0020-\u007e]/g, '')
+
+    await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${typed}{Enter}`)
+
+    await waitFor(() => expect(identifyCalls()).toHaveLength(1))
+    expect(identifyCalls()[0].body).toMatchObject({ citizenId: '079085000123', card: { permanentAddress: null } })
+    if (foundRecord) {
+      expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
+    } else {
+      expect(await screen.findByRole('alert')).toHaveTextContent('Máy chưa đọc đúng họ tên có dấu trên thẻ')
+      expect(screen.queryByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).not.toBeInTheDocument()
+    }
+  })
+
   it('kiosk không có camera: chỉ dùng máy quét như trước, không bật camera', async () => {
     removeCamera = installFakeMediaDevices(['audioinput'])
     await openScan()

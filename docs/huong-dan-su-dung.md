@@ -211,7 +211,7 @@ Không có máy quét: bấm **Quét bằng camera**. Lần đầu, trình duy�
 
 Khi bệnh viện đã kết nối hệ thống thông tin người bệnh, sau khi quét thẻ, phần mềm tự lấy thêm thông tin còn thiếu (mã người bệnh, số điện thoại…). Phần mềm chỉ điền vào ô còn trống, thông tin trên thẻ được ưu tiên.
 
-Máy quét chưa cài đọc tiếng Việt thường gõ chữ có dấu thành ký tự lạ (kiểu *"Ä‘Æ°á»ng"* thay cho *"đường"*). Phần mềm tự sửa lại các chữ này. Địa chỉ không sửa được thì phần mềm để trống, kèm cảnh báo *"Địa chỉ trong mã QR bị lỗi chữ có dấu…"*: nhập bổ sung. Nếu thấy khung vàng **Cần kiểm tra lại** (ví dụ *"Họ tên có ký tự lạ"*), hãy đối chiếu với thẻ và sửa lại, rồi báo bộ phận CNTT cài lại máy quét. Camera (**Quét bằng camera**) đọc đúng chữ có dấu trong mã QR.
+Máy quét chưa cài đọc tiếng Việt thường gõ chữ có dấu thành ký tự lạ (kiểu *"Ä‘Æ°á»ng"* thay cho *"đường"*). Phần mềm tự sửa lại các chữ này. Có máy quét bỏ hẳn chữ có dấu (kiểu *"ng"* thay cho *"Đường"*): chữ đã mất thì không sửa được. Địa chỉ không sửa được, hoặc bị mất chữ có dấu, thì phần mềm để trống, kèm cảnh báo *"Địa chỉ trong mã QR bị lỗi chữ có dấu…"*: nhập bổ sung. Nếu thấy khung vàng **Cần kiểm tra lại** (ví dụ *"Họ tên có ký tự lạ"*), hãy đối chiếu với thẻ và sửa lại, rồi báo bộ phận CNTT cài lại máy quét. Camera (**Quét bằng camera**) đọc đúng chữ có dấu trong mã QR.
 
 **Cách 2: Lấy thông tin từ hệ thống bệnh viện**
 
@@ -645,7 +645,7 @@ Máy kiosk là màn hình cảm ứng 32 inch đặt dọc, có máy quét mã Q
 
 - **Quét CCCD** (nhanh nhất): lật thẻ sang mặt có mã QR, đưa mã QR lại gần đèn đỏ của máy quét, giữ yên 1–2 giây. Nghe tiếng "bíp" là xong, máy tự chuyển sang bước sau. Máy chỉ đọc chữ trong mã QR, không chụp hay lưu ảnh thẻ.
   Kiosk có camera thì màn hình hiện khung hình camera: đưa mã QR vào khung vuông trên màn hình, cách camera khoảng một gang tay, giữ yên 1–2 giây. Đọc xong máy tự chuyển sang bước sau. Máy quét bên dưới (nếu có) vẫn dùng được cùng lúc. Hình từ camera chỉ dùng để đọc mã ngay trên máy, không lưu, không gửi đi.
-  Mã QR căn cước trên ứng dụng VNeID cũng quét được như mã trên thẻ. Máy quét gõ sai chữ có dấu thì kiosk tự sửa; địa chỉ không sửa được thì kiosk bỏ qua, không lưu chữ hỏng vào hồ sơ và phiếu.
+  Mã QR căn cước trên ứng dụng VNeID cũng quét được như mã trên thẻ. Máy quét gõ sai chữ có dấu thì kiosk tự sửa; địa chỉ không sửa được hoặc bị mất chữ có dấu thì kiosk bỏ qua, không lưu chữ hỏng vào hồ sơ và phiếu. Họ tên bị mất chữ có dấu mà bệnh viện chưa có hồ sơ thì kiosk báo *"Máy chưa đọc đúng họ tên có dấu trên thẻ…"* và mời chọn **Nhập thông tin**; đã có hồ sơ thì kiosk dùng họ tên trong hồ sơ.
 - **Nhập mã y tế hoặc số CCCD**: chọn **Mã y tế** hoặc **Số CCCD**, nhập bằng bàn phím số trên màn hình, chạm **Ô tiếp**, nhập **Ngày sinh (ngày/tháng/năm)**, chạm **Lấy thông tin**. Máy chỉ hiện thông tin khi ngày sinh khớp hồ sơ.
 - **Nhập thông tin** (khi không mang CCCD hoặc chưa có mã y tế): nhập **Họ và tên**, **Ngày sinh**, **Giới tính**, **Số điện thoại**, **Số CCCD** (nếu có), **Chỗ ở hiện nay**, rồi chạm **Tiếp tục**. Bàn phím tiếng Việt có hàng phím dấu: gõ chữ rồi chạm dấu.
 
@@ -1305,7 +1305,7 @@ Bạn chỉ thấy phiếu của khoa mình và phiếu do mình lập. Khi lậ
 Mỗi người được xuất tối đa 10 lần mỗi phút. Chờ một phút rồi thử lại.
 
 **Quét CCCD (hoặc mã QR trên VNeID), địa chỉ hoặc họ tên bị mất dấu, hiện ký tự lạ?**
-Máy quét 2D chưa cài chế độ đọc tiếng Việt. Phần mềm tự sửa các chữ máy quét gõ thành ký tự lạ (kiểu *Ä‘Æ°á»ng*). Địa chỉ không sửa được thì để trống (màn hình nhân viên có cảnh báo, kiosk ghi **Chưa có**) để nhập lại. Khắc phục hẳn: bộ phận CNTT cài máy quét xuất ký tự Unicode (tài liệu triển khai, mục 9b), hoặc dùng camera: camera đọc đúng chữ có dấu.
+Máy quét 2D chưa cài chế độ đọc tiếng Việt. Phần mềm tự sửa các chữ máy quét gõ thành ký tự lạ (kiểu *Ä‘Æ°á»ng*). Máy quét bỏ hẳn chữ có dấu (kiểu *ng* thay cho *Đường*, *H Ch Minh* thay cho *Hồ Chí Minh*) thì không sửa được. Địa chỉ không sửa được thì để trống (màn hình nhân viên có cảnh báo, kiosk ghi **Chưa có** hoặc **Đã có trong hồ sơ**) để nhập lại. Họ tên bị mất chữ có dấu mà bệnh viện chưa có hồ sơ thì kiosk mời chọn **Nhập thông tin**. Thử nhanh: bật **Num Lock**, mở Notepad trên máy có máy quét và quét mã QR vào Notepad. Notepad hiện đúng dấu thì máy quét đã ổn. Khắc phục hẳn: bộ phận CNTT cài máy quét xuất ký tự Unicode (tài liệu triển khai, mục 9b), hoặc dùng camera: camera đọc đúng chữ có dấu.
 
 **Kiosk báo đã tạm khóa tra cứu?**
 Do nhập mã/CCCD kèm ngày sinh sai 5 lần. Máy mở lại sau 5 phút, hoặc quản trị **Mở khóa** tài khoản kiosk ở **Quản trị → Người dùng** (trạng thái **Tạm khóa tra cứu**). Trong lúc chờ, người bệnh chọn **Nhập thông tin** (không kèm số CCCD) hoặc đến quầy tiếp đón.
