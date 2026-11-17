@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
+import type { Role } from '../../api/admin'
 import { Permissions } from '../../auth/permissions'
 import {
   adminSession,
@@ -245,5 +246,150 @@ describe('Vai trò và quyền', () => {
     await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
     const body = calls.find((c) => c.method === 'PUT')!.body as { permissions: string[] }
     expect([...body.permissions].sort()).toEqual([Permissions.ConsentsRead, Permissions.UsersRead].sort())
+  })
+
+  // Quyết định 40: quản trị thêm, đổi tên, xóa vai trò.
+  const customRole: Role = {
+    id: 'r-duocsi',
+    code: 'VT_DUOC_SI',
+    name: 'Dược sĩ',
+    description: null,
+    isSystem: false,
+    isAdministrator: false,
+    permissions: [Permissions.ConsentsRead],
+  }
+
+  it('thêm vai trò, lấy sẵn quyền từ vai trò có sẵn; lưu xong chọn ngay vai trò mới', async () => {
+    let current: Role[] = [...roles]
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/roles': () => current,
+      'GET /api/v1/permissions': permissionCatalog,
+      'POST /api/v1/roles': (call) => {
+        const body = call.body as { name: string; description: string | null; permissions: string[] }
+        const created: Role = { ...customRole, id: 'r-moi', code: 'VT_DUOC_SI_LAM_SANG', ...body }
+        current = [...current, created]
+        return json(created, 201)
+      },
+    })
+    renderApp('/quan-tri/vai-tro')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: /Thêm vai trò/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Thêm vai trò' })
+    // Vai trò Quản trị hệ thống (quyền cố định) không dùng làm mẫu quyền.
+    await user.click(within(dialog).getByRole('combobox', { name: 'Lấy sẵn quyền từ vai trò' }))
+    const doctorOption = await screen.findByTitle('Bác sĩ (2 quyền)')
+    const dropdown = doctorOption.closest<HTMLElement>('.ant-select-dropdown')!
+    expect(within(dropdown).queryByTitle(/Quản trị hệ thống/)).not.toBeInTheDocument()
+    await user.click(doctorOption)
+    await user.type(within(dialog).getByLabelText('Tên vai trò'), 'Dược sĩ lâm sàng')
+    await user.type(within(dialog).getByLabelText('Mô tả'), 'Khoa Dược')
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/roles')).toBe(true))
+    expect(calls.find((c) => c.method === 'POST' && c.path === '/api/v1/roles')!.body).toEqual({
+      name: 'Dược sĩ lâm sàng',
+      description: 'Khoa Dược',
+      permissions: [Permissions.ConsentsRead, Permissions.ConsentsCreate],
+    })
+    expect(await screen.findByText(/Đã thêm vai trò "Dược sĩ lâm sàng" \(mã VT_DUOC_SI_LAM_SANG\)/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Thêm vai trò' })).not.toBeInTheDocument())
+    expect(screen.getByRole('menuitem', { name: /Dược sĩ lâm sàng/ })).toHaveClass('ant-menu-item-selected')
+    expect(screen.getByText('Tự tạo')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /Lập phiếu/ })).toBeChecked()
+  })
+
+  it('đổi tên vai trò có sẵn; tên trùng thì báo ngay ở ô tên', async () => {
+    let attempts = 0
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/roles': roles,
+      'GET /api/v1/permissions': permissionCatalog,
+      'PUT /api/v1/roles/r-doctor': (call) => {
+        attempts += 1
+        return attempts === 1
+          ? problem(400, 'Dữ liệu không hợp lệ.', { code: 'validation', errors: { name: ['Đã có vai trò tên "Quản trị hệ thống".'] } })
+          : { ...roles[1], ...(call.body as object) }
+      },
+    })
+    renderApp('/quan-tri/vai-tro')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('menuitem', { name: /Bác sĩ/ }))
+    expect(screen.getByText('Có sẵn')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Xóa vai trò/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Sửa tên, mô tả/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Sửa tên, mô tả vai trò' })
+    expect(within(dialog).getByText('DOCTOR')).toBeInTheDocument()
+    const name = within(dialog).getByLabelText('Tên vai trò')
+    await user.clear(name)
+    await user.type(name, 'Quản trị hệ thống')
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+
+    expect(await within(dialog).findByText('Đã có vai trò tên "Quản trị hệ thống".')).toBeInTheDocument()
+
+    await user.clear(name)
+    await user.type(name, 'Bác sĩ điều trị')
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText('Đã cập nhật vai trò "Bác sĩ điều trị".')).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'PUT').at(-1)!.body).toEqual({ name: 'Bác sĩ điều trị', description: 'Lập và ký phiếu' })
+  })
+
+  it('xóa vai trò tự tạo: máy chủ từ chối thì báo lý do; xóa được thì về vai trò đầu danh sách', async () => {
+    let current: Role[] = [...roles, customRole]
+    let attempts = 0
+    mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/roles': () => current,
+      'GET /api/v1/permissions': permissionCatalog,
+      'DELETE /api/v1/roles/r-duocsi': () => {
+        attempts += 1
+        if (attempts === 1) {
+          return problem(422, 'Vai trò đang gán cho 2 tài khoản. Bỏ vai trò này khỏi các tài khoản đó (Quản trị → Người dùng) rồi xóa.', {
+            code: 'roles.in_use',
+          })
+        }
+        current = current.filter((r) => r.id !== 'r-duocsi')
+        return noContent()
+      },
+    })
+    renderApp('/quan-tri/vai-tro')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('menuitem', { name: /Dược sĩ/ }))
+    await user.click(screen.getByRole('button', { name: /Xóa vai trò/ }))
+    await user.click(await screen.findByRole('button', { name: 'Xóa' }))
+    expect(await screen.findByText(/Vai trò đang gán cho 2 tài khoản/)).toBeInTheDocument()
+    // Nút còn hiệu ứng đang xử lý (không bấm được) đến khi yêu cầu xóa kết thúc.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Xóa vai trò/ })).not.toHaveClass('ant-btn-loading'))
+
+    await user.click(screen.getByRole('button', { name: /Xóa vai trò/ }))
+    await user.click((await screen.findAllByRole('button', { name: 'Xóa' })).at(-1)!)
+
+    expect(await screen.findByText('Đã xóa vai trò "Dược sĩ".')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('menuitem', { name: /Dược sĩ/ })).not.toBeInTheDocument())
+    expect(screen.getByRole('menuitem', { name: /Quản trị hệ thống/ })).toHaveClass('ant-menu-item-selected')
+  })
+
+  it('quyền dùng kiosk không đánh dấu được cho vai trò khác vai trò Kiosk', async () => {
+    mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/roles': roles,
+      'GET /api/v1/permissions': [
+        ...permissionCatalog,
+        { code: Permissions.KioskUse, name: 'Dùng kiosk người bệnh tự làm phiếu', group: 'Phiếu đồng thuận' },
+      ],
+    })
+    renderApp('/quan-tri/vai-tro')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('menuitem', { name: /Bác sĩ/ }))
+
+    const kiosk = screen.getByRole('checkbox', { name: /Dùng kiosk người bệnh tự làm phiếu.*chỉ dành cho vai trò Kiosk/ })
+    expect(kiosk).toBeDisabled()
+    expect(kiosk).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: /Lập phiếu/ })).toBeEnabled()
   })
 })

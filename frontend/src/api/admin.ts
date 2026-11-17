@@ -40,6 +40,12 @@ export interface Role {
   isLocked?: boolean
 }
 
+/** Tên, mô tả của vai trò (quyết định 40); mã vai trò do máy chủ sinh và không đổi. */
+export interface RoleInput {
+  name: string
+  description: string | null
+}
+
 export interface UserListItem {
   id: string
   userName: string
@@ -121,6 +127,10 @@ export const adminApi = {
   listPermissions: (signal?: AbortSignal) => apiRequest<PermissionDefinition[]>('/api/v1/permissions', { signal }),
   updateRolePermissions: (id: string, permissions: string[]) =>
     apiRequest<Role>(`/api/v1/roles/${id}/permissions`, { method: 'PUT', body: { permissions } }),
+  createRole: (input: RoleInput & { permissions: string[] }) =>
+    apiRequest<Role>('/api/v1/roles', { method: 'POST', body: input }),
+  updateRole: (id: string, input: RoleInput) => apiRequest<Role>(`/api/v1/roles/${id}`, { method: 'PUT', body: input }),
+  deleteRole: (id: string) => apiRequest<void>(`/api/v1/roles/${id}`, { method: 'DELETE' }),
 
   searchUsers: (query: UserQuery, signal?: AbortSignal) =>
     apiRequest<PagedResult<UserListItem>>(`/api/v1/users${toQueryString({ ...query })}`, { signal }),

@@ -36,3 +36,9 @@ public sealed record RoleDto(
 }
 
 public sealed record UpdateRolePermissionsRequest(IReadOnlyList<string> Permissions);
+
+/// <summary>Thêm vai trò (quyết định 40). Mã vai trò do máy chủ sinh từ tên (<see cref="RoleCodes.FromName"/>).</summary>
+public sealed record CreateRoleRequest(string Name, string? Description, IReadOnlyList<string>? Permissions);
+
+/// <summary>Đổi tên, mô tả của vai trò; mã vai trò giữ nguyên.</summary>
+public sealed record UpdateRoleRequest(string Name, string? Description);

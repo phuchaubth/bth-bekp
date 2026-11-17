@@ -128,7 +128,8 @@ internal sealed class AppTestContext
         Store,
         new DepartmentRequestValidator());
 
-    public RoleService CreateRoleService() => new(new InMemoryRoleRepository(Store), Store);
+    public RoleService CreateRoleService() => new(
+        new InMemoryRoleRepository(Store), new InMemoryUserRepository(Store), new InMemoryConsentTemplateRepository(Store), Store);
 
     public PatientService CreatePatientService() => new(
         new InMemoryPatientRepository(Store),

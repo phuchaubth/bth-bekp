@@ -158,6 +158,9 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
     public Task<int> CountActiveUsersInRoleAsync(Guid roleId, Guid? excludeUserId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Count(u => u.IsActive && u.Id != excludeUserId && u.RoleIds.Contains(roleId)));
 
+    public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Users.Count(u => u.RoleIds.Contains(roleId)));
+
     public Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
         var items = store.Users
@@ -180,6 +183,10 @@ internal sealed class InMemoryRoleRepository(InMemoryStore store) : IRoleReposit
 
     public Task<IReadOnlyList<Role>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Role>>([.. store.Roles.Where(r => ids.Contains(r.Id))]);
+
+    public void Add(Role role) => store.Roles.Add(role);
+
+    public void Remove(Role role) => store.Roles.Remove(role);
 }
 
 internal sealed class InMemoryDepartmentRepository(InMemoryStore store) : IDepartmentRepository

@@ -31,6 +31,9 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
             u => u.IsActive && u.Id != excludeUserId && u.Roles.Any(r => r.RoleId == roleId),
             cancellationToken);
 
+    public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
+        db.Users.CountAsync(u => u.Roles.Any(r => r.RoleId == roleId), cancellationToken);
+
     public async Task<PagedResult<UserListItemDto>> SearchAsync(
         UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
@@ -119,6 +122,10 @@ internal sealed class RoleRepository(ConsentDbContext db) : IRoleRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public void Add(Role role) => db.Roles.Add(role);
+
+    public void Remove(Role role) => db.Roles.Remove(role);
 }
 
 internal sealed class DepartmentRepository(ConsentDbContext db) : IDepartmentRepository

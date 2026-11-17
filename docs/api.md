@@ -163,7 +163,10 @@ Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_
 |---|---|---|---|
 | GET | `/api/v1/permissions` | Đã đăng nhập | Danh mục quyền: `[{ code, name, group }]` |
 | GET | `/api/v1/roles` | Đã đăng nhập | Danh sách vai trò kèm mã quyền |
-| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`); vai trò Kiosk chỉ có `kiosk.use` và không sửa được (`422 roles.kiosk_immutable`). Danh sách vai trò có `isLocked` cho hai vai trò này |
+| POST | `/api/v1/roles` | `roles.manage` | Thêm vai trò (quyết định 40) `{ "name", "description"?, "permissions": [...] }` → `201`. Mã vai trò do máy chủ sinh từ tên: tiền tố `VT_`, tên bỏ dấu viết hoa nối bằng `_`, trùng thì thêm `_2`, `_3`… Lỗi `400`: tên trống, quá 100 ký tự hoặc trùng tên vai trò khác (không phân biệt hoa thường, khoảng trắng thừa) ở `errors.name`; mô tả quá 500 ký tự ở `errors.description`; quyền không tồn tại hoặc `kiosk.use` (chỉ dành cho vai trò Kiosk) ở `errors.permissions` |
+| PUT | `/api/v1/roles/{id}` | `roles.manage` | Đổi tên, mô tả `{ "name", "description"? }` (cả vai trò có sẵn); mã giữ nguyên. Lỗi như khi thêm; `404 roles.not_found` |
+| DELETE | `/api/v1/roles/{id}` | `roles.manage` | Xóa vai trò tự tạo → `204`. `422 roles.system_role` (vai trò có sẵn), `422 roles.in_use` (còn gán cho tài khoản, kể cả tài khoản đã khóa), `422 roles.used_by_templates` (đang dùng ở bước xác nhận cuối hoặc bước xác nhận trung gian của mẫu phiếu, mọi phiên bản; thông báo kèm tên mẫu) |
+| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`); vai trò Kiosk chỉ có `kiosk.use` và không sửa được (`422 roles.kiosk_immutable`). Danh sách vai trò có `isLocked` cho hai vai trò này. Quyền `kiosk.use` không gán được cho vai trò khác (`400`, `errors.permissions`) |
 
 Quyền mới có hiệu lực khi access token được làm mới (tối đa 15 phút).
 

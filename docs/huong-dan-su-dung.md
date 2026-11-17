@@ -1021,18 +1021,42 @@ Tài khoản kiosk chỉ dùng được màn hình kiosk. Mở trang khác cũng
 
 ### 8.3. Vai trò và quyền
 
-1. Bấm **Quản trị** → **Vai trò và quyền**.
-2. Chọn vai trò ở cột trái (mỗi vai trò ghi số quyền).
-3. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Phạm vi dữ liệu**.
-4. Bấm **Lưu thay đổi** (hoặc **Hủy thay đổi** để bỏ).
+Bấm **Quản trị** → **Vai trò và quyền**. Cột trái liệt kê các vai trò, mỗi vai trò ghi mã và số quyền. Vai trò có sẵn của phần mềm mang nhãn **Có sẵn**; vai trò quản trị thêm mang nhãn **Tự tạo**.
 
-Người dùng nhận quyền mới khi phiên đăng nhập được làm mới (tối đa 15 phút). Vai trò **Quản trị hệ thống** luôn có toàn bộ quyền. Vai trò **Kiosk người bệnh** có quyền cố định. Hai vai trò này không sửa được.
+**Sửa quyền của vai trò:**
+
+1. Chọn vai trò ở cột trái.
+2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**.
+3. Bấm **Lưu thay đổi** (hoặc **Hủy thay đổi** để bỏ).
+
+**Thêm vai trò** (ví dụ vai trò cho Ban giám đốc, Dược sĩ lâm sàng):
+
+1. Bấm **Thêm vai trò** ở góc phải.
+2. Nhập **Tên vai trò** (không trùng tên vai trò khác) và **Mô tả** nếu cần.
+3. Muốn bắt đầu từ quyền của một vai trò có sẵn thì chọn vai trò đó ở ô **Lấy sẵn quyền từ vai trò**. Không chọn thì vai trò mới chưa có quyền nào.
+4. Bấm **Lưu**. Vai trò mới được chọn ngay ở cột trái. Đánh dấu, bỏ dấu quyền cho đúng việc rồi bấm **Lưu thay đổi**.
+5. Gán vai trò cho nhân viên ở **Quản trị → Người dùng** (mục 8.1).
+
+Mã vai trò được tạo tự động từ tên, bắt đầu bằng `VT_` (ví dụ `VT_DUOC_SI_LAM_SANG`), và không đổi về sau. Vai trò mới chọn được ở cấu hình ký của mẫu phiếu, như vai trò có sẵn.
+
+**Sửa tên, mô tả:** chọn vai trò, bấm **Sửa tên, mô tả**, sửa rồi bấm **Lưu**. Đổi được cả tên vai trò có sẵn. Mã vai trò giữ nguyên, nên tài khoản và mẫu phiếu đang dùng vai trò không bị ảnh hưởng.
+
+**Xóa vai trò:** chỉ xóa được vai trò **Tự tạo**. Chọn vai trò, bấm **Xóa vai trò** rồi **Xóa**. Phần mềm không cho xóa khi:
+
+- vai trò còn gán cho tài khoản nào, kể cả tài khoản đã khóa: bỏ vai trò khỏi các tài khoản đó ở **Quản trị → Người dùng** trước;
+- vai trò đang dùng trong cấu hình ký của mẫu phiếu (bước xác nhận cuối hoặc bước xác nhận trung gian, kể cả phiên bản cũ): chọn vai trò khác cho mẫu đó trước.
+
+Người dùng nhận quyền mới khi phiên đăng nhập được làm mới (tối đa 15 phút). Vai trò **Quản trị hệ thống** luôn có toàn bộ quyền. Vai trò **Kiosk người bệnh** có quyền cố định. Quyền của hai vai trò này không sửa được, và quyền **Dùng kiosk người bệnh tự làm phiếu** chỉ dành cho vai trò Kiosk người bệnh.
 
 Quyền **Xem dữ liệu toàn viện** cho phép xem phiếu của mọi khoa. Không có quyền này thì chỉ thấy phiếu của khoa mình và phiếu mình lập.
 
+<img src="huong-dan-su-dung/94a-them-vai-tro.png" alt="Hộp Thêm vai trò" width="420">
+
+*Hình 8.5a. Hộp **Thêm vai trò**: tên, mô tả, lấy sẵn quyền từ vai trò **Điều dưỡng**.*
+
 ![Vai trò và quyền](huong-dan-su-dung/94-vai-tro-quyen.png)
 
-*Hình 8.5. Vai trò **Điều dưỡng** và các quyền mặc định.*
+*Hình 8.5. Vai trò **Dược sĩ lâm sàng** vừa thêm (nhãn **Tự tạo**, mã `VT_DUOC_SI_LAM_SANG`), quyền lấy sẵn từ vai trò Điều dưỡng; có nút **Sửa tên, mô tả** và **Xóa vai trò**.*
 
 ### 8.4. Khoa/phòng
 

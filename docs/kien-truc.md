@@ -415,7 +415,7 @@ sequenceDiagram
 
 - **Mặc định an toàn:** `FallbackPolicy` yêu cầu đăng nhập cho mọi endpoint; chỉ endpoint đánh dấu `[AllowAnonymous]` (đăng nhập, làm mới, đăng xuất, health) mới mở.
 - **Theo quyền:** `[HasPermission(Permissions.UsersManage)]` tạo policy động `perm:<mã>` kiểm tra claim `perm` trong access token.
-- **Quyền thuộc vai trò:** người dùng có nhiều vai trò; quyền hiệu lực là hợp các quyền. Vai trò `ADMIN` luôn có toàn bộ quyền và không sửa được. Thay đổi quyền có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút); khóa tài khoản thu hồi refresh token ngay.
+- **Quyền thuộc vai trò:** người dùng có nhiều vai trò; quyền hiệu lực là hợp các quyền. Vai trò `ADMIN` luôn có toàn bộ quyền và không sửa được. Quản trị thêm được vai trò (quyết định 40): mã do máy chủ sinh từ tên với tiền tố `VT_` (không trùng mã vai trò có sẵn, kể cả vai trò có sẵn thêm ở bản sau, vì bộ khởi tạo nhận vai trò theo mã), không đổi về sau; vai trò có sẵn (`IsSystem`) đổi được tên, mô tả nhưng không xóa được; vai trò tự tạo chỉ xóa được khi không còn tài khoản nào mang nó (khóa ngoại `UserRoles` cũng chặn) và không mẫu phiếu nào dùng mã đó trong cấu hình ký. Quyền `kiosk.use` chỉ thuộc vai trò `KIOSK`. Thay đổi quyền có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút); khóa tài khoản thu hồi refresh token ngay.
 - **Phạm vi theo khoa:** access token chứa khoa của người dùng (`dept`) và quyền `scope.all_departments` cho vai trò toàn viện. `ICurrentUser` cung cấp hai thông tin này để lọc phiếu theo khoa (mục 8.6). Hồ sơ người bệnh dùng chung toàn viện, vì một người bệnh có thể khám ở nhiều khoa.
 - **Giao diện:** menu và nút được ẩn/hiện theo quyền; trang không có quyền hiển thị 403. Đây chỉ là trải nghiệm người dùng, kiểm soát thật luôn nằm ở API.
 
