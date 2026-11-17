@@ -217,7 +217,8 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: c.header,
       key: c.key,
       align: 'right' as const,
-      width: 96,
+      // 12 cột số (quyết định 38) vẫn vừa màn hình rộng 1366 điểm ảnh, không phải cuộn ngang.
+      width: 84,
       render: (_: unknown, row: NursingSummaryRow) => number(row.cells[c.key]),
     })),
   ]

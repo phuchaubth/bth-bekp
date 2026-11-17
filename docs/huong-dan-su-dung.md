@@ -1114,7 +1114,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
    *Hình 9.1. Menu **Điều dưỡng** chỉ hiện với tài khoản được lập hoặc xem báo cáo điều dưỡng.*
 
 2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
-3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay.
+3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**, số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
 
    ![Báo cáo mới của khoa, có số điền sẵn](huong-dan-su-dung/dd-01-bao-cao-khoa.png)
 
@@ -1159,7 +1159,7 @@ Lưu ý:
    - **Khoa đã gửi**: số khoa đã gửi trên số khoa phải báo cáo.
    - Số liệu HIS lấy lúc nào, bởi ai.
    - Khi HIS lỗi: dòng **Khoa nhập tay khi HIS lỗi** cho biết khoa nào đã nhập số liệu HIS, khoa nào chưa nhập (mục 9.5).
-3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa. Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
 4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
 
    ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)

@@ -126,6 +126,8 @@ public static class NursingSummaryBuilder
             NursingReportForm.BedsColumn => department.BedCount,
             NursingHisIndicators.WaitingAdmission => statistics.Waiting(department.Id),
             _ when figures is null => null,
+            // Báo cáo gửi trước khi tách cột chỉ có số tổng: để trống hai cột mới, không ghi 0 (quyết định 38).
+            _ when figures.HasOnlyLegacyAdmissions && NursingReportForm.AdmissionKeys.Contains(column) => null,
             NursingReportForm.OutsideVisitsColumn => NursingReportForm.OutsideVisitKeys.Sum(k => figures.Value(k) ?? 0),
             _ => figures.Value(column) ?? 0,
         };
