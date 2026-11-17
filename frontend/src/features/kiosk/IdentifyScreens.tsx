@@ -231,7 +231,6 @@ export function ScanScreen({
               <Suspense fallback={null}>
                 <QrCameraView
                   facingMode="user"
-                  mirrored
                   onStarted={() => setCamera({ state: 'on' })}
                   onError={(failure) => setCamera({ state: 'failed', reason: kioskCameraReason(failure) })}
                   onDetected={(text) => submit(text, 'camera')}

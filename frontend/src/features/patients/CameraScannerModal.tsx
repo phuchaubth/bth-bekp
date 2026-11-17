@@ -1,5 +1,5 @@
 import { Alert, Modal, Typography } from 'antd'
-import { useRef, useState } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { cameraErrorName, canUseCamera } from './cameraSupport'
 import QrCameraView from './QrCameraView'
 
@@ -10,6 +10,20 @@ interface Props {
 
 const INSECURE_CONNECTION =
   'Trình duyệt không cho phép dùng camera trên kết nối này. Camera chỉ hoạt động khi truy cập qua HTTPS (hoặc localhost).'
+
+/** Khung vuông hướng dẫn, như trên kiosk: nằm trong vùng giữa khung hình mà bộ đọc phóng to để đọc mã nhỏ trên thẻ. */
+const TARGET_STYLE: CSSProperties = {
+  position: 'absolute',
+  top: '50%',
+  left: '50%',
+  width: '46%',
+  aspectRatio: '1',
+  transform: 'translate(-50%, -50%)',
+  border: '3px dashed rgba(255, 255, 255, 0.9)',
+  borderRadius: 12,
+  boxShadow: '0 0 0 100vmax rgba(0, 0, 0, 0.3)',
+  pointerEvents: 'none',
+}
 
 function cameraErrorMessage(error: unknown): string {
   const name = cameraErrorName(error)
@@ -39,20 +53,23 @@ export default function CameraScannerModal({ onDetected, onClose }: Props) {
         <Alert type="warning" showIcon title={error} />
       ) : (
         <>
-          <QrCameraView
-            style={{ borderRadius: 8, aspectRatio: '4 / 3' }}
-            onStarted={() => setStarted(true)}
-            onError={(failure) => setError(cameraErrorMessage(failure))}
-            onDetected={(text) => {
-              if (!detected.current) {
-                detected.current = true
-                onDetected(text)
-              }
-            }}
-          />
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 8, aspectRatio: '4 / 3', background: '#000' }}>
+            <QrCameraView
+              style={{ height: '100%' }}
+              onStarted={() => setStarted(true)}
+              onError={(failure) => setError(cameraErrorMessage(failure))}
+              onDetected={(text) => {
+                if (!detected.current) {
+                  detected.current = true
+                  onDetected(text)
+                }
+              }}
+            />
+            <span aria-hidden="true" data-testid="camera-target" style={TARGET_STYLE} />
+          </div>
           <Typography.Paragraph type="secondary" role="status" style={{ marginTop: 12, marginBottom: 0 }}>
             {started
-              ? 'Đưa mã QR ở mặt trước thẻ CCCD vào giữa khung hình, giữ yên khoảng 1–2 giây.'
+              ? 'Đưa mã QR ở mặt trước thẻ CCCD vào khung vuông, cách camera khoảng một gang tay, giữ yên 1–2 giây. Hình bị mờ thì đưa thẻ ra xa hơn một chút.'
               : 'Đang mở camera… Nếu trình duyệt hỏi quyền dùng camera, hãy chọn Cho phép.'}
           </Typography.Paragraph>
         </>

@@ -435,14 +435,14 @@ describe('Kiosk quét CCCD bằng camera', () => {
     expect(await screen.findByRole('heading', { name: CAMERA_HEADING })).toBeInTheDocument()
     await waitFor(() => expect(fakeCameras).toHaveLength(1))
     const [camera] = fakeCameras
-    // Camera hướng về người bệnh, hình lật như soi gương.
     expect(camera.constraints).toMatchObject({ video: { facingMode: 'user' } })
-    expect(camera.video).toHaveStyle({ transform: 'scaleX(-1)' })
     expect(screen.getByRole('status')).toHaveTextContent('Đang mở camera…')
     expect(screen.getByText(/không lưu và không gửi đi/)).toBeInTheDocument()
 
     await act(async () => camera.start())
     expect(screen.getByRole('status')).toHaveTextContent('Đang chờ quét thẻ…')
+    // Camera hướng về người bệnh, hình lật như soi gương.
+    expect(camera.video).toHaveStyle({ transform: 'scaleX(-1)' })
 
     // Mã QR không phải của CCCD: nhắc đưa lại, camera vẫn đọc tiếp.
     act(() => camera.read('https://vi-du.test/khong-phai-cccd'))

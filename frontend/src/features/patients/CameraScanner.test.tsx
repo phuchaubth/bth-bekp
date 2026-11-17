@@ -34,11 +34,17 @@ describe('Quét CCCD bằng camera (màn hình nhân viên)', () => {
     const { dialog, camera, onScan } = await openCamera()
 
     expect(dialog).toContainElement(camera.video)
-    expect(camera.constraints).toMatchObject({ video: { facingMode: 'environment', width: { ideal: 1280 } } })
+    expect(camera.constraints).toEqual({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } } })
+    // Khung vuông hướng dẫn đưa mã vào vùng giữa (vùng bộ đọc phóng to).
+    expect(within(dialog).getByTestId('camera-target')).toHaveStyle({ width: '46%' })
     expect(within(dialog).getByRole('status')).toHaveTextContent('Đang mở camera… Nếu trình duyệt hỏi quyền dùng camera, hãy chọn Cho phép.')
 
     await act(async () => camera.start())
-    expect(within(dialog).getByRole('status')).toHaveTextContent('Đưa mã QR ở mặt trước thẻ CCCD vào giữa khung hình')
+    expect(within(dialog).getByRole('status')).toHaveTextContent(
+      'Đưa mã QR ở mặt trước thẻ CCCD vào khung vuông, cách camera khoảng một gang tay, giữ yên 1–2 giây. Hình bị mờ thì đưa thẻ ra xa hơn một chút.',
+    )
+    // Webcam máy tính hướng về người dùng: hình lật như soi gương để đưa thẻ đúng hướng.
+    expect(camera.video).toHaveStyle({ transform: 'scaleX(-1)' })
 
     act(() => {
       camera.read(QR)
@@ -48,6 +54,14 @@ describe('Quét CCCD bằng camera (màn hình nhân viên)', () => {
     expect(onScan).toHaveBeenCalledWith(QR)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(camera.stop).toHaveBeenCalled()
+  })
+
+  it('camera sau của máy tính bảng, điện thoại: hình không lật', async () => {
+    const { camera } = await openCamera()
+
+    await act(async () => camera.start('environment'))
+
+    expect(camera.video.style.transform).toBe('')
   })
 
   it('trang vẽ lại khi hộp thoại đang mở: camera không bị tắt rồi bật lại, mã đọc được chuyển cho hàm mới nhất', async () => {

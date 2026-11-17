@@ -203,7 +203,7 @@ Bấm **Người bệnh** → **Tiếp nhận người bệnh**. Có ba cách đ
 3. Kiểm tra lại thông tin. Bổ sung số điện thoại, dân tộc, nghề nghiệp, mã thẻ BHYT, mã người bệnh nếu có.
 4. Bấm **Lưu hồ sơ**.
 
-Không có máy quét: bấm **Quét bằng camera**. Lần đầu, trình duyệt hỏi quyền dùng camera: chọn **Cho phép**. Hộp thoại ghi *"Đang mở camera…"* cho tới khi camera bật. Đưa mã QR ở mặt thẻ vào giữa khung hình, giữ yên 1–2 giây. Đọc được mã thì hộp thoại tự đóng và thông tin được điền như cách 1. Camera chỉ hoạt động khi phần mềm chạy qua địa chỉ an toàn (HTTPS).
+Không có máy quét: bấm **Quét bằng camera**. Lần đầu, trình duyệt hỏi quyền dùng camera: chọn **Cho phép**. Hộp thoại ghi *"Đang mở camera…"* cho tới khi camera bật. Đưa mã QR ở mặt trước thẻ vào **khung vuông** giữa khung hình, cách camera khoảng một gang tay, giữ yên 1–2 giây. Hình bị mờ thì đưa thẻ ra xa hơn một chút. Với webcam máy tính, hình được lật như soi gương: đưa thẻ sang trái thì hình cũng sang trái. Đọc được mã thì hộp thoại tự đóng và thông tin được điền như cách 1. Camera chỉ hoạt động khi phần mềm chạy qua địa chỉ an toàn (HTTPS).
 
 ![Tiếp nhận người bệnh sau khi quét CCCD](huong-dan-su-dung/11-tiep-nhan-quet-cccd.png)
 
@@ -1276,6 +1276,15 @@ Hộp thoại ghi lý do:
 - *"Camera đang được ứng dụng khác sử dụng"*: đóng Zalo, Teams, Zoom… rồi thử lại.
 
 Trong lúc chưa dùng được camera: dùng máy quét 2D hoặc nhập tay. Báo bộ phận CNTT nếu vẫn lỗi.
+
+**Camera bật nhưng lâu không nhận mã QR?**
+Mã QR trên thẻ CCCD nhỏ (khoảng 1,4 cm), camera phải thấy rõ từng ô của mã:
+
+- Đưa mã QR vào giữa **khung vuông**, cách camera khoảng một gang tay, giữ yên 1–2 giây.
+- Hình bị mờ: đưa thẻ ra xa hơn một chút (nhiều webcam không lấy nét được khi để quá gần). Mã quá nhỏ trong khung vuông: đưa lại gần hơn.
+- Mặt thẻ bị lóa đèn: nghiêng thẻ một chút. Chỗ tối: bật thêm đèn.
+- Mã QR trên VNeID: tăng độ sáng màn hình điện thoại, tránh để màn hình lóa đèn.
+- Webcam đời cũ (độ phân giải thấp, không tự lấy nét) có thể vẫn khó đọc mã trên thẻ: dùng máy quét 2D (nhanh và chắc chắn nhất) hoặc nhập tay, và báo bộ phận CNTT.
 
 **Người bệnh có ký trên điện thoại riêng của họ được không?**
 Được. Bấm **Mã QR cho người bệnh** (hoặc **Mã QR ký cả bộ**), người bệnh quét mã, nhập ngày sinh của người bệnh rồi ký (mục 2.8, cách 2 và mục 3.1). Điện thoại phải vào được địa chỉ của phần mềm, ví dụ qua Wi-Fi của bệnh viện.
