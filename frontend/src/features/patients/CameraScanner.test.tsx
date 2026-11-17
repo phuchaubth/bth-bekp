@@ -53,7 +53,7 @@ describe('Quét CCCD bằng camera (màn hình nhân viên)', () => {
     expect(onScan).toHaveBeenCalledTimes(1)
     expect(onScan).toHaveBeenCalledWith(QR)
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(camera.stop).toHaveBeenCalled()
+    await waitFor(() => expect(camera.stop).toHaveBeenCalled())
   })
 
   it('camera sau của máy tính bảng, điện thoại: hình không lật', async () => {

@@ -455,7 +455,8 @@ describe('Kiosk quét CCCD bằng camera', () => {
     expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
     expect(identifyCalls()).toHaveLength(1)
     expect(identifyCalls()[0].body).toMatchObject({ method: 'CitizenIdCard', dateOfBirth: '1985-03-12', citizenId: '079085000123' })
-    expect(camera.stop).toHaveBeenCalled()
+    // Camera tắt khi React dọn khung hình cũ, việc này chạy sau khi màn hình mới hiện.
+    await waitFor(() => expect(camera.stop).toHaveBeenCalled())
   })
 
   it('thẻ còn trong khung hình thì không gửi lại; đưa thẻ ra rồi đưa lại mới thử lại (tránh tự tính nhiều lần sai)', async () => {
@@ -495,7 +496,7 @@ describe('Kiosk quét CCCD bằng camera', () => {
     await user.type(screen.getByLabelText('Mã QR trên CCCD (máy quét tự nhập)'), `${QR}{Enter}`)
 
     expect(await screen.findByRole('heading', { name: 'Đây có phải thông tin của ông/bà?' })).toBeInTheDocument()
-    expect(fakeCameras[0].stop).toHaveBeenCalled()
+    await waitFor(() => expect(fakeCameras[0].stop).toHaveBeenCalled())
   })
 
   it.each([
