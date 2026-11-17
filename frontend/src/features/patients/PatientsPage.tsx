@@ -9,7 +9,7 @@ import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDate, formatDateTime } from '../../utils/format'
-import { genderLabels } from './labels'
+import { departmentPatientsHint, genderLabels } from './labels'
 
 export function HisTag({ verified }: { verified: boolean }) {
   return verified ? <Tag color="green">Đã đối chiếu HIS</Tag> : <Tag color="orange">Chưa đối chiếu HIS</Tag>
@@ -22,6 +22,7 @@ export function PatientsPage() {
   const [query, setQuery] = useState<PatientQuery>({ page: 1, pageSize: 20 })
   const { data, isPending, isFetching, isError, error } = usePatients(query)
   const { his } = useFeatures()
+  const scopeAll = hasPermission(Permissions.ScopeAllDepartments)
 
   const columns: TableColumnsType<PatientListItem> = [
     {
@@ -73,6 +74,11 @@ export function PatientsPage() {
           style={{ maxWidth: 520, marginBottom: 16 }}
           onSearch={(keyword) => setQuery((q) => ({ ...q, keyword: keyword.trim() || undefined, page: 1 }))}
         />
+        {!scopeAll && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: -8 }}>
+            {departmentPatientsHint}
+          </Typography.Paragraph>
+        )}
         {isError && <Alert type="error" showIcon title={errorMessage(error)} style={{ marginBottom: 16 }} />}
         <Table<PatientListItem>
           rowKey="id"

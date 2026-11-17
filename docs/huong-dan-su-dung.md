@@ -188,6 +188,8 @@ Quy trình thường gặp:
 2. Gõ vào ô tìm kiếm: họ tên (gõ không dấu cũng được), mã người bệnh, hoặc số CCCD đủ 12 số. Nhấn Enter.
 3. Bấm tên người bệnh để mở hồ sơ.
 
+Danh sách chỉ có người bệnh **liên quan đến khoa của bạn**: có phiếu ở khoa của bạn, có phiếu bạn lập, hoặc hồ sơ bạn tiếp nhận. Người bệnh khoa khác chuyển đến (chưa có phiếu ở khoa bạn): tìm bằng **đúng mã người bệnh** hoặc **đủ 12 số CCCD** (hoặc quét CCCD), rồi lập phiếu; từ đó người bệnh có trong danh sách của khoa. Tài khoản có quyền xem toàn viện thấy mọi người bệnh.
+
 ![Danh sách người bệnh](huong-dan-su-dung/10-danh-sach-nguoi-benh.png)
 
 *Hình 2.1. Danh sách người bệnh. Số CCCD được che bớt. Nút **Tiếp nhận người bệnh** ở góc phải để thêm người bệnh mới.*
@@ -1007,7 +1009,7 @@ Sửa, khóa, mở khóa, đặt lại mật khẩu:
 
 Dữ liệu theo khoa:
 
-- Tài khoản thấy phiếu, trang Tổng quan, báo cáo thống kê, xuất dữ liệu và báo cáo điều dưỡng của **khoa chính và các khoa khác** của mình, cùng phiếu do mình lập. Hồ sơ người bệnh dùng chung toàn viện.
+- Tài khoản thấy phiếu, trang Tổng quan, báo cáo thống kê, xuất dữ liệu và báo cáo điều dưỡng của **khoa chính và các khoa khác** của mình, cùng phiếu do mình lập. Danh sách người bệnh cũng theo khoa (mục 2.1): người bệnh có phiếu ở các khoa đó, phiếu mình lập hoặc hồ sơ mình tiếp nhận; người bệnh khác tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD.
 - Danh sách người dùng ghi khoa chính, dưới đó là *Khoa khác: …*. Lọc theo **Khoa/phòng** tìm cả người có khoa đó là khoa khác.
 - Người cần xem mọi khoa (Kế hoạch tổng hợp, ban giám đốc, kiểm tra): không cần chọn hết các khoa, hãy gán vai trò có quyền **Xem dữ liệu toàn viện** (mục 8.3).
 - Đổi khoa của tài khoản có hiệu lực sau tối đa 15 phút, hoặc ngay khi người dùng đăng xuất rồi đăng nhập lại.
@@ -1343,6 +1345,9 @@ Bấm **Thử lại**. Nếu vẫn lỗi, báo quản trị. Quản trị có th
 
 **Không thấy phiếu mà đồng nghiệp khoa khác lập?**
 Bạn chỉ thấy phiếu của khoa mình và phiếu do mình lập. Khi lập phiếu, người lập cần chọn đúng **Khoa của phiếu** (khoa điều trị người bệnh) để khoa đó thấy và xác nhận.
+
+**Tìm người bệnh theo họ tên không ra, dù người bệnh đã có hồ sơ?**
+Danh sách người bệnh chỉ có người bệnh có phiếu ở khoa của bạn, phiếu bạn lập hoặc hồ sơ bạn tiếp nhận. Người bệnh khoa khác chuyển đến: tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD (hoặc quét CCCD), rồi lập phiếu (mục 2.1).
 
 **Tôi làm ở hai khoa, làm sao thấy phiếu của cả hai khoa?**
 Nhờ quản trị thêm khoa thứ hai vào ô **Khoa/phòng khác** của tài khoản (mục 8.1), rồi đăng xuất và đăng nhập lại. Sau đó bạn thấy phiếu, báo cáo của cả hai khoa; báo cáo điều dưỡng có ô chọn khoa.

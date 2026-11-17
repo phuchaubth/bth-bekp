@@ -96,7 +96,7 @@ public interface IPatientRepository
     /// <summary>Tìm theo mã người bệnh (mã y tế trên HIS), so sánh chính xác.</summary>
     Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken);
 
-    Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken);
+    Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, PatientScope scope, CancellationToken cancellationToken);
 
     void Add(Patient patient);
 }

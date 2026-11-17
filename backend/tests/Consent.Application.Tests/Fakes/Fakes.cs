@@ -118,6 +118,9 @@ internal sealed class InMemoryStore : IUnitOfWork
 
     public List<Patient> Patients { get; } = [];
 
+    /// <summary>Phạm vi của lần tìm người bệnh gần nhất (quyết định 41).</summary>
+    public PatientScope? LastPatientScope { get; set; }
+
     public List<ConsentTemplate> ConsentTemplates { get; } = [];
 
     public List<ConsentForm> ConsentForms { get; } = [];
@@ -247,8 +250,10 @@ internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientR
     public Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken) =>
         Task.FromResult(store.Patients.Find(p => p.PatientCode == patientCode));
 
-    public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken)
+    public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, PatientScope scope, CancellationToken cancellationToken)
     {
+        // Lọc theo phạm vi do kho dữ liệu thật (SQL) làm; ở đây chỉ ghi lại phạm vi nghiệp vụ truyền xuống.
+        store.LastPatientScope = scope;
         var items = store.Patients
             .Select(p => new PatientSummary(p.Id, p.PatientCode, p.FullName, p.DateOfBirth, p.Gender, p.CitizenId, p.HisVerifiedAtUtc, p.UpdatedAtUtc))
             .ToList();

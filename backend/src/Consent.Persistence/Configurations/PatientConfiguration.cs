@@ -1,3 +1,4 @@
+using Consent.Domain.Identity;
 using Consent.Domain.Patients;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -30,6 +31,9 @@ internal sealed class PatientConfiguration : IEntityTypeConfiguration<Patient>
         // Chỉ mục mù của số CCCD: tra cứu/phát hiện trùng mà không cần giải mã.
         builder.Property<string?>(CitizenIdHash).HasMaxLength(HashLength).IsFixedLength().IsUnicode(false);
         builder.HasIndex(CitizenIdHash).IsUnique().HasFilter($"[{CitizenIdHash}] IS NOT NULL");
+
+        // Người tạo hồ sơ (quyết định 41): người dùng không xem toàn viện vẫn thấy hồ sơ mình tạo khi chưa có phiếu.
+        builder.HasOne<User>().WithMany().HasForeignKey(p => p.CreatedByUserId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(p => p.Representatives).WithOne().HasForeignKey(r => r.PatientId).OnDelete(DeleteBehavior.Cascade);
         builder.Navigation(p => p.Representatives).HasField("_representatives").UsePropertyAccessMode(PropertyAccessMode.Field);

@@ -1046,6 +1046,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<Guid?>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("CurrentAddress")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -1118,6 +1121,8 @@ namespace Consent.Persistence.Migrations
                     b.HasIndex("CitizenIdHash")
                         .IsUnique()
                         .HasFilter("[CitizenIdHash] IS NOT NULL");
+
+                    b.HasIndex("CreatedByUserId");
 
                     b.HasIndex("PatientCode")
                         .IsUnique()
@@ -1337,6 +1342,14 @@ namespace Consent.Persistence.Migrations
                         .HasForeignKey("PatientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.Patients.Patient", b =>
+                {
+                    b.HasOne("Consent.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentForm", b =>

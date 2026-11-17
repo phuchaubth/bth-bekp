@@ -332,6 +332,29 @@ describe('Danh sách và hồ sơ người bệnh (màn hình 9, 10)', () => {
     expect(screen.getByText('05/04/1988')).toBeInTheDocument()
   })
 
+  // Quyết định 41: người bệnh chia theo khoa.
+  it('người không xem toàn viện thấy dòng hướng dẫn tìm người bệnh khoa khác', async () => {
+    mockApi({ ...baseRoutes(nurse()), 'GET /api/v1/patients': list })
+    renderApp('/nguoi-benh')
+
+    expect(
+      await screen.findByText(
+        'Danh sách chỉ có người bệnh có phiếu ở khoa của bạn, phiếu bạn lập hoặc hồ sơ bạn tiếp nhận. Người bệnh khác: tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD.',
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('người xem toàn viện không có dòng hướng dẫn đó', async () => {
+    mockApi({
+      ...baseRoutes(session({ permissions: [Permissions.PatientsRead, Permissions.ScopeAllDepartments] })),
+      'GET /api/v1/patients': list,
+    })
+    renderApp('/nguoi-benh')
+
+    expect(await screen.findByText('Phạm Thị Dung')).toBeInTheDocument()
+    expect(screen.queryByText(/Người bệnh khác: tìm bằng đúng mã/)).not.toBeInTheDocument()
+  })
+
   it('tìm kiếm gửi từ khóa; người chỉ được xem không thấy nút tiếp nhận', async () => {
     const { calls } = mockApi({
       ...baseRoutes(session({ permissions: [Permissions.PatientsRead] })),

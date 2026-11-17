@@ -27,3 +27,10 @@ export function ageFrom(dateOfBirth: string, today = new Date()): number {
   }
   return age
 }
+
+/**
+ * Người bệnh chia theo khoa (quyết định 41): người không xem toàn viện chỉ thấy người bệnh có phiếu ở khoa mình, phiếu mình
+ * lập hoặc hồ sơ mình tạo; người bệnh khác tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD.
+ */
+export const departmentPatientsHint =
+  'Danh sách chỉ có người bệnh có phiếu ở khoa của bạn, phiếu bạn lập hoặc hồ sơ bạn tiếp nhận. Người bệnh khác: tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD.'

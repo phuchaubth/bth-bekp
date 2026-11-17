@@ -88,6 +88,19 @@ public sealed class PatientTests
         Assert.Equal("DN4790000000002", patient.HealthInsuranceNumber);
         Assert.Null(patient.HisVerifiedAtUtc);
         Assert.Equal(Now, patient.CreatedAtUtc);
+        Assert.Null(patient.CreatedByUserId);
+    }
+
+    // Quyết định 41: người tạo hồ sơ luôn thấy hồ sơ trong danh sách người bệnh.
+    [Fact]
+    public void Create_RecordsWhoCreatedTheRecord_AndUpdateKeepsIt()
+    {
+        var creator = Guid.CreateVersion7();
+        var patient = Patient.Create(Details(), Now, creator);
+
+        patient.Update(Details(), Now.AddMinutes(5));
+
+        Assert.Equal(creator, patient.CreatedByUserId);
     }
 
     [Fact]

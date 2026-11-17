@@ -213,7 +213,7 @@ public sealed class KioskService(
         }
 
         // Bản xem trước của hồ sơ (sau khi bổ sung) để tự điền phiếu; hồ sơ thật chỉ đổi khi mọi thứ đã hợp lệ.
-        var preview = Patient.Create(details.Value.ToDetails(), clock.UtcNow);
+        var preview = Patient.Create(details.Value.ToDetails(), clock.UtcNow, currentUser.UserId);
 
         // Người bệnh chọn "Không thay đổi" so với lần trước (quyết định 27): máy chủ tự tìm lại phiếu cũ của hồ sơ có sẵn.
         var inheritanceDays = request.KeepPrevious && identity.Local is not null

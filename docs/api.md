@@ -206,7 +206,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**) |
+| GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**). Người không có `scope.all_departments` (quyết định 41): danh sách (không có `keyword`) và tìm theo họ tên chỉ gồm người bệnh có phiếu ở các khoa của mình, có phiếu mình lập, hoặc hồ sơ mình tạo; tìm đúng số CCCD hoặc mã người bệnh thì ra mọi người bệnh |
 | GET | `/api/v1/patients/{id}` | `patients.read` | Hồ sơ đầy đủ, kèm người đại diện; ghi nhật ký `Patients.Viewed` |
 | POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS (`Disabled` khi chưa kết nối HIS); ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
 | POST | `/api/v1/patients/lookup-source` | `patients.manage` | Lấy thông tin hành chính từ **API thông tin người bệnh** của bệnh viện (quyết định 22): `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một) → `{ status, patient, existingPatient }`. `status`: `Found` / `NotFound` / `Unavailable` (API lỗi, quá thời gian `His:TimeoutSeconds`) / `Disabled` (chưa cấu hình). `existingPatient`: hồ sơ đã có cùng số CCCD (để chọn luôn, không tạo trùng). Ghi nhật ký `Patients.SourceLookedUp` (chỉ ghi tra theo gì và kết quả, không ghi mã/CCCD) |

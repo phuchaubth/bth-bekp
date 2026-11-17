@@ -174,6 +174,67 @@ public sealed class PatientsApiTests(SqlServerFixture sql) : IAsyncLifetime
             a.GetProperty("entityType").GetString() == "LegalRepresentative" && a.GetProperty("action").GetString() == "Create");
     }
 
+    /// <summary>
+    /// Quyết định 41: người bệnh chia theo khoa. Nhân viên khoa chỉ thấy (danh sách, tìm theo họ tên) người bệnh có phiếu ở
+    /// khoa mình, phiếu mình lập, hoặc hồ sơ mình tạo; tìm đúng số CCCD hoặc mã người bệnh thì ra mọi người bệnh.
+    /// </summary>
+    [Fact]
+    public async Task List_ForDepartmentStaff_ShowsOnlyTheirPatients_ButExactCitizenIdOrCodeFindsAnyone()
+    {
+        var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
+        var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;
+        var reporter = (await _client.LoginAsync("baocao.demo", TestSettings.DemoPassword)).AccessToken!;
+        async Task<bool> Lists(string token, string id, string? keyword = null)
+        {
+            var path = keyword is null ? "/api/v1/patients" : $"/api/v1/patients?keyword={Uri.EscapeDataString(keyword)}";
+            var (status, page) = await _client.SendJsonAsync(HttpMethod.Get, path, token);
+            Assert.Equal(HttpStatusCode.OK, status);
+            return page.GetProperty("items").EnumerateArray().Any(p => p.GetProperty("id").GetString() == id);
+        }
+
+        // Tiếp đón Khoa Khám bệnh tiếp nhận người bệnh mới (mã người bệnh lấy từ HIS giả lập).
+        var (created, patient) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/patients", receptionist, NewPatient("036188000127"));
+        Assert.Equal(HttpStatusCode.Created, created);
+        var id = patient.GetProperty("id").GetString()!;
+        Assert.Equal("BN88000127", patient.GetProperty("patientCode").GetString());
+
+        Assert.True(await Lists(receptionist, id));
+        Assert.True(await Lists(receptionist, id, "pham thi dung"));
+        Assert.False(await Lists(nurse, id));
+        Assert.False(await Lists(nurse, id, "pham thi dung"));
+        Assert.True(await Lists(nurse, id, "036188000127"));
+        Assert.True(await Lists(nurse, id, "BN88000127"));
+        Assert.True(await Lists(reporter, id, "pham thi dung"));
+
+        // Lập phiếu cho Khoa Nội: điều dưỡng Khoa Nội thấy người bệnh trong danh sách và khi tìm theo họ tên.
+        var (_, departments) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/departments", _admin);
+        var noiId = departments.EnumerateArray().Single(d => d.GetProperty("code").GetString() == "NOI").GetProperty("id").GetString();
+        var (_, available) = await _client.SendJsonAsync(
+            HttpMethod.Get, $"/api/v1/consent-templates/available?departmentId={noiId}", receptionist);
+        var templateId = available.EnumerateArray().First().GetProperty("templateId").GetString();
+        var (formStatus, form) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/consent-forms", receptionist, new { patientId = id, templateId, departmentId = noiId });
+        Assert.True(formStatus == HttpStatusCode.Created, form.ToString());
+
+        Assert.True(await Lists(nurse, id));
+        Assert.True(await Lists(nurse, id, "pham thi dung"));
+
+        // Phiếu mình lập cho khoa khác: người bệnh (hồ sơ có sẵn, không có người tạo) có trong danh sách của mình.
+        var (_, found) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/patients?keyword=079192000002", nurse);
+        var demoId = found.GetProperty("items")[0].GetProperty("id").GetString()!;
+        Assert.False(await Lists(nurse, demoId));
+        var kkbId = departments.EnumerateArray().Single(d => d.GetProperty("code").GetString() == "KKB").GetProperty("id").GetString();
+        var (_, kkbTemplates) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/consent-templates/available?departmentId={kkbId}", nurse);
+        var (nurseFormStatus, nurseForm) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/consent-forms", nurse, new
+        {
+            patientId = demoId,
+            templateId = kkbTemplates.EnumerateArray().First().GetProperty("templateId").GetString(),
+            departmentId = kkbId,
+        });
+        Assert.True(nurseFormStatus == HttpStatusCode.Created, nurseForm.ToString());
+        Assert.True(await Lists(nurse, demoId));
+    }
+
     [Fact]
     public async Task Permissions_ReadOnlyRoleCannotCreate_ClinicalRoleCan()
     {
