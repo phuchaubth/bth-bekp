@@ -437,7 +437,9 @@ Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 
    SELECT MaKhoa AS Code, TenKhoa AS Name FROM dbo.KhoaPhong WHERE HoatDong = 1
    ```
 
-   Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, thì API dừng khi khởi động (HTTP 500.30).
+   Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, thì API dừng khi khởi động (HTTP 500.30). Bảng danh mục của HIS thường có cả mục không phải khoa (quầy thu, xét nghiệm gửi ngoài…): lọc theo cột loại (`AND <cột loại> IN (…)`, cách nên dùng vì mục mới thêm sau này cũng tự bị loại) hoặc bỏ theo mã (`AND <cột mã> NOT IN (…)`); nếu không, các mục này hiện trong mọi ô chọn khoa. Nếu lọc sau khi đã lấy danh mục, các mục bị bỏ chuyển sang *ngừng sử dụng* chứ không mất.
+
+   **Quyền đọc:** cấp `SELECT` cho `patientinfo_reader` trên bảng/view danh mục khoa (xem phần *danh mục khoa/phòng* cuối `deploy\sql\04-patientinfo-reader.sql`); thiếu quyền thì bước 3 báo `(503)`.
 2. **Đặt biến** cho Application Pool `PatientInfoApi` (hàm `Set-PoolEnv` ở mục 5.5 bước 4):
 
    ```powershell

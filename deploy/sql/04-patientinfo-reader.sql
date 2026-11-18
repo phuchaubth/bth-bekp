@@ -31,6 +31,9 @@ GRANT SELECT ON [dbo].[BANG_BENH_NHAN] TO [patientinfo_reader];
 -- PatientInfo__DailyStatisticsQuery dùng (tiếp nhận khám, chờ nhập viện, chỉ định cận lâm sàng…):
 -- GRANT SELECT ON [dbo].[BANG_CHO_NHAP_VIEN] TO [patientinfo_reader];
 -- GRANT SELECT ON [dbo].[BANG_CHI_DINH_CLS] TO [patientinfo_reader];
+-- Danh mục khoa/phòng (quyết định 42, tùy chọn): cấp SELECT bảng/view danh mục khoa mà câu truy vấn
+-- PatientInfo__DepartmentQuery dùng:
+-- GRANT SELECT ON [dbo].[BANG_KHOA_PHONG] TO [patientinfo_reader];
 GO
 
 -- Chặn ghi tuyệt đối (phòng khi tài khoản lỡ được thêm vào nhóm có quyền ghi).
