@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet restore BEKP.slnx
+      - run: dotnet build BEKP.slnx --no-restore -c Release
+      - run: dotnet test BEKP.slnx --no-build -c Release
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  iis-package:
+    needs: [backend, frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: ./scripts/publish-iis.sh "$RUNNER_TEMP/bekp-iis" /
+      - run: test -f "$RUNNER_TEMP/bekp-iis/web.config" && test -f "$RUNNER_TEMP/bekp-iis/wwwroot/index.html"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bekp-iis
+          path: ${{ runner.temp }}/bekp-iis
+          retention-days: 7

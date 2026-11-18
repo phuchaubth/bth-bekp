@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\BEKP.Domain\BEKP.Domain.csproj" />
+    <ProjectReference Include="..\BEKP.Shared\BEKP.Shared.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="BEKP.Application.Tests" />
+    <InternalsVisibleTo Include="BEKP.Persistence.Tests" />
+  </ItemGroup>
+</Project>

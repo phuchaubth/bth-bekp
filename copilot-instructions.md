@@ -6,14 +6,14 @@ This repository contains the BTH Enterprise Knowledge Platform (BEKP), a hospita
 
 ## Technology stack
 
-- Backend: ASP.NET Core 9 Web API
+- Backend: ASP.NET Core 10 Web API (.NET 10)
 - Architecture: Clean Architecture
-- Database: PostgreSQL
+- Database: Microsoft SQL Server (separate "BEKP" database on the shared hospital SQL Server)
 - ORM: Entity Framework Core
 - Frontend: React, TypeScript, Vite
 - UI: Material UI
 - API client: TanStack Query
-- Infrastructure: Docker Compose
+- Hosting: IIS on Windows Server (ASP.NET Core Module, in-process); the API serves the React build from wwwroot. No Docker.
 - Testing: xUnit for backend and Vitest for frontend
 
 ## Required solution structure
@@ -67,7 +67,7 @@ Before completing a task:
 5. Run frontend lint.
 6. Run frontend tests.
 7. Build frontend.
-8. Ensure Docker Compose configuration is valid.
+8. Ensure the IIS publish package builds (scripts/publish-iis.ps1 or publish-iis.sh).
 9. Update README when setup or behavior changes.
 
 ## Pull requests

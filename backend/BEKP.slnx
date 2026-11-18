@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/tests/">
+    <Project Path="tests/BEKP.Api.Tests/BEKP.Api.Tests.csproj" />
+    <Project Path="tests/BEKP.Application.Tests/BEKP.Application.Tests.csproj" />
+    <Project Path="tests/BEKP.Domain.Tests/BEKP.Domain.Tests.csproj" />
+    <Project Path="tests/BEKP.Persistence.Tests/BEKP.Persistence.Tests.csproj" />
+    <Project Path="tests/BEKP.Testing/BEKP.Testing.csproj" />
+  </Folder>
+  <Project Path="BEKP.Api/BEKP.Api.csproj" />
+  <Project Path="BEKP.Application/BEKP.Application.csproj" />
+  <Project Path="BEKP.Domain/BEKP.Domain.csproj" />
+  <Project Path="BEKP.Infrastructure/BEKP.Infrastructure.csproj" />
+  <Project Path="BEKP.Persistence/BEKP.Persistence.csproj" />
+  <Project Path="BEKP.Shared/BEKP.Shared.csproj" />
+</Solution>
