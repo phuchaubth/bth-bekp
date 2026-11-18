@@ -3,6 +3,7 @@ using Consent.Application.ConsentForms;
 using Consent.Application.Tests.Fakes;
 using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
+using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Identity;
 using Consent.Shared;
 
@@ -48,19 +49,34 @@ public sealed class ConfirmationStepTests
     private static async Task<(ConsentScenario S, Guid FormId)> PatientSignedBm10()
     {
         var s = ConsentScenario.Create();
-        var template = s.AddHospitalTemplate("QT-KNGT-BM10");
-        s.LogInAs(s.Kkb, SystemRoles.Doctor);
+        var formId = await PatientSigned(s, s.AddHospitalTemplate("QT-KNGT-BM10"), SystemRoles.Doctor, Bm10Data());
+        return (s, formId);
+    }
+
+    /// <summary>
+    /// Nhân viên Khoa Khám bệnh có vai trò <paramref name="creatorRole"/> lập phiếu (điền <paramref name="data"/> nếu có), trình
+    /// ký, người bệnh ký trên máy tính bảng; sau đó vẫn đăng nhập là người lập phiếu.
+    /// </summary>
+    private static async Task<Guid> PatientSigned(ConsentScenario s, ConsentTemplate template, string creatorRole, JsonObject? data)
+    {
+        s.LogInAs(s.Kkb, creatorRole);
         var form = (await s.Service.CreateAsync(new(s.Patient.Id, template.Id, null), CancellationToken.None)).Value;
-        var updated = await s.Service.UpdateAsync(form.Id, new(Bm10Data(), ConsentSignerKind.Patient, null), CancellationToken.None);
-        Assert.True(updated.IsSuccess, updated.Error?.Message);
+        if (data is not null)
+        {
+            var updated = await s.Service.UpdateAsync(form.Id, new(data, ConsentSignerKind.Patient, null), CancellationToken.None);
+            Assert.True(updated.IsSuccess, updated.Error?.Message);
+        }
+
         var submitted = await s.Service.SubmitAsync(form.Id, CancellationToken.None);
         Assert.True(submitted.IsSuccess, string.Join("; ", submitted.Error?.FieldErrors?.Keys ?? []));
         Assert.True((await s.Signing.StartSigningAsync(form.Id, CancellationToken.None)).IsSuccess);
         var back = s.UseSigningToken();
-        var signed = await s.Signing.SignAsPatientAsync(form.Id, new(null, SignaturePng, "Tôi đã nghe, hiểu và đồng ý"), CancellationToken.None);
+        // BM10 chỉ ký xác nhận (quyết định bị bỏ qua); phiếu tư vấn hỏi Đồng ý/Không đồng ý.
+        var signed = await s.Signing.SignAsPatientAsync(
+            form.Id, new(ConsentDecision.Agreed, SignaturePng, "Tôi đã nghe, hiểu và đồng ý"), CancellationToken.None);
         Assert.True(signed.IsSuccess, signed.Error?.Message);
         back();
-        return (s, form.Id);
+        return form.Id;
     }
 
     private static Task<Result<ConsentFormDetailDto>> Confirm(ConsentScenario s, Guid formId, string step) =>
@@ -274,5 +290,91 @@ public sealed class ConfirmationStepTests
         s.Ctx.CurrentUser.UserName = user.UserName;
         s.Ctx.CurrentUser.Roles.Clear();
         s.Ctx.CurrentUser.Roles.UnionWith(roles);
+    }
+
+    /// <summary>
+    /// <see cref="AwaitingIds"/>, kiểm tra thêm: mỗi phiếu <paramref name="formIds"/> có trong danh sách khi và chỉ khi mở phiếu
+    /// thấy nút xác nhận (bước hoặc xác nhận cuối), tức danh sách theo đúng quy tắc của trang phiếu.
+    /// </summary>
+    private static async Task<IReadOnlyList<Guid>> AwaitingIdsMatchingConfirmButtons(ConsentScenario s, params Guid[] formIds)
+    {
+        var listed = await AwaitingIds(s);
+        foreach (var formId in formIds)
+        {
+            var view = await s.Service.GetAsync(formId, CancellationToken.None);
+            var canConfirm = view.IsSuccess && (view.Value.Actions.CanConfirmStep || view.Value.Actions.CanConfirm);
+            Assert.Equal(canConfirm, listed.Contains(formId));
+        }
+
+        return listed;
+    }
+
+    /// <summary>
+    /// Phiếu tư vấn cổng thông tin có bước trung gian: người tư vấn (tiếp đón) xác nhận trước, điều dưỡng khoa xác nhận cuối
+    /// (như trước quyết định 43; bản mặc định nay chỉ một người ký). Điều dưỡng không thấy phiếu khi bước người tư vấn còn chờ
+    /// (mở phiếu cũng không có nút xác nhận).
+    /// </summary>
+    [Fact]
+    public async Task Dashboard_WardNurse_SeesThePortalConsultationOnlyAfterTheConsultant()
+    {
+        var s = ConsentScenario.Create();
+        var portal = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
+        var formId = await PatientSigned(s, portal, SystemRoles.Receptionist, data: null);
+
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        Assert.Empty(await AwaitingIdsMatchingConfirmButtons(s, formId));
+        s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+        Assert.Equal([formId], await AwaitingIdsMatchingConfirmButtons(s, formId));
+        Assert.True((await Confirm(s, formId, "consultant")).IsSuccess);
+
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        Assert.Equal([formId], await AwaitingIdsMatchingConfirmButtons(s, formId));
+    }
+
+    /// <summary>Xong mọi bước: tài khoản đã xác nhận một bước không thấy phiếu dù có vai trò xác nhận cuối; bác sĩ khác thấy.</summary>
+    [Fact]
+    public async Task Dashboard_FinalConfirmation_SkipsWhoeverConfirmedAStep()
+    {
+        var (s, formId) = await PatientSignedBm10();
+        var receptionist = s.LogInAs(s.Kkb, SystemRoles.Receptionist);
+        Assert.True((await Confirm(s, formId, "screeningStaff")).IsSuccess);
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+        Assert.True((await Confirm(s, formId, "nurse")).IsSuccess);
+
+        ActAs(s, receptionist, SystemRoles.Receptionist, SystemRoles.Doctor);
+        Assert.Empty(await AwaitingIdsMatchingConfirmButtons(s, formId));
+        s.LogInAs(s.Kkb, SystemRoles.Doctor);
+        Assert.Equal([formId], await AwaitingIdsMatchingConfirmButtons(s, formId));
+    }
+
+    /// <summary>Số đếm gồm mọi phiếu đang đến lượt mình (bước trung gian hoặc xác nhận cuối); danh sách hiện 5 phiếu người bệnh ký sớm nhất.</summary>
+    [Fact]
+    public async Task Dashboard_CountsEveryFormAtMyTurn_AndShowsTheOldestFive()
+    {
+        var s = ConsentScenario.Create();
+        var portal = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
+        var assessment = s.AddHospitalTemplate("QT-KNGT-BM10");
+        // Phiếu ký sớm nhất còn chờ người tư vấn: chưa đến lượt điều dưỡng.
+        await PatientSigned(s, portal, SystemRoles.Receptionist, data: null);
+        var consulted = new List<Guid>();
+        for (var i = 0; i < 5; i++)
+        {
+            s.Ctx.Clock.Advance(TimeSpan.FromMinutes(1));
+            var id = await PatientSigned(s, portal, SystemRoles.Receptionist, data: null);
+            Assert.True((await Confirm(s, id, "consultant")).IsSuccess);
+            consulted.Add(id);
+        }
+
+        s.Ctx.Clock.Advance(TimeSpan.FromMinutes(1));
+        var atTheNurseStep = await PatientSigned(s, assessment, SystemRoles.Receptionist, Bm10Data());
+        Assert.True((await Confirm(s, atTheNurseStep, "screeningStaff")).IsSuccess);
+        s.LogInAs(s.Kkb, SystemRoles.Nurse);
+
+        var awaiting = (await s.Ctx.CreateDashboardService().GetAsync(CancellationToken.None)).AwaitingMyConfirmation;
+
+        // 5 phiếu tư vấn chờ điều dưỡng khoa xác nhận cuối và 1 phiếu BM10 ở bước điều dưỡng (ký sau cùng nên không hiện);
+        // phiếu tư vấn còn chờ người tư vấn không tính.
+        Assert.Equal(6, awaiting.Total);
+        Assert.Equal(consulted, awaiting.Items.Select(i => i.Id));
     }
 }
