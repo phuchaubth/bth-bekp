@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- Dịch vụ riêng, chỉ đọc: tra thông tin hành chính người bệnh trong CSDL của bệnh viện cho các phần mềm khác gọi qua API.
+       Không tham chiếu mã nguồn phần mềm phiếu đồng thuận. -->
+  <PropertyGroup>
+    <RootNamespace>PatientInfo.Api</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+    <!-- SqlClient kéo theo System.Security.Cryptography.Pkcs bản có lỗ hổng: nâng lên bản đã vá. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PatientInfo.Api.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,519 @@
+using System.Text.Json.Nodes;
+using Consent.Application.ConsentTemplates;
+using Consent.Domain.ConsentTemplates;
+using Consent.Domain.Identity;
+
+namespace Consent.Application.Tests;
+
+/// <summary>Bốn mẫu phiếu thật được khởi tạo sẵn (song ngữ, chuyển từ bản Word của bệnh viện).</summary>
+public sealed class HospitalTemplateTests
+{
+    public static TheoryData<string> Codes => new() { "QT-KNGT-BM02", "TTNB-NGOAITRU", "QT-KNGT-BM10", "TUVAN-CONGTT" };
+
+    private static TemplateDefinition Definition(string code) =>
+        TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
+
+    [Fact]
+    public void DefaultTemplates_AreTheFourHospitalForms_WithExpectedSigners()
+    {
+        var roles = DefaultConsentTemplates.All.ToDictionary(t => t.Code, t => t.HospitalSignerRoleCode);
+
+        Assert.Equal(
+            new Dictionary<string, string>
+            {
+                ["QT-KNGT-BM02"] = SystemRoles.Receptionist,
+                ["TTNB-NGOAITRU"] = SystemRoles.Receptionist,
+                ["QT-KNGT-BM10"] = SystemRoles.Doctor,
+                ["TUVAN-CONGTT"] = SystemRoles.Nurse,
+            },
+            roles);
+        Assert.All(DefaultConsentTemplates.All, t =>
+        {
+            Assert.Equal(ConsentTemplate.NormalizeCode(t.Code), t.Code);
+            Assert.InRange(t.Code.Length, 1, ConsentTemplate.CodeMaxLength);
+            Assert.InRange(t.Name.Length, 1, ConsentTemplate.NameMaxLength);
+        });
+    }
+
+    [Theory]
+    [MemberData(nameof(Codes))]
+    public void DefaultTemplates_AreValid(string code)
+    {
+        var (definition, errors) = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson);
+
+        Assert.Empty(errors);
+        Assert.NotNull(definition);
+    }
+
+    [Theory]
+    [InlineData("QT-KNGT-BM02", false)]
+    [InlineData("TTNB-NGOAITRU", false)]
+    [InlineData("QT-KNGT-BM10", false)]
+    [InlineData("TUVAN-CONGTT", true)]
+    public void OnlyThePortalConsultation_AsksForAgreeOrDisagree(string code, bool requiresDecision)
+    {
+        var signatures = Definition(code).Signatures!;
+
+        Assert.Equal(requiresDecision, signatures.RequiresDecision);
+        if (requiresDecision)
+        {
+            Assert.Equal("Đồng ý (Agree)", signatures.AgreeLabel);
+            Assert.Equal("Không đồng ý (Disagree)", signatures.RefuseLabel);
+            Assert.StartsWith("Ông/bà đã xem và đồng ý", signatures.DecisionLabel, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// Bệnh viện yêu cầu 15/11/2026: TTNB, TUVAN không in dòng khoa; phiếu tư vấn in phần I song ngữ; BM02 in như bản giấy
+    /// (đầu phiếu có mã tài liệu, song ngữ). Quyết định 43: BM10 và phiếu tư vấn in theo bản giấy (không dòng khoa, song ngữ).
+    /// </summary>
+    [Theory]
+    [InlineData("QT-KNGT-BM02", false, true)]
+    [InlineData("TTNB-NGOAITRU", true, true)]
+    [InlineData("QT-KNGT-BM10", true, true)]
+    [InlineData("TUVAN-CONGTT", true, true)]
+    public void HeaderAndPatientSection_FollowThePaperForm(string code, bool hideDepartment, bool bilingual)
+    {
+        var definition = Definition(code);
+
+        Assert.Equal(hideDepartment, definition.HideDepartment);
+        Assert.Equal(bilingual, definition.Bilingual);
+    }
+
+    /// <summary>BM02 theo bản giấy bệnh viện gửi 15/11/2026 (mã QT-KNGT/BM02, lần ban hành 09).</summary>
+    [Fact]
+    public void Bm02_FollowsThePaperLayout()
+    {
+        var definition = Definition("QT-KNGT-BM02");
+        var blocks = definition.Sections.SelectMany(s => s.Blocks).ToList();
+
+        Assert.Equal(new TemplateDocumentControl("QT-KNGT/BM02", "09", string.Empty), definition.DocumentControl);
+        // Tiêu đề 4 dòng như bản giấy; dòng trong ngoặc là dòng phụ (PDF không viết hoa).
+        Assert.Equal(
+            [
+                "Giấy đồng thuận",
+                "(Về chế độ thanh toán và quyền lợi khám chữa bệnh Bảo hiểm y tế)",
+                "Consent Form",
+                "(Regarding Payment Policy and Health Insurance Benefits for Medical Examination and Treatment)",
+            ],
+            definition.Title.Split('\n'));
+        Assert.Null(definition.Subtitle);
+        // Thông tin người bệnh như bản giấy: họ tên; ngày sinh, giới tính; mã BN; số thẻ BHYT (trường của phiếu, in ở đầu).
+        Assert.Equal(
+            ["fullName", "dateOfBirth+gender", "patientCode", "field:insuranceNumber"],
+            definition.PatientLines!.Select(line => string.Join('+', line.Select(i => i.Patient ?? $"field:{i.Field}"))));
+        Assert.Equal(["Nam/Male", "Nữ/Female"], definition.PatientLines![1][1].Options!);
+        // Không còn tiêu đề phần; câu chọn chế độ chỉ in hai ô; nhân viên hướng dẫn ký bên trái, tên ô ký giữ chữ thường.
+        Assert.All(definition.Sections, s => Assert.Null(s.Title));
+        Assert.True(blocks.Single(b => b.Key == "careScheme").PrintOptionsOnly);
+        Assert.True(definition.Signatures!.HospitalFirst);
+        Assert.True(definition.Signatures.PlainTitles);
+        Assert.Equal("Nhân viên hướng dẫn/ Counseling Staff", definition.Signatures.Hospital);
+        Assert.Equal("Người thỏa thuận/ Declarant", definition.Signatures.Patient);
+    }
+
+    /// <summary>TTNB theo bản giấy bệnh viện gửi 16/11/2026 (mã QT-KNGT/BM03, lần ban hành 08), quyết định 33.</summary>
+    [Fact]
+    public void OutpatientInformation_FollowsThePaperForm()
+    {
+        var definition = Definition("TTNB-NGOAITRU");
+
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QT-KNGT/BM03", "08", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue number)", EffectiveDateLabel: "Ngày hiệu lực (Effective date)"),
+            definition.DocumentControl);
+        Assert.Null(definition.Subtitle);
+        // 15 mục đánh số như bản giấy: thông tin hồ sơ xen với trường của phiếu; ba dòng phụ của mục 15 không đánh số.
+        Assert.True(definition.NumberedPatientLines);
+        Assert.Equal(
+            [
+                "fullName", "gender", "dateOfBirth", "field:ethnicity", "field:religion+religionOther", "field:educationLevel", "citizenId",
+                "field:occupation", "field:permanentAddress", "field:currentAddress", "phoneNumber", "field:familyName",
+                "field:familyRelationship", "field:familyPhone", "field:familyIsEmergencyContact", "indent:emergencyName",
+                "indent:emergencyRelationship", "indent:emergencyPhone",
+            ],
+            definition.PatientLines!.Select(line => line.Single() switch
+            {
+                { Indent: true, Field: { } field } => $"indent:{field}",
+                { Field: { } field, Other: { } other } => $"field:{field}+{other}",
+                { Field: { } field } => $"field:{field}",
+                var item => item.Patient!,
+            }));
+        Assert.Equal(["Kinh", "Khác, ghi rõ (Other, specify)"], definition.PatientLines![3][0].Options!);
+        // Mọi trường nhập liệu đã in ở 15 mục, thân phiếu chỉ còn lời cam đoan; không còn tiêu đề phần.
+        var printed = definition.PatientLines.SelectMany(l => l).SelectMany(i => new[] { i.Field, i.Other }).OfType<string>().ToHashSet();
+        Assert.All(definition.InputBlocks, b => Assert.Contains(b.Key!, printed));
+        Assert.All(definition.Sections, s => Assert.Null(s.Title));
+        Assert.Equal("paragraph", definition.Sections.SelectMany(s => s.Blocks).Last().Type);
+
+        // Nhân viên tiếp nhận bên trái, người khai bên phải; ghi chú như bản giấy, dòng "đã đối chiếu…" màu đỏ.
+        var signatures = definition.Signatures!;
+        Assert.True(signatures.HospitalFirst);
+        Assert.True(signatures.PlainTitles);
+        Assert.True(signatures.CenterDate);
+        Assert.True(signatures.PaperHints);
+        Assert.Equal("Nhân viên tiếp nhận", signatures.Hospital);
+        Assert.StartsWith("!(đã đối chiếu thông tin trên giấy tờ tùy thân)", signatures.HospitalHint, StringComparison.Ordinal);
+        Assert.Equal("Người khai (ký tên, ghi rõ họ tên)", signatures.Patient);
+        Assert.Contains("Nếu không phải người bệnh, ghi rõ quan hệ với người bệnh", signatures.PatientHint, StringComparison.Ordinal);
+    }
+
+    /// <summary>Phiếu tư vấn theo bản giấy QĐ-VHTT-BM02, lần ban hành 01, bệnh viện gửi 18/11/2026 (quyết định 43).</summary>
+    [Fact]
+    public void PortalConsultation_FollowsThePaperForm()
+    {
+        var definition = Definition("TUVAN-CONGTT");
+
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QĐ-VHTT-BM02", "01", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue number)", EffectiveDateLabel: "Ngày hiệu lực (Effective date)"),
+            definition.DocumentControl);
+        Assert.Equal(4, definition.Title.Split('\n').Length);
+        Assert.Null(definition.Subtitle);
+        // Thông tin người bệnh như bản giấy: họ tên, ngày sinh, giới tính, địa chỉ, mỗi mục một dòng.
+        Assert.Equal(["fullName", "dateOfBirth", "gender", "address"], definition.PatientLines!.Select(line => line.Single().Patient!));
+        Assert.Equal(["Nam (Male)", "Nữ (Female)"], definition.PatientLines![2][0].Options!);
+        // Cuối phần I là khung lưu ý 3 mục đánh số; phiếu không có trường nhập liệu (người bệnh chọn ý kiến khi ký).
+        var notice = definition.Sections[0].Blocks[^1];
+        Assert.True(notice.Box);
+        Assert.Equal(TemplateBlock.LayoutOrdered, notice.Layout);
+        Assert.Equal("Xin Quý người bệnh và thân nhân lưu ý (Notice to Patients and Relatives)", notice.Label);
+        Assert.Equal(3, notice.Items!.Count);
+        Assert.Empty(definition.InputBlocks);
+        Assert.StartsWith(
+            "Hướng dẫn thực hiện phiếu (Instructions for completing the form)\n* Người tư vấn là Nhân viên chăm sóc khách hàng",
+            definition.Footnote, StringComparison.Ordinal);
+
+        // Hai ô ký như bản giấy: người bệnh/người đại diện và người tư vấn (xác nhận cuối); không còn bước xác nhận trung gian.
+        var signatures = definition.Signatures!;
+        Assert.Null(signatures.Steps);
+        Assert.Equal("Người tư vấn (*) (Consultant)", signatures.Hospital);
+        Assert.Equal("Người bệnh/Người đại diện của người bệnh (Patient/Patient’s Representative)", signatures.Patient);
+        Assert.Equal(signatures.Patient, signatures.Representative);
+        Assert.True(signatures.BoldTitles);
+        Assert.True(signatures.PaperHints);
+        Assert.All(definition.Sections, s => Assert.Null(s.Signer));
+    }
+
+    /// <summary>
+    /// BM10 theo bản giấy QT-KNGT/BM10, lần ban hành 08, bệnh viện gửi 18/11/2026 (quyết định 43): bốn phần, mỗi phần một trang
+    /// và một người ký ở cuối phần.
+    /// </summary>
+    [Fact]
+    public void Bm10_FollowsThePaperForm()
+    {
+        var definition = Definition("QT-KNGT-BM10");
+
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QT-KNGT/BM10", "08", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue No)", EffectiveDateLabel: "Ngày hiệu lực (Effective Date)", UnitInHead: true),
+            definition.DocumentControl);
+        Assert.Equal(
+            ["fullName", "dateOfBirth+gender", "field:consultingRoom", "address"],
+            definition.PatientLines!.Select(line => string.Join('+', line.Select(i => i.Patient ?? $"field:{i.Field}"))));
+        Assert.All(definition.Sections, s => Assert.True(s.Banner));
+        Assert.Equal([false, true, true, true], definition.Sections.Select(s => s.NewPage));
+        Assert.Equal(["patient", "screeningStaff", "nurse", "hospital"], definition.Sections.Select(s => s.Signer));
+        Assert.Equal(["screeningStaff", "nurse"], definition.Signatures!.Steps!.Select(step => step.Key));
+        // Câu hỏi Có/Không của người bệnh, nhân viên hướng dẫn, PNST và nhu cầu giáo dục sức khỏe in thành bảng như bản giấy.
+        Assert.Equal(
+            [
+                "selfFallHistory", "selfMobilityAid", "infectionSymptoms", "epidemiologicalExposure", "closeContact", "staffMobilityAid",
+                "staffUnsteady", "pnstWeightLoss", "pnstPoorWeightGain", "pnstPoorIntake", "pnstNoticeableLoss", "nurseEduFall",
+                "nurseEduWound", "physicianEduFall", "physicianEduWound", "physicianEduPain", "physicianEduNewPatient", "physicianEduOther",
+            ],
+            definition.InputBlocks.Where(b => b.Layout == TemplateBlock.LayoutRow).Select(b => b.Key!));
+        Assert.True(definition.Signatures.BoldTitles);
+        Assert.True(definition.Signatures.PaperHints);
+        Assert.Equal("Bác sĩ thực hiện (Physician in charge)", definition.Signatures.Hospital);
+    }
+
+    [Fact]
+    public void Bm02_InsuranceScheme_RequiresCardNumber_AndChecksFormat()
+    {
+        var definition = Definition("QT-KNGT-BM02");
+
+        var missing = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance" });
+        var invalid = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "12-34" });
+        var valid = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD479012345678901" });
+        var legacy = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "GD4790000000125" });
+        var bhxhOnly = FormDataEvaluator.Evaluate(definition, new JsonObject { ["careScheme"] = "insurance", ["insuranceNumber"] = "7900000001" });
+
+        Assert.Contains("insuranceNumber", missing.Errors.Keys);
+        Assert.Contains("Số thẻ BHYT gồm 17 ký tự", invalid.Errors["insuranceNumber"][0], StringComparison.Ordinal);
+        Assert.True(valid.IsValid);
+        Assert.True(legacy.IsValid);
+        Assert.Contains("insuranceNumber", bhxhOnly.Errors.Keys);
+    }
+
+    [Fact]
+    public void Bm02_NonInsuranceScheme_DropsCardNumber()
+    {
+        var result = FormDataEvaluator.Evaluate(
+            Definition("QT-KNGT-BM02"), new JsonObject { ["careScheme"] = "nonInsurance", ["insuranceNumber"] = "GD4790000000125" });
+
+        Assert.True(result.IsValid);
+        Assert.Null(result.Data["insuranceNumber"]);
+    }
+
+    [Fact]
+    public void OutpatientInformation_OtherReligionAndSeparateEmergencyContact_AreRequired()
+    {
+        var data = OutpatientInformation();
+        data["religion"] = "other";
+        data["familyIsEmergencyContact"] = "no";
+
+        var result = FormDataEvaluator.Evaluate(Definition("TTNB-NGOAITRU"), data);
+
+        Assert.Equal(
+            ["emergencyName", "emergencyPhone", "emergencyRelationship", "religionOther"],
+            result.Errors.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void OutpatientInformation_FamilyMemberIsEmergencyContact_IsComplete()
+    {
+        var data = OutpatientInformation();
+        data["emergencyName"] = "bị bỏ vì đang ẩn";
+
+        var result = FormDataEvaluator.Evaluate(Definition("TTNB-NGOAITRU"), data);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors.Keys));
+        Assert.Null(result.Data["emergencyName"]);
+    }
+
+    [Fact]
+    public void Bm10_Bmi_IsComputedFromWeightAndHeight_IgnoringTypedValue()
+    {
+        var data = InitialAssessment();
+        data["bmi"] = "99";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        // 50 kg / (1,60 m)² = 19,53 → 19,5.
+        Assert.Equal("19,5", result.Data["bmi"]!.GetValue<string>());
+        Assert.DoesNotContain("bmi", result.Errors.Keys);
+    }
+
+    [Theory]
+    [InlineData("64", "atLeast20")]      // 25,0
+    [InlineData("51,2", "atLeast20")]    // 20,0 (đúng ngưỡng 20 thuộc mức ≥ 20)
+    [InlineData("51", "from18_5to20")]   // 19,9
+    [InlineData("47,4", "from18_5to20")] // 18,5
+    [InlineData("47,3", "from18_5to20")] // 18,48 làm tròn thành 18,5: chọn theo BMI hiển thị trên phiếu
+    [InlineData("47,2", "below18_5")]    // 18,4
+    public void Bm10_AdultBmiScore_IsSelectedFromComputedBmi_IgnoringUserChoice(string weight, string expected)
+    {
+        var data = InitialAssessment();
+        data["weight"] = weight;
+        data["adultBmiScore"] = "atLeast20" == expected ? "below18_5" : "atLeast20";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal(expected, result.Data["adultBmiScore"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Bm10_AdultBmiScore_IsChosenByHand_WhenBmiCannotBeComputed()
+    {
+        var data = InitialAssessment();
+        data.Remove("weight");
+        data["adultBmiScore"] = "below18_5";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal("below18_5", result.Data["adultBmiScore"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void Bm10_Bmi_IsEmptyUntilWeightAndHeightAreEntered()
+    {
+        var data = InitialAssessment();
+        data.Remove("height");
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Null(result.Data["bmi"]);
+        Assert.Contains("height", result.Errors.Keys);
+        Assert.DoesNotContain("bmi", result.Errors.Keys);
+    }
+
+    [Fact]
+    public void Bm10_CompleteAdultAssessment_IsValid_AndScoresNutritionRisk()
+    {
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), InitialAssessment());
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors.Select(e => $"{e.Key}: {e.Value[0]}")));
+        Assert.Equal(1, result.Scores["adultNutritionTotal"].Total);
+        Assert.Equal("moderate", result.Scores["adultNutritionTotal"].LevelCode);
+        Assert.Null(result.Scores["pnstTotal"].Total);
+    }
+
+    [Theory]
+    [InlineData("atLeast20", "below5", "no", 0, "none")]
+    [InlineData("from18_5to20", "below5", "no", 1, "moderate")]
+    [InlineData("below18_5", "from5to10", "no", 3, "high")]
+    [InlineData("from18_5to20", "from5to10", "yes", 4, "high")]
+    [InlineData("below18_5", "above10", "no", 4, "high")]
+    [InlineData("below18_5", "from5to10", "yes", 5, "veryHigh")]
+    [InlineData("below18_5", "above10", "yes", 6, "veryHigh")]
+    public void Bm10_AdultNutritionScore_FollowsTheFormThresholds(
+        string bmi, string weightLoss, string acuteIllness, int expectedTotal, string expectedLevel)
+    {
+        var data = InitialAssessment();
+        // Mức BMI tự chọn theo BMI tính từ cân nặng (cao 160 cm): 60 kg → 23,4; 50 kg → 19,5; 45 kg → 17,6.
+        data["weight"] = bmi switch { "atLeast20" => "60", "from18_5to20" => "50", _ => "45" };
+        data["adultWeightLossScore"] = weightLoss;
+        data["adultAcuteIllnessScore"] = acuteIllness;
+
+        var score = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data).Scores["adultNutritionTotal"];
+
+        Assert.Equal(expectedTotal, score.Total);
+        Assert.Equal(expectedLevel, score.LevelCode);
+    }
+
+    [Theory]
+    [InlineData(1, "low")]
+    [InlineData(2, "risk")]
+    [InlineData(4, "risk")]
+    public void Bm10_PediatricPnst_CountsRiskFactors(int riskFactors, string expectedLevel)
+    {
+        var data = InitialAssessment();
+        data["nutritionGroup"] = "pediatric";
+        data.Remove("adultNutritionRisk");
+        data["pediatricNutritionRisk"] = expectedLevel;
+        string[] questions = ["pnstWeightLoss", "pnstPoorWeightGain", "pnstPoorIntake", "pnstNoticeableLoss"];
+        for (var i = 0; i < questions.Length; i++)
+        {
+            data[questions[i]] = i < riskFactors ? "yes" : "no";
+        }
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors.Keys));
+        Assert.Equal(riskFactors, result.Scores["pnstTotal"].Total);
+        Assert.Equal(expectedLevel, result.Scores["pnstTotal"].LevelCode);
+        Assert.Null(result.Data["adultBmiScore"]);
+        Assert.Null(result.Scores["adultNutritionTotal"].Total);
+    }
+
+    [Fact]
+    public void Bm10_EmergencySigns_SkipTheAssessment()
+    {
+        var data = InitialAssessment();
+        data["emergencySigns"] = "yes";
+        data["emergencySignsDetail"] = "Khó thở, tím tái";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors.Keys));
+        Assert.Null(result.Data["visitReason"]);
+        Assert.Null(result.Data["currentPain"]);
+        Assert.Null(result.Data["adultBmiScore"]);
+        Assert.Null(result.Data["adultNutritionRisk"]);
+        Assert.Null(result.Scores["adultNutritionTotal"].Total);
+    }
+
+    [Fact]
+    public void Bm10_InfectionSymptoms_RequireEpidemiologyAndStaffAction()
+    {
+        var data = InitialAssessment();
+        data["infectionSymptoms"] = "yes";
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal(["closeContact", "epidemiologicalExposure", "infectionAction"], result.Errors.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("bloodPressure", "120-80")]
+    [InlineData("painScore", "11")]
+    [InlineData("pulse", "tám mươi")]
+    public void Bm10_Measurements_AreChecked(string key, string value)
+    {
+        var data = InitialAssessment();
+        data["currentPain"] = "yes";
+        data["painOnset"] = "Hai ngày trước";
+        data["painLocation"] = "Lưng";
+        data["painScore"] = "3";
+        data["painScale"] = "nrs";
+        data[key] = value;
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal([key], result.Errors.Keys);
+    }
+
+    [Fact]
+    public void Bm10_DietCounselingOther_RequiresDescription()
+    {
+        var data = InitialAssessment();
+        data["dietCounseling"] = "required";
+        data["dietRegimens"] = new JsonArray("ironDeficiency", "other");
+
+        var result = FormDataEvaluator.Evaluate(Definition("QT-KNGT-BM10"), data);
+
+        Assert.Equal(["dietRegimenOther"], result.Errors.Keys);
+    }
+
+    private static JsonObject OutpatientInformation() => new()
+    {
+        ["ethnicity"] = "Kinh",
+        ["religion"] = "buddhism",
+        ["educationLevel"] = "12/12",
+        ["occupation"] = "Nhân viên văn phòng",
+        ["permanentAddress"] = "1 Đường Thử Nghiệm, Phường Mẫu, TP. Hồ Chí Minh",
+        ["currentAddress"] = "1 Đường Thử Nghiệm, Phường Mẫu, TP. Hồ Chí Minh",
+        ["familyName"] = "Người Nhà Thử Nghiệm",
+        ["familyRelationship"] = "Con",
+        ["familyPhone"] = "0900000001",
+        ["familyIsEmergencyContact"] = "yes",
+    };
+
+    /// <summary>Phiếu nhận định người lớn đầy đủ, không có dấu hiệu cấp cứu (dữ liệu giả lập).</summary>
+    private static JsonObject InitialAssessment() => new()
+    {
+        ["consultingRoom"] = "Phòng 05",
+        ["selfFallHistory"] = "no",
+        ["selfMobilityAid"] = "no",
+        ["infectionSymptoms"] = "no",
+        ["staffMobilityAid"] = "no",
+        ["staffUnsteady"] = "no",
+        ["pulse"] = "80",
+        ["temperature"] = "37,2",
+        ["bloodPressure"] = "120/80",
+        ["respiratoryRate"] = "18",
+        ["height"] = "160",
+        ["weight"] = "50",
+        ["bmi"] = "19,5",
+        ["emergencySigns"] = "no",
+        ["visitReason"] = "followUp",
+        ["allergies"] = "none",
+        ["mentalStatusAppropriate"] = "no",
+        ["barrierLanguage"] = "no",
+        ["barrierCognitive"] = "no",
+        ["barrierSensory"] = "no",
+        ["barrierReligious"] = "no",
+        ["barrierCultural"] = "no",
+        ["barrierMobility"] = "no",
+        ["livingStatus"] = "withFamily",
+        ["currentPain"] = "no",
+        ["nutritionGroup"] = "adult",
+        ["adultBmiScore"] = "from18_5to20",
+        ["adultWeightLossScore"] = "below5",
+        ["adultAcuteIllnessScore"] = "no",
+        ["highFallRisk"] = "no",
+        ["nurseEduFall"] = "notNeeded",
+        ["nurseEduWound"] = "notNeeded",
+        ["adultNutritionRisk"] = "moderate",
+        ["dietCounseling"] = "notRequired",
+        ["physicianEduFall"] = "notRequired",
+        ["physicianEduWound"] = "notRequired",
+        ["physicianEduPain"] = "notRequired",
+        ["physicianEduNewPatient"] = "notRequired",
+        ["physicianEduOther"] = "notRequired",
+    };
+}

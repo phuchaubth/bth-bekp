@@ -1,0 +1,149 @@
+import { CheckCircleFilled, CheckCircleOutlined, EditOutlined, QrcodeOutlined } from '@ant-design/icons'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Alert, App, Button, Card, Flex, Space, Typography } from 'antd'
+import { useState } from 'react'
+import { Link } from 'react-router'
+import {
+  consentFormKeys,
+  consentFormsApi,
+  type ConsentFormBundle,
+  type ConsentFormDetail,
+  type EncounterChoice,
+  type StaffSignatureInput,
+} from '../../api/consentForms'
+import { useFeatures } from '../../api/features'
+import { fieldErrorMessage } from '../../utils/formErrors'
+import { FormStatusTag } from './FormStatusTag'
+import { StaffSignModal, StartBundleSigningModal } from './SigningActions'
+import { KioskTag } from './KioskTag'
+import { RemoteSigningModal } from './RemoteSigningModal'
+
+/**
+ * Thanh bộ phiếu (quyết định 23) trên trang phiếu: các phiếu của bộ và trạng thái, chuyển nhanh giữa các phiếu, ký cả bộ
+ * một lần trên điện thoại và xác nhận một lần các phiếu đến lượt mình.
+ */
+export function BundleBar({ form, bundle }: { form: ConsentFormDetail; bundle: ConsentFormBundle }) {
+  const [signingOpen, setSigningOpen] = useState(false)
+  const [remoteOpen, setRemoteOpen] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const queryClient = useQueryClient()
+  const { message } = App.useApp()
+  const features = useFeatures()
+  const toSign = bundle.forms.filter((item) => item.actions.canStartSigning)
+  const myTurn = bundle.forms.filter((item) => item.actions.canConfirmStep || item.actions.canConfirm)
+  // Như máy chủ: phiếu còn bước trung gian đến lượt thì xác nhận bước, không thì xác nhận cuối (hoàn tất).
+  const completing = myTurn.filter((item) => !item.actions.canConfirmStep && item.actions.canConfirm)
+  // Lượt tiếp nhận chỉ gắn vào phiếu được hoàn tất; bắt buộc hay không do quản trị bật/tắt (máy chủ trả lời).
+  const offerEncounter = features.patientSource && completing.length > 0
+
+  const confirm = useMutation({
+    mutationFn: ({ signature, encounter }: { signature: StaffSignatureInput; encounter: EncounterChoice | null }) =>
+      consentFormsApi.confirmBundle(bundle.bundleId, signature, encounter),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: consentFormKeys.all })
+      setConfirmOpen(false)
+      const completed = result.confirmed.filter((item) => item.action === 'completed').length
+      message.success(
+        `Đã xác nhận ${result.confirmed.length} phiếu${completed > 0 ? ` (hoàn tất ${completed} phiếu)` : ''}: ${result.confirmed
+          .map((item) => item.formNo)
+          .join(', ')}.`,
+      )
+      result.failed.forEach((item) => message.warning(`${item.formNo}: ${item.message}`))
+    },
+    onError: (e) => {
+      void queryClient.invalidateQueries({ queryKey: ['consent-forms', 'encounters'] })
+      message.error(fieldErrorMessage(e, 'encounterNo'))
+    },
+  })
+
+  return (
+    <Card
+      size="small"
+      title={
+        <Space wrap size={8}>
+          {`Bộ phiếu của ${bundle.patientName} (${bundle.forms.length} phiếu)`}
+          <KioskTag method={bundle.kioskIdentity} />
+        </Space>
+      }
+      extra={
+        <Space wrap>
+          {bundle.canStartSigning && (
+            <Button type="primary" icon={<EditOutlined />} onClick={() => setSigningOpen(true)}>
+              Ký cả bộ trên điện thoại ({toSign.length} phiếu)
+            </Button>
+          )}
+          {bundle.canStartSigning && (
+            <Button icon={<QrcodeOutlined />} onClick={() => setRemoteOpen(true)}>
+              Mã QR ký cả bộ
+            </Button>
+          )}
+          {bundle.canConfirm && (
+            <Button type="primary" icon={<CheckCircleOutlined />} onClick={() => setConfirmOpen(true)}>
+              Xác nhận cả bộ ({myTurn.length} phiếu)
+            </Button>
+          )}
+        </Space>
+      }
+    >
+      <Flex vertical gap={8}>
+        <ol style={{ margin: 0, paddingLeft: 20 }} aria-label="Các phiếu trong bộ">
+          {bundle.forms.map((item) => (
+            <li key={item.id} style={{ marginBottom: 4 }}>
+              <Flex gap={8} wrap align="center">
+                {item.id === form.id ? (
+                  <Typography.Text strong aria-current="page">
+                    {item.templateName}
+                  </Typography.Text>
+                ) : (
+                  <Link to={`/phieu-dong-thuan/${item.id}`}>{item.templateName}</Link>
+                )}
+                <Typography.Text type="secondary">{item.formNo}</Typography.Text>
+                <FormStatusTag status={item.status} />
+                {item.patientSigned && item.status === 'PendingSignature' && (
+                  <Typography.Text type="success">
+                    <CheckCircleFilled /> Người bệnh đã ký{item.nextStepLabel ? ` · chờ ${item.nextStepLabel}` : ''}
+                  </Typography.Text>
+                )}
+              </Flex>
+            </li>
+          ))}
+        </ol>
+        {bundle.notices.map((notice) => (
+          <Alert key={notice} type="info" showIcon title={notice} />
+        ))}
+      </Flex>
+      {remoteOpen && (
+        <RemoteSigningModal
+          target={{ bundleId: bundle.bundleId }}
+          count={toSign.length}
+          byRepresentative={form.signerKind === 'Representative'}
+          onClose={() => setRemoteOpen(false)}
+        />
+      )}
+      {signingOpen && (
+        <StartBundleSigningModal
+          bundleId={bundle.bundleId}
+          count={toSign.length}
+          byRepresentative={form.signerKind === 'Representative'}
+          onClose={() => setSigningOpen(false)}
+        />
+      )}
+      {confirmOpen && (
+        <StaffSignModal
+          title="Xác nhận cả bộ phiếu"
+          description={`Bạn sẽ ký xác nhận ${myTurn.length} phiếu đang đến lượt mình: ${myTurn
+            .map((item) => `${item.templateName} (${item.formNo})`)
+            .join('; ')}. Chữ ký được in vào ô của bạn trên từng phiếu.`}
+          okText="Ký và xác nhận cả bộ"
+          loading={confirm.isPending}
+          encounterSource={offerEncounter ? { bundleId: bundle.bundleId } : null}
+          encounterHint={`${
+            completing.length === myTurn.length ? 'Các phiếu' : `${completing.length} phiếu`
+          } hoàn tất lần này được gắn vào lượt tiếp nhận bạn chọn; số tiếp nhận và người tiếp nhận in ở chân phiếu.`}
+          onSign={(signature, encounter) => confirm.mutate({ signature, encounter })}
+          onClose={() => setConfirmOpen(false)}
+        />
+      )}
+    </Card>
+  )
+}

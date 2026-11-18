@@ -1,0 +1,956 @@
+/*
+ * Kiosk người bệnh tự làm phiếu (quyết định 24): thiết kế cho màn hình 32 inch dọc 1080×1920. Mọi kích thước tính theo
+ * "điểm thiết kế" --k (1 điểm = 1px ở 1080×1920), nên màn hình nhỏ hơn thu nhỏ theo đúng tỉ lệ. Nút bấm, bàn phím, khung
+ * ký đặt ở nửa dưới (vừa tầm tay); nửa trên để đọc.
+ */
+.kiosk {
+  --k: min(calc(100vw / 1080), calc(100vh / 1920));
+  --brand: #0d7c74;
+  --brand-dark: #0b5f59;
+  --brand-light: #e2f3f1;
+  --line: #c9dadb;
+  --line-soft: #dce7e8;
+  --muted: #5b7472;
+  --ink: #16302e;
+  --ink-2: #33504e;
+  --danger: #b42318;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: #f3f7f8;
+  color: var(--ink);
+  font-family: 'Be Vietnam Pro', 'Segoe UI', system-ui, sans-serif;
+  font-size: calc(var(--k) * 26);
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.kiosk *,
+.kiosk *::before,
+.kiosk *::after {
+  box-sizing: border-box;
+}
+
+.kiosk h1 {
+  margin: 0;
+  font-size: calc(var(--k) * 52);
+  line-height: 1.2;
+}
+
+.kiosk h2 {
+  margin: 0;
+  font-size: calc(var(--k) * 30);
+}
+
+.kiosk p {
+  margin: 0;
+}
+
+.kiosk button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kiosk button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kiosk button:focus-visible,
+.kiosk input:focus-visible {
+  outline: calc(var(--k) * 4) solid #f0b429;
+  outline-offset: calc(var(--k) * 3);
+}
+
+/* Đầu trang */
+.kiosk-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--k) * 20);
+  height: calc(var(--k) * 140);
+  padding: 0 calc(var(--k) * 56);
+  background: #fff;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.kiosk-logo {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--k) * 76);
+  height: calc(var(--k) * 76);
+  border: 0;
+  border-radius: calc(var(--k) * 20);
+  background: var(--brand);
+}
+
+.kiosk-logo svg {
+  width: calc(var(--k) * 40);
+  height: calc(var(--k) * 40);
+}
+
+.kiosk-hospital {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 4);
+}
+
+.kiosk-hospital strong {
+  font-size: calc(var(--k) * 30);
+}
+
+.kiosk-hospital span,
+.kiosk-header-note {
+  font-size: calc(var(--k) * 22);
+  color: var(--muted);
+}
+
+.kiosk-header-note {
+  margin-left: auto;
+  text-align: right;
+}
+
+/* Các bước */
+.kiosk-steps {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(var(--k) * 16);
+  margin: 0;
+  padding: calc(var(--k) * 28) calc(var(--k) * 56) 0;
+  list-style: none;
+}
+
+.kiosk-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 12);
+  font-size: calc(var(--k) * 24);
+  color: var(--muted);
+}
+
+.kiosk-steps li::before {
+  content: '';
+  height: calc(var(--k) * 12);
+  border-radius: 999px;
+  background: var(--line-soft);
+}
+
+.kiosk-steps li.done {
+  color: var(--brand-dark);
+  font-weight: 600;
+}
+
+.kiosk-steps li.done::before {
+  background: #8fcbc5;
+}
+
+.kiosk-steps li.active {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.kiosk-steps li.active::before {
+  background: var(--brand);
+}
+
+/* Thân và chân trang */
+.kiosk-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 28);
+  padding: calc(var(--k) * 40) calc(var(--k) * 56);
+  overflow-y: auto;
+}
+
+.kiosk-bottom {
+  margin-top: auto;
+}
+
+.kiosk-footer {
+  flex: none;
+  display: flex;
+  gap: calc(var(--k) * 20);
+  padding: calc(var(--k) * 28) calc(var(--k) * 56) calc(var(--k) * 40);
+  background: #fff;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* Nút */
+.kiosk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--k) * 12);
+  min-height: calc(var(--k) * 104);
+  padding: 0 calc(var(--k) * 36);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: calc(var(--k) * 22);
+  background: #fff;
+  font-size: calc(var(--k) * 28);
+  font-weight: 600;
+}
+
+.kiosk-btn.primary {
+  flex: 1;
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+  font-size: calc(var(--k) * 32);
+  font-weight: 700;
+}
+
+.kiosk-btn.small {
+  min-height: calc(var(--k) * 72);
+  padding: 0 calc(var(--k) * 28);
+  font-size: calc(var(--k) * 24);
+}
+
+.kiosk-btn.block {
+  width: 100%;
+}
+
+/* Màn hình đầu: thẻ chọn cách nhận diện */
+.kiosk-welcome {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 16);
+  padding-top: calc(var(--k) * 32);
+}
+
+.kiosk-welcome h1 {
+  font-size: calc(var(--k) * 64);
+  line-height: 1.15;
+}
+
+.kiosk-lead {
+  font-size: calc(var(--k) * 30);
+  color: var(--ink-2);
+}
+
+.kiosk-steps-intro {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--k) * 20);
+  margin: 0;
+  padding: calc(var(--k) * 32) calc(var(--k) * 28);
+  list-style: none;
+  border-radius: calc(var(--k) * 28);
+  background: var(--brand-light);
+  text-align: center;
+}
+
+.kiosk-steps-intro li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--k) * 10);
+  font-size: calc(var(--k) * 21);
+  color: var(--ink-2);
+}
+
+.kiosk-steps-intro b {
+  display: grid;
+  place-items: center;
+  width: calc(var(--k) * 72);
+  height: calc(var(--k) * 72);
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  font-size: calc(var(--k) * 32);
+}
+
+.kiosk-steps-intro strong {
+  font-size: calc(var(--k) * 27);
+  color: var(--brand-dark);
+}
+
+.kiosk-methods {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 24);
+}
+
+.kiosk-method {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--k) * 32);
+  min-height: calc(var(--k) * 236);
+  padding: calc(var(--k) * 32) calc(var(--k) * 40);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: calc(var(--k) * 28);
+  background: #fff;
+  text-align: left;
+}
+
+.kiosk-method.featured {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 calc(var(--k) * 10) calc(var(--k) * 28) rgba(13, 124, 116, 0.28);
+}
+
+.kiosk-method svg {
+  flex: none;
+  width: calc(var(--k) * 112);
+  height: calc(var(--k) * 112);
+}
+
+.kiosk-method strong {
+  display: block;
+  font-size: calc(var(--k) * 42);
+  line-height: 1.2;
+}
+
+.kiosk-method span {
+  display: block;
+  margin-top: calc(var(--k) * 10);
+  font-size: calc(var(--k) * 26);
+  line-height: 1.45;
+}
+
+.kiosk-method .badge {
+  position: absolute;
+  top: calc(var(--k) * 24);
+  right: calc(var(--k) * 28);
+  margin: 0;
+  padding: calc(var(--k) * 8) calc(var(--k) * 16);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--brand-dark);
+  font-size: calc(var(--k) * 20);
+  font-weight: 700;
+}
+
+.kiosk-help {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 8);
+  padding: calc(var(--k) * 24) calc(var(--k) * 28);
+  border: 1px solid var(--line-soft);
+  border-radius: calc(var(--k) * 20);
+  background: #fff;
+  color: var(--ink-2);
+  font-size: calc(var(--k) * 22);
+}
+
+.kiosk-help strong {
+  color: var(--brand-dark);
+  font-size: calc(var(--k) * 26);
+}
+
+/* Khối thông tin, thông báo */
+.kiosk-card {
+  padding: calc(var(--k) * 36) calc(var(--k) * 40);
+  border: 1px solid var(--line-soft);
+  border-radius: calc(var(--k) * 28);
+  background: #fff;
+}
+
+.kiosk-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--k) * 24) calc(var(--k) * 32);
+}
+
+.kiosk-facts .wide {
+  grid-column: span 2;
+}
+
+.kiosk-facts span {
+  display: block;
+  font-size: calc(var(--k) * 24);
+  color: var(--muted);
+}
+
+.kiosk-facts strong {
+  display: block;
+  font-size: calc(var(--k) * 32);
+}
+
+.kiosk-facts .name {
+  font-size: calc(var(--k) * 46);
+  line-height: 1.2;
+}
+
+.kiosk-badge {
+  align-self: flex-start;
+  padding: calc(var(--k) * 8) calc(var(--k) * 18);
+  border-radius: 999px;
+  background: var(--brand-light);
+  color: var(--brand-dark);
+  font-size: calc(var(--k) * 22);
+  font-weight: 700;
+}
+
+.kiosk-hint {
+  font-size: calc(var(--k) * 24);
+  color: var(--muted);
+}
+
+.kiosk-error {
+  padding: calc(var(--k) * 20) calc(var(--k) * 28);
+  border-radius: calc(var(--k) * 20);
+  background: #fdecec;
+  color: #9b1c1c;
+  font-size: calc(var(--k) * 26);
+  font-weight: 600;
+}
+
+.kiosk-status {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--k) * 16);
+  padding: calc(var(--k) * 22) calc(var(--k) * 28);
+  border-radius: calc(var(--k) * 20);
+  background: #fff3dc;
+  color: #8a5400;
+  font-size: calc(var(--k) * 30);
+  font-weight: 600;
+}
+
+.kiosk-status::before {
+  content: '';
+  flex: none;
+  width: calc(var(--k) * 20);
+  height: calc(var(--k) * 20);
+  border-radius: 50%;
+  background: #e0a100;
+}
+
+.kiosk-list {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 14);
+  margin: 0;
+  padding-left: calc(var(--k) * 40);
+  font-size: calc(var(--k) * 30);
+  color: var(--ink-2);
+}
+
+.kiosk-illustration {
+  display: grid;
+  place-items: center;
+  padding: calc(var(--k) * 32);
+  border: 1px solid var(--line-soft);
+  border-radius: calc(var(--k) * 28);
+  background: #fff;
+}
+
+.kiosk-illustration svg {
+  width: calc(var(--k) * 640);
+  max-width: 100%;
+  height: auto;
+}
+
+/* Camera đọc mã QR (khi kiosk có camera): hình lật như soi gương, khung vuông chỉ chỗ đưa mã. */
+.kiosk-camera {
+  position: relative;
+  flex: none;
+  align-self: center;
+  width: 100%;
+  max-width: calc(var(--k) * 860);
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: calc(var(--k) * 6) solid var(--brand);
+  border-radius: calc(var(--k) * 28);
+  background: #000;
+}
+
+.kiosk-camera video {
+  height: 100%;
+}
+
+.kiosk-camera-target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: calc(var(--k) * 6) dashed rgba(255, 255, 255, 0.9);
+  border-radius: calc(var(--k) * 20);
+  box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+}
+
+/* Ô nhập */
+.kiosk-field {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 8);
+  min-width: 0;
+}
+
+.kiosk-field > label,
+.kiosk-field > .label {
+  font-size: calc(var(--k) * 26);
+  font-weight: 600;
+}
+
+.kiosk-required {
+  color: var(--danger);
+}
+
+.kiosk-input {
+  width: 100%;
+  min-width: 0;
+  height: calc(var(--k) * 96);
+  padding: 0 calc(var(--k) * 24);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: calc(var(--k) * 20);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(var(--k) * 34);
+  user-select: text;
+}
+
+.kiosk-input.large {
+  height: calc(var(--k) * 104);
+  font-size: calc(var(--k) * 44);
+  letter-spacing: calc(var(--k) * 3);
+}
+
+.kiosk-input.active {
+  border-color: var(--brand);
+  border-width: calc(var(--k) * 4);
+}
+
+.kiosk-input.invalid {
+  border-color: var(--danger);
+}
+
+.kiosk-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--k) * 20) calc(var(--k) * 24);
+}
+
+.kiosk-grid-2 .wide {
+  grid-column: span 2;
+}
+
+.kiosk-segmented {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  overflow: hidden;
+  border: calc(var(--k) * 3) solid var(--brand);
+  border-radius: calc(var(--k) * 22);
+}
+
+.kiosk-segmented button {
+  height: calc(var(--k) * 88);
+  border: 0;
+  background: #fff;
+  color: var(--brand-dark);
+  font-size: calc(var(--k) * 30);
+  font-weight: 600;
+}
+
+.kiosk-segmented button[aria-checked='true'] {
+  background: var(--brand);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Lựa chọn lớn (câu hỏi, giới tính, Đồng ý/Không đồng ý) */
+.kiosk-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: calc(var(--k) * 20);
+}
+
+.kiosk-choices.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.kiosk-choice {
+  min-height: calc(var(--k) * 116);
+  padding: calc(var(--k) * 16) calc(var(--k) * 24);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: calc(var(--k) * 24);
+  background: #fff;
+  font-size: calc(var(--k) * 32);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.kiosk-choice.short {
+  min-height: calc(var(--k) * 96);
+}
+
+.kiosk-choice[aria-checked='true'],
+.kiosk-choice[aria-pressed='true'] {
+  border: calc(var(--k) * 4) solid var(--brand);
+  background: var(--brand-light);
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.kiosk-choice.refuse[aria-checked='true'] {
+  border-color: var(--danger);
+  background: #fdecec;
+  color: #9b1c1c;
+}
+
+/* Bàn phím màn hình */
+.kiosk-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 10);
+  padding: calc(var(--k) * 18);
+  border-radius: calc(var(--k) * 24);
+  background: #e3ecec;
+}
+
+.kiosk-keyboard-row {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: calc(var(--k) * 8);
+}
+
+.kiosk-key {
+  height: calc(var(--k) * 76);
+  border: 0;
+  border-radius: calc(var(--k) * 14);
+  background: #fff;
+  box-shadow: 0 calc(var(--k) * 3) 0 #b9caca;
+  font-size: calc(var(--k) * 30);
+}
+
+.kiosk-key.vn {
+  color: var(--brand-dark);
+  font-weight: 700;
+}
+
+.kiosk-key.tone {
+  background: #cfe9e5;
+  box-shadow: 0 calc(var(--k) * 3) 0 #9fc3c0;
+  color: var(--brand-dark);
+  font-size: calc(var(--k) * 21);
+  font-weight: 700;
+}
+
+.kiosk-key.fn {
+  background: #cfdcdc;
+  box-shadow: 0 calc(var(--k) * 3) 0 #a9bcbc;
+  font-size: calc(var(--k) * 22);
+  font-weight: 600;
+}
+
+.kiosk-key.space {
+  color: var(--muted);
+  font-size: calc(var(--k) * 22);
+  font-weight: 600;
+}
+
+.kiosk-key.go {
+  background: var(--brand);
+  box-shadow: 0 calc(var(--k) * 3) 0 var(--brand-dark);
+  color: #fff;
+  font-size: calc(var(--k) * 24);
+  font-weight: 700;
+}
+
+.kiosk-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--k) * 16);
+  align-self: center;
+  width: min(100%, calc(var(--k) * 800));
+}
+
+.kiosk-keypad button {
+  height: calc(var(--k) * 100);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: calc(var(--k) * 22);
+  background: #fff;
+  font-size: calc(var(--k) * 42);
+  font-weight: 600;
+}
+
+.kiosk-keypad button.fn {
+  background: #eef4f4;
+  font-size: calc(var(--k) * 28);
+}
+
+/* Trả lời và ký */
+.kiosk-forms {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 10);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kiosk-forms li {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--k) * 16);
+  padding: calc(var(--k) * 14) calc(var(--k) * 18);
+  border: calc(var(--k) * 3) solid transparent;
+  border-radius: calc(var(--k) * 18);
+  background: #f3f7f8;
+  font-size: calc(var(--k) * 24);
+}
+
+.kiosk-forms li.current {
+  border-color: var(--brand);
+  background: var(--brand-light);
+}
+
+.kiosk-forms li .state {
+  margin-left: auto;
+  font-size: calc(var(--k) * 21);
+  color: var(--muted);
+}
+
+.kiosk-forms li .mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--k) * 40);
+  height: calc(var(--k) * 40);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: 50%;
+  background: #fff;
+  color: #fff;
+  font-weight: 700;
+}
+
+.kiosk-forms li.answered .mark {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+
+.kiosk-forms li.current .mark {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 calc(var(--k) * 7) #fff;
+  background: var(--brand);
+}
+
+.kiosk-progress {
+  height: calc(var(--k) * 14);
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line-soft);
+}
+
+.kiosk-progress > div {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+.kiosk-question {
+  font-size: calc(var(--k) * 52);
+  line-height: 1.25;
+}
+
+.kiosk-question .bilingual-en,
+.kiosk-question i {
+  display: block;
+  margin-top: calc(var(--k) * 6);
+  font-size: calc(var(--k) * 30);
+}
+
+.kiosk-sign-list li {
+  justify-content: space-between;
+  padding: calc(var(--k) * 18) calc(var(--k) * 24);
+  border: 1px solid var(--line-soft);
+  background: #fff;
+}
+
+.kiosk-sign-list strong {
+  display: block;
+  font-size: calc(var(--k) * 26);
+}
+
+.kiosk-sign-list span {
+  font-size: calc(var(--k) * 22);
+  color: var(--brand-dark);
+}
+
+.kiosk-statement-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--k) * 12);
+}
+
+.kiosk-statement-chips button {
+  min-height: calc(var(--k) * 68);
+  padding: calc(var(--k) * 8) calc(var(--k) * 24);
+  border: calc(var(--k) * 3) solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: calc(var(--k) * 24);
+  font-weight: 600;
+}
+
+.kiosk-statement-chips button[aria-pressed='true'] {
+  border: calc(var(--k) * 4) solid #c00000;
+  background: #fff5f5;
+  color: #c00000;
+  font-weight: 700;
+}
+
+.kiosk-statement {
+  color: #c00000;
+  font-size: calc(var(--k) * 36);
+  font-weight: 700;
+}
+
+.kiosk-signature {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--k) * 8);
+  padding: calc(var(--k) * 24) calc(var(--k) * 28) calc(var(--k) * 20);
+  border: calc(var(--k) * 3) dashed #9fc3c0;
+  border-radius: calc(var(--k) * 24);
+  background: #fff;
+}
+
+.kiosk-signature canvas {
+  border: 0 !important;
+}
+
+/* Hướng dẫn và nút "Ký lại" của khung ký dùng chung: phóng to theo cỡ kiosk. */
+.kiosk-signature .ant-typography {
+  font-size: calc(var(--k) * 22);
+}
+
+.kiosk-signature .ant-btn {
+  height: calc(var(--k) * 64);
+  padding: 0 calc(var(--k) * 28);
+  border-width: calc(var(--k) * 3);
+  border-radius: calc(var(--k) * 16);
+  font-size: calc(var(--k) * 24);
+  font-weight: 600;
+}
+
+.kiosk-signer {
+  padding-top: calc(var(--k) * 10);
+  border-top: calc(var(--k) * 3) solid var(--line-soft);
+  text-align: center;
+  font-size: calc(var(--k) * 26);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Hoàn tất */
+.kiosk-done {
+  align-items: center;
+  padding-top: calc(var(--k) * 96);
+  text-align: center;
+}
+
+.kiosk-done-icon {
+  display: grid;
+  place-items: center;
+  width: calc(var(--k) * 200);
+  height: calc(var(--k) * 200);
+  border-radius: 50%;
+  background: var(--brand-light);
+}
+
+.kiosk-done-icon svg {
+  width: calc(var(--k) * 112);
+  height: calc(var(--k) * 112);
+}
+
+.kiosk-done h1 {
+  font-size: calc(var(--k) * 64);
+}
+
+.kiosk-ticket {
+  width: 100%;
+  padding: calc(var(--k) * 12) calc(var(--k) * 40);
+  border: 1px solid var(--line-soft);
+  border-radius: calc(var(--k) * 28);
+  background: #fff;
+  text-align: left;
+}
+
+.kiosk-ticket div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: calc(var(--k) * 24);
+  padding: calc(var(--k) * 20) 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: calc(var(--k) * 26);
+  color: var(--muted);
+}
+
+.kiosk-ticket div:last-child {
+  border-bottom: 0;
+}
+
+.kiosk-ticket strong {
+  color: var(--ink);
+  font-size: calc(var(--k) * 32);
+  text-align: right;
+}
+
+.kiosk-countdown {
+  width: calc(var(--k) * 480);
+  height: calc(var(--k) * 10);
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line-soft);
+}
+
+.kiosk-countdown > div {
+  height: 100%;
+  background: var(--brand);
+  transition: width 1s linear;
+}
+
+/* Nhắc sắp tự về trang đầu */
+.kiosk-idle {
+  position: absolute;
+  left: calc(var(--k) * 56);
+  right: calc(var(--k) * 56);
+  bottom: calc(var(--k) * 200);
+  z-index: 10;
+  padding: calc(var(--k) * 28) calc(var(--k) * 32);
+  border-radius: calc(var(--k) * 24);
+  background: var(--ink);
+  color: #fff;
+  font-size: calc(var(--k) * 30);
+  font-weight: 600;
+  text-align: center;
+  box-shadow: 0 calc(var(--k) * 12) calc(var(--k) * 36) rgba(0, 0, 0, 0.3);
+}
+
+.kiosk-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.kiosk-message {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--k) * 24);
+  text-align: center;
+}

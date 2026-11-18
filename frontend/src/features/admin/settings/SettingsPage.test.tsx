@@ -1,0 +1,331 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SystemSettings } from '../../../api/settings'
+import { adminSession, baseRoutes, session } from '../../../test/fixtures'
+import { json, mockApi, problem } from '../../../test/mockApi'
+import { renderApp } from '../../../test/renderApp'
+
+const settings: SystemSettings = {
+  hospital: { parentAgency: 'SỞ Y TẾ [TỈNH/THÀNH PHỐ]', name: 'BỆNH VIỆN [TÊN BỆNH VIỆN]', place: '[Địa danh]', updatedAtUtc: null },
+  hisEnabled: false,
+  logo: null,
+  smartCaEnabled: false,
+  exportMaxRows: 100000,
+  retentionPolicy: 'Theo thời hạn lưu trữ hồ sơ bệnh án; hệ thống không tự động xóa phiếu.',
+  signatureFrame: null,
+}
+
+describe('Cấu hình hệ thống (màn hình 19)', () => {
+  it('hiển thị giá trị mẫu, lưu tên đơn vị và báo thành công', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'PUT /api/v1/settings/hospital': (call) => {
+        const body = call.body as { parentAgency: string; name: string; place: string }
+        return json({ ...settings, hospital: { ...body, updatedAtUtc: '2026-11-12T03:00:00Z' } })
+      },
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText(/Đang dùng giá trị mẫu/)).toBeInTheDocument()
+    expect(screen.getByText('Chưa cấu hình')).toBeInTheDocument()
+    expect(screen.getByText('100.000 phiếu')).toBeInTheDocument()
+
+    const name = screen.getByLabelText('Tên bệnh viện')
+    await user.clear(name)
+    await user.type(name, 'BỆNH VIỆN GIẢ LẬP')
+    await user.click(screen.getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText(/Cập nhật lần cuối/)).toBeInTheDocument()
+    const put = calls.find((c) => c.method === 'PUT')!
+    expect(put.body).toEqual({ parentAgency: 'SỞ Y TẾ [TỈNH/THÀNH PHỐ]', name: 'BỆNH VIỆN GIẢ LẬP', place: '[Địa danh]' })
+  })
+
+  it('API thông tin người bệnh đã kết nối thì không ghi "chưa kết nối" cho HIS', async () => {
+    mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/settings': { ...settings, patientInfoEnabled: true } })
+    renderApp('/quan-tri/cau-hinh')
+
+    const patientInfo = (await screen.findByText(/API thông tin người bệnh/)).closest('tr')!
+    expect(within(patientInfo).getByText('Đã kết nối')).toBeInTheDocument()
+    const directLookup = screen.getByText('Tra cứu HIS tự động khi quét CCCD').closest('tr')!
+    expect(within(directLookup).getByText('Không dùng – bấm Lấy thông tin')).toBeInTheDocument()
+    expect(screen.queryByText(/Chưa kết nối/)).not.toBeInTheDocument()
+  })
+
+  it('hiển thị lỗi theo trường từ máy chủ', async () => {
+    mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'PUT /api/v1/settings/hospital': () => problem(400, 'Dữ liệu không hợp lệ.', { code: 'validation', errors: { place: ['Vui lòng nhập địa danh.'] } }),
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('button', { name: 'Lưu' }))
+
+    await waitFor(() => expect(screen.getByText('Vui lòng nhập địa danh.')).toBeInTheDocument())
+  })
+
+  describe('logo bệnh viện', () => {
+    beforeEach(() => {
+      // jsdom không có URL.createObjectURL.
+      URL.createObjectURL = vi.fn(() => 'blob:logo-xem-truoc')
+      URL.revokeObjectURL = vi.fn()
+    })
+    afterEach(() => vi.restoreAllMocks())
+
+    const withLogo: SystemSettings = {
+      ...settings,
+      logo: { contentType: 'image/png', width: 512, height: 512, updatedAtUtc: '2026-11-14T03:00:00Z' },
+    }
+
+    it('tải logo PNG lên: gửi ảnh dạng data URL, hiện xem trước và thông tin ảnh', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': settings,
+        'PUT /api/v1/settings/logo': () => json(withLogo),
+        'GET /api/v1/settings/logo': () => new Response('PNG-gia-lap', { headers: { 'Content-Type': 'image/png' } }),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup()
+
+      expect(await screen.findByText('Chưa có logo')).toBeInTheDocument()
+      const file = new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'logo-gia-lap.png', { type: 'image/png' })
+      await user.upload(screen.getByLabelText('Chọn file logo'), file)
+
+      expect(await screen.findByRole('img', { name: 'Logo bệnh viện đang dùng' })).toHaveAttribute('src', 'blob:logo-xem-truoc')
+      expect(screen.getByText(/PNG 512 × 512 điểm ảnh/)).toBeInTheDocument()
+      const put = calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/settings/logo')!
+      expect((put.body as { image: string }).image).toMatch(/^data:image\/png;base64,/)
+    })
+
+    it('chặn file không phải PNG/JPG ngay trên trình duyệt; lỗi máy chủ hiện tại chỗ', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': settings,
+        'PUT /api/v1/settings/logo': () =>
+          problem(400, 'Dữ liệu không hợp lệ.', { code: 'validation', errors: { image: ['Kích thước logo phải từ 32 đến 4000 điểm ảnh mỗi chiều.'] } }),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup({ applyAccept: false })
+
+      await screen.findByText('Chưa có logo')
+      await user.upload(screen.getByLabelText('Chọn file logo'), new File(['GIF89a'], 'logo.gif', { type: 'image/gif' }))
+      expect(await screen.findByText('Logo phải là ảnh PNG hoặc JPG.')).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'PUT')).toBe(false)
+
+      await user.upload(screen.getByLabelText('Chọn file logo'), new File([new Uint8Array([1, 2, 3])], 'nho.png', { type: 'image/png' }))
+      expect(await screen.findByText('Kích thước logo phải từ 32 đến 4000 điểm ảnh mỗi chiều.')).toBeInTheDocument()
+    })
+
+    it('bỏ logo sau khi xác nhận', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': withLogo,
+        'GET /api/v1/settings/logo': () => new Response('PNG-gia-lap', { headers: { 'Content-Type': 'image/png' } }),
+        'DELETE /api/v1/settings/logo': () => json(settings),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: /Bỏ logo/ }))
+      await user.click(await screen.findByRole('button', { name: 'Bỏ logo' }))
+
+      expect(await screen.findByText('Chưa có logo')).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/settings/logo')).toBe(true)
+    })
+  })
+
+  describe('khung chữ ký', () => {
+    const frame = { contentType: 'image/png' as const, width: 1440, height: 1080, updatedAtUtc: '2026-11-15T09:00:00Z' }
+    const withFrame: SystemSettings = { ...settings, signatureFrame: frame }
+
+    it('tải ảnh khung lên: gửi data URL, hiện ảnh khung đang dùng kèm kích thước', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': settings,
+        'PUT /api/v1/settings/signature-frame': () => json(withFrame),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup()
+
+      expect(await screen.findByText(/Chưa có khung/)).toBeInTheDocument()
+      const file = new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])], 'khung-gia-lap.png', { type: 'image/png' })
+      await user.upload(screen.getByLabelText('Chọn file khung chữ ký'), file)
+
+      const image = await screen.findByRole('img', { name: 'Khung chữ ký đang dùng' })
+      expect(image.getAttribute('src')).toBe(`/api/v1/branding/signature-frame/image?v=${encodeURIComponent(frame.updatedAtUtc)}`)
+      expect(screen.getByText(/PNG 1440 × 1080 điểm ảnh/)).toBeInTheDocument()
+      const put = calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/settings/signature-frame')!
+      expect((put.body as { image: string }).image).toMatch(/^data:image\/png;base64,/)
+    })
+
+    it('chặn file không phải PNG/JPG; bỏ khung sau khi xác nhận', async () => {
+      const { calls } = mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': withFrame,
+        'DELETE /api/v1/settings/signature-frame': () => json(settings),
+      })
+      renderApp('/quan-tri/cau-hinh')
+      const user = userEvent.setup({ applyAccept: false })
+
+      await screen.findByRole('img', { name: 'Khung chữ ký đang dùng' })
+      await user.upload(screen.getByLabelText('Chọn file khung chữ ký'), new File(['GIF89a'], 'khung.gif', { type: 'image/gif' }))
+      expect(await screen.findByText('Ảnh khung chữ ký cần là ảnh PNG.')).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'PUT')).toBe(false)
+
+      await user.click(screen.getByRole('button', { name: /Bỏ khung/ }))
+      await user.click(await screen.findByRole('button', { name: 'Bỏ khung' }))
+      expect(await screen.findByText(/Chưa có khung/)).toBeInTheDocument()
+      expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/v1/settings/signature-frame')).toBe(true)
+    })
+
+    it('khung JPG tải lên từ bản trước: nhắc tải lại PNG để in được lên PDF', async () => {
+      mockApi({
+        ...baseRoutes(adminSession()),
+        'GET /api/v1/settings': { ...settings, signatureFrame: { ...frame, contentType: 'image/jpeg' } },
+      })
+      renderApp('/quan-tri/cau-hinh')
+
+      expect(await screen.findByText(/chưa in được lên PDF/)).toBeInTheDocument()
+    })
+  })
+
+  it('người không có quyền cấu hình thấy trang 403', async () => {
+    mockApi(baseRoutes(session()))
+    renderApp('/quan-tri/cau-hinh')
+
+    expect(await screen.findByText('Bạn không có quyền truy cập')).toBeInTheDocument()
+  })
+})
+
+describe('Kiosk người bệnh tự làm phiếu (quyết định 24)', () => {
+  const template = (id: string, code: string, name: string) => ({
+    id,
+    code,
+    name,
+    hospitalSignerRoleCode: 'RECEPTIONIST',
+    departmentId: null,
+    isActive: true,
+    publishedVersionNo: 1,
+    publishedAtUtc: '2026-11-01T00:00:00Z',
+    draftVersionNo: null,
+    updatedAtUtc: '2026-11-01T00:00:00Z',
+  })
+
+  it('chọn thêm mẫu theo thứ tự làm rồi lưu; báo mẫu đã chọn nhưng không còn dùng được', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'GET /api/v1/settings/kiosk': {
+        templates: [
+          { id: 't-bm02', code: 'QT-KNGT-BM02', name: 'Giấy đồng thuận BHYT', problems: [] },
+          { id: 't-cu', code: 'CU-01', name: 'Mẫu cũ', problems: ['Mẫu đang ngừng sử dụng.'] },
+        ],
+        updatedAtUtc: '2026-11-15T02:00:00Z',
+      },
+      'GET /api/v1/consent-templates': [
+        template('t-bm02', 'QT-KNGT-BM02', 'Giấy đồng thuận BHYT'),
+        template('t-ttnb', 'TTNB-NGOAITRU', 'Phiếu thông tin người bệnh'),
+      ],
+      'PUT /api/v1/settings/kiosk': (call) =>
+        json({
+          templates: (call.body as { templateIds: string[] }).templateIds.map((id) => ({ id, code: id, name: id, problems: [] })),
+          updatedAtUtc: '2026-11-15T03:00:00Z',
+        }),
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('CU-01: Mẫu đang ngừng sử dụng.')).toBeInTheDocument()
+    const save = screen.getByRole('button', { name: 'Lưu mẫu kiosk' })
+    expect(save).toBeDisabled()
+
+    await user.click(screen.getByRole('combobox', { name: 'Mẫu dùng trên kiosk' }))
+    await user.click(await screen.findByTitle('TTNB-NGOAITRU – Phiếu thông tin người bệnh'))
+    await user.click(save)
+
+    await waitFor(() => expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ templateIds: ['t-bm02', 't-cu', 't-ttnb'] }))
+  })
+})
+
+describe('Gắn phiếu với lượt tiếp nhận (quyết định 25)', () => {
+  const name = 'Bắt buộc chọn lượt tiếp nhận khi ký hoàn tất phiếu'
+  const routes = {
+    ...baseRoutes(adminSession()),
+    'GET /api/v1/settings': settings,
+    'GET /api/v1/settings/kiosk': { templates: [], updatedAtUtc: null },
+    'GET /api/v1/consent-templates': [],
+  }
+
+  it('quản trị bật/tắt ngay trên trang (HIS lỗi thì tắt để nhân viên hoàn tất tiếp)', async () => {
+    let enabled = false
+    const { calls } = mockApi({
+      ...routes,
+      'GET /api/v1/settings/encounters': () => ({ enabled, available: true, updatedAtUtc: null }),
+      'PUT /api/v1/settings/encounters': (call) => {
+        enabled = (call.body as { enabled: boolean }).enabled
+        return { enabled, available: true, updatedAtUtc: '2026-11-15T03:00:00Z' }
+      },
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    const toggle = await screen.findByRole('switch', { name })
+    expect(toggle).not.toBeChecked()
+    expect(screen.getByText(/HIS lỗi thì tắt/)).toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(await screen.findByText('Đã bật: ký hoàn tất phiếu phải chọn lượt tiếp nhận.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('switch', { name })).toBeChecked())
+    expect(screen.getByText(/Đổi lần cuối/)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('switch', { name }))
+    expect(await screen.findByText('Đã tắt: ký hoàn tất phiếu không cần chọn lượt tiếp nhận.')).toBeInTheDocument()
+    expect(calls.filter((c) => c.method === 'PUT' && c.path === '/api/v1/settings/encounters').map((c) => c.body)).toEqual([
+      { enabled: true },
+      { enabled: false },
+    ])
+  })
+
+  it('chưa cấu hình API thông tin người bệnh: công tắc bị khóa, có hướng dẫn', async () => {
+    mockApi({ ...routes, 'GET /api/v1/settings/encounters': { enabled: false, available: false, updatedAtUtc: null } })
+    renderApp('/quan-tri/cau-hinh')
+
+    expect(await screen.findByRole('switch', { name })).toBeDisabled()
+    expect(screen.getByText('Chưa cấu hình API thông tin người bệnh nên chưa bật được.')).toBeInTheDocument()
+  })
+})
+
+describe('Kế thừa phiếu lần trước (quyết định 27)', () => {
+  it('đặt số ngày rồi lưu; 0 là tắt', async () => {
+    let days = 0
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      'GET /api/v1/settings': settings,
+      'GET /api/v1/settings/form-inheritance': () => ({ days, updatedAtUtc: null }),
+      'PUT /api/v1/settings/form-inheritance': (call) => {
+        days = (call.body as { days: number }).days
+        return { days, updatedAtUtc: '2026-11-15T10:00:00Z' }
+      },
+    })
+    renderApp('/quan-tri/cau-hinh')
+    const user = userEvent.setup()
+
+    const input = await screen.findByRole('spinbutton', { name: 'Số ngày được kế thừa phiếu lần trước' })
+    expect(input).toHaveValue('0')
+    expect(screen.getByText('Chưa đặt: đang tắt.', { exact: false })).toBeInTheDocument()
+    const card = input.closest('.ant-card') as HTMLElement
+    expect(within(card).getByRole('button', { name: 'Lưu' })).toBeDisabled()
+
+    await user.clear(input)
+    await user.type(input, '30')
+    await user.click(within(card).getByRole('button', { name: 'Lưu' }))
+
+    expect(await screen.findByText('Đã lưu: phiếu mới được điền sẵn theo phiếu lần trước trong 30 ngày.')).toBeInTheDocument()
+    expect(calls.find((c) => c.method === 'PUT' && c.path === '/api/v1/settings/form-inheritance')!.body).toEqual({ days: 30 })
+    expect(screen.getByText(/Đổi lần cuối/)).toBeInTheDocument()
+  })
+})

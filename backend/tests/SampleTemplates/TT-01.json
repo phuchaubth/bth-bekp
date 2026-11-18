@@ -1,0 +1,111 @@
+{
+  "title": "Phiếu cung cấp thông tin\nvà cam kết chung",
+  "sections": [
+    {
+      "title": "II. Nội dung đã được cung cấp",
+      "blocks": [
+        {
+          "type": "multiChoice",
+          "key": "providedInformation",
+          "label": "Nội dung đã được cung cấp",
+          "required": true,
+          "requireAll": true,
+          "options": [
+            { "value": "rights", "label": "Quyền và nghĩa vụ của người bệnh theo quy định của pháp luật về khám bệnh, chữa bệnh." },
+            { "value": "rules", "label": "Nội quy bệnh viện, quy định về người nhà chăm sóc và giờ thăm." },
+            { "value": "process", "label": "Quy trình khám, chữa bệnh tại khoa/phòng và thời gian chờ dự kiến." },
+            { "value": "costs", "label": "Giá dịch vụ, phạm vi quỹ BHYT chi trả, cách thanh toán; quyền nhận hóa đơn, bảng kê chi phí." },
+            { "value": "privacy", "label": "Thông tin của người bệnh được giữ bí mật; quyền chỉ định người được nhận thông tin." },
+            { "value": "explanation", "label": "Quyền được giải thích về tình trạng bệnh, chẩn đoán, điều trị; quyền từ chối điều trị, xin ra viện." },
+            { "value": "safety", "label": "An toàn người bệnh: vòng đeo tay nhận dạng, phòng ngừa té ngã, phòng cháy chữa cháy." },
+            { "value": "feedback", "label": "Kênh góp ý: đường dây nóng [số đường dây nóng], hòm thư góp ý, khảo sát hài lòng." }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "III. Người được nhận thông tin về tình trạng bệnh",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "informationSharing",
+          "label": "Cung cấp thông tin về tình trạng bệnh",
+          "required": true,
+          "options": [
+            { "value": "share", "label": "Tôi đồng ý bệnh viện cung cấp thông tin về tình trạng bệnh của tôi cho những người dưới đây." },
+            { "value": "none", "label": "Tôi không đồng ý cung cấp cho người khác, trừ trường hợp pháp luật quy định." }
+          ]
+        },
+        {
+          "type": "repeater",
+          "key": "informationRecipients",
+          "label": "Người được nhận thông tin",
+          "required": true,
+          "minItems": 1,
+          "maxItems": 2,
+          "columns": [
+            { "key": "fullName", "label": "Họ và tên", "required": true, "maxLength": 200 },
+            { "key": "relationship", "label": "Quan hệ", "required": true, "maxLength": 50 },
+            {
+              "key": "phoneNumber",
+              "label": "Số điện thoại",
+              "required": true,
+              "maxLength": 15,
+              "pattern": "^(0|\\+84)[0-9]{9,10}$",
+              "patternMessage": "không hợp lệ (ví dụ 0912345678)."
+            }
+          ],
+          "visibleWhen": { "field": "informationSharing", "in": ["share"] }
+        }
+      ]
+    },
+    {
+      "title": "IV. Các lựa chọn đồng ý",
+      "blocks": [
+        {
+          "type": "choice",
+          "key": "consentRoutineCare",
+          "label": "Bệnh viện thực hiện xét nghiệm, chẩn đoán hình ảnh, thăm dò chức năng và chăm sóc thông thường cần cho việc khám, chữa bệnh. Thủ thuật, phẫu thuật, gây mê, truyền máu… có phiếu đồng ý riêng.",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "agree", "label": "Đồng ý" },
+            { "value": "disagree", "label": "Không đồng ý" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "consentContact",
+          "label": "Bệnh viện liên hệ qua số điện thoại đã cung cấp để báo kết quả, nhắc lịch tái khám, khảo sát mức độ hài lòng.",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "agree", "label": "Đồng ý" },
+            { "value": "disagree", "label": "Không đồng ý" }
+          ]
+        },
+        {
+          "type": "choice",
+          "key": "consentResearch",
+          "label": "Bệnh viện dùng thông tin của tôi, đã được ẩn danh, cho đào tạo, nghiên cứu khoa học và nâng cao chất lượng. Không đồng ý không ảnh hưởng quyền lợi khám, chữa bệnh.",
+          "required": true,
+          "layout": "inline",
+          "options": [
+            { "value": "agree", "label": "Đồng ý" },
+            { "value": "disagree", "label": "Không đồng ý" }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "V. Xác nhận",
+      "blocks": [
+        {
+          "type": "paragraph",
+          "text": "Tôi đã được nhân viên y tế cung cấp đầy đủ các thông tin trên. Tôi đã đọc, hoặc được đọc cho nghe, đã hiểu, và đã được trả lời các câu hỏi. Tôi đồng ý với các lựa chọn đã ghi trong phiếu này. Tôi có thể thay đổi lựa chọn bất cứ lúc nào bằng cách báo nhân viên y tế."
+        }
+      ]
+    }
+  ],
+  "signatures": { "hospital": "Nhân viên y tế cung cấp thông tin" }
+}

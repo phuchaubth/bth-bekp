@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PatientInfo.Api\PatientInfo.Api.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Khởi động SQL Server trong container có thử lại, dùng chung cho các project test cần CSDL. -->
+    <Compile Include="..\TestSupport\SqlServerContainers.cs" Link="TestSupport\SqlServerContainers.cs" />
+  </ItemGroup>
+</Project>
