@@ -224,12 +224,14 @@ public sealed class ExportsAndReportsApiTests(SqlServerFixture sql) : IAsyncLife
 
     /// <summary>
     /// "Chờ tôi xác nhận" theo thứ tự các bước xác nhận (quyết định 13/11/2026), với SQL Server thật và tài khoản demo: tiếp
-    /// đón (Khoa Khám bệnh) lập cho Khoa Nội phiếu nhận định BM10 (hướng dẫn → điều dưỡng → bác sĩ) và phiếu tư vấn (người tư
-    /// vấn → điều dưỡng khoa). Mỗi người chỉ thấy phiếu đang đến lượt mình, khớp với nút xác nhận trên phiếu.
+    /// đón (Khoa Khám bệnh) lập cho Khoa Nội phiếu nhận định BM10 (hướng dẫn → điều dưỡng → bác sĩ) và phiếu tư vấn theo phiên
+    /// bản có bước trung gian (người tư vấn → điều dưỡng khoa; bản mặc định từ quyết định 43 chỉ một người ký). Mỗi người chỉ
+    /// thấy phiếu đang đến lượt mình, khớp với nút xác nhận trên phiếu.
     /// </summary>
     [Fact]
     public async Task Dashboard_AwaitingMyConfirmation_FollowsTheConfirmationSteps()
     {
+        await _client.PublishPortalConsultationWithConsultantStepAsync(await LoginDemoAsync("mauphieu.demo"));
         var receptionist = await LoginDemoAsync("tiepdon.demo");
         // Điều dưỡng demo có thêm vai trò bác sĩ (ví dụ cấu hình nhầm): xác nhận bước điều dưỡng rồi thì không còn lượt xác nhận cuối.
         await AddRoleAsync(await _client.LoginAsAdministratorAsync(), "dieuduong.demo", "DOCTOR");

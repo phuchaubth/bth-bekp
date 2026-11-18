@@ -310,14 +310,16 @@ public sealed class ConfirmationStepTests
     }
 
     /// <summary>
-    /// Phiếu tư vấn cổng thông tin: người tư vấn (tiếp đón) xác nhận trước, điều dưỡng khoa xác nhận cuối. Điều dưỡng không
-    /// thấy phiếu khi bước người tư vấn còn chờ (mở phiếu cũng không có nút xác nhận).
+    /// Phiếu tư vấn cổng thông tin có bước trung gian: người tư vấn (tiếp đón) xác nhận trước, điều dưỡng khoa xác nhận cuối
+    /// (như trước quyết định 43; bản mặc định nay chỉ một người ký). Điều dưỡng không thấy phiếu khi bước người tư vấn còn chờ
+    /// (mở phiếu cũng không có nút xác nhận).
     /// </summary>
     [Fact]
     public async Task Dashboard_WardNurse_SeesThePortalConsultationOnlyAfterTheConsultant()
     {
         var s = ConsentScenario.Create();
-        var formId = await PatientSigned(s, s.AddHospitalTemplate("TUVAN-CONGTT"), SystemRoles.Receptionist, data: null);
+        var portal = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
+        var formId = await PatientSigned(s, portal, SystemRoles.Receptionist, data: null);
 
         s.LogInAs(s.Kkb, SystemRoles.Nurse);
         Assert.Empty(await AwaitingIdsMatchingConfirmButtons(s, formId));
@@ -350,7 +352,7 @@ public sealed class ConfirmationStepTests
     public async Task Dashboard_CountsEveryFormAtMyTurn_AndShowsTheOldestFive()
     {
         var s = ConsentScenario.Create();
-        var portal = s.AddHospitalTemplate("TUVAN-CONGTT");
+        var portal = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
         var assessment = s.AddHospitalTemplate("QT-KNGT-BM10");
         // Phiếu ký sớm nhất còn chờ người tư vấn: chưa đến lượt điều dưỡng.
         await PatientSigned(s, portal, SystemRoles.Receptionist, data: null);
