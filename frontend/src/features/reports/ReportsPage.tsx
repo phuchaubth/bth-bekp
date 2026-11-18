@@ -2,6 +2,7 @@ import { Alert, Card, Col, DatePicker, Flex, Progress, Row, Select, Statistic, T
 import dayjs, { type Dayjs } from 'dayjs'
 import { useState } from 'react'
 import { useDepartments } from '../../api/admin'
+import { accountDepartments } from '../../api/auth'
 import { useConsentTemplates } from '../../api/consentTemplates'
 import { useReportSummary, type GroupStats, type ReportQuery } from '../../api/reports'
 import { useAuth } from '../../auth/authContext'
@@ -16,8 +17,10 @@ const minutes = (value: number | null) => (value === null ? '—' : value >= 120
 
 /** Màn hình 14: thống kê phiếu theo khoa, mẫu, trạng thái, tỉ lệ từ chối, người ký, thời gian hoàn tất, theo ngày. */
 export function ReportsPage() {
-  const { hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth()
   const scopeAll = hasPermission(Permissions.ScopeAllDepartments)
+  // Quyết định 41: tài khoản thuộc nhiều khoa lọc được từng khoa của mình.
+  const myDepartments = accountDepartments(user)
   const [query, setQuery] = useState<ReportQuery>({})
   const report = useReportSummary(query)
   const templates = useConsentTemplates(true, hasPermission(Permissions.TemplatesRead))
@@ -73,10 +76,20 @@ export function ReportsPage() {
               style={{ width: 240 }}
             />
           )}
+          {!scopeAll && myDepartments.length > 1 && (
+            <Select
+              allowClear
+              placeholder="Khoa/phòng (các khoa của bạn)"
+              aria-label="Khoa/phòng"
+              options={myDepartments.map((d) => ({ value: d.id, label: d.name }))}
+              onChange={(departmentId?: string) => setQuery((q) => ({ ...q, departmentId }))}
+              style={{ width: 240 }}
+            />
+          )}
         </Flex>
         {!scopeAll && (
           <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-            Số liệu trong phạm vi khoa của bạn.
+            {myDepartments.length > 1 ? 'Số liệu trong phạm vi các khoa của bạn.' : 'Số liệu trong phạm vi khoa của bạn.'}
           </Typography.Text>
         )}
       </Card>

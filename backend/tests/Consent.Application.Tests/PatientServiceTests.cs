@@ -29,6 +29,41 @@ public sealed class PatientServiceTests
         Assert.Equal("BN85000001", result.Value.PatientCode);
     }
 
+    // Quyết định 41: người tạo hồ sơ thấy hồ sơ trong danh sách; danh sách lọc theo các khoa của người dùng.
+    [Fact]
+    public async Task Create_RecordsTheCurrentUserAsCreator()
+    {
+        var ctx = new AppTestContext();
+        ctx.CurrentUser.UserId = Guid.CreateVersion7();
+        var service = ctx.CreatePatientService();
+
+        var result = await service.CreateAsync(Request(), CancellationToken.None);
+
+        Assert.Equal(ctx.CurrentUser.UserId, Assert.Single(ctx.Store.Patients, p => p.Id == result.Value.Id).CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task Search_PassesTheScopeOfTheCurrentUser_ToTheRepository()
+    {
+        var ctx = new AppTestContext();
+        Guid userId = Guid.CreateVersion7(), primary = Guid.CreateVersion7(), other = Guid.CreateVersion7();
+        ctx.CurrentUser.UserId = userId;
+        ctx.CurrentUser.DepartmentId = primary;
+        ctx.CurrentUser.AdditionalDepartmentIds.Add(other);
+        var service = ctx.CreatePatientService();
+
+        await service.SearchAsync(new PatientQuery(" an "), CancellationToken.None);
+        var departmentScope = ctx.Store.LastPatientScope!;
+        ctx.CurrentUser.Permissions.Add(Consent.Domain.Authorization.Permissions.ScopeAllDepartments);
+        await service.SearchAsync(new PatientQuery(), CancellationToken.None);
+        var hospitalWide = ctx.Store.LastPatientScope!;
+
+        Assert.False(departmentScope.All);
+        Assert.Equal([primary, other], departmentScope.DepartmentIds);
+        Assert.Equal(userId, departmentScope.UserId);
+        Assert.True(hospitalWide.All);
+    }
+
     [Fact]
     public async Task Create_WhenHisIsNotConnected_SavesWithoutCallingHis_AndKeepsManualPatientCode()
     {

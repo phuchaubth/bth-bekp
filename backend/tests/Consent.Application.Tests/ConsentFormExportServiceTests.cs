@@ -169,6 +169,26 @@ public sealed class ConsentFormExportServiceTests
         Assert.Equal(ErrorType.Forbidden, other.Error.Type);
     }
 
+    // Quyết định 41: tài khoản thuộc nhiều khoa xuất được phiếu của từng khoa của mình.
+    [Fact]
+    public async Task UserWithSeveralDepartments_ExportsAnyOfThem()
+    {
+        var (s, _, _, tn01) = await Scenario();
+        var ngoai = s.Ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        s.LogInAs(ngoai, SystemRoles.DepartmentHead, Permissions.ExportsRun);
+        var service = s.Ctx.CreateConsentFormExportService();
+
+        var denied = await service.ExportAsync(Request(new ConsentFormExportFilter(DepartmentId: s.Noi.Id)), CancellationToken.None);
+        s.Ctx.CurrentUser.AdditionalDepartmentIds.Add(s.Noi.Id);
+        var allowed = await service.ExportAsync(Request(new ConsentFormExportFilter(DepartmentId: s.Noi.Id)), CancellationToken.None);
+
+        Assert.Equal("exports.department_forbidden", denied.Error!.Code);
+        Assert.True(allowed.IsSuccess, allowed.Error?.Message);
+        Assert.Equal(
+            [s.Ctx.Store.ConsentForms.Single(f => f.Id == tn01).FormNo],
+            s.Ctx.XlsxWriter.Rows.Select((_, i) => s.Ctx.XlsxWriter.Cell(i, "Số phiếu")));
+    }
+
     [Fact]
     public async Task Filters_ByStatusTemplateAndDate_AreApplied_AndAnEmptyResultIsRejected()
     {

@@ -1,5 +1,6 @@
+import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, Checkbox, Col, Flex, Menu, Row, Space, Spin, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Checkbox, Col, Flex, Menu, Popconfirm, Row, Space, Spin, Tag, Typography } from 'antd'
 import { useMemo, useState } from 'react'
 import {
   adminApi,
@@ -9,8 +10,10 @@ import {
   type PermissionDefinition,
   type Role,
 } from '../../../api/admin'
+import { Permissions } from '../../../auth/permissions'
 import { PageHeader } from '../../../components/PageHeader'
 import { errorMessage } from '../../../utils/formErrors'
+import { RoleFormModal } from './RoleFormModal'
 
 function groupPermissions(catalog: PermissionDefinition[]): [string, PermissionDefinition[]][] {
   const groups = new Map<string, PermissionDefinition[]>()
@@ -20,7 +23,13 @@ function groupPermissions(catalog: PermissionDefinition[]): [string, PermissionD
   return [...groups.entries()]
 }
 
-function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: PermissionDefinition[] }) {
+interface EditorProps {
+  role: Role
+  catalog: PermissionDefinition[]
+  onEdit: () => void
+}
+
+function RolePermissionsEditor({ role, catalog, onEdit }: EditorProps) {
   const [selected, setSelected] = useState(() => new Set(role.permissions))
   const queryClient = useQueryClient()
   const { message } = App.useApp()
@@ -39,6 +48,17 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
     onError: (e) => message.error(errorMessage(e)),
   })
 
+  // Quyết định 40: chỉ xóa được vai trò tự tạo; máy chủ chặn khi vai trò còn gán cho tài khoản hay đang dùng trong mẫu phiếu.
+  // Xóa xong, trang tự chọn vai trò đầu danh sách (vai trò đang chọn không còn trong danh sách).
+  const remove = useMutation({
+    mutationFn: () => adminApi.deleteRole(role.id),
+    onSuccess: async () => {
+      message.success(`Đã xóa vai trò "${role.name}".`)
+      await queryClient.invalidateQueries({ queryKey: adminKeys.roles })
+    },
+    onError: (e) => message.error(errorMessage(e)),
+  })
+
   const toggle = (code: string, checked: boolean) =>
     setSelected((current) => {
       const next = new Set(current)
@@ -52,7 +72,12 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
 
   return (
     <Card
-      title={role.name}
+      title={
+        <Space wrap>
+          {role.name}
+          <Tag color={role.isSystem ? undefined : 'blue'}>{role.isSystem ? 'Có sẵn' : 'Tự tạo'}</Tag>
+        </Space>
+      }
       extra={
         !locked && (
           <Space wrap>
@@ -67,6 +92,25 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
       }
     >
       {role.description && <Typography.Paragraph type="secondary">{role.description}</Typography.Paragraph>}
+      <Flex wrap gap={8} style={{ marginBottom: 16 }}>
+        <Button icon={<EditOutlined />} onClick={onEdit}>
+          Sửa tên, mô tả
+        </Button>
+        {!role.isSystem && (
+          <Popconfirm
+            title={`Xóa vai trò "${role.name}"?`}
+            description="Chỉ xóa được vai trò không còn gán cho tài khoản nào và không dùng trong cấu hình ký của mẫu phiếu."
+            okText="Xóa"
+            cancelText="Hủy"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => remove.mutate()}
+          >
+            <Button danger icon={<DeleteOutlined />} loading={remove.isPending}>
+              Xóa vai trò
+            </Button>
+          </Popconfirm>
+        )}
+      </Flex>
       {role.isAdministrator && (
         <Alert
           type="info"
@@ -89,20 +133,25 @@ function RolePermissionsEditor({ role, catalog }: { role: Role; catalog: Permiss
             {group}
           </Typography.Title>
           <Row gutter={[16, 8]}>
-            {permissions.map((permission) => (
-              <Col xs={24} sm={12} key={permission.code}>
-                <Checkbox
-                  checked={selected.has(permission.code)}
-                  disabled={locked}
-                  onChange={(e) => toggle(permission.code, e.target.checked)}
-                >
-                  {permission.name}{' '}
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    ({permission.code})
-                  </Typography.Text>
-                </Checkbox>
-              </Col>
-            ))}
+            {permissions.map((permission) => {
+              // Quyền dùng kiosk chỉ thuộc vai trò Kiosk (quyết định 24): vai trò khác không đánh dấu được, chỉ bỏ dấu được.
+              const kioskOnly = !locked && permission.code === Permissions.KioskUse
+              return (
+                <Col xs={24} sm={12} key={permission.code}>
+                  <Checkbox
+                    checked={selected.has(permission.code)}
+                    disabled={locked || (kioskOnly && !selected.has(permission.code))}
+                    onChange={(e) => toggle(permission.code, e.target.checked)}
+                  >
+                    {permission.name}{' '}
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      ({permission.code}
+                      {kioskOnly && ', chỉ dành cho vai trò Kiosk'})
+                    </Typography.Text>
+                  </Checkbox>
+                </Col>
+              )
+            })}
           </Row>
         </section>
       ))}
@@ -115,6 +164,7 @@ export function RolesPage() {
   const roles = useRoles()
   const catalog = usePermissionCatalog()
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [editing, setEditing] = useState<Role | 'new' | null>(null)
 
   if (roles.isPending || catalog.isPending) {
     return <Spin style={{ display: 'block', padding: 48 }} />
@@ -128,7 +178,14 @@ export function RolesPage() {
 
   return (
     <>
-      <PageHeader title="Vai trò và quyền" />
+      <PageHeader
+        title="Vai trò và quyền"
+        extra={
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditing('new')}>
+            Thêm vai trò
+          </Button>
+        }
+      />
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
           <Card title="Vai trò" styles={{ body: { padding: 8 } }}>
@@ -160,9 +217,27 @@ export function RolesPage() {
           </Card>
         </Col>
         <Col xs={24} lg={16}>
-          {selectedRole && <RolePermissionsEditor key={selectedRole.id} role={selectedRole} catalog={catalog.data} />}
+          {selectedRole && (
+            <RolePermissionsEditor
+              key={selectedRole.id}
+              role={selectedRole}
+              catalog={catalog.data}
+              onEdit={() => setEditing(selectedRole)}
+            />
+          )}
         </Col>
       </Row>
+      {editing && (
+        <RoleFormModal
+          role={editing === 'new' ? null : editing}
+          roles={roles.data}
+          onClose={() => setEditing(null)}
+          onSaved={(saved) => {
+            setSelectedId(saved.id)
+            setEditing(null)
+          }}
+        />
+      )}
     </>
   )
 }

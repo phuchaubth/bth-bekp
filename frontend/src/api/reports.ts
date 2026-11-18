@@ -263,6 +263,7 @@ export const auditActionLabels: Record<string, string> = {
 
 export const auditEntityLabels: Record<string, string> = {
   User: 'Người dùng',
+  UserDepartment: 'Khoa khác của người dùng',
   Role: 'Vai trò',
   Department: 'Khoa/phòng',
   Patient: 'Người bệnh',

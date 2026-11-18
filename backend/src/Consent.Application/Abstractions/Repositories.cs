@@ -32,6 +32,9 @@ public interface IUserRepository
     /// <summary>Số người dùng đang hoạt động có vai trò <paramref name="roleId"/>, không tính <paramref name="excludeUserId"/>.</summary>
     Task<int> CountActiveUsersInRoleAsync(Guid roleId, Guid? excludeUserId, CancellationToken cancellationToken);
 
+    /// <summary>Số người dùng có vai trò <paramref name="roleId"/>, kể cả tài khoản đã khóa.</summary>
+    Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken);
+
     Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken);
 
     void Add(User user);
@@ -44,6 +47,10 @@ public interface IRoleRepository
     Task<Role?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<Role>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
+
+    void Add(Role role);
+
+    void Remove(Role role);
 }
 
 public interface IDepartmentRepository
@@ -89,7 +96,7 @@ public interface IPatientRepository
     /// <summary>Tìm theo mã người bệnh (mã y tế trên HIS), so sánh chính xác.</summary>
     Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken);
 
-    Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken);
+    Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, PatientScope scope, CancellationToken cancellationToken);
 
     void Add(Patient patient);
 }

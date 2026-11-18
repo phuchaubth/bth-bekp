@@ -1,8 +1,9 @@
 import { FilePdfOutlined, SaveOutlined, SendOutlined } from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, App, Button, Card, DatePicker, Flex, Form, Popconfirm, Spin, Typography } from 'antd'
+import { Alert, App, Button, Card, DatePicker, Flex, Form, Popconfirm, Select, Spin, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useState } from 'react'
+import { accountDepartments } from '../../api/auth'
 import {
   nursingKeys,
   nursingReportsApi,
@@ -11,6 +12,7 @@ import {
   type NursingReport,
   type NursingReportFormDefinition,
 } from '../../api/nursingReports'
+import { useAuth } from '../../auth/authContext'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { HisEntryCard } from './HisEntryCard'
@@ -23,26 +25,43 @@ const DATE = 'YYYY-MM-DD'
  * Báo cáo công tác điều dưỡng hằng ngày của khoa (quyết định 31): điều dưỡng chọn ngày, nhập theo bản giấy, lưu nháp hoặc
  * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa. Khi HIS lỗi, khoa nhập số liệu HIS
  * thuộc nhiệm vụ của khoa ở thẻ riêng (quyết định 35); khoa không phải báo cáo nhưng được giao chỉ số thì chỉ thấy thẻ này.
+ * Tài khoản thuộc nhiều khoa (quyết định 41) chọn khoa; mặc định là khoa chính.
  */
 export function NursingReportPage() {
+  const { user } = useAuth()
+  const myDepartments = accountDepartments(user)
   const [date, setDate] = useState<Dayjs>(() => dayjs())
+  // Chưa chọn: khoa chính (máy chủ tự lấy theo tài khoản).
+  const [departmentId, setDepartmentId] = useState<string | undefined>(undefined)
   const reportDate = date.format(DATE)
   const definition = useNursingReportForm()
-  const report = useNursingReport(reportDate)
+  const report = useNursingReport(reportDate, departmentId)
 
   return (
     <>
       <PageHeader
         title="Báo cáo điều dưỡng của khoa"
         extra={
-          <DatePicker
-            value={date}
-            format="DD/MM/YYYY"
-            allowClear={false}
-            aria-label="Ngày báo cáo"
-            disabledDate={(d) => d.isAfter(dayjs(), 'day')}
-            onChange={(d) => d && setDate(d)}
-          />
+          <Flex gap={8} wrap>
+            {myDepartments.length > 1 && (
+              <Select
+                aria-label="Khoa"
+                value={departmentId ?? myDepartments[0].id}
+                options={myDepartments.map((d) => ({ value: d.id, label: d.name }))}
+                onChange={(id: string) => setDepartmentId(id)}
+                style={{ minWidth: 220 }}
+                popupMatchSelectWidth={false}
+              />
+            )}
+            <DatePicker
+              value={date}
+              format="DD/MM/YYYY"
+              allowClear={false}
+              aria-label="Ngày báo cáo"
+              disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+              onChange={(d) => d && setDate(d)}
+            />
+          </Flex>
         }
       />
       {definition.isError || report.isError ? (
@@ -58,21 +77,28 @@ export function NursingReportPage() {
             description="Khoa chỉ nhập các số liệu HIS được Phòng Điều dưỡng giao, khi HIS lỗi."
           />
           <HisEntryCard
-            key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+            key={`${report.data.departmentId}-${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
             report={report.data}
             entry={report.data.hisEntry}
             maxValue={definition.data.maxValue}
+            queryDepartmentId={departmentId}
           />
         </>
       ) : (
         <>
-          <ReportEditor key={`${reportDate}-${report.data.id ?? 'new'}`} definition={definition.data} report={report.data} />
+          <ReportEditor
+            key={`${report.data.departmentId}-${reportDate}-${report.data.id ?? 'new'}`}
+            definition={definition.data}
+            report={report.data}
+            queryDepartmentId={departmentId}
+          />
           {report.data.hisEntry && (
             <HisEntryCard
-              key={`${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+              key={`${report.data.departmentId}-${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
               report={report.data}
               entry={report.data.hisEntry}
               maxValue={definition.data.maxValue}
+              queryDepartmentId={departmentId}
             />
           )}
         </>
@@ -81,15 +107,28 @@ export function NursingReportPage() {
   )
 }
 
-function ReportEditor({ definition, report }: { definition: NursingReportFormDefinition; report: NursingReport }) {
+function ReportEditor({
+  definition,
+  report,
+  queryDepartmentId,
+}: {
+  definition: NursingReportFormDefinition
+  report: NursingReport
+  /** Khoa đã chọn ở đầu trang (khóa bộ nhớ đệm); chưa chọn là khoa chính. */
+  queryDepartmentId?: string
+}) {
   const [form] = Form.useForm<NursingReportFormValues>()
   const [pdfOpen, setPdfOpen] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   const save = useMutation({
-    mutationFn: (submit: boolean) => nursingReportsApi.save(toSaveInput(definition, form.getFieldsValue(true), report.reportDate, submit)),
+    mutationFn: (submit: boolean) =>
+      nursingReportsApi.save({
+        ...toSaveInput(definition, form.getFieldsValue(true), report.reportDate, submit),
+        departmentId: report.departmentId,
+      }),
     onSuccess: (saved, submit) => {
-      queryClient.setQueryData(nursingKeys.daily(report.reportDate), saved)
+      queryClient.setQueryData(nursingKeys.daily(report.reportDate, queryDepartmentId), saved)
       void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
       message.success(submit ? 'Đã gửi báo cáo cho Phòng Điều dưỡng.' : 'Đã lưu nháp.')
     },

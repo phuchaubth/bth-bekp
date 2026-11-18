@@ -129,6 +129,19 @@ describe('Tổng quan (màn hình 2)', () => {
     expect(screen.getByText('Bạn không có phiếu nháp hay chờ ký nào.')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /14 ngày gần nhất/ })).toBeInTheDocument()
   })
+
+  // Quyết định 41: tài khoản thuộc nhiều khoa.
+  it('tài khoản thuộc nhiều khoa: lời chào và đầu trang ghi các khoa, khoa chính đứng đầu', async () => {
+    const departments = [
+      { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+      { id: 'd-kkb', name: 'Khoa Khám bệnh' },
+    ]
+    mockApi({ ...baseRoutes(session({ departments })), 'GET /api/v1/dashboard': dashboard })
+    renderApp('/')
+
+    expect(await screen.findByText(/Xin chào Bác sĩ Demo – Khoa Nội tổng hợp, Khoa Khám bệnh\./)).toBeInTheDocument()
+    expect(screen.getByText('Khoa Nội tổng hợp và 1 khoa khác')).toHaveAttribute('title', 'Khoa Nội tổng hợp, Khoa Khám bệnh')
+  })
 })
 
 describe('Xuất dữ liệu (màn hình 13)', () => {
@@ -258,6 +271,61 @@ describe('Báo cáo thống kê (màn hình 14)', () => {
     expect(within(byDepartment).getByText('—')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /Số phiếu lập theo ngày/ })).toBeInTheDocument()
     expect(calls.filter((c) => c.path === '/api/v1/reports/summary')).toHaveLength(1)
+  })
+})
+
+describe('Báo cáo thống kê: tài khoản thuộc nhiều khoa (quyết định 41)', () => {
+  it('chọn được từng khoa của mình, không có khoa khác', async () => {
+    const departmentHead = (departments: { id: string; name: string }[]) =>
+      session({
+        id: 'u-truongkhoa',
+        userName: 'truongkhoa.demo',
+        fullName: 'Trưởng khoa Demo',
+        departments,
+        roles: [{ id: 'r-head', code: 'DEPARTMENT_HEAD', name: 'Trưởng khoa' }],
+        permissions: [Permissions.ReportsRead, Permissions.ConsentsRead],
+      })
+    const { calls } = mockApi({
+      ...baseRoutes(
+        departmentHead([
+          { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+          { id: 'd-kkb', name: 'Khoa Khám bệnh' },
+        ]),
+      ),
+      'GET /api/v1/reports/summary': report,
+      'GET /api/v1/departments': departments,
+    })
+    renderApp('/bao-cao')
+    const user = userEvent.setup()
+
+    expect(await screen.findByText('Số liệu trong phạm vi các khoa của bạn.')).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Khoa/phòng' }))
+    const kkb = await screen.findByTitle('Khoa Khám bệnh')
+    const dropdown = kkb.closest<HTMLElement>('.ant-select-dropdown')!
+    expect(within(dropdown).getByTitle('Khoa Nội tổng hợp')).toBeInTheDocument()
+    expect(within(dropdown).queryByTitle('Khoa Cũ')).not.toBeInTheDocument()
+    await user.click(kkb)
+
+    await waitFor(() =>
+      expect(calls.filter((c) => c.path === '/api/v1/reports/summary').at(-1)!.search).toContain('departmentId=d-kkb'),
+    )
+  })
+
+  it('tài khoản một khoa: không có ô chọn khoa', async () => {
+    mockApi({
+      ...baseRoutes(
+        session({
+          roles: [{ id: 'r-head', code: 'DEPARTMENT_HEAD', name: 'Trưởng khoa' }],
+          permissions: [Permissions.ReportsRead, Permissions.ConsentsRead],
+        }),
+      ),
+      'GET /api/v1/reports/summary': report,
+      'GET /api/v1/departments': departments,
+    })
+    renderApp('/bao-cao')
+
+    expect(await screen.findByText('Số liệu trong phạm vi khoa của bạn.')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Khoa/phòng' })).not.toBeInTheDocument()
   })
 })
 

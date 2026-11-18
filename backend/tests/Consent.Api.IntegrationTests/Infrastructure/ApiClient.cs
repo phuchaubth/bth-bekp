@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace Consent.Api.IntegrationTests.Infrastructure;
@@ -112,5 +113,29 @@ public static class ApiClient
             ? body.GetProperty("accessToken").GetString()
             : null;
         return new AuthCall(response.StatusCode, accessToken, string.IsNullOrEmpty(cookieValue) ? null : cookieValue, setCookie, body);
+    }
+
+    /// <summary>
+    /// Quản lý mẫu phiếu phát hành phiên bản mới của phiếu tư vấn (TUVAN-CONGTT) có thêm bước xác nhận trung gian "người tư
+    /// vấn" (tiếp đón) trước xác nhận cuối của điều dưỡng, như trước quyết định 43 (bản giấy QĐ-VHTT-BM02 nay chỉ một người tư
+    /// vấn ký), để thử luồng có bước trung gian qua API.
+    /// </summary>
+    public static async Task PublishPortalConsultationWithConsultantStepAsync(this HttpClient client, string manager)
+    {
+        var (_, list) = await client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates", manager);
+        var id = list.EnumerateArray().Single(t => t.GetProperty("code").GetString() == "TUVAN-CONGTT").GetProperty("id").GetString();
+        var (draftStatus, draft) = await client.SendJsonAsync(HttpMethod.Post, $"/api/v1/consent-templates/{id}/versions", manager);
+        Assert.True(draftStatus == HttpStatusCode.Created, draft.ToString());
+        var versionNo = draft.GetProperty("versionNo").GetInt32();
+        var definition = JsonNode.Parse(draft.GetProperty("definition").GetRawText())!.AsObject();
+        definition["signatures"]!["steps"] = new JsonArray(
+            new JsonObject { ["key"] = "consultant", ["roleCode"] = "RECEPTIONIST", ["label"] = "Người tư vấn (Consultant)" });
+        definition["signatures"]!["hospital"] = "Điều dưỡng khoa (Ward Nurse)";
+        var (saved, savedBody) = await client.SendJsonAsync(
+            HttpMethod.Put, $"/api/v1/consent-templates/{id}/versions/{versionNo}", manager, new { definition });
+        Assert.True(saved == HttpStatusCode.OK, savedBody.ToString());
+        var (published, publishedBody) = await client.SendJsonAsync(
+            HttpMethod.Post, $"/api/v1/consent-templates/{id}/versions/{versionNo}/publish", manager);
+        Assert.True(published == HttpStatusCode.OK, publishedBody.ToString());
     }
 }

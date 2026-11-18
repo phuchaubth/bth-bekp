@@ -50,6 +50,8 @@ public sealed class NursingReportServiceTests
         _ctx.CurrentUser.UserId = user.Id;
         _ctx.CurrentUser.UserName = user.UserName;
         _ctx.CurrentUser.DepartmentId = user.DepartmentId;
+        _ctx.CurrentUser.AdditionalDepartmentIds.Clear();
+        _ctx.CurrentUser.AdditionalDepartmentIds.AddRange(user.AdditionalDepartmentIds);
         _ctx.CurrentUser.Permissions.Clear();
         foreach (var permission in permissions)
         {
@@ -143,6 +145,32 @@ public sealed class NursingReportServiceTests
         ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
         var office = await service.SaveAsync(Request(departmentId: _ward.Id), CancellationToken.None);
         Assert.Equal(ErrorType.Forbidden, office.Error?.Type);
+    }
+
+    // Quyết định 41: điều dưỡng thuộc nhiều khoa lập báo cáo cho từng khoa của mình; mặc định là khoa chính.
+    [Fact]
+    public async Task Nurse_WithSeveralDepartments_ReportsForEachOfThem_DefaultingToThePrimary_ButNotForOthers()
+    {
+        var third = _ctx.AddDepartment("SAN", "Khoa Sản (giả lập)");
+        _ctx.Store.NursingDepartments.Add(NursingReportDepartment.Create(third.Id, 20, _ctx.Clock.UtcNow));
+        _nurse.SetDepartments(_ward.Id, [_surgery.Id]);
+        ActAs(_nurse, Permissions.NursingReportsSubmit);
+        var service = _ctx.CreateNursingReportService();
+
+        var primary = await service.GetAsync(null, Today, CancellationToken.None);
+        var other = await service.GetAsync(_surgery.Id, Today, CancellationToken.None);
+        var saved = await service.SaveAsync(Request(departmentId: _surgery.Id), CancellationToken.None);
+        var denied = await service.SaveAsync(Request(departmentId: third.Id), CancellationToken.None);
+        var deniedView = await service.GetAsync(third.Id, Today, CancellationToken.None);
+
+        Assert.Equal(_ward.Id, primary.Value.DepartmentId);
+        Assert.True(primary.Value.CanEdit);
+        Assert.Equal(_surgery.Id, other.Value.DepartmentId);
+        Assert.True(other.Value.CanEdit);
+        Assert.True(saved.IsSuccess, saved.Error?.Message);
+        Assert.Equal(_surgery.Id, saved.Value.DepartmentId);
+        Assert.Equal(ErrorType.Forbidden, denied.Error?.Type);
+        Assert.Equal(ErrorType.Forbidden, deniedView.Error?.Type);
     }
 
     [Fact]

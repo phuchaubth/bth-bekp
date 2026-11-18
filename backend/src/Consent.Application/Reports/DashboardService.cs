@@ -25,7 +25,7 @@ public sealed class DashboardService(
     {
         var scope = new ConsentFormSearch(
             Status: null, TemplateId: null, PatientId: null, DepartmentId: null, FromUtc: null, ToUtc: null, Keyword: null,
-            Page: 1, PageSize: 1, currentUser.HasPermission(Permissions.ScopeAllDepartments), currentUser.DepartmentId, currentUser.UserId);
+            Page: 1, PageSize: 1, currentUser.HasPermission(Permissions.ScopeAllDepartments), currentUser.DepartmentIds, currentUser.UserId);
         var today = ReportDates.Today(clock.UtcNow);
         var todayStart = ConsentFormService.StartOfDayUtc(today)!.Value;
         var tomorrow = todayStart.AddDays(1);

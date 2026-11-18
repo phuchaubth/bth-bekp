@@ -74,6 +74,35 @@ public sealed class SigningTokenTests
             service.CreateSigningToken(new SigningTokenClaims(Guid.NewGuid(), "tiepdon.demo", [], Guid.NewGuid())));
     }
 
+    // Quyết định 41: khoa chính ở claim "dept", mỗi khoa khác một claim "dept_other".
+    [Fact]
+    public async Task AccessToken_CarriesPrimaryDepartment_AndEachOtherDepartmentAsItsOwnClaim()
+    {
+        var service = new JwtTokenService(Microsoft.Extensions.Options.Options.Create(Options), new FixedClock());
+        Guid primary = Guid.NewGuid(), second = Guid.NewGuid(), third = Guid.NewGuid();
+
+        var several = await new JsonWebTokenHandler().ValidateTokenAsync(
+            service.CreateAccessToken(new AccessTokenClaims(
+                Guid.NewGuid(), "dieuduong.demo", "Điều dưỡng Demo", primary, ["NURSE"], ["consents.read"], false, [second, third])).Value,
+            ValidationFor(Options.Audience));
+        var one = await new JsonWebTokenHandler().ValidateTokenAsync(
+            service.CreateAccessToken(new AccessTokenClaims(
+                Guid.NewGuid(), "dieuduong.demo", "Điều dưỡng Demo", primary, ["NURSE"], ["consents.read"], false, [second])).Value,
+            ValidationFor(Options.Audience));
+        var none = await new JsonWebTokenHandler().ValidateTokenAsync(
+            service.CreateAccessToken(new AccessTokenClaims(
+                Guid.NewGuid(), "dieuduong.demo", "Điều dưỡng Demo", primary, ["NURSE"], ["consents.read"], false)).Value,
+            ValidationFor(Options.Audience));
+
+        Assert.True(several.IsValid);
+        Assert.Equal(primary.ToString(), several.ClaimsIdentity.FindFirst(AppClaimTypes.Department)?.Value);
+        Assert.Equal(
+            [second.ToString(), third.ToString()],
+            several.ClaimsIdentity.FindAll(AppClaimTypes.AdditionalDepartment).Select(c => c.Value));
+        Assert.Equal([second.ToString()], one.ClaimsIdentity.FindAll(AppClaimTypes.AdditionalDepartment).Select(c => c.Value));
+        Assert.Empty(none.ClaimsIdentity.FindAll(AppClaimTypes.AdditionalDepartment));
+    }
+
     [Fact]
     public async Task LoginToken_IsNotAcceptedAsASigningToken()
     {

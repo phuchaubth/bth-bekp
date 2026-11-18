@@ -375,6 +375,8 @@ public sealed class KioskServiceTests
         Assert.True(submitted.IsSuccess, submitted.Error?.Message);
         var patient = k.Store.Patients.Single(p => p.CitizenId == "079085000123");
         Assert.Equal("Nguyễn Văn An (giả lập)", patient.FullName);
+        // Quyết định 41: hồ sơ do tài khoản kiosk tạo.
+        Assert.Equal(k.S.Ctx.CurrentUser.UserId, patient.CreatedByUserId);
         Assert.Equal("0900000555", patient.PhoneNumber);
         Assert.Equal("Số 1 Đường Thử Nghiệm, Phường Mẫu", patient.PermanentAddress);
         Assert.Equal(new DateOnly(2021, 6, 15), patient.CitizenIdIssueDate);

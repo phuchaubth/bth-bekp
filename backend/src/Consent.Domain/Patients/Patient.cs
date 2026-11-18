@@ -82,14 +82,23 @@ public sealed class Patient : Entity, IAuditableEntity
 
     public DateTimeOffset CreatedAtUtc { get; private set; }
 
+    /// <summary>
+    /// Tài khoản tạo hồ sơ (nhân viên tiếp nhận hoặc máy kiosk); <c>null</c> với hồ sơ tạo trước quyết định 41. Người tạo luôn
+    /// thấy hồ sơ trong danh sách người bệnh, kể cả khi chưa có phiếu.
+    /// </summary>
+    public Guid? CreatedByUserId { get; private set; }
+
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
     public IReadOnlyCollection<LegalRepresentative> Representatives => _representatives;
 
-    public static Patient Create(PatientDetails details, DateTimeOffset nowUtc)
+    public static Patient Create(PatientDetails details, DateTimeOffset nowUtc, Guid? createdByUserId = null)
     {
         ArgumentNullException.ThrowIfNull(details);
-        var patient = new Patient(Guid.CreateVersion7(), RequireName(details.FullName), details.DateOfBirth, details.Gender, nowUtc);
+        var patient = new Patient(Guid.CreateVersion7(), RequireName(details.FullName), details.DateOfBirth, details.Gender, nowUtc)
+        {
+            CreatedByUserId = createdByUserId,
+        };
         patient.Apply(details, nowUtc);
         return patient;
     }

@@ -325,6 +325,7 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
         patientHint: '(Declarant (signature, full name))',
         centerDate: true,
         paperHints: true,
+        boldTitles: true,
       },
     }
     const { calls } = mockApi({
@@ -351,7 +352,110 @@ describe('Phiên bản mẫu phiếu (màn hình 12)', () => {
       patientHint: '(Declarant (signature, full name))',
       centerDate: true,
       paperHints: true,
+      boldTitles: true,
     })
+  })
+
+  it('cấu hình ký: xóa một bước thì bỏ ô ký cuối phần của bước đó, các ô ký cuối phần khác giữ nguyên', async () => {
+    const paragraph = (text: string) => ({ type: 'paragraph' as const, text })
+    const perPart: TemplateDefinition = {
+      title: 'Phiếu nhận định thử nghiệm',
+      sections: [
+        { title: 'Phần người bệnh', signer: 'patient', blocks: [paragraph('A')] },
+        { title: 'Phần nhân viên hướng dẫn', newPage: true, signer: 'screeningStaff', blocks: [paragraph('B')] },
+        { title: 'Phần điều dưỡng', newPage: true, signer: 'nurse', blocks: [paragraph('C')] },
+        { title: 'Phần bác sĩ', newPage: true, signer: 'hospital', blocks: [paragraph('D')] },
+      ],
+      signatures: {
+        decision: 'none',
+        steps: [
+          { key: 'screeningStaff', roleCode: 'RECEPTIONIST', label: 'Nhân viên hướng dẫn' },
+          { key: 'nurse', roleCode: 'NURSE', label: 'Điều dưỡng thực hiện' },
+        ],
+      },
+    }
+    const { calls } = mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'GET /api/v1/consent-templates/t-1/versions/2': () => ({ ...version(2, 'Draft'), definition: perPart }),
+      'PUT /api/v1/consent-templates/t-1/versions/2': (request) => ({
+        ...version(2, 'Draft'),
+        definition: (request.body as { definition: TemplateDefinition }).definition,
+      }),
+    })
+    renderApp('/mau-phieu/t-1')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: 'Cấu hình ký' }))
+    await user.click(screen.getByRole('button', { name: /Xóa bước 2/ }))
+    await user.click(screen.getByRole('button', { name: 'Lưu cấu hình ký' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'PUT')).toBe(true))
+    const saved = calls.find((c) => c.method === 'PUT')!.body as { definition: TemplateDefinition }
+    expect(saved.definition.sections.map((section) => section.signer)).toEqual(['patient', 'screeningStaff', undefined, 'hospital'])
+    expect(saved.definition.sections.map((section) => section.newPage)).toEqual([undefined, true, true, true])
+    expect(saved.definition.signatures?.steps?.map((step) => step.key)).toEqual(['screeningStaff'])
+  })
+
+  it('xem trước: câu hỏi in thành hàng bảng (row) hiện lựa chọn trên một dòng; tiêu đề mục in đậm; khung lưu ý có tiêu đề', async () => {
+    const paperLayout: TemplateDefinition = {
+      title: 'Phiếu thử nghiệm',
+      sections: [
+        {
+          title: 'Phần người bệnh tự khai',
+          banner: true,
+          blocks: [
+            { type: 'paragraph', text: 'A - Nguy cơ té ngã (Fall risk)', heading: true },
+            {
+              type: 'choice',
+              key: 'fallHistory',
+              label: '1. Té ngã 2 lần trở lên trong 3 tháng qua',
+              layout: 'row',
+              options: [
+                { value: 'yes', label: 'Có (Yes)' },
+                { value: 'no', label: 'Không (No)' },
+              ],
+            },
+            {
+              type: 'choice',
+              key: 'channel',
+              label: 'Kênh liên hệ',
+              options: [
+                { value: 'phone', label: 'Điện thoại' },
+                { value: 'email', label: 'Thư điện tử' },
+              ],
+            },
+            { type: 'paragraph', text: 'Đoạn văn thường' },
+            {
+              type: 'list',
+              layout: 'ordered',
+              box: true,
+              label: 'Xin Quý người bệnh và thân nhân lưu ý (Notice to Patients and Relatives)',
+              items: ['Lưu ý thứ nhất', 'Lưu ý thứ hai'],
+            },
+            { type: 'list', label: 'Nhãn không in', items: ['Mục thường'] },
+          ],
+        },
+      ],
+    }
+    mockApi({
+      ...baseRoutes(manager()),
+      ...templateServer(),
+      'GET /api/v1/consent-templates/t-1/versions/2': () => ({ ...version(2, 'Draft'), definition: paperLayout }),
+    })
+    renderApp('/mau-phieu/t-1')
+
+    const heading = await screen.findByText(/A - Nguy cơ té ngã/)
+    expect(heading.closest('strong')).not.toBeNull()
+    expect(screen.getByText('Đoạn văn thường').closest('strong')).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Có (Yes)' }).closest('.ant-flex')).not.toHaveClass('ant-flex-vertical')
+    expect(screen.getByRole('radio', { name: 'Điện thoại' }).closest('.ant-flex')).toHaveClass('ant-flex-vertical')
+    // Khung lưu ý: tiêu đề khung như PDF, các mục đánh số trong khung; danh sách thường không in nhãn (như PDF).
+    const notice = screen.getByText(/Xin Quý người bệnh và thân nhân lưu ý/).closest('.ant-card')!
+    expect(within(notice as HTMLElement).getAllByRole('listitem').map((item) => item.textContent)).toEqual(['Lưu ý thứ nhất', 'Lưu ý thứ hai'])
+    expect(within(notice as HTMLElement).getByRole('list').tagName).toBe('OL')
+    expect(screen.queryByText('Nhãn không in')).not.toBeInTheDocument()
+    expect(notice).not.toContainElement(screen.getByText('Mục thường'))
   })
 
   it('xem trước: BMI tự tính ngay khi nhập chiều cao và cân nặng; mức BMI tự chọn theo BMI', async () => {

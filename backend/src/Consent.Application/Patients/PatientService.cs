@@ -2,6 +2,7 @@ using System.Text.Json;
 using Consent.Application.Abstractions;
 using Consent.Application.Common;
 using Consent.Domain.Auditing;
+using Consent.Domain.Authorization;
 using Consent.Domain.Common;
 using Consent.Domain.Patients;
 using Consent.Shared;
@@ -33,7 +34,10 @@ public sealed class PatientService(
     {
         ArgumentNullException.ThrowIfNull(query);
         var (page, pageSize) = Paging.Normalize(query.Page, query.PageSize);
-        var result = await patients.SearchAsync(query with { Keyword = query.Keyword?.Trim(), Page = page, PageSize = pageSize }, cancellationToken)
+        var scope = new PatientScope(
+            currentUser.HasPermission(Permissions.ScopeAllDepartments), currentUser.DepartmentIds, currentUser.UserId);
+        var result = await patients
+            .SearchAsync(query with { Keyword = query.Keyword?.Trim(), Page = page, PageSize = pageSize }, scope, cancellationToken)
             .ConfigureAwait(false);
         var items = result.Items
             .Select(p => new PatientListItemDto(
@@ -97,7 +101,7 @@ public sealed class PatientService(
             return conflict;
         }
 
-        var patient = Patient.Create(request.ToDetails(), clock.UtcNow);
+        var patient = Patient.Create(request.ToDetails(), clock.UtcNow, currentUser.UserId);
         await ApplyHisVerificationAsync(patient, cancellationToken).ConfigureAwait(false);
         patients.Add(patient);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

@@ -2,6 +2,7 @@ import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
+import { accountDepartments } from '../../api/auth'
 import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
 import { BRAND } from '../../app/theme'
 import { useAuth } from '../../auth/authContext'
@@ -41,6 +42,7 @@ export function AppLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user, hasPermission, logout } = useAuth()
+  const departmentNames = accountDepartments(user).map((d) => d.name)
 
   const visibleItems = useMemo(() => filterNavItems(navItems, hasPermission), [hasPermission])
   // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /phieu-dong-thuan/... → Phiếu đồng thuận).
@@ -70,8 +72,12 @@ export function AppLayout() {
           {APP_TITLE}
         </Typography.Text>
         {isDesktop && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {user?.departmentName ?? 'Toàn viện'}
+          <Typography.Text type="secondary" style={{ fontSize: 12 }} title={departmentNames.join(', ') || undefined}>
+            {departmentNames.length === 0
+              ? 'Toàn viện'
+              : departmentNames.length === 1
+                ? departmentNames[0]
+                : `${departmentNames[0]} và ${departmentNames.length - 1} khoa khác`}
           </Typography.Text>
         )}
       </span>

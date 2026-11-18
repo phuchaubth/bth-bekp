@@ -33,6 +33,15 @@ public sealed class DepartmentsController(DepartmentService departments) : Contr
     public async Task<IActionResult> Update(Guid id, DepartmentRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await departments.UpdateAsync(id, request, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>
+    /// Lấy danh mục khoa/phòng từ HIS qua API thông tin người bệnh (quyết định 42). Chưa kết nối API, API chưa cấu hình câu
+    /// truy vấn, HIS lỗi hoặc trả về rỗng thì 422 và danh mục giữ nguyên.
+    /// </summary>
+    [HttpPost("sync-his")]
+    [HasPermission(Permissions.DepartmentsManage)]
+    public async Task<IActionResult> SyncFromHis(CancellationToken cancellationToken) =>
+        this.ToActionResult(await departments.SyncFromHisAsync(cancellationToken).ConfigureAwait(false));
+
     /// <summary>Xóa khoa chưa có người dùng; khoa đang được dùng thì trả 422 (hãy ngừng sử dụng thay vì xóa).</summary>
     [HttpDelete("{id:guid}")]
     [HasPermission(Permissions.DepartmentsManage)]

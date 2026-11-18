@@ -1,5 +1,5 @@
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Checkbox, DatePicker, Flex, Form, Input, Radio, Tag, Typography, type FormInstance } from 'antd'
+import { Button, Card, Checkbox, DatePicker, Flex, Form, Input, Radio, Tag, Typography, type FormInstance } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useEffect, useMemo } from 'react'
 import type { FormData, ScoreResult } from '../../api/consentForms'
@@ -59,21 +59,29 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
             const key = block.key ?? `${s}-${b}`
             if (block.type === 'paragraph') {
               return (
-                <Typography.Paragraph key={key} style={{ textAlign: 'justify' }}>
+                <Typography.Paragraph key={key} style={{ textAlign: 'justify' }} strong={block.heading}>
                   <Bilingual text={block.text} />
                 </Typography.Paragraph>
               )
             }
             if (block.type === 'list') {
               const ListTag = block.layout === 'ordered' ? 'ol' : 'ul'
-              return (
-                <ListTag key={key} style={{ paddingLeft: 22, marginTop: 0 }}>
+              const list = (
+                <ListTag key={key} style={{ paddingLeft: 22, marginTop: 0, marginBottom: block.box ? 0 : undefined }}>
                   {block.items?.map((item) => (
                     <li key={item} style={{ marginBottom: 4 }}>
                       <Bilingual text={item} />
                     </li>
                   ))}
                 </ListTag>
+              )
+              // Khung lưu ý (`box`, như bản giấy QĐ-VHTT-BM02): tiêu đề khung là nhãn của danh sách, như trên PDF.
+              return block.box ? (
+                <Card key={key} size="small" title={block.label && <Bilingual text={block.label} />} style={{ marginBottom: 16 }}>
+                  {list}
+                </Card>
+              ) : (
+                list
               )
             }
             if (block.type === 'score') {
@@ -99,6 +107,9 @@ export function DynamicForm({ definition, form, initialValues, disabled = false,
     </Form>
   )
 }
+
+/** Lựa chọn trên một dòng: `inline`, và `row` (PDF in thành hàng của bảng kẻ ô). */
+const onOneLine = (block: TemplateBlock) => block.layout === 'inline' || block.layout === 'row'
 
 function Field({ block, error, derivedFrom }: { block: TemplateBlock; error?: string[]; derivedFrom?: string }) {
   const common = {
@@ -142,7 +153,7 @@ function Field({ block, error, derivedFrom }: { block: TemplateBlock; error?: st
       return (
         <Form.Item {...common}>
           <Radio.Group disabled={derivedFrom ? true : undefined}>
-            <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
+            <Flex vertical={!onOneLine(block)} wrap gap={onOneLine(block) ? 16 : 4}>
               {block.options?.map((option) => (
                 <Radio key={option.value} value={option.value}>
                   {optionLabel(option)}
@@ -156,7 +167,7 @@ function Field({ block, error, derivedFrom }: { block: TemplateBlock; error?: st
       return (
         <Form.Item {...common}>
           <Checkbox.Group>
-            <Flex vertical={block.layout !== 'inline'} wrap gap={block.layout === 'inline' ? 16 : 4}>
+            <Flex vertical={!onOneLine(block)} wrap gap={onOneLine(block) ? 16 : 4}>
               {block.options?.map((option) => (
                 <Checkbox key={option.value} value={option.value}>
                   <Bilingual text={option.label} />

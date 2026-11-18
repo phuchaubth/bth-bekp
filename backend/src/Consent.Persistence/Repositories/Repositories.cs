@@ -13,16 +13,23 @@ namespace Consent.Persistence.Repositories;
 internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
 {
     public Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
-        db.Users.Include(u => u.Roles).FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
+        db.Users.Include(u => u.Roles).Include(u => u.AdditionalDepartments)
+            .AsSingleQuery()
+            .FirstOrDefaultAsync(u => u.Id == id, cancellationToken);
 
     public Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken) =>
-        db.Users.Include(u => u.Roles).FirstOrDefaultAsync(u => u.UserName == normalizedUserName, cancellationToken);
+        db.Users.Include(u => u.Roles).Include(u => u.AdditionalDepartments)
+            .AsSingleQuery()
+            .FirstOrDefaultAsync(u => u.UserName == normalizedUserName, cancellationToken);
 
     public Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken) =>
         db.Users.AnyAsync(u => u.UserName == normalizedUserName, cancellationToken);
 
+    /// <summary>Có người dùng thuộc khoa (khoa chính hoặc khoa/phòng khác).</summary>
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
-        db.Users.AnyAsync(u => u.DepartmentId == departmentId, cancellationToken);
+        db.Users.AnyAsync(
+            u => u.DepartmentId == departmentId || u.AdditionalDepartments.Any(d => d.DepartmentId == departmentId),
+            cancellationToken);
 
     public Task<bool> AnyAsync(CancellationToken cancellationToken) => db.Users.AnyAsync(cancellationToken);
 
@@ -30,6 +37,9 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
         db.Users.CountAsync(
             u => u.IsActive && u.Id != excludeUserId && u.Roles.Any(r => r.RoleId == roleId),
             cancellationToken);
+
+    public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
+        db.Users.CountAsync(u => u.Roles.Any(r => r.RoleId == roleId), cancellationToken);
 
     public async Task<PagedResult<UserListItemDto>> SearchAsync(
         UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
@@ -46,7 +56,7 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
 
         if (query.DepartmentId is { } departmentId)
         {
-            users = users.Where(u => u.DepartmentId == departmentId);
+            users = users.Where(u => u.DepartmentId == departmentId || u.AdditionalDepartments.Any(d => d.DepartmentId == departmentId));
         }
 
         if (query.IsActive is { } isActive)
@@ -67,6 +77,11 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
                 u.Title,
                 u.DepartmentId,
                 DepartmentName = db.Departments.Where(d => d.Id == u.DepartmentId).Select(d => d.Name).FirstOrDefault(),
+                AdditionalDepartmentNames = db.Departments
+                    .Where(d => u.AdditionalDepartments.Any(ud => ud.DepartmentId == d.Id))
+                    .OrderBy(d => d.Name)
+                    .Select(d => d.Name)
+                    .ToList(),
                 RoleNames = db.Roles
                     .Where(r => u.Roles.Any(ur => ur.RoleId == r.Id))
                     .OrderBy(r => r.Name)
@@ -91,7 +106,8 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
             r.IsActive,
             r.LockoutEndUtc > nowUtc,
             r.LastLoginAtUtc,
-            r.KioskLookupLockedUntilUtc > nowUtc));
+            r.KioskLookupLockedUntilUtc > nowUtc,
+            r.AdditionalDepartmentNames));
         return new PagedResult<UserListItemDto>(items, query.Page, query.PageSize, total);
     }
 
@@ -119,6 +135,10 @@ internal sealed class RoleRepository(ConsentDbContext db) : IRoleRepository
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
     }
+
+    public void Add(Role role) => db.Roles.Add(role);
+
+    public void Remove(Role role) => db.Roles.Remove(role);
 }
 
 internal sealed class DepartmentRepository(ConsentDbContext db) : IDepartmentRepository

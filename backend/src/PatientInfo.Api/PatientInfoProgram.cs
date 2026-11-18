@@ -39,6 +39,8 @@ public static partial class PatientInfoProgram
                 "PatientInfo:EncounterQuery (nếu đặt) phải là một câu SELECT dùng @From, @To và @PatientCode/@CitizenId, không có dấu ';' giữa câu.")
             .Validate(o => o.HasValidDailyStatisticsQuery,
                 "PatientInfo:DailyStatisticsQuery (nếu đặt) phải là một câu SELECT dùng @From và @To, không có dấu ';' giữa câu.")
+            .Validate(o => o.HasValidDepartmentQuery,
+                "PatientInfo:DepartmentQuery (nếu đặt) phải là một câu SELECT (hoặc WITH … SELECT), không có dấu ';' giữa câu.")
             .Validate(o => o.QueryTimeoutSeconds is >= 1 and <= 60, "PatientInfo:QueryTimeoutSeconds phải trong khoảng 1–60 giây.")
             .Validate(o => o.HasUnambiguousGenderValues,
                 "Giá trị giới tính bị trùng giữa Nam và Nữ: đặt cả PatientInfo__MaleValues__0… và PatientInfo__FemaleValues__0… (danh sách đặt thay hẳn mặc định).")
@@ -46,6 +48,7 @@ public static partial class PatientInfoProgram
         builder.Services.AddSingleton<PatientRepository>();
         builder.Services.AddSingleton<EncounterRepository>();
         builder.Services.AddSingleton<DailyStatisticsRepository>();
+        builder.Services.AddSingleton<DepartmentRepository>();
         builder.Services.ConfigureHttpJsonOptions(o =>
         {
             o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -63,6 +66,7 @@ public static partial class PatientInfoProgram
         app.MapPost("/api/v1/patients/lookup", LookupAsync);
         app.MapPost("/api/v1/encounters/search", SearchEncountersAsync);
         app.MapPost("/api/v1/daily-statistics", GetDailyStatisticsAsync);
+        app.MapGet("/api/v1/departments", GetDepartmentsAsync);
         return app;
     }
 
@@ -183,6 +187,46 @@ public static partial class PatientInfoProgram
         catch (SqlException ex)
         {
             logger.LogWarning("Lỗi CSDL khi lấy số liệu trong ngày (mã lỗi SQL {Number}).", ex.Number);
+            return Results.Problem("Không truy vấn được CSDL bệnh viện.", statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    }
+
+    /// <summary>Số khoa/phòng nhiều nhất trả về một lần.</summary>
+    public const int MaxDepartments = 2000;
+
+    /// <summary>
+    /// Danh mục khoa/phòng của HIS (quyết định 42). Kết quả dài quá giới hạn thì báo lỗi, không cắt bớt: phần mềm phiếu
+    /// coi khoa/phòng không có trong danh mục là ngừng sử dụng.
+    /// </summary>
+    internal static async Task<IResult> GetDepartmentsAsync(
+        DepartmentRepository repository,
+        IOptions<PatientInfoOptions> options,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        if (!options.Value.HasDepartmentQuery)
+        {
+            return Results.Problem("Chưa cấu hình truy vấn danh mục khoa/phòng (PatientInfo__DepartmentQuery).", statusCode: StatusCodes.Status501NotImplemented);
+        }
+
+        var logger = loggerFactory.CreateLogger("PatientInfo.Departments");
+        try
+        {
+            var items = await repository.ListAsync(MaxDepartments + 1, cancellationToken).ConfigureAwait(false);
+            if (items.Count > MaxDepartments)
+            {
+                logger.LogWarning("Danh mục khoa/phòng có hơn {Max} dòng.", MaxDepartments);
+                return Results.Problem(
+                    $"Câu truy vấn danh mục khoa/phòng trả về hơn {MaxDepartments} dòng: chỉ lấy khoa/phòng đang hoạt động.",
+                    statusCode: StatusCodes.Status422UnprocessableEntity);
+            }
+
+            logger.LogInformation("Lấy danh mục khoa/phòng: {Count} dòng", items.Count);
+            return Results.Ok(new { items });
+        }
+        catch (SqlException ex)
+        {
+            logger.LogWarning("Lỗi CSDL khi lấy danh mục khoa/phòng (mã lỗi SQL {Number}).", ex.Number);
             return Results.Problem("Không truy vấn được CSDL bệnh viện.", statusCode: StatusCodes.Status503ServiceUnavailable);
         }
     }

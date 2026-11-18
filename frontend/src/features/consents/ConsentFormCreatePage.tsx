@@ -13,7 +13,7 @@ import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDate } from '../../utils/format'
-import { genderLabels } from '../patients/labels'
+import { departmentPatientsHint, genderLabels } from '../patients/labels'
 import { QuickPatientModal } from '../patients/QuickPatientModal'
 import { SourceLookup } from '../patients/SourceLookup'
 
@@ -278,7 +278,11 @@ function PatientPicker({ onPick }: { onPick: (id: string) => void }) {
         dataSource={results.data?.items}
         pagination={false}
         scroll={{ x: 640 }}
-        locale={{ emptyText: 'Không có người bệnh phù hợp.' }}
+        locale={{
+          emptyText: hasPermission(Permissions.ScopeAllDepartments)
+            ? 'Không có người bệnh phù hợp.'
+            : `Không có người bệnh phù hợp. ${departmentPatientsHint}`,
+        }}
         columns={[
           { title: 'Họ và tên', dataIndex: 'fullName' },
           { title: 'Ngày sinh', dataIndex: 'dateOfBirth', width: 110, render: (value: string) => formatDate(value) },

@@ -30,6 +30,11 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Navigation(u => u.Roles).HasField("_roles").UsePropertyAccessMode(PropertyAccessMode.Field);
         builder.Ignore(u => u.RoleIds);
 
+        builder.HasMany(u => u.AdditionalDepartments).WithOne().HasForeignKey(d => d.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.Navigation(u => u.AdditionalDepartments).HasField("_additionalDepartments").UsePropertyAccessMode(PropertyAccessMode.Field);
+        builder.Ignore(u => u.AdditionalDepartmentIds);
+        builder.Ignore(u => u.DepartmentIds);
+
         builder.HasRowVersion();
     }
 
@@ -41,6 +46,17 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
                 (a, b) => (a == null && b == null) || (a != null && b != null && a.SequenceEqual(b)),
                 v => v == null ? 0 : v.Length,
                 v => v));
+}
+
+/// <summary>Khoa/phòng khác của người dùng (quyết định 41). Khoa đang gán cho người dùng thì không xóa được (chỉ ngừng sử dụng).</summary>
+internal sealed class UserDepartmentConfiguration : IEntityTypeConfiguration<UserDepartment>
+{
+    public void Configure(EntityTypeBuilder<UserDepartment> builder)
+    {
+        builder.ToTable("UserDepartments");
+        builder.HasKey(d => new { d.UserId, d.DepartmentId });
+        builder.HasOne<Department>().WithMany().HasForeignKey(d => d.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+    }
 }
 
 internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>

@@ -62,8 +62,8 @@ public sealed class UserAdminService(
         }
 
         var user = User.Create(userName, request.FullName, clock.UtcNow);
-        user.UpdateProfile(
-            request.FullName, request.Email, request.PhoneNumber, request.Title, request.DepartmentId, request.SmartCaUserId);
+        user.UpdateProfile(request.FullName, request.Email, request.PhoneNumber, request.Title, request.SmartCaUserId);
+        user.SetDepartments(request.DepartmentId, request.AdditionalDepartmentIds ?? []);
         user.SetRoles(request.RoleIds);
         user.SetPassword(passwordHasher.Hash(request.Password), mustChangePassword: true);
         users.Add(user);
@@ -99,8 +99,8 @@ public sealed class UserAdminService(
             return Result<UserDetailDto>.Failure(LastAdministrator);
         }
 
-        user.UpdateProfile(
-            request.FullName, request.Email, request.PhoneNumber, request.Title, request.DepartmentId, request.SmartCaUserId);
+        user.UpdateProfile(request.FullName, request.Email, request.PhoneNumber, request.Title, request.SmartCaUserId);
+        user.SetDepartments(request.DepartmentId, request.AdditionalDepartmentIds ?? []);
         user.SetRoles(request.RoleIds);
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -191,6 +191,24 @@ public sealed class UserAdminService(
             }
         }
 
+        // Quyết định 41: khoa/phòng khác (ngoài khoa chính); khoa trùng khoa chính thì bỏ qua.
+        var additional = (request.AdditionalDepartmentIds ?? []).Where(id => id != request.DepartmentId).Distinct().ToArray();
+        if (additional.Length > 0)
+        {
+            if (request.DepartmentId is null)
+            {
+                return Error.ValidationField(
+                    "additionalDepartmentIds", "Chọn khoa/phòng chính trước (khoa mặc định khi lập phiếu, báo cáo) rồi mới thêm khoa khác.");
+            }
+
+            var active = (await departments.ListAsync(includeInactive: false, cancellationToken).ConfigureAwait(false))
+                .Select(d => d.Id).ToHashSet();
+            if (!additional.All(active.Contains))
+            {
+                return Error.ValidationField("additionalDepartmentIds", "Có khoa/phòng không tồn tại hoặc đã ngừng sử dụng.");
+            }
+        }
+
         var requestedRoleIds = request.RoleIds.Distinct().ToArray();
         var found = await roles.GetByIdsAsync(requestedRoleIds, cancellationToken).ConfigureAwait(false);
         if (found.Count != requestedRoleIds.Length)
@@ -211,6 +229,12 @@ public sealed class UserAdminService(
             {
                 return Error.ValidationField(
                     "departmentId", "Tài khoản kiosk phải thuộc một khoa: phiếu người bệnh làm trên kiosk thuộc khoa này.");
+            }
+
+            if (additional.Length > 0)
+            {
+                return Error.ValidationField(
+                    "additionalDepartmentIds", "Tài khoản kiosk chỉ thuộc một khoa: phiếu người bệnh làm trên kiosk thuộc khoa này.");
             }
         }
 
@@ -243,11 +267,11 @@ public sealed class UserAdminService(
     private async Task<UserDetailDto> ToDetailAsync(User user, CancellationToken cancellationToken)
     {
         var userRoles = await roles.GetByIdsAsync(user.RoleIds, cancellationToken).ConfigureAwait(false);
-        string? departmentName = null;
-        if (user.DepartmentId is { } departmentId)
-        {
-            departmentName = (await departments.GetByIdAsync(departmentId, cancellationToken).ConfigureAwait(false))?.Name;
-        }
+        var departmentById = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
+            .ToDictionary(d => d.Id);
+        var departmentName = user.DepartmentId is { } departmentId && departmentById.TryGetValue(departmentId, out var primary)
+            ? primary.Name
+            : null;
 
         var now = clock.UtcNow;
         return new UserDetailDto(
@@ -266,6 +290,10 @@ public sealed class UserAdminService(
             user.LockoutEndUtc,
             user.MustChangePassword,
             user.LastLoginAtUtc,
-            user.CreatedAtUtc);
+            user.CreatedAtUtc,
+            [.. user.AdditionalDepartmentIds
+                .Where(departmentById.ContainsKey)
+                .Select(id => new DepartmentRefDto(id, departmentById[id].Name))
+                .OrderBy(d => d.Name, VietnameseComparer.Instance)]);
     }
 }

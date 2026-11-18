@@ -20,6 +20,27 @@ public sealed class RolesController(RoleService roles) : ControllerBase
     public async Task<IReadOnlyList<RoleDto>> List(CancellationToken cancellationToken) =>
         await roles.ListAsync(cancellationToken).ConfigureAwait(false);
 
+    /// <summary>Thêm vai trò (quyết định 40): tên, mô tả, quyền. Mã vai trò do máy chủ sinh từ tên (tiền tố VT_).</summary>
+    [HttpPost("roles")]
+    [HasPermission(Domain.Authorization.Permissions.RolesManage)]
+    public async Task<IActionResult> Create(CreateRoleRequest request, CancellationToken cancellationToken)
+    {
+        var result = await roles.CreateAsync(request, cancellationToken).ConfigureAwait(false);
+        return this.ToActionResult(result, dto => Created($"/api/v1/roles/{dto.Id}", dto));
+    }
+
+    /// <summary>Đổi tên, mô tả của vai trò (mã giữ nguyên).</summary>
+    [HttpPut("roles/{id:guid}")]
+    [HasPermission(Domain.Authorization.Permissions.RolesManage)]
+    public async Task<IActionResult> Update(Guid id, UpdateRoleRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await roles.UpdateAsync(id, request, cancellationToken).ConfigureAwait(false));
+
+    /// <summary>Xóa vai trò do quản trị tạo, khi không còn tài khoản nào có vai trò và không mẫu phiếu nào dùng vai trò.</summary>
+    [HttpDelete("roles/{id:guid}")]
+    [HasPermission(Domain.Authorization.Permissions.RolesManage)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
+        this.ToActionResult(await roles.DeleteAsync(id, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Cập nhật toàn bộ quyền của một vai trò (không áp dụng cho vai trò Quản trị hệ thống).</summary>
     [HttpPut("roles/{id:guid}/permissions")]
     [HasPermission(Domain.Authorization.Permissions.RolesManage)]

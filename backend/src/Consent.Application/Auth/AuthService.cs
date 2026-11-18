@@ -169,8 +169,8 @@ public sealed class AuthService(
         }
 
         var userRoles = await roles.GetByIdsAsync(user.RoleIds, cancellationToken).ConfigureAwait(false);
-        var departmentName = await GetDepartmentNameAsync(user.DepartmentId, cancellationToken).ConfigureAwait(false);
-        return BuildCurrentUser(user, userRoles, departmentName);
+        var userDepartments = await GetDepartmentsAsync(user, cancellationToken).ConfigureAwait(false);
+        return BuildCurrentUser(user, userRoles, userDepartments);
     }
 
     /// <summary>
@@ -245,8 +245,8 @@ public sealed class AuthService(
         User user, Guid familyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
         var userRoles = await roles.GetByIdsAsync(user.RoleIds, cancellationToken).ConfigureAwait(false);
-        var departmentName = await GetDepartmentNameAsync(user.DepartmentId, cancellationToken).ConfigureAwait(false);
-        var currentUser = BuildCurrentUser(user, userRoles, departmentName);
+        var userDepartments = await GetDepartmentsAsync(user, cancellationToken).ConfigureAwait(false);
+        var currentUser = BuildCurrentUser(user, userRoles, userDepartments);
 
         var accessToken = tokenService.CreateAccessToken(new AccessTokenClaims(
             user.Id,
@@ -255,7 +255,8 @@ public sealed class AuthService(
             user.DepartmentId,
             [.. userRoles.Select(r => r.Code)],
             currentUser.Permissions,
-            user.MustChangePassword));
+            user.MustChangePassword,
+            user.AdditionalDepartmentIds));
 
         var rawRefreshToken = tokenService.GenerateRefreshToken();
         var refreshToken = RefreshToken.Issue(
@@ -273,28 +274,34 @@ public sealed class AuthService(
     }
 
     /// <summary>Người dùng còn phải đổi mật khẩu thì chưa được cấp quyền nào.</summary>
-    private static CurrentUserDto BuildCurrentUser(User user, IReadOnlyList<Role> userRoles, string? departmentName) =>
+    private static CurrentUserDto BuildCurrentUser(User user, IReadOnlyList<Role> userRoles, IReadOnlyList<DepartmentRefDto> userDepartments) =>
         new(
             user.Id,
             user.UserName,
             user.FullName,
             user.Title,
             user.DepartmentId,
-            departmentName,
+            userDepartments.FirstOrDefault(d => d.Id == user.DepartmentId)?.Name,
+            userDepartments,
             [.. userRoles.OrderBy(r => r.Name, VietnameseComparer.Instance).Select(r => new RoleRefDto(r.Id, r.Code, r.Name))],
             user.MustChangePassword ? [] : PermissionResolver.Resolve(userRoles),
             user.MustChangePassword,
             user.SignatureSpecimenPng is not null);
 
-    private async Task<string?> GetDepartmentNameAsync(Guid? departmentId, CancellationToken cancellationToken)
+    /// <summary>Các khoa của tài khoản (quyết định 41): khoa chính đứng đầu, sau đó các khoa khác theo tên.</summary>
+    private async Task<IReadOnlyList<DepartmentRefDto>> GetDepartmentsAsync(User user, CancellationToken cancellationToken)
     {
-        if (departmentId is not { } id)
+        if (user.DepartmentId is null)
         {
-            return null;
+            return [];
         }
 
-        var department = await departments.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        return department?.Name;
+        var byId = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false)).ToDictionary(d => d.Id);
+        return [.. user.DepartmentIds
+            .Where(byId.ContainsKey)
+            .Select(id => new DepartmentRefDto(id, byId[id].Name))
+            .OrderBy(d => d.Id != user.DepartmentId)
+            .ThenBy(d => d.Name, VietnameseComparer.Instance)];
     }
 
     private async Task RevokeFamilyAsync(Guid familyId, DateTimeOffset now, string reason, CancellationToken cancellationToken)

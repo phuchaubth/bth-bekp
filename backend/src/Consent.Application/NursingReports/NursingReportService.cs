@@ -305,8 +305,9 @@ public sealed class NursingReportService(
     private static string By(IReadOnlyDictionary<Guid, string> names, Guid? userId) =>
         userId is { } id && names.TryGetValue(id, out var name) ? $" bởi {name}" : string.Empty;
 
+    /// <summary>Lập, sửa báo cáo của một khoa của mình (khoa chính hoặc khoa khác, quyết định 41), hoặc mọi khoa khi xem toàn viện.</summary>
     private bool CanEdit(Guid departmentId) =>
-        CanSubmit && (currentUser.HasPermission(Permissions.ScopeAllDepartments) || departmentId == currentUser.DepartmentId);
+        CanSubmit && (currentUser.HasPermission(Permissions.ScopeAllDepartments) || currentUser.DepartmentIds.Contains(departmentId));
 
     private bool CanView(Guid departmentId) => CanReadAll || CanEdit(departmentId);
 

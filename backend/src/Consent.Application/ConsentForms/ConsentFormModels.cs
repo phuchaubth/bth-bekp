@@ -19,8 +19,9 @@ public sealed record ConsentFormQuery(
     int PageSize = 20);
 
 /// <summary>
-/// Truy vấn đã chuẩn hóa cho repository. <see cref="ScopeAll"/> = xem toàn viện; ngược lại chỉ phiếu của khoa
-/// <see cref="ScopeDepartmentId"/> hoặc do người dùng <see cref="ScopeUserId"/> lập.
+/// Truy vấn đã chuẩn hóa cho repository. <see cref="ScopeAll"/> = xem toàn viện; ngược lại chỉ phiếu của các khoa
+/// <see cref="ScopeDepartmentIds"/> (khoa chính và các khoa khác của người dùng, quyết định 41) hoặc do người dùng
+/// <see cref="ScopeUserId"/> lập.
 /// </summary>
 public sealed record ConsentFormSearch(
     ConsentFormStatus? Status,
@@ -33,7 +34,7 @@ public sealed record ConsentFormSearch(
     int Page,
     int PageSize,
     bool ScopeAll,
-    Guid? ScopeDepartmentId,
+    IReadOnlyList<Guid> ScopeDepartmentIds,
     Guid? ScopeUserId);
 
 public sealed record ConsentFormListItemDto(

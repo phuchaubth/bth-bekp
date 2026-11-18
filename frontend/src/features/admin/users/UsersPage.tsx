@@ -90,7 +90,21 @@ export function UsersPage() {
       ),
     },
     { title: 'Chức danh', dataIndex: 'title', width: 150, render: (value: string | null) => value ?? '—' },
-    { title: 'Khoa/phòng', dataIndex: 'departmentName', width: 180, render: (value: string | null) => value ?? '—' },
+    {
+      title: 'Khoa/phòng',
+      key: 'department',
+      width: 200,
+      render: (_, user) => (
+        <Flex vertical>
+          <span>{user.departmentName ?? '—'}</span>
+          {user.additionalDepartmentNames && user.additionalDepartmentNames.length > 0 && (
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Khoa khác: {user.additionalDepartmentNames.join(', ')}
+            </Typography.Text>
+          )}
+        </Flex>
+      ),
+    },
     {
       title: 'Vai trò',
       dataIndex: 'roleNames',

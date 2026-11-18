@@ -1,4 +1,5 @@
 import { Card, Col, Descriptions, Row, Space, Tag, Typography } from 'antd'
+import { accountDepartments } from '../../api/auth'
 import { useAuth } from '../../auth/authContext'
 import { ChangePasswordForm } from './ChangePasswordForm'
 import { SignatureSpecimenCard } from './SignatureSpecimen'
@@ -21,7 +22,15 @@ export function AccountPage() {
               <Descriptions.Item label="Họ tên">{user.fullName}</Descriptions.Item>
               <Descriptions.Item label="Tên đăng nhập">{user.userName}</Descriptions.Item>
               <Descriptions.Item label="Chức danh">{user.title ?? '—'}</Descriptions.Item>
-              <Descriptions.Item label="Khoa/phòng">{user.departmentName ?? '—'}</Descriptions.Item>
+              <Descriptions.Item label="Khoa/phòng chính">{user.departmentName ?? '—'}</Descriptions.Item>
+              {accountDepartments(user).length > 1 && (
+                <Descriptions.Item label="Khoa/phòng khác">
+                  {accountDepartments(user)
+                    .slice(1)
+                    .map((d) => d.name)
+                    .join(', ')}
+                </Descriptions.Item>
+              )}
               <Descriptions.Item label="Vai trò">
                 <Space size={[4, 4]} wrap>
                   {user.roles.map((role) => (

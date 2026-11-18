@@ -190,9 +190,9 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 
 ### 5.4. Nâng cấp phiên bản
 
-1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
+1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2; bản có quyết định 41 thêm bảng `UserDepartments` và cột `Patients.CreatedByUserId`, mục 5.8). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
 
-**Khi bản mới đổi định nghĩa một mẫu khởi tạo sẵn** (ví dụ TTNB in theo bản giấy QT-KNGT/BM03, quyết định 33): máy chủ đang chạy vẫn giữ phiên bản mẫu cũ, nên sau khi cài gói, người quản lý mẫu vào **Mẫu phiếu → mẫu đó → Tạo phiên bản mới**, mở thẻ **Soạn định nghĩa (JSON)**, dán đè bằng nội dung file `backend/src/Consent.Application/ConsentTemplates/Defaults/<mã mẫu>.json` của bản mới, bấm **Lưu phiên bản nháp** rồi **Phát hành**. Phải cài gói trước: bản cũ không biết các tùy chọn mới và sẽ bỏ mất chúng khi lưu. Phiếu đã lập giữ phiên bản cũ; PDF đã ký giữ nguyên.
+**Khi bản mới đổi định nghĩa một mẫu khởi tạo sẵn** (ví dụ TTNB in theo bản giấy QT-KNGT/BM03, quyết định 33): máy chủ đang chạy vẫn giữ phiên bản mẫu cũ, nên sau khi cài gói, người quản lý mẫu vào **Mẫu phiếu → mẫu đó → Tạo phiên bản mới**, mở thẻ **Soạn định nghĩa (JSON)**, dán đè bằng nội dung file `backend/src/Consent.Application/ConsentTemplates/Defaults/<mã mẫu>.json` của bản mới, bấm **Lưu phiên bản nháp** rồi **Phát hành**. Phải cài gói trước: bản cũ không biết các tùy chọn mới và sẽ bỏ mất chúng khi lưu. Phiếu đã lập giữ phiên bản cũ; PDF đã ký giữ nguyên. Quyết định 43 (18/11/2026) đổi hai mẫu `QT-KNGT-BM10` và `TUVAN-CONGTT`: làm như trên cho từng mẫu. Phiên bản mới của `TUVAN-CONGTT` không còn bước xác nhận "Người tư vấn" (Tiếp đón): người tư vấn là người xác nhận cuối, nên kiểm tra **Sửa thông tin mẫu → vai trò xác nhận cuối** (mặc định Điều dưỡng). Vai trò này áp dụng ngay cho cả phiếu tư vấn đang chờ xác nhận theo phiên bản cũ, nên đổi khi các phiếu đó đã xong. Cấu hình ký đã sửa trên phiên bản cũ (nếu có) cần sửa lại trên phiên bản mới.
 
 ### 5.5. API thông tin người bệnh (tùy chọn, quyết định 22)
 
@@ -251,6 +251,7 @@ Dịch vụ riêng `PatientInfoApi` đọc thông tin hành chính trong CSDL c�
    | `ASPNETCORE_ENVIRONMENT` | `Production` |
    | `PatientInfo__ConnectionString` | `Server=tcp:SQLHIS,1433;Database=…;User Id=patientinfo_reader;Password=…;Encrypt=True;TrustServerCertificate=True;ApplicationIntent=ReadOnly` |
    | `PatientInfo__Query` | Câu truy vấn ở bước 2 (một dòng) |
+   | `PatientInfo__EncounterQuery`, `PatientInfo__DailyStatisticsQuery`, `PatientInfo__DepartmentQuery` | (Tùy chọn) lượt tiếp nhận (mục 5.6), số liệu trong ngày cho báo cáo điều dưỡng (mục 5.7), danh mục khoa/phòng (mục 5.9) |
    | `PatientInfo__ApiKeys__0` | Khóa API ngẫu nhiên ≥ 32 ký tự, tạo như `Jwt__SigningKey` ở mục 3 (bộ sinh số ngẫu nhiên an toàn, không dùng `Get-Random`) |
    | `PatientInfo__MaleValues__0`…, `PatientInfo__FemaleValues__0`… | (Tùy chọn) khi cột giới tính không theo mặc định (`Nam/M/Male/1` là Nam, `Nữ/F/Female/0/2` là Nữ). Đặt **cả hai** danh sách, danh sách đặt thay hẳn mặc định. Ví dụ CSDL lưu 0 = Nam, 1 = Nữ: `PatientInfo__MaleValues__0 = 0`, `PatientInfo__FemaleValues__0 = 1`. Cũng có thể đổi ngay trong câu truy vấn: `CASE GioiTinh WHEN 0 THEN N'Nam' WHEN 1 THEN N'Nữ' END AS Gender` |
 
@@ -363,8 +364,8 @@ Khoa lập "Báo cáo công tác điều dưỡng" mỗi ngày, Phòng Điều d
 
 Từ quyết định 38, mục VI của báo cáo khoa nhập riêng **số ca nhập khoa từ PK** và **số ca nhập khoa do CK** ngày hôm trước, và bảng tổng hợp mục A có hai cột **Nhập khoa từ PK**, **Nhập khoa do CK** thay cột "Số ca nhập viện ngày hôm trước" (màn hình, PDF, Excel). Không có migration. Báo cáo đã gửi trước khi cài gói chỉ có số tổng: hai cột mới của khoa đó để trống; cần đủ số thì Phòng Điều dưỡng **Trả lại khoa** để khoa nhập lại.
 
-1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, trả lại báo cáo cho khoa sửa (nút **Trả lại khoa**), cài khoa báo cáo, số giường, khoa nhập số liệu HIS và bấm lấy số liệu HIS. Phòng Điều dưỡng không nhập số liệu thay khoa. Ban giám đốc chỉ cần xem: phần mềm chưa tạo được vai trò mới, nên thêm quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp* vào vai trò ban giám đốc đang dùng (*Quản trị → Vai trò và quyền*; mọi người có vai trò đó cùng xem được).
-2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa của người dùng). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
+1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, trả lại báo cáo cho khoa sửa (nút **Trả lại khoa**), cài khoa báo cáo, số giường, khoa nhập số liệu HIS và bấm lấy số liệu HIS. Phòng Điều dưỡng không nhập số liệu thay khoa. Ban giám đốc chỉ cần xem: tạo vai trò riêng (ví dụ *Ban giám đốc*) ở *Quản trị → Vai trò và quyền → Thêm vai trò*, chỉ đánh dấu quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp* (và các quyền xem khác nếu cần), rồi gán cho tài khoản ban giám đốc (quyết định 40).
+2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa chính của người dùng; điều dưỡng làm ở nhiều khoa thì thêm các khoa đó ở ô *Khoa/phòng khác* và chọn khoa ở đầu trang báo cáo, mục 5.8). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
 3. **Khoa báo cáo và số giường:** Phòng Điều dưỡng vào *Báo cáo điều dưỡng → Tổng hợp hằng ngày*, bấm **Khoa báo cáo và số giường**, chọn các khoa phải gửi báo cáo và nhập số giường thực kê (không tính băng ca). Khoa chưa được chọn thì chưa lập được báo cáo.
 4. **Khoa nhập số liệu HIS khi HIS lỗi:** trong hộp **Khoa báo cáo và số giường**, phần *Khoa nhập số liệu HIS khi HIS lỗi*, Phòng Điều dưỡng chọn khoa nhập từng chỉ số mục B, D (ví dụ TSNB đến khám: Khoa Khám bệnh; siêu âm, X-quang, CT, MRI: Khoa Chẩn đoán hình ảnh; siêu âm tim, điện tâm đồ: Khoa Thăm dò chức năng). Mỗi khoa phải báo cáo tự nhập "NB PK chờ nhập viện" của khoa mình. Mỗi khoa được giao cần **ít nhất một tài khoản đúng khoa có quyền** *Lập và gửi báo cáo điều dưỡng của khoa* (ví dụ vai trò **Điều dưỡng**); khoa được giao không cần nằm trong danh sách khoa báo cáo. Khoa nhập ở trang **Báo cáo của khoa** (hướng dẫn sử dụng mục 9.5).
 5. **Số liệu HIS (tùy chọn):** mục B (TSNB đến khám), mục D (số liệu CĐHA) và cột "NB PK chờ nhập viện" lấy từ HIS qua API thông tin người bệnh (mục 5.5). Chưa làm bước này, hoặc HIS lỗi, thì các khoa nhập tay như bước 4; bảng tổng hợp dùng số HIS trước, ô HIS không có số mới dùng số khoa nhập.
@@ -416,6 +417,58 @@ Từ quyết định 38, mục VI của báo cáo khoa nhập riêng **số ca n
 
      `(404)`: `PatientInfoApi` còn bản cũ (thay thư mục như mục 5.4 bước 5). `(501)`: chưa đặt `PatientInfo__DailyStatisticsQuery`. `(503)`: câu truy vấn lỗi hoặc thiếu quyền đọc.
    - Trên bảng tổng hợp, bấm **Lấy số liệu HIS**: số liệu được lưu lại theo ngày (số "chờ nhập viện" là số tại lúc lấy). Mã khoa HIS trả về mà không khớp khoa nào được báo lên màn hình để sửa câu truy vấn.
+
+### 5.8. Dữ liệu theo khoa, tài khoản nhiều khoa (quyết định 41)
+
+Tài khoản khoa nào thấy dữ liệu khoa đó: phiếu, tổng quan, báo cáo thống kê, xuất dữ liệu, báo cáo điều dưỡng (cùng phiếu do mình lập, quyết định 19). **Người bệnh** cũng chia theo khoa: danh sách người bệnh chỉ có người bệnh có phiếu ở khoa mình, phiếu mình lập hoặc hồ sơ mình tạo; tìm **đúng mã người bệnh hoặc đủ 12 số CCCD** thì vẫn ra mọi người bệnh. Bản có tính năng này kèm hai migration: `AddUserDepartments` (1 bảng mới) và `AddPatientCreatedBy` (1 cột mới ở bảng người bệnh); không đổi dữ liệu cũ. Chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khoa hiện có của mỗi tài khoản trở thành **khoa chính**, không phải nhập lại. Hồ sơ người bệnh tạo trước khi cài gói không có người tạo: nhân viên thấy qua phiếu của khoa mình.
+
+1. **Khoa chính:** *Quản trị → Người dùng → Sửa*, ô **Khoa/phòng chính**: khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng. Tài khoản kiosk chỉ có khoa chính (phiếu làm trên kiosk thuộc khoa này).
+2. **Khoa khác:** nhân viên làm ở nhiều khoa (ví dụ điều dưỡng luân phiên, bác sĩ khám ở hai khoa), chọn thêm ở ô **Khoa/phòng khác** (tối đa 20). Tài khoản thấy dữ liệu của khoa chính và các khoa này; ở Báo cáo, Xuất dữ liệu và Báo cáo điều dưỡng chọn được từng khoa.
+3. **Xem toàn viện:** người cần xem mọi khoa (phòng Kế hoạch tổng hợp, ban giám đốc, kiểm tra) không cần chọn hết các khoa: gán vai trò có quyền *Xem dữ liệu toàn viện* (vai trò **Báo cáo / Xuất dữ liệu**, **Kiểm tra**, **Quản lý mẫu phiếu** có sẵn quyền này, hoặc thêm quyền cho vai trò tự tạo ở *Vai trò và quyền*).
+4. Đổi khoa của tài khoản có hiệu lực khi phiên tự làm mới (tối đa 15 phút) hoặc khi người dùng đăng nhập lại. Khoa đang được gán cho tài khoản nào (khoa chính hay khoa khác) thì không xóa được, chỉ chuyển sang ngừng sử dụng.
+
+### 5.9. Danh mục khoa/phòng lấy từ HIS (quyết định 42)
+
+Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 5.5, `PatientSource__Provider` là `Api`), danh mục khoa/phòng **lấy từ HIS**: trang *Quản trị → Khoa/phòng* không còn nút thêm, sửa, xóa, thay bằng nút **Lấy danh mục từ HIS**. Chưa kết nối API thì danh mục vẫn thêm, sửa, xóa trong phần mềm như trước. Không có migration.
+
+1. **Câu truy vấn** (phòng CNTT viết, chạy thử trong SSMS trước): một câu `SELECT` (hoặc `WITH … SELECT`), không tham số, trả về cột `Code` (mã khoa trên HIS, tối đa 20 ký tự) và `Name` (tên khoa/phòng). Chỉ lấy khoa/phòng **đang hoạt động** mà phần mềm phiếu cần (khoa lâm sàng, phòng khám, phòng chức năng có nhân viên dùng phần mềm, cả Phòng Điều dưỡng, Phòng Kế hoạch tổng hợp nếu có tài khoản thuộc phòng đó): khoa/phòng không có trong kết quả sẽ chuyển sang *ngừng sử dụng*. Ví dụ (tên bảng/cột thay theo CSDL thật):
+
+   ```sql
+   SELECT MaKhoa AS Code, TenKhoa AS Name FROM dbo.KhoaPhong WHERE HoatDong = 1
+   ```
+
+   Câu có dấu `;` giữa câu, hoặc không phải `SELECT`/`WITH`, thì API dừng khi khởi động (HTTP 500.30). Bảng danh mục của HIS thường có cả mục không phải khoa (quầy thu, xét nghiệm gửi ngoài…): lọc theo cột loại (`AND <cột loại> IN (…)`, cách nên dùng vì mục mới thêm sau này cũng tự bị loại) hoặc bỏ theo mã (`AND <cột mã> NOT IN (…)`); nếu không, các mục này hiện trong mọi ô chọn khoa. Nếu lọc sau khi đã lấy danh mục, các mục bị bỏ chuyển sang *ngừng sử dụng* chứ không mất.
+
+   **Quyền đọc:** cấp `SELECT` cho `patientinfo_reader` trên bảng/view danh mục khoa (xem phần *danh mục khoa/phòng* cuối `deploy\sql\04-patientinfo-reader.sql`); thiếu quyền thì bước 3 báo `(503)`.
+2. **Đặt biến** cho Application Pool `PatientInfoApi` (hàm `Set-PoolEnv` ở mục 5.5 bước 4):
+
+   ```powershell
+   $departmentQuery = @'
+   <dán câu truy vấn đã chạy thử>
+   '@
+   $departmentQuery = ($departmentQuery -replace '\s+', ' ').Trim()
+   Set-PoolEnv PatientInfoApi 'PatientInfo__DepartmentQuery' $departmentQuery
+   Restart-WebAppPool PatientInfoApi
+   ```
+
+3. **Kiểm tra** (in mã và tên khoa, không có thông tin người bệnh):
+
+   ```powershell
+   $key = (Get-WebConfiguration -PSPath 'MACHINE/WEBROOT/APPHOST' -Filter "system.applicationHost/applicationPools/add[@name='PatientInfoApi']/environmentVariables/add[@name='PatientInfo__ApiKeys__0']").value
+   $r = Invoke-RestMethod -Uri http://127.0.0.1:5081/api/v1/departments -Headers @{ 'X-Api-Key' = $key }
+   $r.items.Count
+   $r.items | Format-Table code, name
+   ```
+
+   `(404)`: `PatientInfoApi` còn bản cũ (thay thư mục như mục 5.4 bước 5). `(501)`: chưa đặt `PatientInfo__DepartmentQuery`. `(503)`: câu truy vấn lỗi hoặc thiếu quyền đọc. `(422)`: kết quả hơn 2.000 dòng, cần lọc lại.
+4. **Lấy danh mục:** quản trị vào *Quản trị → Khoa/phòng*, bấm **Lấy danh mục từ HIS**:
+   - khoa/phòng có **mã trùng** mã trên HIS: cập nhật tên theo HIS (đang ngừng sử dụng thì dùng lại);
+   - khoa/phòng nhập tay trước đây có **tên trùng** tên trên HIS (không phân biệt hoa thường, khoảng trắng thừa): nhận mã HIS, giữ nguyên người dùng, phiếu, báo cáo đã gắn;
+   - khoa/phòng chỉ có trên HIS: thêm mới;
+   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*).
+
+   HIS lỗi, API chưa có câu truy vấn hoặc HIS trả về rỗng thì danh mục giữ nguyên. Mỗi thay đổi ghi nhật ký hệ thống. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm lại nút này.
+5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

@@ -44,6 +44,14 @@ public sealed record TemplateDefinition(
     public bool NumberedPatientLines { get; init; }
 
     /// <summary>
+    /// Ghi chú in cuối phiếu, sau khối chữ ký, chữ nhỏ nghiêng, có đường kẻ phía trên, như phần "Hướng dẫn thực hiện phiếu" của
+    /// bản giấy QĐ-VHTT-BM02 (quyết định 43); "\n" là xuống dòng. Màn hình nhập liệu không hiện.
+    /// </summary>
+    public string? Footnote { get; init; }
+
+    public const int MaxFootnoteLength = 2000;
+
+    /// <summary>
     /// Mọi khối nhập liệu (có <see cref="TemplateBlock.Key"/>), theo thứ tự xuất hiện. Chỉ để tính toán: không ghi vào JSON
     /// (trước đây bị ghi thành bản sao "inputBlocks", sửa ở bản sao đó không có tác dụng).
     /// </summary>
@@ -52,7 +60,27 @@ public sealed record TemplateDefinition(
         Sections.SelectMany(s => s.Blocks).Where(b => BlockTypes.IsInput(b.Type));
 }
 
-public sealed record TemplateSection(string? Title, IReadOnlyList<TemplateBlock> Blocks);
+public sealed record TemplateSection(string? Title, IReadOnlyList<TemplateBlock> Blocks)
+{
+    /// <summary>
+    /// PDF in tên phần trong dải nền màu, canh giữa, chữ hoa đậm (dòng đầu), như các phần của bản giấy QT-KNGT/BM10 (quyết định
+    /// 43); các dòng sau (tiếng Anh, ghi chú) chữ thường. Màn hình nhập liệu không đổi.
+    /// </summary>
+    public bool Banner { get; init; }
+
+    /// <summary>PDF bắt đầu phần này ở trang mới, như bản giấy mỗi phần một trang. Màn hình nhập liệu không đổi.</summary>
+    public bool NewPage { get; init; }
+
+    /// <summary>
+    /// PDF in ô ký của một người ngay cuối phần này (ngày tháng, tên ô ký, chữ ký) thay vì ở cuối phiếu, như bản giấy BM10 mỗi
+    /// phần có người ký riêng: <c>patient</c> (người bệnh/người đại diện), <c>hospital</c> (xác nhận cuối), hoặc khóa của một
+    /// bước xác nhận trung gian (<see cref="TemplateConfirmationStep.Key"/>).
+    /// </summary>
+    public string? Signer { get; init; }
+
+    public const string PatientSigner = "patient";
+    public const string HospitalSigner = "hospital";
+}
 
 /// <summary>Một khối của mẫu: đoạn văn cố định, danh sách cố định, hoặc trường nhập liệu (xem <see cref="BlockTypes"/>).</summary>
 public sealed record TemplateBlock
@@ -88,8 +116,29 @@ public sealed record TemplateBlock
     /// <summary>Tự điền từ hồ sơ khi lập phiếu, ví dụ <c>patient.healthInsuranceNumber</c> (xem <see cref="PrefillSources"/>).</summary>
     public string? Prefill { get; init; }
 
-    /// <summary><c>inline</c>: các lựa chọn trên một dòng; <c>ordered</c>: danh sách có đánh số.</summary>
+    /// <summary>
+    /// <c>inline</c>: các lựa chọn trên một dòng; <c>ordered</c>: danh sách có đánh số; <c>row</c> (câu hỏi chọn một): PDF in
+    /// thành một hàng của bảng kẻ ô (câu hỏi, rồi mỗi lựa chọn một ô), các câu <c>row</c> liền nhau cùng một bảng, như bảng
+    /// "Có/Không" của bản giấy BM10 (quyết định 43); màn hình nhập liệu in các lựa chọn trên một dòng.
+    /// </summary>
     public string? Layout { get; init; }
+
+    public const string LayoutInline = "inline";
+    public const string LayoutOrdered = "ordered";
+    public const string LayoutRow = "row";
+
+    /// <summary>
+    /// Danh sách cố định: PDF in trong khung nền xám, <see cref="Label"/> là tiêu đề khung (canh giữa, đậm nghiêng), các mục
+    /// chữ nghiêng, như khung "Xin Quý người bệnh và thân nhân lưu ý" của bản giấy QĐ-VHTT-BM02 (quyết định 43). Màn hình nhập
+    /// liệu hiện danh sách trong khung có tiêu đề.
+    /// </summary>
+    public bool Box { get; init; }
+
+    /// <summary>
+    /// Đoạn văn: PDF in thành tiêu đề mục (đậm, canh giữa, chữ hoa), như "A - NGUY CƠ TÉ NGÃ (FALL RISK)" của bản giấy BM10
+    /// (quyết định 43). Màn hình nhập liệu in như đoạn văn.
+    /// </summary>
+    public bool Heading { get; init; }
 
     /// <summary>
     /// PDF in trường này tiếp trên dòng của trường đứng trước, ví dụ "Trình độ văn hóa: … Nghề nghiệp: …" (chỉ trường dạng
@@ -165,6 +214,10 @@ public sealed record ScoreLevel(string Code, string Label, int Min);
 /// Ghi chú dưới tên ô ký in gần bằng cỡ chữ tên ô ký (cỡ 11) như bản giấy, và giữ nguyên sau khi nhân viên xác nhận (trạng
 /// thái "Đã ký, xác nhận bằng tài khoản" in dưới họ tên). Mặc định ghi chú in cỡ 10 và được thay bằng trạng thái xác nhận.
 /// </param>
+/// <param name="BoldTitles">
+/// PDF in tên ô ký đậm nhưng giữ chữ thường như đã ghi (mặc định viết hoa toàn bộ), như bản giấy QĐ-VHTT-BM02 và QT-KNGT/BM10
+/// (quyết định 43).
+/// </param>
 public sealed record TemplateSignatures(
     string? Patient = null,
     string? Representative = null,
@@ -180,7 +233,8 @@ public sealed record TemplateSignatures(
     bool PlainTitles = false,
     string? PatientHint = null,
     bool CenterDate = false,
-    bool PaperHints = false)
+    bool PaperHints = false,
+    bool BoldTitles = false)
 {
     public const int MaxSteps = 5;
 
@@ -218,6 +272,10 @@ public sealed record TemplateConfirmationStep(string Key, string RoleCode, strin
 /// Tên phiếu in ở giữa đầu phiếu, thay cho quốc hiệu (bản giấy TTNB QT-KNGT/BM03 không có quốc hiệu): logo, tên phiếu, mã tài
 /// liệu trên cùng một hàng; dòng tiếng Anh của tên phiếu màu xanh, chữ đứng.
 /// </param>
+/// <param name="UnitInHead">
+/// Cùng <see cref="TitleInHead"/>: cột trái in tên cơ quan chủ quản và tên bệnh viện phía trên logo, như bản giấy QT-KNGT/BM10
+/// (quyết định 43).
+/// </param>
 public sealed record TemplateDocumentControl(
     string? Code = null,
     string? IssueNo = null,
@@ -225,7 +283,8 @@ public sealed record TemplateDocumentControl(
     bool TitleInHead = false,
     string? CodeLabel = null,
     string? IssueNoLabel = null,
-    string? EffectiveDateLabel = null)
+    string? EffectiveDateLabel = null,
+    bool UnitInHead = false)
 {
     public const int MaxLength = 50;
 

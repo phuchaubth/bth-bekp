@@ -209,7 +209,8 @@ internal static class ConsentFormFilters
         var forms = db.ConsentForms.AsNoTracking();
         if (!query.ScopeAll)
         {
-            forms = forms.Where(f => f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId);
+            var departmentIds = query.ScopeDepartmentIds;
+            forms = forms.Where(f => departmentIds.Contains(f.DepartmentId) || f.CreatedByUserId == query.ScopeUserId);
         }
 
         if (query.Status is { } status)

@@ -184,6 +184,8 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     renderApp('/dieu-duong/bao-cao-khoa')
 
     expect(await screen.findByText(/Đã điền sẵn nhân sự và chỉ tiêu/)).toBeInTheDocument()
+    // Tài khoản một khoa: không có ô chọn khoa.
+    expect(screen.queryByRole('combobox', { name: 'Khoa' })).not.toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: 'Điều dưỡng' })).toHaveValue('18')
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toMatch(/^\?date=\d{4}-\d{2}-\d{2}$/)
 
@@ -223,6 +225,58 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     expect(screen.getByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
     expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /In PDF/ })).toBeInTheDocument()
+  })
+
+  // Quyết định 41: tài khoản thuộc nhiều khoa chọn khoa để lập báo cáo; mặc định khoa chính.
+  it('điều dưỡng thuộc nhiều khoa: chọn khoa ở đầu trang, tải và lưu đúng báo cáo của khoa đã chọn', async () => {
+    const user = userEvent.setup()
+    const surgery = { departmentId: 'd-ngoai', departmentName: 'Khoa Ngoại B (giả lập)' }
+    let surgeryLoads = 0
+    const { calls } = mockApi({
+      ...baseRoutes(
+        session({
+          ...nurseSession().user,
+          departments: [
+            { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+            { id: 'd-ngoai', name: 'Khoa Ngoại B (giả lập)' },
+          ],
+        }),
+      ),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/daily': (call: ApiCall) => {
+        if (!call.search.includes('departmentId=d-ngoai')) return report()
+        // Lần tải lại sau khi lưu chưa trả về (mạng chậm): trang phải hiện ngay báo cáo vừa lưu của đúng khoa đó.
+        surgeryLoads += 1
+        return surgeryLoads === 1 ? report(surgery) : new Promise(() => {})
+      },
+      'PUT /api/v1/nursing-reports/daily': (call: ApiCall) =>
+        report({
+          ...((call.body as { departmentId: string }).departmentId === 'd-ngoai' ? surgery : {}),
+          id: 'r-1',
+          status: 'Draft',
+          updatedAtUtc: '2026-11-17T01:00:00Z',
+          updatedBy: 'Điều dưỡng Demo',
+        }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText(`${definition.title} – Khoa Nội tổng hợp`)).toBeInTheDocument()
+    expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toMatch(/^\?date=\d{4}-\d{2}-\d{2}$/)
+    expect(screen.getByRole('combobox', { name: 'Khoa' }).closest('.ant-select')).toHaveTextContent('Khoa Nội tổng hợp')
+
+    await user.click(screen.getByRole('combobox', { name: 'Khoa' }))
+    await user.click(await screen.findByTitle('Khoa Ngoại B (giả lập)'))
+
+    expect(await screen.findByText(`${definition.title} – Khoa Ngoại B (giả lập)`)).toBeInTheDocument()
+    expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain('departmentId=d-ngoai')
+    await user.click(screen.getByRole('button', { name: /Lưu nháp/ }))
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/daily')?.body).toMatchObject({ departmentId: 'd-ngoai', submit: false }),
+    )
+    expect(await screen.findByText('Đã lưu nháp.')).toBeInTheDocument()
+    expect(screen.getByText(`${definition.title} – Khoa Ngoại B (giả lập)`)).toBeInTheDocument()
+    expect(await screen.findByText('Nháp')).toBeInTheDocument()
+    expect(screen.queryByText('Chưa lập')).not.toBeInTheDocument()
   })
 
   it('khoa chưa có trong danh sách báo cáo thì chỉ xem, không lưu được', async () => {
@@ -283,6 +337,7 @@ describe('Báo cáo điều dưỡng của khoa', () => {
 
     await waitFor(() =>
       expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/his-entry')?.body).toEqual({
+        departmentId: 'd-noi',
         reportDate: TODAY,
         values: { waitingAdmission: 3 },
       }),

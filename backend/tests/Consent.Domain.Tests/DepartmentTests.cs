@@ -27,6 +27,22 @@ public sealed class DepartmentTests
         Assert.False(department.IsActive);
     }
 
+    [Fact]
+    public void SyncFromHis_TakesTheHisCodeAndName_ReactivatesIt_AndReportsWhetherAnythingChanged()
+    {
+        var department = Department.Create("NOI", "Khoa Nội");
+        department.Deactivate();
+        Assert.False(department.IsActive);
+
+        Assert.True(department.SyncFromHis(" k02 ", " Khoa Nội tổng hợp "));
+        Assert.Equal(("K02", "Khoa Nội tổng hợp", true), (department.Code, department.Name, department.IsActive));
+
+        Assert.False(department.SyncFromHis("K02", "Khoa Nội tổng hợp"));
+        Assert.True(department.SyncFromHis("K02", "Khoa Nội"));
+        department.Deactivate();
+        Assert.True(department.SyncFromHis("K02", "Khoa Nội"));
+    }
+
     [Theory]
     [InlineData("", "Tên")]
     [InlineData("KKB", " ")]

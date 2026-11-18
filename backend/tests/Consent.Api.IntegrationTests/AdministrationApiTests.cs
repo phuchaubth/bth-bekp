@@ -170,6 +170,95 @@ public sealed class AdministrationApiTests(SqlServerFixture sql) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task CustomRole_Create_AssignToUser_Rename_Delete_AreChecked_AndAudited()
+    {
+        // Quyết định 40: quản trị tạo vai trò mới, mã sinh từ tên.
+        var (created, role) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/roles", _admin, new
+        {
+            name = "Dược sĩ lâm sàng",
+            description = "Khoa Dược",
+            permissions = new[] { Permissions.PatientsRead, Permissions.ConsentsRead },
+        });
+        Assert.True(created == HttpStatusCode.Created, role.ToString());
+        var roleId = role.GetProperty("id").GetString()!;
+        Assert.Equal("VT_DUOC_SI_LAM_SANG", role.GetProperty("code").GetString());
+        Assert.False(role.GetProperty("isSystem").GetBoolean());
+
+        // Tài khoản mang vai trò mới nhận đúng các quyền của vai trò.
+        var (userCreated, user) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/users", _admin, new
+        {
+            userName = "duocsi.thu",
+            fullName = "Dược sĩ Thử (giả lập)",
+            roleIds = new[] { roleId },
+            password = "Mat-Khau-Tam-2026",
+        });
+        Assert.True(userCreated == HttpStatusCode.Created, user.ToString());
+        var login = await _client.LoginAsync("duocsi.thu", "Mat-Khau-Tam-2026");
+        var (_, session) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/auth/change-password", login.AccessToken,
+            new { currentPassword = "Mat-Khau-Tam-2026", newPassword = "Duoc-Si-Gia-Lap-2026!" });
+        Assert.Equal(
+            [Permissions.ConsentsRead, Permissions.PatientsRead],
+            session.GetProperty("user").GetProperty("permissions").EnumerateArray().Select(p => p.GetString()).Order(StringComparer.Ordinal));
+
+        // Còn tài khoản mang vai trò thì không xóa được.
+        var (inUse, inUseProblem) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/roles/{roleId}", _admin);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, inUse);
+        Assert.Equal("roles.in_use", inUseProblem.GetProperty("code").GetString());
+
+        // Đổi tên: mã giữ nguyên.
+        var (renamed, renamedRole) = await _client.SendJsonAsync(
+            HttpMethod.Put, $"/api/v1/roles/{roleId}", _admin, new { name = "Dược sĩ", description = (string?)null });
+        Assert.Equal(HttpStatusCode.OK, renamed);
+        Assert.Equal("Dược sĩ", renamedRole.GetProperty("name").GetString());
+        Assert.Equal("VT_DUOC_SI_LAM_SANG", renamedRole.GetProperty("code").GetString());
+
+        // Bỏ vai trò khỏi tài khoản rồi xóa.
+        var doctorRoleId = await RoleIdAsync("DOCTOR");
+        var (updated, _) = await _client.SendJsonAsync(
+            HttpMethod.Put, $"/api/v1/users/{user.GetProperty("id").GetString()}", _admin,
+            new { fullName = "Dược sĩ Thử (giả lập)", roleIds = new[] { doctorRoleId } });
+        Assert.Equal(HttpStatusCode.OK, updated);
+        var (deleted, _) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/roles/{roleId}", _admin);
+        Assert.Equal(HttpStatusCode.NoContent, deleted);
+        var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", _admin);
+        Assert.DoesNotContain(roles.EnumerateArray(), r => r.GetProperty("id").GetString() == roleId);
+
+        var (_, audit) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/audit-logs?entityType=Role&entityId={roleId}", _admin);
+        var actions = audit.GetProperty("items").EnumerateArray().Select(a => a.GetProperty("action").GetString()).ToList();
+        Assert.Equal(["Delete", "Update", "Create"], actions);
+    }
+
+    [Fact]
+    public async Task RoleManagement_NeedsRolesManage_ProtectsSystemRoles_AndKeepsKioskPermissionForKiosk()
+    {
+        var doctor = await _client.LoginAsync("bacsi.demo", TestSettings.DemoPassword);
+        var (forbidden, _) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/roles", doctor.AccessToken, new { name = "Tự cấp quyền", permissions = Array.Empty<string>() });
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden);
+
+        var (systemRole, systemProblem) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/roles/{await RoleIdAsync("REPORTER")}", _admin);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, systemRole);
+        Assert.Equal("roles.system_role", systemProblem.GetProperty("code").GetString());
+
+        var (kiosk, kioskProblem) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/roles", _admin, new { name = "Kiosk phụ", permissions = new[] { Permissions.KioskUse } });
+        Assert.Equal(HttpStatusCode.BadRequest, kiosk);
+        Assert.True(kioskProblem.GetProperty("errors").TryGetProperty("permissions", out _), kioskProblem.ToString());
+
+        var (duplicate, duplicateProblem) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/roles", _admin, new { name = "bác sĩ" });
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate);
+        Assert.True(duplicateProblem.GetProperty("errors").TryGetProperty("name", out _), duplicateProblem.ToString());
+
+        // Đổi tên vai trò có sẵn được, mã giữ nguyên.
+        var (renamed, renamedRole) = await _client.SendJsonAsync(
+            HttpMethod.Put, $"/api/v1/roles/{await RoleIdAsync("AUDITOR")}", _admin, new { name = "Thanh tra, pháp chế", description = "Chỉ đọc." });
+        Assert.Equal(HttpStatusCode.OK, renamed);
+        Assert.Equal("AUDITOR", renamedRole.GetProperty("code").GetString());
+        Assert.True(renamedRole.GetProperty("isSystem").GetBoolean());
+    }
+
+    [Fact]
     public async Task AuditLogs_HaveNoModifyApi_AndDatabaseRejectsUpdatesAndDeletes()
     {
         var (_, audit) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/audit-logs?pageSize=1", _admin);

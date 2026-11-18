@@ -109,12 +109,65 @@ public sealed class UserTests
     {
         var user = User.Create("bacsi.demo", "Bác sĩ Demo", Now);
 
-        user.UpdateProfile("  Bác sĩ Demo 2 ", "  ", null, " Bác sĩ CKI ", null, "");
+        user.UpdateProfile("  Bác sĩ Demo 2 ", "  ", null, " Bác sĩ CKI ", "");
 
         Assert.Equal("Bác sĩ Demo 2", user.FullName);
         Assert.Null(user.Email);
         Assert.Equal("Bác sĩ CKI", user.Title);
         Assert.Null(user.SmartCaUserId);
+    }
+
+    // Quyết định 41: một tài khoản thuộc nhiều khoa (khoa chính và các khoa/phòng khác).
+    [Fact]
+    public void SetDepartments_KeepsPrimaryFirst_IgnoresPrimaryAndDuplicatesInOthers_AndReplacesOthers()
+    {
+        var user = User.Create("dieuduong.thu", "Điều dưỡng Thử", Now);
+        Guid primary = Guid.CreateVersion7(), second = Guid.CreateVersion7(), third = Guid.CreateVersion7();
+
+        user.SetDepartments(primary, [second, primary, second, third]);
+
+        Assert.Equal(primary, user.DepartmentId);
+        Assert.Equal([second, third], user.AdditionalDepartmentIds);
+        Assert.Equal([primary, second, third], user.DepartmentIds);
+        Assert.All(user.AdditionalDepartments, d => Assert.Equal(user.Id, d.UserId));
+
+        // Đổi khoa chính sang một khoa khác: khoa đó không còn nằm trong danh sách khoa khác.
+        user.SetDepartments(third, [primary, third]);
+
+        Assert.Equal(third, user.DepartmentId);
+        Assert.Equal([primary], user.AdditionalDepartmentIds);
+        Assert.Equal([third, primary], user.DepartmentIds);
+
+        user.SetDepartments(third, []);
+        Assert.Empty(user.AdditionalDepartments);
+        Assert.Equal([third], user.DepartmentIds);
+
+        user.SetDepartments(null, []);
+        Assert.Null(user.DepartmentId);
+        Assert.Empty(user.DepartmentIds);
+    }
+
+    [Fact]
+    public void SetDepartments_RejectsOthersWithoutPrimary_EmptyIds_AndTooMany()
+    {
+        var user = User.Create("dieuduong.thu", "Điều dưỡng Thử", Now);
+        var primary = Guid.CreateVersion7();
+        user.SetDepartments(primary, [Guid.CreateVersion7()]);
+        var before = user.DepartmentIds;
+
+        var withoutPrimary = Assert.Throws<DomainException>(() => user.SetDepartments(null, [Guid.CreateVersion7()]));
+        Assert.Contains("khoa/phòng chính", withoutPrimary.Message, StringComparison.Ordinal);
+        Assert.Throws<DomainException>(() => user.SetDepartments(primary, [Guid.Empty]));
+        Assert.Throws<DomainException>(() => user.SetDepartments(Guid.Empty, []));
+        var tooMany = Enumerable.Range(0, User.MaxAdditionalDepartments + 1).Select(_ => Guid.CreateVersion7()).ToList();
+        Assert.Throws<DomainException>(() => user.SetDepartments(primary, tooMany));
+
+        // Lỗi thì không đổi gì.
+        Assert.Equal(before, user.DepartmentIds);
+
+        // Đúng giới hạn thì được.
+        user.SetDepartments(primary, tooMany.Take(User.MaxAdditionalDepartments));
+        Assert.Equal(User.MaxAdditionalDepartments + 1, user.DepartmentIds.Count);
     }
 
     [Fact]

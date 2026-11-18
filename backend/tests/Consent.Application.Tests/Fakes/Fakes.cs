@@ -84,6 +84,12 @@ internal sealed class FakeCurrentUser : ICurrentUser
 
     public Guid? DepartmentId { get; set; }
 
+    /// <summary>Khoa/phòng khác (quyết định 41), như claim <c>dept_other</c> của access token.</summary>
+    public List<Guid> AdditionalDepartmentIds { get; } = [];
+
+    public IReadOnlyList<Guid> DepartmentIds =>
+        DepartmentId is { } primary ? [primary, .. AdditionalDepartmentIds.Where(id => id != primary).Distinct()] : [];
+
     public HashSet<string> Permissions { get; } = [];
 
     public HashSet<string> Roles { get; } = [];
@@ -111,6 +117,9 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<AuditLog> AuditLogs { get; } = [];
 
     public List<Patient> Patients { get; } = [];
+
+    /// <summary>Phạm vi của lần tìm người bệnh gần nhất (quyết định 41).</summary>
+    public PatientScope? LastPatientScope { get; set; }
 
     public List<ConsentTemplate> ConsentTemplates { get; } = [];
 
@@ -151,12 +160,15 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
         Task.FromResult(store.Users.Exists(u => u.UserName == normalizedUserName));
 
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
-        Task.FromResult(store.Users.Exists(u => u.DepartmentId == departmentId));
+        Task.FromResult(store.Users.Exists(u => u.DepartmentIds.Contains(departmentId)));
 
     public Task<bool> AnyAsync(CancellationToken cancellationToken) => Task.FromResult(store.Users.Count > 0);
 
     public Task<int> CountActiveUsersInRoleAsync(Guid roleId, Guid? excludeUserId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Count(u => u.IsActive && u.Id != excludeUserId && u.RoleIds.Contains(roleId)));
+
+    public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
+        Task.FromResult(store.Users.Count(u => u.RoleIds.Contains(roleId)));
 
     public Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
@@ -180,6 +192,10 @@ internal sealed class InMemoryRoleRepository(InMemoryStore store) : IRoleReposit
 
     public Task<IReadOnlyList<Role>> GetByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<Role>>([.. store.Roles.Where(r => ids.Contains(r.Id))]);
+
+    public void Add(Role role) => store.Roles.Add(role);
+
+    public void Remove(Role role) => store.Roles.Remove(role);
 }
 
 internal sealed class InMemoryDepartmentRepository(InMemoryStore store) : IDepartmentRepository
@@ -234,8 +250,10 @@ internal sealed class InMemoryPatientRepository(InMemoryStore store) : IPatientR
     public Task<Patient?> FindByPatientCodeAsync(string patientCode, CancellationToken cancellationToken) =>
         Task.FromResult(store.Patients.Find(p => p.PatientCode == patientCode));
 
-    public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken)
+    public Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, PatientScope scope, CancellationToken cancellationToken)
     {
+        // Lọc theo phạm vi do kho dữ liệu thật (SQL) làm; ở đây chỉ ghi lại phạm vi nghiệp vụ truyền xuống.
+        store.LastPatientScope = scope;
         var items = store.Patients
             .Select(p => new PatientSummary(p.Id, p.PatientCode, p.FullName, p.DateOfBirth, p.Gender, p.CitizenId, p.HisVerifiedAtUtc, p.UpdatedAtUtc))
             .ToList();
@@ -483,7 +501,7 @@ internal sealed class InMemoryConsentFormRepository(InMemoryStore store) : ICons
     private IEnumerable<ConsentForm> Filter(ConsentFormSearch query) => Filter(store, query);
 
     internal static IEnumerable<ConsentForm> Filter(InMemoryStore store, ConsentFormSearch query) => store.ConsentForms
-        .Where(f => query.ScopeAll || f.DepartmentId == query.ScopeDepartmentId || f.CreatedByUserId == query.ScopeUserId)
+        .Where(f => query.ScopeAll || query.ScopeDepartmentIds.Contains(f.DepartmentId) || f.CreatedByUserId == query.ScopeUserId)
         .Where(f => query.Status is null || f.Status == query.Status)
         .Where(f => query.PatientId is null || f.PatientId == query.PatientId)
         .Where(f => query.TemplateId is null || f.TemplateId == query.TemplateId)

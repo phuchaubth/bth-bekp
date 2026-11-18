@@ -142,6 +142,30 @@ public sealed class ReportServiceTests
         Assert.Equal("reports.department_forbidden", other.Error.Code);
     }
 
+    // Quyết định 41: tài khoản thuộc nhiều khoa xem báo cáo chung các khoa của mình, hoặc lọc từng khoa; khoa khác thì không.
+    [Fact]
+    public async Task UserWithSeveralDepartments_SeesAllOfThem_CanFilterEach_ButNotAnotherDepartment()
+    {
+        var s = await Scenario();
+        var ngoai = s.Ctx.AddDepartment("NGOAI", "Khoa Ngoại");
+        s.LogInAs(ngoai, SystemRoles.DepartmentHead, Permissions.ReportsRead);
+        var service = s.Ctx.CreateReportService();
+        var from = new DateOnly(2026, 11, 1);
+
+        var onlyPrimary = await service.SummaryAsync(new(from), CancellationToken.None);
+        s.Ctx.CurrentUser.AdditionalDepartmentIds.AddRange([s.Noi.Id, s.Kkb.Id]);
+        var all = await service.SummaryAsync(new(from), CancellationToken.None);
+        var noi = await service.SummaryAsync(new(from, DepartmentId: s.Noi.Id), CancellationToken.None);
+        s.Ctx.CurrentUser.AdditionalDepartmentIds.Remove(s.Kkb.Id);
+        var kkb = await service.SummaryAsync(new(from, DepartmentId: s.Kkb.Id), CancellationToken.None);
+
+        Assert.Equal(0, onlyPrimary.Value.Totals.Total);
+        Assert.Equal(7, all.Value.Totals.Total);
+        Assert.Equal(["KKB", "NOI"], all.Value.ByDepartment.Select(d => d.Code).Order(StringComparer.Ordinal));
+        Assert.Equal(2, noi.Value.Totals.Total);
+        Assert.Equal("reports.department_forbidden", kkb.Error!.Code);
+    }
+
     [Fact]
     public async Task Dashboard_ShowsCountsWorkWaitingForMeAndTheLast14Days()
     {
@@ -185,5 +209,12 @@ public sealed class ReportServiceTests
         Assert.Equal(0, nurse.AwaitingMyConfirmation.Total);
         Assert.Equal(1, nurse.Drafts);
         Assert.Equal(0, nurse.PendingSignature);
+
+        // Quyết định 41: thêm Khoa Khám bệnh làm khoa khác thì tổng quan tính cả phiếu của khoa đó.
+        s.Ctx.CurrentUser.AdditionalDepartmentIds.Add(s.Kkb.Id);
+        var nurseOfBoth = await s.Ctx.CreateDashboardService().GetAsync(ct);
+        Assert.Equal(2, nurseOfBoth.Drafts);
+        Assert.Equal(2, nurseOfBoth.PendingSignature);
+        Assert.Equal(1, nurseOfBoth.CompletedToday);
     }
 }

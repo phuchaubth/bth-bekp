@@ -24,7 +24,7 @@ public sealed class ConsentBundleTests
     {
         var s = ConsentScenario.Create();
         var bm02 = s.AddHospitalTemplate("QT-KNGT-BM02");
-        var tuvan = s.AddHospitalTemplate("TUVAN-CONGTT");
+        var tuvan = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
         s.LogInAs(s.Kkb, SystemRoles.Receptionist);
         var created = await s.Service.CreateBundleAsync(new(s.Patient.Id, [bm02.Id, tuvan.Id], null), CancellationToken.None);
         Assert.True(created.IsSuccess, created.Error?.Message);

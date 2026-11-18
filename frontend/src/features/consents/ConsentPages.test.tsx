@@ -245,6 +245,20 @@ describe('Lập phiếu (màn hình 4–5)', () => {
     })
   })
 
+  // Quyết định 41: người bệnh chia theo khoa.
+  it('lập phiếu chưa chọn người bệnh: tìm không ra thì hướng dẫn tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD', async () => {
+    mockApi({
+      ...baseRoutes(nurse()),
+      'GET /api/v1/patients': { items: [], page: 1, pageSize: 8, totalCount: 0, totalPages: 0 },
+      'GET /api/v1/departments': departments.filter((d) => d.isActive),
+    })
+    renderApp('/phieu-dong-thuan/tao-moi')
+
+    expect(
+      await screen.findByText(/Không có người bệnh phù hợp\. Danh sách chỉ có người bệnh có phiếu ở khoa của bạn/),
+    ).toHaveTextContent('Người bệnh khác: tìm bằng đúng mã người bệnh hoặc đủ 12 số CCCD.')
+  })
+
   it('chọn khoa của phiếu khác khoa mình: tải mẫu của khoa đó và lập phiếu cho khoa đó', async () => {
     const { calls } = mockApi({
       ...baseRoutes(nurse()),

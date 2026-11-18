@@ -65,12 +65,12 @@ public sealed class HospitalTemplateTests
 
     /// <summary>
     /// Bệnh viện yêu cầu 15/11/2026: TTNB, TUVAN không in dòng khoa; phiếu tư vấn in phần I song ngữ; BM02 in như bản giấy
-    /// (đầu phiếu có mã tài liệu, song ngữ).
+    /// (đầu phiếu có mã tài liệu, song ngữ). Quyết định 43: BM10 và phiếu tư vấn in theo bản giấy (không dòng khoa, song ngữ).
     /// </summary>
     [Theory]
     [InlineData("QT-KNGT-BM02", false, true)]
     [InlineData("TTNB-NGOAITRU", true, true)]
-    [InlineData("QT-KNGT-BM10", false, false)]
+    [InlineData("QT-KNGT-BM10", true, true)]
     [InlineData("TUVAN-CONGTT", true, true)]
     public void HeaderAndPatientSection_FollowThePaperForm(string code, bool hideDepartment, bool bilingual)
     {
@@ -157,6 +157,78 @@ public sealed class HospitalTemplateTests
         Assert.StartsWith("!(đã đối chiếu thông tin trên giấy tờ tùy thân)", signatures.HospitalHint, StringComparison.Ordinal);
         Assert.Equal("Người khai (ký tên, ghi rõ họ tên)", signatures.Patient);
         Assert.Contains("Nếu không phải người bệnh, ghi rõ quan hệ với người bệnh", signatures.PatientHint, StringComparison.Ordinal);
+    }
+
+    /// <summary>Phiếu tư vấn theo bản giấy QĐ-VHTT-BM02, lần ban hành 01, bệnh viện gửi 18/11/2026 (quyết định 43).</summary>
+    [Fact]
+    public void PortalConsultation_FollowsThePaperForm()
+    {
+        var definition = Definition("TUVAN-CONGTT");
+
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QĐ-VHTT-BM02", "01", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue number)", EffectiveDateLabel: "Ngày hiệu lực (Effective date)"),
+            definition.DocumentControl);
+        Assert.Equal(4, definition.Title.Split('\n').Length);
+        Assert.Null(definition.Subtitle);
+        // Thông tin người bệnh như bản giấy: họ tên, ngày sinh, giới tính, địa chỉ, mỗi mục một dòng.
+        Assert.Equal(["fullName", "dateOfBirth", "gender", "address"], definition.PatientLines!.Select(line => line.Single().Patient!));
+        Assert.Equal(["Nam (Male)", "Nữ (Female)"], definition.PatientLines![2][0].Options!);
+        // Cuối phần I là khung lưu ý 3 mục đánh số; phiếu không có trường nhập liệu (người bệnh chọn ý kiến khi ký).
+        var notice = definition.Sections[0].Blocks[^1];
+        Assert.True(notice.Box);
+        Assert.Equal(TemplateBlock.LayoutOrdered, notice.Layout);
+        Assert.Equal("Xin Quý người bệnh và thân nhân lưu ý (Notice to Patients and Relatives)", notice.Label);
+        Assert.Equal(3, notice.Items!.Count);
+        Assert.Empty(definition.InputBlocks);
+        Assert.StartsWith(
+            "Hướng dẫn thực hiện phiếu (Instructions for completing the form)\n* Người tư vấn là Nhân viên chăm sóc khách hàng",
+            definition.Footnote, StringComparison.Ordinal);
+
+        // Hai ô ký như bản giấy: người bệnh/người đại diện và người tư vấn (xác nhận cuối); không còn bước xác nhận trung gian.
+        var signatures = definition.Signatures!;
+        Assert.Null(signatures.Steps);
+        Assert.Equal("Người tư vấn (*) (Consultant)", signatures.Hospital);
+        Assert.Equal("Người bệnh/Người đại diện của người bệnh (Patient/Patient’s Representative)", signatures.Patient);
+        Assert.Equal(signatures.Patient, signatures.Representative);
+        Assert.True(signatures.BoldTitles);
+        Assert.True(signatures.PaperHints);
+        Assert.All(definition.Sections, s => Assert.Null(s.Signer));
+    }
+
+    /// <summary>
+    /// BM10 theo bản giấy QT-KNGT/BM10, lần ban hành 08, bệnh viện gửi 18/11/2026 (quyết định 43): bốn phần, mỗi phần một trang
+    /// và một người ký ở cuối phần.
+    /// </summary>
+    [Fact]
+    public void Bm10_FollowsThePaperForm()
+    {
+        var definition = Definition("QT-KNGT-BM10");
+
+        Assert.Equal(
+            new TemplateDocumentControl(
+                "QT-KNGT/BM10", "08", string.Empty, TitleInHead: true, CodeLabel: "Mã số (Code)",
+                IssueNoLabel: "Lần ban hành (Issue No)", EffectiveDateLabel: "Ngày hiệu lực (Effective Date)", UnitInHead: true),
+            definition.DocumentControl);
+        Assert.Equal(
+            ["fullName", "dateOfBirth+gender", "field:consultingRoom", "address"],
+            definition.PatientLines!.Select(line => string.Join('+', line.Select(i => i.Patient ?? $"field:{i.Field}"))));
+        Assert.All(definition.Sections, s => Assert.True(s.Banner));
+        Assert.Equal([false, true, true, true], definition.Sections.Select(s => s.NewPage));
+        Assert.Equal(["patient", "screeningStaff", "nurse", "hospital"], definition.Sections.Select(s => s.Signer));
+        Assert.Equal(["screeningStaff", "nurse"], definition.Signatures!.Steps!.Select(step => step.Key));
+        // Câu hỏi Có/Không của người bệnh, nhân viên hướng dẫn, PNST và nhu cầu giáo dục sức khỏe in thành bảng như bản giấy.
+        Assert.Equal(
+            [
+                "selfFallHistory", "selfMobilityAid", "infectionSymptoms", "epidemiologicalExposure", "closeContact", "staffMobilityAid",
+                "staffUnsteady", "pnstWeightLoss", "pnstPoorWeightGain", "pnstPoorIntake", "pnstNoticeableLoss", "nurseEduFall",
+                "nurseEduWound", "physicianEduFall", "physicianEduWound", "physicianEduPain", "physicianEduNewPatient", "physicianEduOther",
+            ],
+            definition.InputBlocks.Where(b => b.Layout == TemplateBlock.LayoutRow).Select(b => b.Key!));
+        Assert.True(definition.Signatures.BoldTitles);
+        Assert.True(definition.Signatures.PaperHints);
+        Assert.Equal("Bác sĩ thực hiện (Physician in charge)", definition.Signatures.Hospital);
     }
 
     [Fact]

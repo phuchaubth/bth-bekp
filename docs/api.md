@@ -85,12 +85,18 @@ Ví dụ lỗi kiểm tra dữ liệu:
     "title": "Bác sĩ",
     "departmentId": "01a1ca94-9e60-7c35-8f0b-0b8f2f0f4a11",
     "departmentName": "Khoa Nội tổng hợp",
+    "departments": [
+      { "id": "01a1ca94-9e60-7c35-8f0b-0b8f2f0f4a11", "name": "Khoa Nội tổng hợp" },
+      { "id": "…", "name": "Khoa Khám bệnh" }
+    ],
     "roles": [{ "id": "…", "code": "DOCTOR", "name": "Bác sĩ" }],
     "permissions": ["consents.create", "consents.read", "consents.sign", "patients.manage", "patients.read", "templates.read"],
     "mustChangePassword": false
   }
 }
 ```
+
+`departmentId`, `departmentName` là **khoa chính** (khoa mặc định khi lập phiếu, lập báo cáo điều dưỡng); `departments` là **mọi khoa** của tài khoản, khoa chính đứng đầu (quyết định 41): người dùng thấy dữ liệu của các khoa này. Access token mang khoa chính ở claim `dept` và mỗi khoa khác một claim `dept_other`.
 
 `POST /api/v1/auth/change-password`: `{ "currentPassword": "…", "newPassword": "…" }` → `200` với cùng cấu trúc như đăng nhập.
 
@@ -120,8 +126,11 @@ Ví dụ lỗi kiểm tra dữ liệu:
 | POST | `/api/v1/departments` | `departments.manage` | Thêm; `201` + `Location` |
 | PUT | `/api/v1/departments/{id}` | `departments.manage` | Sửa (gồm ngừng/tiếp tục sử dụng) |
 | DELETE | `/api/v1/departments/{id}` | `departments.manage` | Xóa khoa chưa có người dùng → `204`; khoa đang dùng → `422 departments.in_use` |
+| POST | `/api/v1/departments/sync-his` | `departments.manage` | **Lấy danh mục khoa/phòng từ HIS** (quyết định 42) qua API thông tin người bệnh → `200 { total, added, updated, unchanged, deactivated: [tên khoa], skipped: [mã] }`. `422`: `departments.his_disabled` (chưa cấu hình `PatientSource:Provider = Api`), `departments.his_not_configured` (API chưa đặt `PatientInfo:DepartmentQuery`), `departments.his_unavailable` (không gọi được API hoặc CSDL bệnh viện lỗi), `departments.his_empty` (không có dòng hợp lệ); khi đó danh mục giữ nguyên |
 
 Dữ liệu gửi: `{ "code": "KKB", "name": "Khoa Khám bệnh", "isActive": true }`. Mã khoa được chuẩn hóa chữ hoa, duy nhất (`409 departments.code_exists`).
+
+**Danh mục lấy từ HIS** (quyết định 42): khi đã cấu hình API thông tin người bệnh (`/api/v1/features` trả `departmentsFromHis: true`), thêm, sửa, xóa trả `422 departments.managed_by_his`; danh mục chỉ đổi qua `sync-his`. Cách ghép: mã khoa HIS (chuẩn hóa chữ hoa) trùng mã khoa → cập nhật tên, dùng lại nếu đang ngừng; khoa có mã không có trên HIS mà trùng tên (cùng dạng Unicode, không phân biệt hoa thường, bỏ khoảng trắng thừa) → nhận mã HIS, giữ `id` (người dùng, phiếu, báo cáo đã gắn giữ nguyên); còn lại thêm mới. Khoa không còn trên HIS → ngừng sử dụng (`deactivated`), không xóa. Dòng có mã rỗng hoặc dài quá 20 ký tự bị bỏ (`skipped`); mã lặp lấy dòng đầu; tên thiếu lấy mã, dài quá 200 ký tự thì cắt. Mỗi thay đổi ghi nhật ký hệ thống (`Department`).
 
 ---
 
@@ -129,10 +138,10 @@ Dữ liệu gửi: `{ "code": "KKB", "name": "Khoa Khám bệnh", "isActive": tr
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng") |
-| GET | `/api/v1/users/{id}` | `users.read` | Chi tiết |
+| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng"). `departmentId` khớp khoa chính hoặc khoa khác; mỗi dòng có `departmentName` (khoa chính) và `additionalDepartmentNames` |
+| GET | `/api/v1/users/{id}` | `users.read` | Chi tiết, có `additionalDepartments: [{ id, name }]` |
 | POST | `/api/v1/users` | `users.manage` | Tạo người dùng với mật khẩu tạm; người dùng phải đổi mật khẩu ở lần đăng nhập đầu |
-| PUT | `/api/v1/users/{id}` | `users.manage` | Sửa hồ sơ, khoa, vai trò, mã SmartCA |
+| PUT | `/api/v1/users/{id}` | `users.manage` | Sửa hồ sơ, khoa chính và khoa khác, vai trò, mã SmartCA (gửi đủ các trường; bỏ `additionalDepartmentIds` là không còn khoa khác) |
 | POST | `/api/v1/users/{id}/lock` | `users.manage` | Khóa tài khoản và thu hồi mọi phiên → `204` |
 | POST | `/api/v1/users/{id}/unlock` | `users.manage` | Mở khóa (kể cả khóa tạm do đăng nhập sai và khóa tra cứu của tài khoản kiosk) → `204`. Danh sách người dùng có `isLockedOut` (khóa tạm do đăng nhập sai) và `isKioskLookupLocked` (tài khoản kiosk đang tạm khóa tra cứu) |
 | POST | `/api/v1/users/{id}/reset-password` | `users.manage` | Đặt mật khẩu tạm `{ "newPassword": "…" }`, thu hồi mọi phiên, bắt buộc đổi ở lần đăng nhập sau → `204` |
@@ -145,6 +154,7 @@ Dữ liệu tạo người dùng:
   "fullName": "Điều dưỡng Mới",
   "title": "Điều dưỡng",
   "departmentId": "…",
+  "additionalDepartmentIds": ["…"],
   "roleIds": ["…"],
   "email": "dd@example.test",
   "phoneNumber": "0900000000",
@@ -153,7 +163,9 @@ Dữ liệu tạo người dùng:
 }
 ```
 
-Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists`.
+`departmentId` là khoa chính; `additionalDepartmentIds` là các khoa/phòng khác (quyết định 41): tối đa 20, khoa trùng khoa chính hay lặp lại thì bỏ qua; có khoa khác mà không có khoa chính, hoặc khoa không tồn tại/ngừng dùng → `400` ở `additionalDepartmentIds`; tài khoản kiosk không có khoa khác.
+
+Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists`. Đổi vai trò, khoa của tài khoản có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút) hoặc khi đăng nhập lại.
 
 ---
 
@@ -163,7 +175,10 @@ Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_
 |---|---|---|---|
 | GET | `/api/v1/permissions` | Đã đăng nhập | Danh mục quyền: `[{ code, name, group }]` |
 | GET | `/api/v1/roles` | Đã đăng nhập | Danh sách vai trò kèm mã quyền |
-| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`); vai trò Kiosk chỉ có `kiosk.use` và không sửa được (`422 roles.kiosk_immutable`). Danh sách vai trò có `isLocked` cho hai vai trò này |
+| POST | `/api/v1/roles` | `roles.manage` | Thêm vai trò (quyết định 40) `{ "name", "description"?, "permissions": [...] }` → `201`. Mã vai trò do máy chủ sinh từ tên: tiền tố `VT_`, tên bỏ dấu viết hoa nối bằng `_`, trùng thì thêm `_2`, `_3`… Lỗi `400`: tên trống, quá 100 ký tự hoặc trùng tên vai trò khác (không phân biệt hoa thường, khoảng trắng thừa) ở `errors.name`; mô tả quá 500 ký tự ở `errors.description`; quyền không tồn tại hoặc `kiosk.use` (chỉ dành cho vai trò Kiosk) ở `errors.permissions` |
+| PUT | `/api/v1/roles/{id}` | `roles.manage` | Đổi tên, mô tả `{ "name", "description"? }` (cả vai trò có sẵn); mã giữ nguyên. Lỗi như khi thêm; `404 roles.not_found` |
+| DELETE | `/api/v1/roles/{id}` | `roles.manage` | Xóa vai trò tự tạo → `204`. `422 roles.system_role` (vai trò có sẵn), `422 roles.in_use` (còn gán cho tài khoản, kể cả tài khoản đã khóa), `422 roles.used_by_templates` (đang dùng ở bước xác nhận cuối hoặc bước xác nhận trung gian của mẫu phiếu, mọi phiên bản; thông báo kèm tên mẫu) |
+| PUT | `/api/v1/roles/{id}/permissions` | `roles.manage` | Thay toàn bộ quyền `{ "permissions": ["consents.read", …] }`. Vai trò Quản trị hệ thống luôn có toàn quyền và không sửa được (`422 roles.admin_immutable`); vai trò Kiosk chỉ có `kiosk.use` và không sửa được (`422 roles.kiosk_immutable`). Danh sách vai trò có `isLocked` cho hai vai trò này. Quyền `kiosk.use` không gán được cho vai trò khác (`400`, `errors.permissions`) |
 
 Quyền mới có hiệu lực khi access token được làm mới (tối đa 15 phút).
 
@@ -194,7 +209,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**) |
+| GET | `/api/v1/patients?keyword=&page=1&pageSize=20` | `patients.read` | Tìm kiếm. `keyword` đủ 12 chữ số → tìm chính xác theo CCCD; còn lại → mã người bệnh (chính xác) hoặc họ tên (**không phân biệt dấu**). Người không có `scope.all_departments` (quyết định 41): danh sách (không có `keyword`) và tìm theo họ tên chỉ gồm người bệnh có phiếu ở các khoa của mình, có phiếu mình lập, hoặc hồ sơ mình tạo; tìm đúng số CCCD hoặc mã người bệnh thì ra mọi người bệnh |
 | GET | `/api/v1/patients/{id}` | `patients.read` | Hồ sơ đầy đủ, kèm người đại diện; ghi nhật ký `Patients.Viewed` |
 | POST | `/api/v1/patients/lookup` | `patients.read` | Tra cứu khi quét CCCD `{ "citizenId": "…" }` → hồ sơ đã có (nếu có) + kết quả HIS (`Disabled` khi chưa kết nối HIS); ghi nhật ký `Patients.LookedUp` (không ghi số CCCD) |
 | POST | `/api/v1/patients/lookup-source` | `patients.manage` | Lấy thông tin hành chính từ **API thông tin người bệnh** của bệnh viện (quyết định 22): `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một) → `{ status, patient, existingPatient }`. `status`: `Found` / `NotFound` / `Unavailable` (API lỗi, quá thời gian `His:TimeoutSeconds`) / `Disabled` (chưa cấu hình). `existingPatient`: hồ sơ đã có cùng số CCCD (để chọn luôn, không tạo trùng). Ghi nhật ký `Patients.SourceLookedUp` (chỉ ghi tra theo gì và kết quả, không ghi mã/CCCD) |
@@ -262,11 +277,12 @@ Người đại diện: `{ "fullName", "relationship", "citizenId", "dateOfBirth
 | GET | `/api/v1/features` | Đăng nhập | Tích hợp đang bật, để giao diện ẩn/hiện phần tương ứng |
 
 ```json
-{ "his": false, "smartCa": false, "patientSource": false }
+{ "his": false, "smartCa": false, "patientSource": false, "departmentsFromHis": false }
 ```
 
 - `his`: đã kết nối HIS (theo `His:Provider`). `false` → giao diện ẩn khung kết quả HIS, cột/nhãn "Đối chiếu HIS"; mã người bệnh nhập tay.
 - `patientSource`: đã cấu hình API thông tin người bệnh (`PatientSource:Provider = Api`). `true` → màn hình tiếp nhận và bước 1 của lập phiếu có ô "Lấy thông tin" theo mã người bệnh hoặc CCCD; quét CCCD cũng tự lấy thêm thông tin còn thiếu.
+- `departmentsFromHis`: danh mục khoa/phòng lấy từ HIS (quyết định 42; cùng điều kiện với `patientSource`). `true` → trang *Khoa/phòng* không có thêm, sửa, xóa, có nút **Lấy danh mục từ HIS**.
 - `smartCa`: đã tích hợp ký số VNPT SmartCA. Hiện luôn `false` (tạm hoãn) → ẩn ô "Mã tài khoản SmartCA" ở màn hình người dùng (giá trị đã lưu được giữ nguyên khi sửa).
 
 ## 6a1. API thông tin người bệnh (dịch vụ riêng `PatientInfo.Api`)
@@ -278,6 +294,7 @@ Dịch vụ riêng, chỉ đọc, là nơi **duy nhất** kết nối CSDL của
 | GET | `/health` | Không | `{"status":"Healthy"}` |
 | POST | `/api/v1/patients/lookup` | Header `X-Api-Key` | `{ "patientCode": "…" }` **hoặc** `{ "citizenId": "…" }` (đúng một; mã ≤ 50 ký tự, CCCD 12 chữ số) → `200` thông tin hành chính; `404` không có; `400` sai dữ liệu; `401` thiếu/sai khóa; `503` lỗi CSDL |
 | POST | `/api/v1/daily-statistics` | Header `X-Api-Key` | **Số liệu trong ngày cho bảng tổng hợp điều dưỡng** (quyết định 31): `{ "date": "yyyy-MM-dd" }` → `200 { items: [{ indicator, departmentCode, value }] }` (tối đa 1.000 dòng; dòng thiếu mã chỉ số hoặc giá trị không phải số nguyên ≥ 0 bị bỏ); `400` thiếu ngày; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:DailyStatisticsQuery`; `503` lỗi CSDL. Chỉ là số đếm, không có thông tin người bệnh |
+| GET | `/api/v1/departments` | Header `X-Api-Key` | **Danh mục khoa/phòng** (quyết định 42) → `200 { items: [{ code, name }] }` (dòng không có mã bị bỏ; thiếu tên thì lấy mã); `401` thiếu/sai khóa; `422` hơn 2.000 dòng (báo lỗi, không cắt bớt, vì phần mềm phiếu coi khoa không có trong danh mục là ngừng sử dụng); `501` chưa đặt `PatientInfo:DepartmentQuery`; `503` lỗi CSDL. Không có thông tin người bệnh |
 | POST | `/api/v1/encounters/search` | Header `X-Api-Key` | **Lượt tiếp nhận** (quyết định 25): `{ "patientCode" \| "citizenId", "from": "yyyy-MM-dd", "to": "yyyy-MM-dd" }` (đúng một trong mã/CCCD; `from` ≤ `to`, tối đa 366 ngày, tính cả ngày `to`) → `200 { items: [{ encounterNo, receivedAt, place, receivedBy }] }`, mới nhất trước, tối đa 200 lượt; `400` sai dữ liệu; `401` thiếu/sai khóa; `501` chưa đặt `PatientInfo:EncounterQuery`; `503` lỗi CSDL |
 
 ```json
@@ -306,7 +323,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/api/v1/consent-templates?includeInactive=false` | `templates.read` | Danh sách mẫu (sắp theo mã), kèm phiên bản đang phát hành và phiên bản nháp |
-| GET | `/api/v1/consent-templates/available?departmentId=` | `consents.create` | Mẫu **đang phát hành** dùng được để lập phiếu cho khoa (mặc định: khoa của người dùng): mẫu toàn viện và mẫu riêng của khoa. Trả định nghĩa của phiên bản đang phát hành |
+| GET | `/api/v1/consent-templates/available?departmentId=` | `consents.create` | Mẫu **đang phát hành** dùng được để lập phiếu cho khoa (mặc định: khoa chính của người dùng): mẫu toàn viện và mẫu riêng của khoa. Trả định nghĩa của phiên bản đang phát hành |
 | GET | `/api/v1/consent-templates/{id}` | `templates.read` | Chi tiết mẫu và các phiên bản (mới nhất trước) |
 | GET | `/api/v1/consent-templates/{id}/versions/{versionNo}` | `templates.read` | Một phiên bản, kèm định nghĩa (`definition`) |
 | POST | `/api/v1/consent-templates` | `templates.manage` | Tạo mẫu `{ code, name, hospitalSignerRoleCode, departmentId }` → `201`, có sẵn phiên bản nháp 1. `code`: 2–20 ký tự (chữ không dấu, số, `-`), lưu chữ hoa; trùng → `409 consent_templates.duplicate_code` |
@@ -356,11 +373,11 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 - Mọi khối nhập liệu có `key` (bắt đầu bằng chữ cái; chữ không dấu, số, `_`; không trùng).
 - `visibleWhen`: `{ "field", "in": [...] }` (giá trị của một trường đứng trước thuộc danh sách; chọn nhiều thì chỉ cần một), hoặc `{ "field", "minLevel" }` (trường điểm đạt tối thiểu mức). Trường bị ẩn thì không bắt buộc, và giá trị của nó không được in hay giữ lại khi trình ký.
 - `prefill`: tự điền khi lập phiếu từ `patient.healthInsuranceNumber`, `patient.phoneNumber`, `patient.patientCode`, `patient.permanentAddress`, `patient.currentAddress` (chưa có thì dùng địa chỉ thường trú), `patient.ethnicity`, `patient.occupation`.
-- **Tùy chọn in PDF** (quyết định 28, 29, 33, không bắt buộc; màn hình nhập liệu không đổi):
+- **Tùy chọn in PDF** (quyết định 28, 29, 33, 43, không bắt buộc; màn hình nhập liệu không đổi, trừ chỗ ghi rõ):
   - `hideDepartment: true` (gốc định nghĩa): không in dòng "Khoa/phòng: …" dưới tên bệnh viện, cho mẫu mà bản giấy không có dòng này (`TTNB-NGOAITRU`, `TUVAN-CONGTT`).
   - `bilingual: true` (gốc định nghĩa): phần hệ thống in kèm tiếng Anh: mục "I. Thông tin người bệnh" ("Họ và tên (Full name)", "Mã người bệnh (Patient ID)"…, xếp lại để số không bị xuống dòng), dòng ngày tháng ("ngày (day) … tháng (month) … năm (year) …") và ghi chú dưới tên ô ký ("(Signature and full name)").
-  - `sameLine: true` (trên khối): in trường này tiếp trên dòng của trường đứng trước, ví dụ "Trình độ văn hóa (Education Level): … Nghề nghiệp (Occupation): …". Chỉ dùng cho trường dạng "nhãn: giá trị" (`text`, `date`, `datetime`, `computed`; kiểu khác → `400`). Trường đứng trước bị ẩn thì in tiếp dòng của trường in trước đó; sau đoạn văn, danh sách, câu hỏi chọn thì xuống dòng như thường.
-  - `documentControl: { "code", "issueNo", "effectiveDate", "titleInHead"?, "codeLabel"?, "issueNoLabel"?, "effectiveDateLabel"? }` (gốc định nghĩa, mỗi mục tối đa 50 ký tự): đầu phiếu in như bản giấy có mã tài liệu: logo bên trái, quốc hiệu ở giữa, ô "Mã số (Code No) / Lần ban hành (Issue No) / Ngày hiệu lực (Effective Date)" bên phải. Không in tên đơn vị (trừ khi chưa tải logo), dòng khoa và dòng "MS … Số phiếu" (số phiếu vẫn ở chân trang). `titleInHead: true` (bản giấy TTNB, không có quốc hiệu): tên phiếu in ở giữa đầu phiếu thay cho quốc hiệu, chữ hoa đậm cỡ 12, dòng tiếng Anh màu xanh chữ đứng; mã tài liệu cỡ 9; logo, tên phiếu, mã tài liệu canh giữa theo chiều dọc; không in tên phiếu lần nữa bên dưới. `codeLabel`, `issueNoLabel`, `effectiveDateLabel` thay ba nhãn của ô mã tài liệu, ví dụ "Mã số (Code)".
+  - `sameLine: true` (trên khối): in trường này tiếp trên dòng của trường đứng trước, ví dụ "Trình độ văn hóa (Education Level): … Nghề nghiệp (Occupation): …". Chỉ dùng cho trường dạng "nhãn: giá trị" (`text`, `date`, `datetime`, `computed`; kiểu khác → `400`). Trường đứng trước bị ẩn thì in tiếp dòng của trường in trước đó; sau đoạn văn, danh sách thì xuống dòng như thường. Sau câu hỏi chọn `layout: "inline"` thì in tiếp dòng của câu hỏi, ví dụ "2. Dị ứng (Allergies): ☐ Không (None) ☒ Có, ghi rõ (Yes, specify) Ghi rõ (Specify): …" của BM10 (quyết định 43); sau câu hỏi chọn khác thì xuống dòng.
+  - `documentControl: { "code", "issueNo", "effectiveDate", "titleInHead"?, "codeLabel"?, "issueNoLabel"?, "effectiveDateLabel"? }` (gốc định nghĩa, mỗi mục tối đa 50 ký tự): đầu phiếu in như bản giấy có mã tài liệu: logo bên trái, quốc hiệu ở giữa, ô "Mã số (Code No) / Lần ban hành (Issue No) / Ngày hiệu lực (Effective Date)" bên phải. Không in tên đơn vị (trừ khi chưa tải logo), dòng khoa và dòng "MS … Số phiếu" (số phiếu vẫn ở chân trang). `titleInHead: true` (bản giấy TTNB, không có quốc hiệu): tên phiếu in ở giữa đầu phiếu thay cho quốc hiệu, chữ hoa đậm cỡ 12, dòng tiếng Anh màu xanh chữ đứng; mã tài liệu cỡ 9; logo, tên phiếu, mã tài liệu canh giữa theo chiều dọc; không in tên phiếu lần nữa bên dưới. `codeLabel`, `issueNoLabel`, `effectiveDateLabel` thay ba nhãn của ô mã tài liệu, ví dụ "Mã số (Code)". Tên phiếu dài tự thu nhỏ cỡ chữ (từ 12 xuống tối đa 8) để mỗi dòng nằm gọn một dòng của cột giữa. `unitInHead: true` (chỉ dùng kèm `titleInHead`, khác → `400`; bản giấy BM10): ô trái in tên cơ quan chủ quản và tên bệnh viện phía trên logo, canh giữa; ô mã tài liệu chữ cỡ 7,5.
   - `patientLines` (gốc định nghĩa, 1–20 dòng, mỗi dòng 1–2 mục): các dòng thông tin người bệnh như bản giấy, thay cho mục "I. Thông tin người bệnh". Mỗi mục `{ "patient" | "field", "label"?, "options"?, "other"?, "indent"? }`: `patient` là thông tin hồ sơ (`fullName`, `dateOfBirth`, `gender`, `patientCode`, `citizenId`, `phoneNumber`, `address`), `field` là một trường của mẫu: trường "nhãn: giá trị" hoặc câu hỏi chọn (in ở đây, không in lại ở thân phiếu; đang ẩn thì để chấm trống). `label` bỏ trống thì dùng nhãn mặc định.
     - Giới tính có `options` (nhãn Nam, nhãn Nữ): in hai ô đánh dấu.
     - Câu hỏi chọn: in nhãn và các ô lựa chọn trên dòng; `other` là một trường văn bản in tiếp sau các ô, ví dụ "☐ Khác (Other): …" (trường đó không in lại ở thân phiếu).
@@ -369,11 +386,16 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
     - Người đại diện (nếu có) vẫn in một dòng ngay dưới.
   - `numberedPatientLines: true` (gốc định nghĩa): đánh số 1, 2, 3… các dòng `patientLines` như bản giấy TTNB, chữ thẳng cột sau số thứ tự; dòng `indent` không có số. Khoảng cách dòng gần như bản giấy để phiếu vừa một trang.
   - `printOptionsOnly: true` (khối `choice`, `multiChoice`): PDF chỉ in các ô lựa chọn, chữ đậm, một dòng riêng, không in câu hỏi (đoạn văn đứng trước đã là câu hỏi).
-  - `signatures.hospitalFirst: true`: các ô ký phía bệnh viện in trước (bên trái), ô người bệnh/người đại diện sau cùng. `signatures.plainTitles: true`: tên ô ký in đúng như đã ghi (không viết hoa toàn bộ, không đậm).
+  - `layout: "row"` (khối `choice` có 2–4 lựa chọn, không kèm `printOptionsOnly`; khác → `400`; quyết định 43): PDF in thành một hàng của bảng kẻ ô, câu hỏi ở cột đầu, mỗi lựa chọn một ô có ô đánh dấu, như bảng Có/Không của bản giấy BM10. Các câu `row` liền nhau, cùng số lựa chọn, in chung một bảng; câu đang ẩn không in. Lựa chọn ngắn (tối đa 22 ký tự) thì mỗi ô rộng 26 mm, dài hơn thì cột câu hỏi 70 mm và các ô chia đều phần còn lại. Màn hình nhập liệu hiện các lựa chọn trên một dòng.
+  - `box: true` (khối `list`; khác → `400`): danh sách in trong khung nền xám, viền xanh; `label` là tiêu đề khung (canh giữa, đậm nghiêng), các mục chữ nghiêng, `layout: "ordered"` thì đánh số; như khung "Xin Quý người bệnh và thân nhân lưu ý" của bản giấy QĐ-VHTT-BM02. Màn hình nhập liệu hiện danh sách trong khung có tiêu đề (danh sách không có `box` thì không in, không hiện `label`).
+  - `heading: true` (khối `paragraph`; khác → `400`): tiêu đề mục, PDF in đậm, canh giữa, chữ hoa, đi liền nội dung bên dưới; màn hình in đậm. Ví dụ "A - Nguy cơ té ngã (Fall risk)" của BM10.
+  - Trên phần (`sections[]`): `banner: true` in tên phần trong dải nền màu, canh giữa, dòng đầu chữ hoa đậm (trừ phần trong ngoặc), các dòng sau theo kiểu song ngữ. `newPage: true`: phần bắt đầu ở trang mới. `signer`: ô ký của một người in ngay cuối phần, thay vì ở khối chữ ký cuối phiếu, như bản giấy BM10 mỗi phần một người ký: `"patient"` (người bệnh/người đại diện), `"hospital"` (xác nhận cuối) hoặc `key` của một bước trong `signatures.steps`; mỗi người chỉ ở một phần (khác → `400`). Ô ký cuối phần nằm ở nửa phải trang: dòng "Ngày (Day) … tháng (month) … năm (year) …" là ngày người đó ký hoặc xác nhận (chưa ký thì để chấm), tên ô ký, chữ ký, họ tên. Người đã in ở cuối phần không in lại cuối phiếu; mọi người đều đã in ở cuối phần và mẫu không hỏi ý kiến (`decision: "none"`) thì không còn khối chữ ký cuối phiếu.
+  - `footnote` (gốc định nghĩa, tối đa 2.000 ký tự): ghi chú in cuối phiếu sau khối chữ ký, chữ cỡ 9 nghiêng, có đường kẻ phía trên, như "Hướng dẫn thực hiện phiếu" của bản giấy QĐ-VHTT-BM02; `\n` là xuống dòng. Màn hình nhập liệu không hiện.
+  - `signatures.hospitalFirst: true`: các ô ký phía bệnh viện in trước (bên trái), ô người bệnh/người đại diện sau cùng. `signatures.plainTitles: true`: tên ô ký in đúng như đã ghi (không viết hoa toàn bộ, không đậm). `signatures.boldTitles: true`: tên ô ký in đậm, giữ chữ thường như đã ghi (bản giấy QĐ-VHTT-BM02, BM10).
   - `signatures.patientHint`: ghi chú dưới tên ô ký của người bệnh/người đại diện (mặc định "(Ký, ghi rõ họ tên)"). Ở mọi ghi chú dưới tên ô ký (`patientHint`, `hospitalHint`, `hint` của bước), dòng bắt đầu bằng dấu `!` in màu đỏ (dấu `!` không in), như dòng "(đã đối chiếu thông tin trên giấy tờ tùy thân)" của bản giấy TTNB.
   - `signatures.centerDate: true`: dòng "địa danh, ngày … tháng … năm …" canh giữa, chữ đứng (mặc định canh phải, chữ nghiêng).
   - `signatures.paperHints: true`: ghi chú dưới tên ô ký in cỡ 11 (mặc định cỡ 10) và giữ nguyên sau khi nhân viên xác nhận; dòng "Đã ký, xác nhận bằng tài khoản" in dưới họ tên. Mặc định ghi chú của ô ký bệnh viện được thay bằng trạng thái xác nhận.
-  - Thẻ *Cấu hình ký* giữ nguyên `hospitalFirst`, `plainTitles`, `patientHint`, `centerDate`, `paperHints` khi lưu (chỉ sửa được trong JSON).
+  - Thẻ *Cấu hình ký* giữ nguyên `hospitalFirst`, `plainTitles`, `patientHint`, `centerDate`, `paperHints`, `boldTitles` và `signer` của các phần khi lưu (chỉ sửa được trong JSON); xóa một bước đang in ở cuối một phần thì phần đó bỏ `signer` (bước đó không còn).
   - Tiêu đề: dòng nằm trọn trong ngoặc, ví dụ "(Về chế độ thanh toán …)", là dòng phụ: không viết hoa, in nghiêng; tiếng Việt đậm cỡ 12, tiếng Anh xanh không đậm cỡ 11.
 - **Song ngữ:** tiếng Anh ghi trong ngoặc ("Có (Yes)") hoặc sau dấu "/" đến hết dòng như bản giấy ("Ngày sinh/ Date of birth", "Nam/Male"); phần tiếng Anh in xanh, nghiêng trên PDF và màn hình. Dấu "/" giữa hai chữ tiếng Việt ("người bệnh/người nhà"), trong đường dẫn hay mã ("QT-KNGT/BM02") không tách. Chữ viết tắt tiếng Việt CCCD, CMND, BHYT, BHXH tính là tiếng Việt, nên "(theo CCCD)" giữ màu đen.
 - Định nghĩa trả về và lưu chỉ gồm các thuộc tính trên. Trước bản này JSON lưu còn chép thừa danh sách `inputBlocks`; nay bỏ, và nếu gửi lên thì bị bỏ qua.
@@ -391,7 +413,7 @@ Mỗi mẫu có nhiều **phiên bản**: `Draft` (nháp, sửa được) → `P
 | GET | `/api/v1/consent-forms?status=&templateId=&patientId=&departmentId=&from=&to=&keyword=&page=1&pageSize=20` | `consents.read` | Tìm kiếm, phân trang ở máy chủ, mới nhất trước. `from`/`to` là ngày lập (`yyyy-MM-dd`, giờ Việt Nam, gồm cả ngày `to`). `keyword`: số phiếu, họ tên người bệnh (không phân biệt dấu) hoặc mã người bệnh |
 | GET | `/api/v1/consent-forms/{id}` | `consents.read` | Chi tiết phiếu, kèm định nghĩa của **đúng phiên bản mẫu** đã dùng, dữ liệu, điểm, các mục còn thiếu (`issues`) và thao tác được phép (`actions`); ghi nhật ký `ConsentForms.Viewed` |
 | GET | `/api/v1/consent-forms/{id}/pdf` | `consents.read` | File PDF khổ A4 (`application/pdf`, tên `PDT-2026-000001.pdf`). Phiếu chưa hoàn tất: bản xem trước dựng lại mỗi lần, có dòng **"BẢN XEM TRƯỚC – CHƯA CÓ CHỮ KÝ"**. Phiếu hoàn tất/thu hồi: trả **đúng file đã lưu lúc hoàn tất**, sau khi kiểm tra SHA-256 (file mất, hỏng hoặc bị sửa → `409 consent_forms.signed_pdf_unavailable`). Ghi nhật ký `ConsentForms.PdfViewed` |
-| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId?, replacesFormId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. **Kế thừa phiếu lần trước** (quyết định 27, quản trị đặt số ngày): nếu người bệnh có phiếu **đã hoàn tất** cùng mẫu, **cùng khoa**, trong số ngày đó, phiếu mới điền sẵn câu trả lời của phiếu gần nhất (chuẩn hóa theo phiên bản mẫu hiện hành; trường tự điền vẫn lấy theo hồ sơ; không kế thừa ý kiến, lời xác nhận, chữ ký), `notices` của phản hồi có câu "Đã điền sẵn theo phiếu … (hoàn tất dd/MM/yyyy): kiểm tra lại trước khi trình ký" và nhật ký ghi `ConsentForms.Inherited`. `departmentId` mặc định là khoa của người dùng; người lập chọn được **mọi khoa đang hoạt động** (quyết định 19: khoa điều trị người bệnh, nơi nhân viên sẽ xác nhận), khoa không tồn tại hoặc ngừng dùng → `400` ở trường `departmentId`. Người lập vẫn thấy phiếu mình lập; nhân viên khoa được chọn thấy phiếu để xác nhận |
+| POST | `/api/v1/consent-forms` | `consents.create` | Lập phiếu nháp `{ patientId, templateId, departmentId?, replacesFormId? }` → `201`. Dùng **phiên bản đang phát hành** của mẫu (mẫu chưa phát hành, ngừng dùng hoặc không dùng cho khoa → `400` ở trường `templateId`); điền sẵn các trường có `prefill`. **Kế thừa phiếu lần trước** (quyết định 27, quản trị đặt số ngày): nếu người bệnh có phiếu **đã hoàn tất** cùng mẫu, **cùng khoa**, trong số ngày đó, phiếu mới điền sẵn câu trả lời của phiếu gần nhất (chuẩn hóa theo phiên bản mẫu hiện hành; trường tự điền vẫn lấy theo hồ sơ; không kế thừa ý kiến, lời xác nhận, chữ ký), `notices` của phản hồi có câu "Đã điền sẵn theo phiếu … (hoàn tất dd/MM/yyyy): kiểm tra lại trước khi trình ký" và nhật ký ghi `ConsentForms.Inherited`. `departmentId` mặc định là khoa chính của người dùng; người lập chọn được **mọi khoa đang hoạt động** (quyết định 19: khoa điều trị người bệnh, nơi nhân viên sẽ xác nhận), khoa không tồn tại hoặc ngừng dùng → `400` ở trường `departmentId`. Người lập vẫn thấy phiếu mình lập; nhân viên khoa được chọn thấy phiếu để xác nhận |
 | PUT | `/api/v1/consent-forms/{id}` | `consents.create` | Lưu nháp `{ data, signerKind, representativeId }`. Chưa bắt buộc đầy đủ; các mục còn thiếu trả về trong `issues`. Chỉ phiếu nháp |
 | POST | `/api/v1/consent-forms/{id}/submit` | `consents.create` | Trình ký: kiểm tra đầy đủ theo định nghĩa mẫu (thiếu → `400 consent_forms.incomplete` kèm `errors` theo từng trường), bỏ giá trị của trường đang ẩn, **đóng băng** thông tin người bệnh và người ký (sửa hồ sơ sau đó không làm đổi phiếu) |
 | POST | `/api/v1/consent-forms/{id}/return-to-draft` | `consents.create` | Trả phiếu đang chờ ký về nháp để sửa (bỏ thông tin đã đóng băng) |
@@ -467,7 +489,7 @@ Body của `POST /exports/consent-forms`:
 ```
 
 - `format`: `Xlsx` (Excel, Office Open XML) hoặc `Csv` (UTF-8 có BOM, phân cách dấu phẩy, CRLF). Chuỗi bắt đầu bằng `= + - @` được thêm dấu nháy đơn (chống chèn công thức).
-- `filter`: theo **ngày lập** (giờ Việt Nam); người không có `scope.all_departments` chỉ xuất được phiếu khoa mình và phiếu mình lập (`departmentId` khác khoa mình → `403 exports.department_forbidden`).
+- `filter`: theo **ngày lập** (giờ Việt Nam); người không có `scope.all_departments` chỉ xuất được phiếu các khoa của mình (khoa chính và khoa khác) và phiếu mình lập (`departmentId` không phải khoa của mình → `403 exports.department_forbidden`).
 - `columns`: thứ tự trong file theo danh mục, không theo thứ tự gửi lên. Cột nhạy cảm (`citizenId`, `phoneNumber`, `representativeCitizenId`) **mặc định bị che** (`0790******12`); `includeSensitiveData: true` cần quyền `exports.sensitive` (không có → `403 exports.sensitive_forbidden`).
 - `includeContent: true`: thêm mỗi trường của mẫu một cột (nhãn tiếng Việt từ định nghĩa mẫu; lựa chọn in nhãn; trường điểm có cột tổng và cột mức); bắt buộc lọc theo đúng một `templateId`. Trường tự điền số thẻ BHYT/số điện thoại bị che trừ khi xuất đầy đủ; bảng nhiều dòng chỉ ghi số dòng khi che.
 - Lỗi: không có phiếu nào khớp → `422 exports.no_rows`; quá **100.000** phiếu → `422 exports.too_many_rows` (thu hẹp bộ lọc).
@@ -485,7 +507,7 @@ Mục `GET /exports` trả `ExportJob`: `id`, `requestedAtUtc`, `requestedByName
 | GET | `/api/v1/reports/summary?from=&to=&departmentId=&templateId=` | `reports.read` | Thống kê các phiếu **lập** trong khoảng ngày (mặc định: từ đầu tháng đến hôm nay, giờ Việt Nam; tối đa 366 ngày), trong phạm vi khoa |
 | GET | `/api/v1/dashboard` | `consents.read` | Số liệu trang tổng quan của người dùng hiện tại |
 
-`reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; khoa khác khoa mình (không có quyền toàn viện) → `403 reports.department_forbidden`.
+`reports/summary` trả: `totals` (theo trạng thái hiện tại), `decisions` (đồng ý/từ chối và `refusalRate` 0–1 trên phiếu hoàn tất), `signers` (người bệnh tự ký / người đại diện), `completionTime` (số phiếu, trung bình, trung vị, phân vị 90 tính bằng phút; số phiếu đến 15 phút, đến 1 giờ, đến 1 ngày, trên 1 ngày), `byDepartment`, `byTemplate` (mỗi nhóm có `counts` và `decisions`), `daily` (mỗi ngày trong khoảng). Phiếu đã thu hồi không tính vào ý kiến và thời gian hoàn tất. `from > to` hoặc khoảng quá dài → `400`; `departmentId` không phải khoa của mình (khoa chính hoặc khoa khác; không có quyền toàn viện) → `403 reports.department_forbidden`.
 
 `dashboard` trả: `drafts`, `pendingSignature`, `completedToday`, `revokedLast30Days`, `awaitingMyConfirmation` (phiếu người bệnh đã ký mà **bước xác nhận đang chờ** thuộc vai trò của người dùng: bước trung gian đầu tiên chưa xác nhận theo định nghĩa của đúng phiên bản mẫu, hết bước trung gian thì là xác nhận cuối; bỏ phiếu người dùng đã xác nhận một bước; `total` + tối đa 5 `items`, cũ nhất trước), `myOpenForms` (phiếu nháp/chờ ký do mình lập), `last14Days` (`date`, `created`, `completed`).
 
@@ -549,7 +571,7 @@ Khoa lập báo cáo theo bản giấy "Báo cáo công tác điều dưỡng"; 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
 | GET | `/form` | Đăng nhập | Mẫu báo cáo khoa: `{ title, category, sections: [{ title, valueKey, items: [{ key, label, carryOver }] }], checks: [{ key, label, inSummary }], issueLabel, okLabel, notesLabel, maxValue, notesMaxLength }`. `valueKey`: dòng tiêu đề mục là ô nhập (mục IV. ADR) |
-| GET | `/daily?date=&departmentId=` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) hoặc `nursingreports.read`/`manage` (mọi khoa) | Báo cáo của khoa trong ngày; bỏ trống `departmentId` là khoa của người dùng. Chưa có thì `status: "New"`, `id: null`, điền sẵn các dòng `carryOver` (nhân sự, chỉ tiêu) theo báo cáo đã gửi gần nhất (`carriedOverKeys`). Trả `{ id, departmentId, departmentName, reportDate, status, values, checks, notes, canEdit, canReopen, updatedBy, updatedAtUtc, submittedBy, submittedAtUtc, reopenedBy, reopenedAtUtc, reopenReason, carriedOverKeys, isReportingDepartment, hisEntry }`. `hisEntry` (số liệu HIS khoa nhập khi HIS lỗi; `null` khi khoa không có dòng nào phải nhập): `{ lines: [{ key, label, value, hisValue }], canEdit, hisHasValues, hisUpdatedAtUtc, updatedBy, updatedAtUtc }`; `hisValue` là số lấy từ HIS của ngày (nếu có) |
+| GET | `/daily?date=&departmentId=` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) hoặc `nursingreports.read`/`manage` (mọi khoa) | Báo cáo của khoa trong ngày; bỏ trống `departmentId` là khoa chính của người dùng (tài khoản nhiều khoa chọn được từng khoa của mình). Chưa có thì `status: "New"`, `id: null`, điền sẵn các dòng `carryOver` (nhân sự, chỉ tiêu) theo báo cáo đã gửi gần nhất (`carriedOverKeys`). Trả `{ id, departmentId, departmentName, reportDate, status, values, checks, notes, canEdit, canReopen, updatedBy, updatedAtUtc, submittedBy, submittedAtUtc, reopenedBy, reopenedAtUtc, reopenReason, carriedOverKeys, isReportingDepartment, hisEntry }`. `hisEntry` (số liệu HIS khoa nhập khi HIS lỗi; `null` khi khoa không có dòng nào phải nhập): `{ lines: [{ key, label, value, hisValue }], canEdit, hisHasValues, hisUpdatedAtUtc, updatedBy, updatedAtUtc }`; `hisValue` là số lấy từ HIS của ngày (nếu có) |
 | PUT | `/his-entry` | `nursingreports.submit` (khoa mình; thêm `scope.all_departments` thì mọi khoa) | `{ departmentId?, reportDate, values: { key: số \| null } }`: khoa nhập số liệu HIS của ngày khi HIS lỗi. Khoa phải báo cáo nhập `waitingAdmission` của khoa mình; khoa được giao (`PUT /departments`, `hisEntry`) nhập các chỉ số được giao. Lưu riêng, không khóa theo báo cáo đã gửi; ô `null` là xóa số đã nhập; ghi nhật ký. Trả báo cáo như `GET /daily`. Dòng không được giao hoặc số ngoài 0–99.999 → `400 values.{key}`; khoa không có dòng nào phải nhập → `422 nursing_reports.no_his_entry`; khoa khác khoa mình → `403`; ngày sau hôm nay hoặc quá 366 ngày → `400 reportDate` |
 | PUT | `/daily` | `nursingreports.submit` | `{ departmentId?, reportDate, values: { key: số \| null }, checks: { key: "ok" \| "issue" \| null }, notes, submit }`: tạo hoặc sửa báo cáo của khoa trong ngày; `submit: true` thì gửi luôn và khóa. Số từ 0 đến 99.999; gửi thì phải chọn đủ phần tick (`400 checks`). Khoa khác khoa mình → `403`; khoa chưa có trong danh sách báo cáo → `422 nursing_reports.department_not_reporting`; đã gửi → `422 nursing_reports.submitted`; ngày sau hôm nay hoặc quá 366 ngày → `400 reportDate` |
 | POST | `/{id}/reopen` | `nursingreports.manage` | `{ reason }` (bắt buộc, ≤ 500 ký tự): mở lại báo cáo đã gửi về nháp để khoa sửa và gửi lại (nút **Trả lại khoa** trên giao diện, quyết định 36). Chưa gửi → `422 nursing_reports.not_submitted` |

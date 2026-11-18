@@ -33,6 +33,11 @@ internal sealed class JwtTokenService(IOptions<JwtOptions> options, IClock clock
             payload[AppClaimTypes.Department] = departmentId.ToString();
         }
 
+        if (claims.AdditionalDepartmentIds is { Count: > 0 } additional)
+        {
+            payload[AppClaimTypes.AdditionalDepartment] = additional.Select(id => id.ToString()).ToArray();
+        }
+
         if (claims.Roles.Count > 0)
         {
             payload[AppClaimTypes.Role] = claims.Roles.ToArray();

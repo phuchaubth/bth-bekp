@@ -5,6 +5,13 @@ namespace Consent.Application.Patients;
 
 public sealed record PatientQuery(string? Keyword = null, int Page = 1, int PageSize = 20);
 
+/// <summary>
+/// Phạm vi danh sách người bệnh (quyết định 41). <see cref="All"/> = xem toàn viện; ngược lại danh sách và tìm theo họ tên chỉ
+/// gồm người bệnh có phiếu ở các khoa <see cref="DepartmentIds"/>, có phiếu do <see cref="UserId"/> lập, hoặc hồ sơ do
+/// <see cref="UserId"/> tạo. Tìm đúng mã người bệnh hoặc đủ số CCCD thì ra mọi người bệnh (để lập phiếu).
+/// </summary>
+public sealed record PatientScope(bool All, IReadOnlyList<Guid> DepartmentIds, Guid? UserId);
+
 /// <summary>Dòng dữ liệu tối thiểu cho danh sách (đã giải mã ở tầng Persistence, sẽ được che ở tầng Application).</summary>
 public sealed record PatientSummary(
     Guid Id,

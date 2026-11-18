@@ -1,6 +1,7 @@
 import { Alert, Card, Col, Empty, Flex, Row, Statistic, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { Link } from 'react-router'
+import { accountDepartments } from '../../api/auth'
 import { useDashboard, type DashboardFormItem } from '../../api/reports'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
@@ -13,6 +14,9 @@ import { SystemStatus } from './SystemStatus'
 /** Màn hình 2: số liệu trong phạm vi khoa của người dùng, việc chờ xử lý và biểu đồ 14 ngày gần nhất. */
 export function DashboardPage() {
   const { user, hasPermission } = useAuth()
+  const departmentNames = accountDepartments(user)
+    .map((d) => d.name)
+    .join(', ')
   const canSeeForms = hasPermission(Permissions.ConsentsRead)
   const dashboard = useDashboard(canSeeForms)
   const data = dashboard.data
@@ -31,7 +35,7 @@ export function DashboardPage() {
       </Typography.Title>
       <Typography.Paragraph type="secondary">
         Xin chào {user?.fullName}
-        {user?.departmentName ? ` – ${user.departmentName}` : ''}.
+        {departmentNames ? ` – ${departmentNames}` : ''}.
       </Typography.Paragraph>
       {dashboard.isError && <Alert type="error" showIcon title={errorMessage(dashboard.error)} style={{ marginBottom: 16 }} />}
       <Row gutter={[16, 16]}>

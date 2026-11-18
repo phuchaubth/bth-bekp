@@ -27,25 +27,45 @@ internal sealed class PatientRepository(ConsentDbContext db, IBlindIndexer blind
 
     /// <summary>
     /// Từ khóa là 12 chữ số → tìm chính xác theo số CCCD (qua chỉ mục mù); còn lại → tìm theo mã người bệnh
-    /// (chính xác) hoặc họ tên (không phân biệt dấu).
+    /// (chính xác) hoặc họ tên (không phân biệt dấu). Người không xem toàn viện (quyết định 41): danh sách và tìm theo họ tên
+    /// chỉ gồm người bệnh trong phạm vi (<see cref="PatientScope"/>); tìm đúng số CCCD hoặc mã người bệnh thì ra mọi người bệnh.
     /// </summary>
-    public async Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, CancellationToken cancellationToken)
+    public async Task<PagedResult<PatientSummary>> SearchAsync(PatientQuery query, PatientScope scope, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(scope);
         var patients = db.Patients.AsNoTracking();
+        var departmentIds = scope.DepartmentIds;
+        var userId = scope.UserId;
 
-        if (!string.IsNullOrWhiteSpace(query.Keyword))
+        if (!string.IsNullOrWhiteSpace(query.Keyword) && CitizenIdNumber.HasValidFormat(query.Keyword))
         {
-            var keyword = query.Keyword;
-            if (CitizenIdNumber.HasValidFormat(keyword))
+            var hash = blindIndexer.Compute(query.Keyword);
+            patients = patients.Where(p => EF.Property<string?>(p, PatientConfiguration.CitizenIdHash) == hash);
+        }
+        else if (scope.All)
+        {
+            if (!string.IsNullOrWhiteSpace(query.Keyword))
             {
-                var hash = blindIndexer.Compute(keyword);
-                patients = patients.Where(p => EF.Property<string?>(p, PatientConfiguration.CitizenIdHash) == hash);
-            }
-            else
-            {
+                var keyword = query.Keyword;
                 patients = patients.Where(p => p.PatientCode == keyword || p.FullName.Contains(keyword));
             }
+        }
+        else if (string.IsNullOrWhiteSpace(query.Keyword))
+        {
+            patients = patients.Where(p => (userId != null && p.CreatedByUserId == userId)
+                || db.ConsentForms.Any(f => f.PatientId == p.Id
+                    && (departmentIds.Contains(f.DepartmentId) || (userId != null && f.CreatedByUserId == userId))));
+        }
+        else
+        {
+            // Mã người bệnh đúng thì ra mọi người bệnh; họ tên chỉ trong phạm vi.
+            var keyword = query.Keyword;
+            patients = patients.Where(p => p.PatientCode == keyword
+                || (p.FullName.Contains(keyword)
+                    && ((userId != null && p.CreatedByUserId == userId)
+                        || db.ConsentForms.Any(f => f.PatientId == p.Id
+                            && (departmentIds.Contains(f.DepartmentId) || (userId != null && f.CreatedByUserId == userId))))));
         }
 
         var total = await patients.CountAsync(cancellationToken).ConfigureAwait(false);

@@ -22,6 +22,20 @@ export interface DepartmentInput {
   isActive: boolean
 }
 
+/** Kết quả lấy danh mục khoa/phòng từ HIS (quyết định 42). */
+export interface DepartmentSyncResult {
+  /** Số khoa/phòng HIS trả về (sau khi bỏ dòng lỗi, mã lặp). */
+  total: number
+  added: number
+  /** Đổi tên, nhận mã HIS hoặc dùng lại khoa đã ngừng sử dụng. */
+  updated: number
+  unchanged: number
+  /** Tên khoa/phòng chuyển sang ngừng sử dụng vì không còn trên HIS. */
+  deactivated: string[]
+  /** Mã các dòng bị bỏ qua (mã rỗng hoặc dài quá 20 ký tự). */
+  skipped: string[]
+}
+
 export interface PermissionDefinition {
   code: string
   name: string
@@ -40,13 +54,22 @@ export interface Role {
   isLocked?: boolean
 }
 
+/** Tên, mô tả của vai trò (quyết định 40); mã vai trò do máy chủ sinh và không đổi. */
+export interface RoleInput {
+  name: string
+  description: string | null
+}
+
 export interface UserListItem {
   id: string
   userName: string
   fullName: string
   title: string | null
+  /** Khoa/phòng chính. */
   departmentId: string | null
   departmentName: string | null
+  /** Tên các khoa/phòng khác (quyết định 41). */
+  additionalDepartmentNames?: string[] | null
   roleNames: string[]
   isActive: boolean
   isLockedOut: boolean
@@ -62,8 +85,11 @@ export interface UserDetail {
   email: string | null
   phoneNumber: string | null
   title: string | null
+  /** Khoa/phòng chính. */
   departmentId: string | null
   departmentName: string | null
+  /** Khoa/phòng khác (quyết định 41). */
+  additionalDepartments: { id: string; name: string }[]
   smartCaUserId: string | null
   roles: { id: string; code: string; name: string }[]
   isActive: boolean
@@ -87,7 +113,10 @@ export interface UserProfileInput {
   email?: string | null
   phoneNumber?: string | null
   title?: string | null
+  /** Khoa/phòng chính. */
   departmentId?: string | null
+  /** Khoa/phòng khác (quyết định 41); gửi danh sách đầy đủ, rỗng là không có. */
+  additionalDepartmentIds?: string[]
   smartCaUserId?: string | null
   roleIds: string[]
 }
@@ -116,11 +145,16 @@ export const adminApi = {
   updateDepartment: (id: string, input: DepartmentInput) =>
     apiRequest<Department>(`/api/v1/departments/${id}`, { method: 'PUT', body: input }),
   deleteDepartment: (id: string) => apiRequest<void>(`/api/v1/departments/${id}`, { method: 'DELETE' }),
+  syncDepartmentsFromHis: () => apiRequest<DepartmentSyncResult>('/api/v1/departments/sync-his', { method: 'POST' }),
 
   listRoles: (signal?: AbortSignal) => apiRequest<Role[]>('/api/v1/roles', { signal }),
   listPermissions: (signal?: AbortSignal) => apiRequest<PermissionDefinition[]>('/api/v1/permissions', { signal }),
   updateRolePermissions: (id: string, permissions: string[]) =>
     apiRequest<Role>(`/api/v1/roles/${id}/permissions`, { method: 'PUT', body: { permissions } }),
+  createRole: (input: RoleInput & { permissions: string[] }) =>
+    apiRequest<Role>('/api/v1/roles', { method: 'POST', body: input }),
+  updateRole: (id: string, input: RoleInput) => apiRequest<Role>(`/api/v1/roles/${id}`, { method: 'PUT', body: input }),
+  deleteRole: (id: string) => apiRequest<void>(`/api/v1/roles/${id}`, { method: 'DELETE' }),
 
   searchUsers: (query: UserQuery, signal?: AbortSignal) =>
     apiRequest<PagedResult<UserListItem>>(`/api/v1/users${toQueryString({ ...query })}`, { signal }),

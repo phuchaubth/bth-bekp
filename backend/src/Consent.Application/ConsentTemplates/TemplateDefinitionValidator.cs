@@ -80,7 +80,40 @@ public static partial class TemplateDefinitionValidator
         ValidateDocumentControl(definition.DocumentControl, errors);
         ValidatePatientLines(definition.PatientLines, declared, errors);
         ValidateSignatures(definition.Signatures, errors);
+        ValidateSectionSigners(definition, errors);
+        if (definition.Footnote is { Length: > TemplateDefinition.MaxFootnoteLength })
+        {
+            errors.Add($"Ghi chú cuối phiếu (\"footnote\"): tối đa {TemplateDefinition.MaxFootnoteLength} ký tự.");
+        }
+
         return errors;
+    }
+
+    /// <summary>
+    /// Ô ký in cuối phần (<see cref="TemplateSection.Signer"/>): người bệnh, xác nhận cuối hoặc một bước xác nhận trung gian của
+    /// mẫu; mỗi người ký in ở một phần.
+    /// </summary>
+    private static void ValidateSectionSigners(TemplateDefinition definition, List<string> errors)
+    {
+        var known = new HashSet<string>(StringComparer.Ordinal) { TemplateSection.PatientSigner, TemplateSection.HospitalSigner };
+        known.UnionWith(definition.Signatures?.Steps?.Select(step => step.Key).OfType<string>() ?? []);
+        var placed = new HashSet<string>(StringComparer.Ordinal);
+        for (var s = 0; s < definition.Sections.Count; s++)
+        {
+            if (definition.Sections[s]?.Signer is not { } signer)
+            {
+                continue;
+            }
+
+            if (!known.Contains(signer))
+            {
+                errors.Add($"Phần {s + 1}: người ký cuối phần (\"signer\") chỉ nhận \"patient\", \"hospital\" hoặc mã một bước xác nhận của mẫu.");
+            }
+            else if (!placed.Add(signer))
+            {
+                errors.Add($"Phần {s + 1}: người ký \"{signer}\" đã in ở cuối một phần khác.");
+            }
+        }
     }
 
     private static void ValidateDocumentControl(TemplateDocumentControl? control, List<string> errors)
@@ -94,6 +127,11 @@ public static partial class TemplateDefinitionValidator
         {
             errors.Add(
                 $"Mã tài liệu (\"documentControl\"): mã số, lần ban hành, ngày hiệu lực và các nhãn mỗi mục tối đa {TemplateDocumentControl.MaxLength} ký tự.");
+        }
+
+        if (control is { UnitInHead: true, TitleInHead: false })
+        {
+            errors.Add("Mã tài liệu (\"documentControl\"): \"unitInHead\" (tên đơn vị trên logo) chỉ dùng kèm \"titleInHead\".");
         }
     }
 
@@ -309,6 +347,9 @@ public static partial class TemplateDefinitionValidator
         }
     }
 
+    /// <summary>Số lựa chọn tối đa của một câu hỏi in thành hàng bảng (mỗi lựa chọn một ô).</summary>
+    private const int MaxRowOptions = 4;
+
     private static void ValidateBlock(TemplateBlock block, string where, Dictionary<string, TemplateBlock> declared, List<string> errors)
     {
         if (block.SameLine && !BlockTypes.CanShareLine(block.Type))
@@ -319,6 +360,22 @@ public static partial class TemplateDefinitionValidator
         if (block.PrintOptionsOnly && block.Type is not (BlockTypes.Choice or BlockTypes.MultiChoice))
         {
             errors.Add($"{where}: \"printOptionsOnly\" (chỉ in các ô lựa chọn) chỉ dùng cho câu hỏi chọn một hoặc chọn nhiều.");
+        }
+
+        if (block.Layout == TemplateBlock.LayoutRow
+            && (block.Type != BlockTypes.Choice || block.PrintOptionsOnly || block.Options is not { Count: >= 2 and <= MaxRowOptions }))
+        {
+            errors.Add($"{where}: \"layout\": \"row\" (một hàng của bảng) chỉ dùng cho câu hỏi chọn một có từ 2 đến {MaxRowOptions} lựa chọn, không kèm \"printOptionsOnly\".");
+        }
+
+        if (block.Box && block.Type != BlockTypes.List)
+        {
+            errors.Add($"{where}: \"box\" (in trong khung) chỉ dùng cho danh sách cố định.");
+        }
+
+        if (block.Heading && block.Type != BlockTypes.Paragraph)
+        {
+            errors.Add($"{where}: \"heading\" (in thành tiêu đề mục) chỉ dùng cho đoạn văn.");
         }
 
         switch (block.Type)
