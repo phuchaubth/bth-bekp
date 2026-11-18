@@ -7,6 +7,8 @@ using Consent.Application.Settings;
 using Consent.Domain.ConsentForms;
 using Consent.Domain.Patients;
 using Consent.Infrastructure.Pdf;
+using PdfSharp.Drawing;
+using PdfSharp.Events;
 using PdfSharp.Pdf.IO;
 using Mdom = MigraDoc.DocumentObjectModel;
 using Consent.Tests.Samples;
@@ -164,6 +166,26 @@ public sealed class ConsentPdfRendererTests
             Patient, null, new DateOnly(2026, 11, 11), IsFinal: true);
     }
 
+    /// <summary>
+    /// Mẫu in kiểu thường (không theo bản giấy): BM10 bỏ các tùy chọn in của bản giấy (đầu phiếu có mã tài liệu, song ngữ, ô ký
+    /// cuối từng phần, tên ô ký giữ chữ thường; quyết định 43).
+    /// </summary>
+    private static ConsentPdfDocument StandardDocument()
+    {
+        var document = HospitalDocument("QT-KNGT-BM10");
+        var definition = document.Definition;
+        return document with
+        {
+            Definition = definition with
+            {
+                DocumentControl = null,
+                Bilingual = false,
+                Sections = [.. definition.Sections.Select(section => section with { Signer = null, Banner = false, NewPage = false })],
+                Signatures = definition.Signatures! with { BoldTitles = false, PaperHints = false },
+            },
+        };
+    }
+
     /// <summary>Chữ ở đầu phiếu (tên đơn vị, khoa, quốc hiệu), mỗi ô một dòng.</summary>
     private static string HeadText(Mdom.Document layout)
     {
@@ -197,7 +219,7 @@ public sealed class ConsentPdfRendererTests
 
     [Theory]
     [InlineData("QT-KNGT-BM02", false)]
-    [InlineData("QT-KNGT-BM10", true)]
+    [InlineData("QT-KNGT-BM10", false)]
     [InlineData("TTNB-NGOAITRU", false)]
     [InlineData("TUVAN-CONGTT", false)]
     public void DepartmentLine_IsLeftOut_ForFormsWhosePaperVersionHasNone(string code, bool printed)
@@ -211,7 +233,9 @@ public sealed class ConsentPdfRendererTests
     [Fact]
     public void BilingualForm_PrintsThePatientSectionWithEnglishLabels()
     {
-        var bilingual = HospitalDocument("TUVAN-CONGTT");
+        // Mục "I. Thông tin người bệnh" kiểu thường (mẫu không khai báo dòng thông tin người bệnh như bản giấy).
+        var tuvan = HospitalDocument("TUVAN-CONGTT");
+        var bilingual = tuvan with { Definition = tuvan.Definition with { PatientLines = null } };
         var vietnameseOnly = bilingual with { Definition = bilingual.Definition with { Bilingual = false } };
 
         var layout = MigraDocConsentPdfRenderer.Build(bilingual);
@@ -249,7 +273,7 @@ public sealed class ConsentPdfRendererTests
         var logo = LogoImage.Read(Convert.FromBase64String(TestLogos.Png64))!;
         var withLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02") with { Logo = logo });
         var withoutLogo = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
-        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10"));
+        var standard = MigraDocConsentPdfRenderer.Build(StandardDocument());
 
         var head = withLogo.Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
         Assert.Equal(3, head.Cells.Count);
@@ -477,7 +501,7 @@ public sealed class ConsentPdfRendererTests
     public void Bm02_StaffSignsOnTheLeft_WithTitlesAsWritten_AndABilingualDateLine()
     {
         var bm02 = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM02"));
-        var standard = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10"));
+        var standard = MigraDocConsentPdfRenderer.Build(StandardDocument());
 
         Assert.Contains(BodyLines(bm02), l => l.EndsWith(", ngày (day) 11 tháng (month) 11 năm (year) 2026", StringComparison.Ordinal));
         Assert.Contains(BodyLines(standard), l => l.EndsWith(", ngày 11 tháng 11 năm 2026", StringComparison.Ordinal));
@@ -565,12 +589,13 @@ public sealed class ConsentPdfRendererTests
 
     /// <summary>Bệnh viện yêu cầu 15/11/2026: logo nhỏ lại, cạnh trên logo thẳng cạnh trên chữ quốc hiệu (cả hai kiểu đầu phiếu).</summary>
     [Theory]
-    [InlineData("QT-KNGT-BM02")]
-    [InlineData("TUVAN-CONGTT")]
-    public void Logo_IsAtMost15mmTall_AndTopAlignedWithTheMotto(string code)
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Logo_IsAtMost15mmTall_AndTopAlignedWithTheMotto(bool documentControl)
     {
         var logo = LogoImage.Read(TestPng.Rgba(300, 300, (x, y) => true, whiteBackground: true))!;
-        var head = MigraDocConsentPdfRenderer.Build(HospitalDocument(code) with { Logo = logo })
+        var document = documentControl ? HospitalDocument("QT-KNGT-BM02") : StandardDocument();
+        var head = MigraDocConsentPdfRenderer.Build(document with { Logo = logo })
             .Sections[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Tables.Table>().First().Rows[0];
         var logoParagraph = head.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single();
         var image = logoParagraph.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Shapes.Image>().Single();
@@ -852,8 +877,10 @@ public sealed class ConsentPdfRendererTests
     [Theory]
     [InlineData("QT-KNGT-BM02", null, 2)]
     [InlineData("TTNB-NGOAITRU", null, 2)]
+    // BM10 như bản giấy 6 trang (mỗi phần một trang, phần điều dưỡng và bác sĩ hai trang), kể cả khi có khung chữ ký. Phiếu
+    // tư vấn như bản giấy 3 trang.
     [InlineData("QT-KNGT-BM10", null, 6)]
-    [InlineData("TUVAN-CONGTT", Consent.Domain.ConsentForms.ConsentDecision.Agreed, 2)]
+    [InlineData("TUVAN-CONGTT", Consent.Domain.ConsentForms.ConsentDecision.Agreed, 3)]
     public void HospitalTemplates_RenderSignedPdf(string code, Consent.Domain.ConsentForms.ConsentDecision? decision, int maxPages)
     {
         var definition = TemplateDefinitionValidator.Parse(DefaultConsentTemplates.All.Single(t => t.Code == code).ContentJson).Definition!;
@@ -941,6 +968,395 @@ public sealed class ConsentPdfRendererTests
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.InRange(pdf.PageCount, 1, 6);
         Assert.Equal("%PDF", Encoding.ASCII.GetString(preview, 0, 4));
+    }
+
+    private static List<Mdom.DocumentObject> Elements(Mdom.Document layout) =>
+        layout.Sections[0].Elements.Cast<Mdom.DocumentObject>().ToList();
+
+    /// <summary>Chữ của một ô bảng: các đoạn nối bằng "\n".</summary>
+    private static string CellText(Mdom.Tables.Cell cell) =>
+        string.Join('\n', cell.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements)));
+
+    private static bool IsShaded(Mdom.Tables.Table table, Mdom.Color fill) => table.Rows[0].Shading.Color.RGB == fill.RGB;
+
+    /// <summary>Các bảng câu hỏi in thành hàng ("layout": "row"): bảng từ 3 cột trở lên, trừ bảng đầu phiếu.</summary>
+    private static List<Mdom.Tables.Table> RowTables(Mdom.Document layout) =>
+        Elements(layout).OfType<Mdom.Tables.Table>().Skip(1).Where(t => t.Columns.Count >= 3).ToList();
+
+    private static List<string[]> RowTexts(Mdom.Tables.Table table) =>
+        Enumerable.Range(0, table.Rows.Count)
+            .Select(r => Enumerable.Range(0, table.Columns.Count).Select(c => CellText(table.Rows[r].Cells[c])).ToArray())
+            .ToList();
+
+    /// <summary>Ô ký cuối phần ("signer", quyết định 43): bảng 2 cột, hàng ngày tháng rồi ba hàng của ô ký ở cột phải.</summary>
+    private sealed record SectionSigner(string Date, string Title, string Name, Mdom.Tables.Table Table);
+
+    private static List<SectionSigner> SectionSigners(Mdom.Document layout) =>
+        Elements(layout).OfType<Mdom.Tables.Table>()
+            .Where(t => t.Columns.Count == 2 && t.Rows.Count == 4 && t.Rows[0].KeepWith == 3)
+            .Select(t => new SectionSigner(
+                CellText(t.Rows[0].Cells[1]),
+                TextOf(t.Rows[1].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().First().Elements),
+                TextOf(t.Rows[3].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().FirstOrDefault()?.Elements ?? new Mdom.ParagraphElements()),
+                t))
+            .ToList();
+
+    /// <summary>
+    /// Bản giấy BM10 (lần ban hành 08, quyết định 43): bốn phần, phần 2–4 bắt đầu ở trang mới, tên phần trong dải nền màu (dòng
+    /// đầu chữ hoa, trừ phần trong ngoặc).
+    /// </summary>
+    [Fact]
+    public void Bm10_PrintsEachPartOnItsOwnPage_UnderAShadedBanner()
+    {
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10"));
+        var elements = Elements(layout);
+
+        var banners = elements.OfType<Mdom.Tables.Table>().Where(t => IsShaded(t, MigraDocConsentPdfRenderer.BannerFill)).ToList();
+        Assert.Equal(
+            [
+                "PHẦN NGƯỜI BỆNH TỰ KHAI (Người bệnh thực hiện trước khi đến khám)\n(Patient self-declaration section)\n"
+                + "(To be completed by the patient prior to consultation)",
+                "PHẦN NHÂN VIÊN BỘ PHẬN HƯỚNG DẪN THỰC HIỆN\n(Section for screening staff)",
+                "PHẦN ĐIỀU DƯỠNG THỰC HIỆN\n(Section for nursing staff)",
+                "PHẦN BÁC SĨ THỰC HIỆN (Physician section)",
+            ],
+            banners.Select(t => CellText(t.Rows[0].Cells[0])));
+        Assert.All(banners, t => Assert.Equal(167, t.Columns[0].Width.Millimeter, 1));
+        // Dòng đầu đậm (cả phần trong ngoặc), dòng tiếng Anh sau đó không đậm.
+        var first = banners[0].Rows[0].Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single()
+            .Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>().ToList();
+        Assert.True(Assert.Single(first, t => Plain(t).StartsWith("PHẦN NGƯỜI BỆNH", StringComparison.Ordinal)).Bold);
+        Assert.Equal(3, elements.OfType<Mdom.PageBreak>().Count());
+        // Ngắt trang đứng ngay trước dải tên phần (cách một đoạn trống nhỏ).
+        Assert.All(banners.Skip(1), banner => Assert.IsType<Mdom.PageBreak>(elements[elements.IndexOf(banner) - 2]));
+        // Tiêu đề mục ("heading"): chữ hoa, đậm, canh giữa, đi liền nội dung bên dưới.
+        var headings = BodyParagraphs(layout).Where(p => TextOf(p.Elements) == "A - NGUY CƠ TÉ NGÃ (FALL RISK)").ToList();
+        Assert.Equal(2, headings.Count);
+        Assert.All(headings, heading =>
+        {
+            Assert.Equal(Mdom.ParagraphAlignment.Center, heading.Format.Alignment);
+            Assert.True(heading.Format.KeepWithNext);
+            Assert.All(heading.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>(), t => Assert.True(t.Bold));
+        });
+
+        // Mẫu thường (không "banner", "newPage"): tên phần in đậm như cũ, không ngắt trang.
+        var standard = MigraDocConsentPdfRenderer.Build(StandardDocument());
+        Assert.Empty(Elements(standard).OfType<Mdom.PageBreak>());
+        Assert.DoesNotContain(Elements(standard).OfType<Mdom.Tables.Table>(), t => IsShaded(t, MigraDocConsentPdfRenderer.BannerFill));
+        var title = BodyParagraphs(standard).Single(p => TextOf(p.Elements) == "Phần điều dưỡng thực hiện\n(Section for nursing staff)");
+        Assert.True(title.Format.Font.Bold);
+    }
+
+    /// <summary>
+    /// Câu hỏi Có/Không của bản giấy BM10 in thành bảng kẻ ô ("layout": "row"): câu hỏi, rồi mỗi lựa chọn một ô; các câu liền
+    /// nhau chung một bảng; câu không hiển thị (PNST chỉ dành cho bệnh nhi) không in.
+    /// </summary>
+    [Fact]
+    public void Bm10_YesNoQuestions_ArePrintedAsRowsOfABorderedTable()
+    {
+        var tables = RowTables(MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10")));
+
+        Assert.Equal([2, 1, 2, 2, 2, 5], tables.Select(t => t.Rows.Count));
+        var patientFallRisk = tables[0];
+        Assert.Equal(0.5, patientFallRisk.Borders.Width.Point, 2);
+        Assert.Equal([115, 26, 26], Enumerable.Range(0, 3).Select(c => Math.Round(patientFallRisk.Columns[c].Width.Millimeter, 1)));
+        Assert.Equal(
+            [
+                ["1. Tôi đã bị té ngã từ 2 lần trở lên trong 3 tháng qua (I have fallen 2 times or more in the past 3 months)", "☐ Có (Yes)", "☒ Không (No)"],
+                [
+                    "2. Tôi cần phải dùng nạng hoặc xe lăn hoặc cần có người dìu đỡ khi di chuyển (I require a cane, crutches, wheelchair, or "
+                    + "assistance from another person when moving)",
+                    "☒ Có (Yes)",
+                    "☐ Không (No)",
+                ],
+            ],
+            RowTexts(patientFallRisk));
+        Assert.Equal(
+            [Checked, Unchecked],
+            Boxes(patientFallRisk.Rows[1].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single())
+                .Concat(Boxes(patientFallRisk.Rows[1].Cells[2].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single())));
+
+        // Lựa chọn dài (nhu cầu giáo dục sức khỏe): cột câu hỏi 70 mm, các ô lựa chọn chia đều phần còn lại.
+        var physician = tables[^1];
+        Assert.Equal([70, 48.5, 48.5], Enumerable.Range(0, 3).Select(c => Math.Round(physician.Columns[c].Width.Millimeter, 1)));
+        Assert.Equal(
+            [
+                ["Đau (Pain)", "☐ Không cần thiết (Not required)", "☒ Cần thiết, đã thực hiện tư vấn và xử trí (Required – counseling provided and addressed)"],
+                ["Khác (Other)", "☒ Không cần thiết (Not required)", "☐ Cần thiết, ghi rõ (Required – specify)"],
+            ],
+            RowTexts(physician).Where(row => row[0] is "Đau (Pain)" or "Khác (Other)"));
+    }
+
+    /// <summary>
+    /// Câu "row" liền nhau cùng số lựa chọn in chung một bảng; số lựa chọn khác thì sang bảng mới; câu đang ẩn không in. Câu đầu
+    /// tiên chưa trả lời vẫn in đủ ô trống.
+    /// </summary>
+    [Fact]
+    public void RowChoices_ShareATableOnlyWithTheSameNumberOfOptions()
+    {
+        var definition = TemplateDefinitionValidator.Parse("""
+            {"title":"T","sections":[{"blocks":[
+              {"type":"choice","key":"a","label":"A","layout":"row","options":[{"value":"y","label":"Có"},{"value":"n","label":"Không"}]},
+              {"type":"choice","key":"b","label":"B","layout":"row","options":[{"value":"y","label":"Có"},{"value":"n","label":"Không"}]},
+              {"type":"choice","key":"c","label":"C","layout":"row","options":[{"value":"1","label":"Một"},{"value":"2","label":"Hai"},{"value":"3","label":"Ba"}]},
+              {"type":"choice","key":"d","label":"D","layout":"row","visibleWhen":{"field":"a","in":["n"]},
+               "options":[{"value":"1","label":"Một"},{"value":"2","label":"Hai"},{"value":"3","label":"Ba"}]}]}]}
+            """).Definition!;
+        var evaluation = FormDataEvaluator.Evaluate(definition, new JsonObject { ["a"] = "y", ["c"] = "2" });
+        var document = new ConsentPdfDocument(
+            new HospitalOptions(), "Khoa Khám bệnh", "T-01", 1, "PDT-2026-000001", definition, evaluation.Data, evaluation.Scores,
+            Patient, null, new DateOnly(2026, 11, 11), IsFinal: false);
+
+        var tables = RowTables(MigraDocConsentPdfRenderer.Build(document));
+
+        Assert.Equal(2, tables.Count);
+        Assert.Equal([["A", "☒ Có", "☐ Không"], ["B", "☐ Có", "☐ Không"]], RowTexts(tables[0]));
+        Assert.Equal([["C", "☐ Một", "☒ Hai", "☐ Ba"]], RowTexts(tables[1]));
+    }
+
+    private const string Checked = MigraDocConsentPdfRenderer.Checked;
+    private const string Unchecked = MigraDocConsentPdfRenderer.Unchecked;
+
+    /// <summary>
+    /// Bản giấy BM10: mỗi phần kết thúc bằng ô ký của người thực hiện phần đó (người bệnh, nhân viên hướng dẫn, điều dưỡng, bác
+    /// sĩ), ngày tháng là ngày người đó ký hoặc xác nhận; chưa ký thì để chấm. Không còn khối chữ ký cuối phiếu.
+    /// </summary>
+    [Fact]
+    public void Bm10_EachPartEndsWithItsSigner_DatedOnTheDayTheySigned()
+    {
+        var vietnam = TimeSpan.FromHours(7);
+        var unsigned = HospitalDocument("QT-KNGT-BM10") with { IsFinal = false };
+        var signed = unsigned with
+        {
+            IsFinal = true,
+            PatientSignature = new ConsentPdfSignature(
+                SignatureImage.Normalize(TestPng.Signature()).Png!, new DateTimeOffset(2026, 11, 11, 7, 50, 0, vietnam)),
+            StepConfirmations =
+            [
+                new ConsentPdfConfirmation("Nhân Viên Hướng Dẫn (giả lập)", "Tiếp đón", new DateTimeOffset(2026, 11, 11, 8, 5, 0, vietnam)),
+                new ConsentPdfConfirmation("Điều Dưỡng Thử Nghiệm (giả lập)", "Điều dưỡng", new DateTimeOffset(2026, 11, 12, 8, 20, 0, vietnam)),
+            ],
+            HospitalConfirmation = new ConsentPdfConfirmation("Bác Sĩ Thử Nghiệm (giả lập)", "Bác sĩ", new DateTimeOffset(2026, 11, 13, 9, 0, 0, vietnam)),
+        };
+
+        var blank = SectionSigners(MigraDocConsentPdfRenderer.Build(unsigned));
+        var layout = MigraDocConsentPdfRenderer.Build(signed);
+        var dated = SectionSigners(layout);
+
+        Assert.Equal(
+            [
+                "Người bệnh (Patient)", "Nhân viên bộ phận hướng dẫn (Screening staff)", "Điều dưỡng thực hiện (Nurse in charge)",
+                "Bác sĩ thực hiện (Physician in charge)",
+            ],
+            blank.Select(s => s.Title));
+        Assert.All(blank, s => Assert.Equal("Ngày (Day) …… tháng (month) …… năm (year) 20……", s.Date));
+        Assert.Equal(
+            [
+                "Ngày (Day) 11 tháng (month) 11 năm (year) 2026", "Ngày (Day) 11 tháng (month) 11 năm (year) 2026",
+                "Ngày (Day) 12 tháng (month) 11 năm (year) 2026", "Ngày (Day) 13 tháng (month) 11 năm (year) 2026",
+            ],
+            dated.Select(s => s.Date));
+        Assert.Equal(
+            ["Phạm Thị Dung (giả lập)", "Nhân Viên Hướng Dẫn (giả lập)", "Điều Dưỡng Thử Nghiệm (giả lập)", "Bác Sĩ Thử Nghiệm (giả lập)"],
+            dated.Select(s => s.Name));
+        // Dòng ngày tháng song ngữ nằm trên một dòng của cột phải (trừ lề trong mặc định 1,2 mm mỗi bên), có hay chưa có ngày;
+        // cỡ chữ như nhau trước và sau khi ký để bố cục (số trang) không đổi.
+        static double DateSize(SectionSigner s) =>
+            s.Table.Rows[0].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single().Format.Font.Size.Point;
+        Assert.Equal(blank.Select(DateSize), dated.Select(DateSize));
+        Assert.All(blank.Concat(dated), s =>
+        {
+            var date = s.Table.Rows[0].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single();
+            var width = TextWidth(TextOf(date.Elements), date.Format.Font.Size.Point, XFontStyleEx.Italic);
+            Assert.True(width <= XUnit.FromMillimeter(s.Table.Columns[1].Width.Millimeter - 2.4).Point, $"{TextOf(date.Elements)}: {width:0.#} pt");
+        });
+        Assert.All(dated, s =>
+        {
+            // Ô ký ở nửa phải trang, ngày tháng và ô ký không tách trang; tên ô ký đậm, giữ chữ thường như bản giấy.
+            Assert.Empty(s.Table.Rows[1].Cells[0].Elements);
+            Assert.Equal(Mdom.ParagraphAlignment.Center, s.Table.Rows[0].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single().Format.Alignment);
+            Assert.All(
+                s.Table.Rows[1].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().First().Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>(),
+                t => Assert.True(t.Bold));
+        });
+        // Mỗi ô ký đứng cuối phần của mình: ô ký phần 1–3 đứng ngay trước ngắt trang.
+        var elements = Elements(layout);
+        Assert.All(dated.Take(3), s => Assert.IsType<Mdom.PageBreak>(elements[elements.IndexOf(s.Table) + 1]));
+        Assert.Same(dated[^1].Table, elements[^1]);
+        Assert.DoesNotContain(BodyLines(layout), l => l.Contains(", ngày (day)", StringComparison.Ordinal));
+    }
+
+    /// <summary>Người ký đã in ở cuối một phần thì không in lại trong khối chữ ký cuối phiếu; những người còn lại in như cũ.</summary>
+    [Fact]
+    public void SectionSigner_IsLeftOutOfTheSignatureBlockAtTheEnd()
+    {
+        var document = HospitalDocument("QT-KNGT-BM10");
+        var sections = document.Definition.Sections;
+        var patientOnly = document with
+        {
+            Definition = document.Definition with { Sections = [sections[0], .. sections.Skip(1).Select(s => s with { Signer = null })] },
+        };
+
+        var layout = MigraDocConsentPdfRenderer.Build(patientOnly);
+
+        Assert.Equal(["Người bệnh (Patient)"], SectionSigners(layout).Select(s => s.Title));
+        Assert.Contains(BodyLines(layout), l => l.EndsWith(", ngày (day) 11 tháng (month) 11 năm (year) 2026", StringComparison.Ordinal));
+        var end = Elements(layout).OfType<Mdom.Tables.Table>().Last();
+        Assert.Equal(6, end.Rows.Count);
+        Assert.Equal(
+            ["Nhân viên bộ phận hướng dẫn (Screening staff)", "Điều dưỡng thực hiện (Nurse in charge)", "Bác sĩ thực hiện (Physician in charge)", string.Empty],
+            new[] { end.Rows[0].Cells[0], end.Rows[0].Cells[1], end.Rows[3].Cells[0], end.Rows[3].Cells[1] }
+                .Select(c => c.Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Select(p => TextOf(p.Elements)).FirstOrDefault() ?? string.Empty));
+    }
+
+    /// <summary>
+    /// Bản giấy BM10: ô trái đầu phiếu in tên cơ quan chủ quản và tên bệnh viện phía trên logo ("unitInHead"), ô mã tài liệu
+    /// chữ nhỏ.
+    /// </summary>
+    [Fact]
+    public void UnitInHead_PrintsAgencyAndHospitalAboveTheCenteredLogo()
+    {
+        var logo = LogoImage.Read(TestPng.Rgba(400, 200, (x, y) => true, whiteBackground: true))!;
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10") with { Logo = logo });
+        var head = Elements(layout).OfType<Mdom.Tables.Table>().First().Rows[0];
+        var hospital = new HospitalOptions();
+        var vietnamese = new System.Globalization.CultureInfo("vi-VN");
+
+        var left = head.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().ToList();
+        Assert.Equal(2, left.Count);
+        Assert.Equal($"{hospital.ParentAgency.ToUpper(vietnamese)}\n{hospital.Name.ToUpper(vietnamese)}", TextOf(left[0].Elements));
+        Assert.True(Assert.Single(left[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>()).Bold);
+        Assert.Equal(Mdom.ParagraphAlignment.Center, left[1].Format.Alignment);
+        var image = left[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Shapes.Image>().Single();
+        Assert.Equal(26, image.Width.Millimeter, 1);
+        Assert.Equal(13, image.Height.Millimeter, 1);
+        var box = head.Cells[2].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single();
+        Assert.Equal(7.5, box.Format.Font.Size.Point);
+        Assert.Equal("Mã số (Code): QT-KNGT/BM10\nLần ban hành (Issue No): 08\nNgày hiệu lực (Effective Date): ", TextOf(box.Elements));
+        Assert.Equal(
+            "PHIẾU NHẬN ĐỊNH BAN ĐẦU VÀ NHU\nCẦU GIÁO DỤC SỨC KHOẺ NGƯỜI BỆNH\nNGOẠI TRÚ TẠI KHOA KHÁM BỆNH\nINITIAL ASSESSMENT FORM AND\n"
+            + "PATIENT HEALTH EDUCATION NEEDS\n(Outpatient – Department of Medical Examination)",
+            CellText(head.Cells[1]));
+        // Dòng phụ trong ngoặc của tên phiếu: chữ thường, nghiêng.
+        var subLine = Assert.Single(HeadTexts(layout), t => Plain(t) == "(Outpatient – Department of Medical Examination)");
+        Assert.True(subLine.Italic);
+        Assert.False(subLine.Bold);
+    }
+
+    /// <summary>Bề rộng (pt) của dòng chữ Tinos cỡ <paramref name="size"/>, đo bằng PDFsharp như khi in.</summary>
+    private static double TextWidth(string text, double size, XFontStyleEx style)
+    {
+        _ = new MigraDocConsentPdfRenderer(); // cài bộ font nhúng
+        using var measure = XGraphics.CreateMeasureContext(new XSize(2000, 2000), XGraphicsUnit.Point, XPageDirection.Downwards, new RenderEvents());
+        return measure.MeasureString(text, new XFont(EmbeddedFontResolver.FamilyName, size, style)).Width;
+    }
+
+    /// <summary>
+    /// Tên phiếu ở đầu phiếu ("titleInHead") dùng cỡ chữ lớn nhất (tối đa 12, như bản giấy TTNB) mà mỗi dòng vẫn nằm gọn trên
+    /// một dòng của cột giữa: tên phiếu dài (phiếu tư vấn, BM10) thu nhỏ thay vì xuống dòng giữa chừng.
+    /// </summary>
+    [Theory]
+    [InlineData("TTNB-NGOAITRU", false)]
+    [InlineData("TUVAN-CONGTT", true)]
+    [InlineData("QT-KNGT-BM10", true)]
+    public void HeadTitle_UsesTheLargestFontSizeAtWhichEveryLineFitsTheColumn(string code, bool shrinks)
+    {
+        var head = Elements(MigraDocConsentPdfRenderer.Build(HospitalDocument(code))).OfType<Mdom.Tables.Table>().First();
+        var title = head.Rows[0].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single();
+        var size = title.Format.Font.Size.Point;
+        var available = XUnit.FromMillimeter(head.Columns[1].Width.Millimeter - 3).Point;
+        var lines = TextOf(title.Elements).Split('\n');
+        double Widest(double fontSize) => lines.Max(line =>
+            TextWidth(line, fontSize, line.StartsWith('(') && line.EndsWith(')') ? XFontStyleEx.Italic : XFontStyleEx.Bold));
+
+        Assert.InRange(size, 8, 12);
+        Assert.True(Widest(size) <= available, $"Cỡ {size}: dòng rộng nhất {Widest(size):0.#} pt, cột {available:0.#} pt");
+        Assert.Equal(shrinks, size < 12);
+        if (shrinks)
+        {
+            Assert.True(Widest(size + 0.5) > available);
+        }
+    }
+
+    /// <summary>
+    /// Phiếu tư vấn theo bản giấy QĐ-VHTT-BM02 (quyết định 43): đầu phiếu có tên phiếu và mã tài liệu, thông tin người bệnh mỗi
+    /// mục một dòng, tên ô ký đậm giữ chữ thường.
+    /// </summary>
+    [Fact]
+    public void PortalConsultation_PrintsHeadPatientLinesAndSigners_LikeThePaperForm()
+    {
+        var layout = MigraDocConsentPdfRenderer.Build(HospitalDocument("TUVAN-CONGTT"));
+
+        Assert.EndsWith(
+            "\nPHIẾU TƯ VẤN THAM GIA VÀ SỬ DỤNG\nCỔNG THÔNG TIN CHÍNH THỨC CỦA BỆNH VIỆN\nCONSULTATION FORM FOR PARTICIPATION AND USE\n"
+            + "OF THE HOSPITAL’S OFFICIAL INFORMATION PORTALS\nMã số (Code): QĐ-VHTT-BM02\nLần ban hành (Issue number): 01\n"
+            + "Ngày hiệu lực (Effective date): ",
+            HeadText(layout));
+        Assert.Equal(
+            [
+                "Họ tên người bệnh (Patient’s full name): PHẠM THỊ DUNG (GIẢ LẬP)",
+                "Ngày sinh (Date of birth): 05/04/1988",
+                "Giới tính (Gender): ☐ Nam (Male)    ☒ Nữ (Female)",
+                "Địa chỉ của người bệnh (Address): Số 9 Đường Thử Nghiệm, Phường Mẫu",
+            ],
+            BodyLines(layout).Take(4));
+        Assert.Equal("Người bệnh/Người đại diện của người bệnh (Patient/Patient’s Representative)", SignatureCell(layout, 0).First());
+        Assert.Equal("Người tư vấn (*) (Consultant)", SignatureCell(layout, 1).First());
+        Assert.All(SignatureTitleRuns(layout, 1), t => Assert.True(t.Bold));
+        Assert.Equal(2, SignatureRoles(layout).Cells.Count);
+    }
+
+    /// <summary>
+    /// Bản giấy QĐ-VHTT-BM02: khung lưu ý nền xám viền xanh ("box"), tiêu đề đậm nghiêng, ba mục đánh số chữ nghiêng; phần
+    /// "Hướng dẫn thực hiện phiếu" ("footnote") in sau khối chữ ký, chữ nhỏ nghiêng dưới đường kẻ.
+    /// </summary>
+    [Fact]
+    public void PortalConsultation_PrintsTheNoticeBoxAndTheFootnote_LikeThePaperForm()
+    {
+        var elements = Elements(MigraDocConsentPdfRenderer.Build(HospitalDocument("TUVAN-CONGTT")));
+
+        var box = Assert.Single(elements.OfType<Mdom.Tables.Table>(), t => IsShaded(t, MigraDocConsentPdfRenderer.BoxFill));
+        Assert.Equal(4, box.Rows.Count);
+        var rows = Enumerable.Range(0, 4).Select(r => box.Rows[r]).ToList();
+        Assert.Equal("Xin Quý người bệnh và thân nhân lưu ý (Notice to Patients and Relatives)", CellText(rows[0].Cells[0]));
+        Assert.Collection(
+            rows.Skip(1).Select(r => CellText(r.Cells[0])),
+            item => Assert.StartsWith("1.\tCác kênh thông tin trên chỉ nhằm ghi nhận", item, StringComparison.Ordinal),
+            item => Assert.StartsWith("2.\tNgoài các kênh chính thống", item, StringComparison.Ordinal),
+            item => Assert.StartsWith("3.\tQuý người bệnh và thân nhân người bệnh chịu hoàn toàn trách nhiệm", item, StringComparison.Ordinal));
+        Assert.All(rows, r => Assert.Equal(MigraDocConsentPdfRenderer.BoxFill.RGB, r.Shading.Color.RGB));
+        Assert.Equal(1, rows[0].KeepWith);
+        Assert.Equal(1, rows[0].Borders.Top.Width.Point);
+        Assert.Equal(1, rows[^1].Borders.Bottom.Width.Point);
+        Assert.Equal(1, box.Borders.Left.Width.Point);
+        Assert.Equal(1, box.Borders.Right.Width.Point);
+        var runs = rows.Select(r => r.Cells[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().Single()
+            .Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>().ToList()).ToList();
+        Assert.All(runs[0], t => Assert.True(t.Bold == true && t.Italic == true));
+        Assert.All(runs.Skip(1).SelectMany(r => r), t => Assert.True(t.Italic));
+
+        var footnote = Assert.IsType<Mdom.Paragraph>(elements[^1]);
+        Assert.StartsWith(
+            "Hướng dẫn thực hiện phiếu (Instructions for completing the form)\n* Người tư vấn là Nhân viên chăm sóc khách hàng",
+            TextOf(footnote.Elements), StringComparison.Ordinal);
+        Assert.Equal(9, footnote.Format.Font.Size.Point);
+        Assert.True(footnote.Format.Font.Italic);
+        Assert.True(footnote.Format.KeepTogether);
+        Assert.Equal(0.5, footnote.Format.Borders.Top.Width.Point);
+        Assert.IsType<Mdom.Tables.Table>(elements[^2]);
+        // Mẫu không có ghi chú cuối phiếu: phiếu kết thúc bằng khối chữ ký.
+        Assert.IsType<Mdom.Tables.Table>(Elements(MigraDocConsentPdfRenderer.Build(HospitalDocument("TTNB-NGOAITRU")))[^1]);
+    }
+
+    /// <summary>Câu hỏi chọn trên một dòng: trường "sameLine" đứng sau in tiếp dòng đó, như "Có, ghi rõ (Yes, specify): …" của BM10.</summary>
+    [Fact]
+    public void Bm10_SpecifyField_ContinuesTheLineOfItsInlineChoice()
+    {
+        var lines = BodyLines(MigraDocConsentPdfRenderer.Build(HospitalDocument("QT-KNGT-BM10")));
+
+        Assert.Contains(
+            "2. Dị ứng (Allergies): ☐ Không (None)    ☒ Có, ghi rõ (Yes, specify)    Ghi rõ (Specify): Penicillin", lines);
+        Assert.DoesNotContain(lines, l => l.StartsWith("Ghi rõ (Specify)", StringComparison.Ordinal));
     }
 
     [Fact]

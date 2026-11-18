@@ -441,7 +441,7 @@ Mỗi mẫu phiếu quy định ai xác nhận. Với các mẫu hiện có:
 | QT-KNGT-BM02 – Giấy đồng thuận về chế độ thanh toán và quyền lợi khám chữa bệnh BHYT | Không, chỉ ký | Tiếp đón (xác nhận cuối) |
 | TTNB-NGOAITRU – Phiếu thông tin người bệnh ngoại trú | Không, chỉ ký | Tiếp đón (xác nhận cuối) |
 | QT-KNGT-BM10 – Phiếu nhận định ban đầu và nhu cầu giáo dục sức khỏe người bệnh ngoại trú | Không, chỉ ký | Tiếp đón → Điều dưỡng → Bác sĩ (xác nhận cuối) |
-| TUVAN-CONGTT – Phiếu tư vấn tham gia và sử dụng cổng thông tin chính thức của bệnh viện | Có: Đồng ý (Agree) / Không đồng ý (Disagree) | Tiếp đón → Điều dưỡng (xác nhận cuối) |
+| TUVAN-CONGTT – Phiếu tư vấn tham gia và sử dụng cổng thông tin chính thức của bệnh viện | Có: Đồng ý (Agree) / Không đồng ý (Disagree) | Người tư vấn (xác nhận cuối; mặc định vai trò Điều dưỡng, đổi ở *Sửa thông tin mẫu*) |
 
 Người quản lý mẫu phiếu có thể đổi cấu hình này (phần 5). Khung trên trang phiếu luôn cho biết bước nào đang chờ, vai trò nào cần xác nhận.
 

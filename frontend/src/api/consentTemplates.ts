@@ -59,7 +59,15 @@ export interface TemplateBlock {
   pattern?: string
   patternMessage?: string
   prefill?: string
-  layout?: 'inline' | 'ordered'
+  /**
+   * `inline`: các lựa chọn trên một dòng; `ordered`: danh sách đánh số; `row` (câu hỏi chọn một, 2–4 lựa chọn): PDF in thành
+   * một hàng của bảng kẻ ô (bảng Có/Không của bản giấy BM10), màn hình hiện lựa chọn trên một dòng.
+   */
+  layout?: 'inline' | 'ordered' | 'row'
+  /** Danh sách cố định in trong khung, `label` là tiêu đề khung (khung lưu ý của bản giấy QĐ-VHTT-BM02; PDF nền xám). */
+  box?: boolean
+  /** Đoạn văn: tiêu đề mục (PDF in đậm, canh giữa, chữ hoa; màn hình in đậm), ví dụ "A - Nguy cơ té ngã (Fall risk)". */
+  heading?: boolean
   /** PDF in trường này tiếp trên dòng của trường đứng trước (trường "nhãn: giá trị"); màn hình nhập liệu không đổi. */
   sameLine?: boolean
   /** Câu hỏi chọn: PDF chỉ in các ô lựa chọn (chữ đậm, dòng riêng), không in câu hỏi; màn hình vẫn hiện câu hỏi. */
@@ -79,6 +87,12 @@ export interface TemplateBlock {
 export interface TemplateSection {
   title?: string
   blocks: TemplateBlock[]
+  /** PDF in tên phần trong dải nền màu (các phần của bản giấy BM10). */
+  banner?: boolean
+  /** PDF bắt đầu phần này ở trang mới. */
+  newPage?: boolean
+  /** PDF in ô ký của người này ngay cuối phần: `patient`, `hospital` (xác nhận cuối) hoặc mã một bước xác nhận. */
+  signer?: string
 }
 
 export interface TemplateDefinition {
@@ -100,12 +114,16 @@ export interface TemplateDefinition {
     codeLabel?: string
     issueNoLabel?: string
     effectiveDateLabel?: string
+    /** Cùng `titleInHead`: in tên cơ quan chủ quản và tên bệnh viện phía trên logo (bản giấy BM10). */
+    unitInHead?: boolean
   }
   /** Dòng thông tin người bệnh in như bản giấy, thay cho mục "I. Thông tin người bệnh"; mỗi dòng 1–2 mục. */
   patientLines?: PatientLineItem[][]
   /** Đánh số 1, 2, 3… các dòng thông tin người bệnh (bản giấy TTNB); dòng `indent` không đánh số. */
   numberedPatientLines?: boolean
   sections: TemplateSection[]
+  /** Ghi chú in cuối PDF, sau khối chữ ký, chữ nhỏ nghiêng ("Hướng dẫn thực hiện phiếu" của bản giấy QĐ-VHTT-BM02). */
+  footnote?: string
   signatures?: TemplateSignatures
 }
 
@@ -149,6 +167,8 @@ export interface TemplateSignatures {
   centerDate?: boolean
   /** Ghi chú dưới tên ô ký in gần bằng cỡ tên ô ký và giữ nguyên sau khi nhân viên xác nhận. */
   paperHints?: boolean
+  /** PDF in tên ô ký đậm, giữ chữ thường như đã ghi (bản giấy QĐ-VHTT-BM02, BM10). */
+  boldTitles?: boolean
 }
 
 export interface TemplateStatement {

@@ -75,13 +75,39 @@ internal sealed class ConsentScenario
     }
 
     /// <summary>Thêm (đã phát hành) một trong bốn mẫu thật khởi tạo sẵn của bệnh viện.</summary>
-    public ConsentTemplate AddHospitalTemplate(string code)
+    public ConsentTemplate AddHospitalTemplate(string code) => AddHospitalTemplate(code, adjust: null);
+
+    /// <summary>Mẫu thật của bệnh viện; <paramref name="adjust"/> chỉnh định nghĩa cho kịch bản test (ví dụ thêm bước xác nhận).</summary>
+    public ConsentTemplate AddHospitalTemplate(string code, Action<JsonObject>? adjust)
     {
         var source = DefaultConsentTemplates.All.Single(t => t.Code == code);
-        var template = ConsentTemplate.Create(code, source.Name, source.HospitalSignerRoleCode, null, source.ContentJson, Ctx.Clock.UtcNow);
+        var content = source.ContentJson;
+        if (adjust is not null)
+        {
+            var definition = JsonNode.Parse(content)!.AsObject();
+            adjust(definition);
+            content = definition.ToJsonString();
+        }
+
+        var template = ConsentTemplate.Create(code, source.Name, source.HospitalSignerRoleCode, null, content, Ctx.Clock.UtcNow);
         template.Publish(1, Ctx.Clock.UtcNow);
         Ctx.Store.ConsentTemplates.Add(template);
         return template;
+    }
+
+    /// <summary>
+    /// Thêm bước xác nhận trung gian "người tư vấn" (tiếp đón) trước xác nhận cuối, như phiếu tư vấn trước quyết định 43, để thử bộ
+    /// phiếu có bước trung gian (bản giấy QĐ-VHTT-BM02 nay chỉ còn một người tư vấn ký).
+    /// </summary>
+    public static void WithConsultantStep(JsonObject definition)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        definition["signatures"]!["steps"] = new JsonArray(new JsonObject
+        {
+            ["key"] = "consultant",
+            ["roleCode"] = SystemRoles.Receptionist,
+            ["label"] = "Người tư vấn (Consultant)",
+        });
     }
 
     public static ConsentScenario Create()

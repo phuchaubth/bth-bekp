@@ -40,6 +40,9 @@ public sealed class ConsentBundleApiTests(SqlServerFixture sql) : IAsyncLifetime
     [Fact]
     public async Task Bundle_IsCreatedOnce_SignedOnceByThePatient_AndConfirmedTogether()
     {
+        // Phiên bản phiếu tư vấn có bước trung gian "người tư vấn": tiếp đón xác nhận BM02 và bước đó trong một lần.
+        await _client.PublishPortalConsultationWithConsultantStepAsync(
+            (await _client.LoginAsync("mauphieu.demo", TestSettings.DemoPassword)).AccessToken!);
         var receptionist = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
         var (_, patients) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/patients?keyword=001085000001", receptionist);
         var patientId = patients.GetProperty("items")[0].GetProperty("id").GetString()!;

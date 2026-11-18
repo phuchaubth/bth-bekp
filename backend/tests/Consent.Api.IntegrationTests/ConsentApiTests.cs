@@ -323,6 +323,8 @@ public sealed class ConsentApiTests(SqlServerFixture sql) : IAsyncLifetime
     [Fact]
     public async Task PortalConsultation_ConsultantConfirmsStep_ThenOnlyAWardNurseMayComplete()
     {
+        // Phiên bản phiếu tư vấn có bước trung gian "người tư vấn" (bản mặc định theo bản giấy chỉ một người ký).
+        await _client.PublishPortalConsultationWithConsultantStepAsync(await LoginDemoAsync("mauphieu.demo"));
         var receptionist = await LoginDemoAsync("tiepdon.demo");
         var patientId = await DemoPatientIdAsync(receptionist);
         var (_, available) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/consent-templates/available", receptionist);

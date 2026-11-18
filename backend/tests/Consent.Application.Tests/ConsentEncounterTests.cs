@@ -59,7 +59,7 @@ public sealed class ConsentEncounterTests
     private static async Task<(Guid BundleId, Guid Bm02, Guid Tuvan)> PatientSignedBundle(ConsentScenario s)
     {
         var bm02Template = s.AddHospitalTemplate("QT-KNGT-BM02");
-        var tuvanTemplate = s.AddHospitalTemplate("TUVAN-CONGTT");
+        var tuvanTemplate = s.AddHospitalTemplate("TUVAN-CONGTT", ConsentScenario.WithConsultantStep);
         s.LogInAs(s.Kkb, SystemRoles.Receptionist);
         var bundle = (await s.Service.CreateBundleAsync(new(s.Patient.Id, [bm02Template.Id, tuvanTemplate.Id], null), Ct)).Value;
         var bm02 = bundle.Forms.Single(f => f.TemplateId == bm02Template.Id).Id;

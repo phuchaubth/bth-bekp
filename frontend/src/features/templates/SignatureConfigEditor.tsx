@@ -64,8 +64,8 @@ function toValues(signatures: TemplateSignatures | undefined): SignatureValues {
 
 /**
  * Dựng lại khối `signatures`: bỏ ô trống (dùng nhãn mặc định), giữ mã bước cũ, tạo mã cho bước mới. Cách in ô ký trên PDF
- * (`hospitalFirst`, `plainTitles`, `patientHint`, `centerDate`, `paperHints`, sửa trong JSON) không có trên biểu mẫu này nên
- * giữ nguyên như trước khi lưu.
+ * (`hospitalFirst`, `plainTitles`, `patientHint`, `centerDate`, `paperHints`, `boldTitles`, sửa trong JSON) không có trên biểu
+ * mẫu này nên giữ nguyên như trước khi lưu.
  */
 function toSignatures(values: SignatureValues, previous?: TemplateSignatures): TemplateSignatures | undefined {
   const used = new Set(values.steps.map((s) => s.key).filter(Boolean))
@@ -104,6 +104,7 @@ function toSignatures(values: SignatureValues, previous?: TemplateSignatures): T
     patientHint: previous?.patientHint || undefined,
     centerDate: previous?.centerDate || undefined,
     paperHints: previous?.paperHints || undefined,
+    boldTitles: previous?.boldTitles || undefined,
   }
   const entries = Object.entries(signatures).filter(([, v]) => v !== undefined)
   return entries.length > 0 ? (Object.fromEntries(entries) as TemplateSignatures) : undefined
@@ -134,9 +135,12 @@ export function SignatureConfigEditor({
 
   const save = useMutation({
     mutationFn: (values: SignatureValues) => {
-      const { signatures: previous, ...rest } = version.definition
+      const { signatures: previous, sections, ...rest } = version.definition
       const signatures = toSignatures(values, previous)
-      const definition: TemplateDefinition = signatures ? { ...rest, signatures } : rest
+      // Ô ký cuối phần của bước vừa xóa thì bỏ (bước còn lại giữ mã nên vẫn in ở phần cũ); nếu không, máy chủ từ chối lưu.
+      const signers = new Set(['patient', 'hospital', ...(signatures?.steps?.map((step) => step.key) ?? [])])
+      const kept = sections.map(({ signer, ...section }) => (signer && signers.has(signer) ? { ...section, signer } : section))
+      const definition: TemplateDefinition = signatures ? { ...rest, sections: kept, signatures } : { ...rest, sections: kept }
       return consentTemplatesApi.updateDraft(version.templateId, version.versionNo, definition)
     },
     onSuccess: async (updated) => {
