@@ -303,7 +303,7 @@ public sealed class NursingReportServiceTests
         await SubmitAsync(_surgery, surgeryNurse, new()
         {
             ["currentPatients"] = 20, ["admissionsFromClinic"] = 3, ["admissionsByTransfer"] = 1, ["dischargesYesterday"] = 3,
-            ["expectedDischarges"] = 2,
+            ["expectedDischarges"] = 2, ["foreignPatients"] = 2, ["transfersOutYesterday"] = 1,
             ["newAdmissions"] = 1, ["adr"] = 1, ["outsideExams"] = 1, ["transfers"] = 1,
             ["boneMarrow"] = 2, ["paracentesis"] = 5, ["cvp"] = 1,
         });
@@ -322,7 +322,8 @@ public sealed class NursingReportServiceTests
         ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
         var summary = await _ctx.CreateNursingSummaryService().GetAsync(Today, CancellationToken.None);
 
-        // Khoa sắp theo tên; khoa không phải báo cáo (Khoa Khám bệnh) không có dòng.
+        // Khoa sắp theo mã khoa (tên viết tắt, in ở cột khoa phòng); khoa không phải báo cáo (Khoa Khám bệnh) không có dòng.
+        Assert.Equal(["NGOAIB", "NOIA"], summary.Rows.Select(r => r.DepartmentCode));
         Assert.Equal(["Khoa Ngoại B (giả lập)", "Khoa Nội A (giả lập)"], summary.Rows.Select(r => r.DepartmentName));
         var surgery = summary.Rows[0];
         Assert.Equal(NursingReportState.Submitted, surgery.Status);
@@ -331,6 +332,8 @@ public sealed class NursingReportServiceTests
         Assert.Equal(20, surgery.Cells["currentPatients"]);
         Assert.Equal(3, surgery.Cells["admissionsFromClinic"]);
         Assert.Equal(1, surgery.Cells["admissionsByTransfer"]);
+        Assert.Equal(2, surgery.Cells["foreignPatients"]);
+        Assert.Equal(1, surgery.Cells["transfersOutYesterday"]);
         Assert.Equal(0, surgery.Cells["scheduledAdmissions"]);
         Assert.Null(surgery.Cells[NursingHisIndicators.WaitingAdmission]);
         Assert.Equal(1, surgery.Cells["adr"]);
@@ -363,6 +366,19 @@ public sealed class NursingReportServiceTests
         Assert.True(summary.Statistics.HasValues);
         Assert.Equal(NursingStatisticsSource.His, summary.Statistics.Source);
         Assert.Equal(_office.FullName, summary.Statistics.UpdatedBy);
+
+        // Người báo cáo từng mục (quyết định 44): B, D lấy từ HIS; C là khoa có số PTTT; E, F không khoa nào báo "Không ổn" hay
+        // sự cố nên là mọi khoa đã gửi (cột người báo cáo của mục A). Khoa Nội A chỉ lưu nháp: không có người báo cáo.
+        Assert.Equal(surgeryNurse.FullName, surgery.SubmittedBy);
+        Assert.Null(ward.SubmittedBy);
+        Assert.Equal(
+            new NursingSummaryReportersDto(
+                $"{_office.FullName} (lấy từ HIS)",
+                $"{surgeryNurse.FullName} (NGOAIB)",
+                $"{_office.FullName} (lấy từ HIS)",
+                NursingReportForm.AllSubmittedReporters,
+                NursingReportForm.AllSubmittedReporters),
+            summary.Reporters);
     }
 
     [Fact]
@@ -377,13 +393,21 @@ public sealed class NursingReportServiceTests
         ActAs(_office, Permissions.NursingReportsRead);
         var summary = await _ctx.CreateNursingSummaryService().GetAsync(Today, CancellationToken.None);
 
+        // Khoa ghi bằng mã khoa (quyết định 44).
         var supply = summary.Situation.Single(c => c.Key == "drugSupply");
-        Assert.Equal("Không ổn: Khoa Nội A (giả lập)", supply.Text);
-        Assert.Equal(["Khoa Nội A (giả lập)"], supply.IssueDepartments);
+        Assert.Equal("Không ổn: NOIA", supply.Text);
+        Assert.Equal(["NOIA"], supply.IssueDepartments);
         Assert.Equal("Ổn", summary.Situation.Single(c => c.Key == "professional").Text);
         var note = Assert.Single(summary.Incidents);
+        Assert.Equal("NOIA", note.DepartmentCode);
         Assert.Equal("Khoa Nội A (giả lập)", note.DepartmentName);
         Assert.Equal("Thiếu thuốc X (giả lập)\nĐã báo khoa Dược", note.Text);
+        // Người báo cáo mục E, F: khoa báo "Không ổn", khoa báo cáo sự cố; mục C không khoa nào có số PTTT: mọi khoa đã gửi.
+        Assert.Equal($"{_nurse.FullName} (NOIA)", summary.Reporters.Situation);
+        Assert.Equal($"{_nurse.FullName} (NOIA)", summary.Reporters.Incidents);
+        Assert.Equal(NursingReportForm.AllSubmittedReporters, summary.Reporters.Procedures);
+        Assert.Null(summary.Reporters.Outpatient);
+        Assert.Null(summary.Reporters.Imaging);
     }
 
     [Fact]
@@ -399,6 +423,7 @@ public sealed class NursingReportServiceTests
         Assert.All(summary.Procedures, l => Assert.Null(l.Value));
         Assert.All(summary.Situation, c => Assert.Null(c.Text));
         Assert.False(summary.Statistics.HasValues);
+        Assert.Equal(new NursingSummaryReportersDto(null, null, null, null, null), summary.Reporters);
     }
 
     [Fact]
@@ -530,8 +555,11 @@ public sealed class NursingReportServiceTests
         ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
         var summary = await _ctx.CreateNursingSummaryService().GetAsync(Today, CancellationToken.None);
         Assert.Equal(412, summary.Outpatient.Single().Value);
-        Assert.Equal(clinic.Name, summary.Outpatient.Single().EnteredBy);
+        Assert.Equal("KKB", summary.Outpatient.Single().EnteredBy);
         Assert.Null(summary.Imaging.Single(l => l.Key == NursingHisIndicators.XRay).Value);
+        // Người báo cáo mục B là người khoa đã nhập tay; mục D chưa có số.
+        Assert.Equal($"{clinicNurse.FullName} (KKB)", summary.Reporters.Outpatient);
+        Assert.Null(summary.Reporters.Imaging);
         Assert.Equal(3, summary.Rows.Single(r => r.DepartmentId == _ward.Id).Cells[NursingHisIndicators.WaitingAdmission]);
         Assert.Null(summary.Rows.Single(r => r.DepartmentId == _surgery.Id).Cells[NursingHisIndicators.WaitingAdmission]);
         Assert.False(summary.Statistics.HasValues);
@@ -762,11 +790,16 @@ public sealed class NursingReportServiceTests
         Assert.Equal(new Dictionary<string, int> { ["nurses"] = 18 }, figures.Values);
         Assert.Equal(new Dictionary<string, string> { ["professional"] = "ok" }, figures.Checks);
         Assert.Same(NursingReportFigures.Empty, NursingReportFigures.Parse("{không phải json"));
+        // Ghi kèm phiên bản mẫu; số liệu lưu trước khi có phiên bản là phiên bản 1.
+        Assert.Equal(1, figures.Version);
         Assert.Equal(
-            """{"values":{"currentPatients":3,"nurses":1},"checks":{"security":"issue"}}""",
+            """{"values":{"currentPatients":3,"nurses":1},"checks":{"security":"issue"},"form":2}""",
             new NursingReportFigures(
                 new Dictionary<string, int> { ["nurses"] = 1, ["currentPatients"] = 3 },
                 new Dictionary<string, string> { ["security"] = "issue" }).ToJson());
+        Assert.Equal(2, NursingReportFigures.Parse("""{"values":{},"checks":{},"form":2}""").Version);
+        Assert.Equal(1, NursingReportFigures.Parse("""{"values":{},"checks":{},"form":"hai"}""").Version);
+        Assert.Equal(1, NursingReportFigures.Parse("""{"values":{},"checks":{},"form":0}""").Version);
     }
 
     [Fact]
@@ -788,18 +821,93 @@ public sealed class NursingReportServiceTests
         Assert.Null(ward.Cells["admissionsByTransfer"]);
         Assert.Equal(40, ward.Cells["currentPatients"]);
         Assert.Equal(0, ward.Cells["noBed"]);
+        // Báo cáo lưu trước khi có hai dòng mới (quyết định 44): để trống, không ghi 0.
+        Assert.Null(ward.Cells["foreignPatients"]);
+        Assert.Null(ward.Cells["transfersOutYesterday"]);
         // Báo cáo mới bỏ trống một dòng thì tính 0 như mọi ô khác.
         var surgery = summary.Rows.Single(r => r.DepartmentId == _surgery.Id);
         Assert.Equal(2, surgery.Cells["admissionsFromClinic"]);
         Assert.Equal(0, surgery.Cells["admissionsByTransfer"]);
+        Assert.Equal(0, surgery.Cells["foreignPatients"]);
+        Assert.Equal(0, surgery.Cells["transfersOutYesterday"]);
         Assert.Equal(2, summary.Totals["admissionsFromClinic"]);
         Assert.Equal(0, summary.Totals["admissionsByTransfer"]);
+        Assert.Equal(0, summary.Totals["foreignPatients"]);
 
         // Khoa không nhập mới được số tổng cũ.
         ActAs(_nurse, Permissions.NursingReportsSubmit);
         var old = await _ctx.CreateNursingReportService().SaveAsync(
             Request(new() { ["admissionsYesterday"] = 4 }, date: Today.AddDays(-1)), CancellationToken.None);
         Assert.True(old.Error!.FieldErrors!.ContainsKey("values.admissionsYesterday"));
+    }
+
+    /// <summary>
+    /// Người báo cáo từng mục (quyết định 44): mỗi người một lần, theo thứ tự mã khoa (C) hoặc thứ tự dòng (B, D); số Phòng Điều
+    /// dưỡng nhập tay trước quyết định 35 ghi Phòng Điều dưỡng; tài khoản không còn thì "Không rõ". Khoa xếp theo mã, không theo
+    /// tên (mã HHNL1 trước NGOAIB dù tên "Trung tâm…" sau "Khoa…").
+    /// </summary>
+    [Fact]
+    public void Summary_Reporters_NameEachPersonOnce_WithTheirDepartmentCode()
+    {
+        var hematology = Guid.NewGuid();
+        var surgery = Guid.NewGuid();
+        var imaging = Guid.NewGuid();
+        var departments = new List<NursingSummaryDepartment>
+        {
+            new(surgery, "NGOAIB", "Khoa Ngoại B (giả lập)", IsReporting: true, BedCount: 20),
+            new(hematology, "HHNL1", "Trung tâm Huyết học người lớn 1 (giả lập)", IsReporting: true, BedCount: 30),
+            new(imaging, "CDHA", "Khoa Chẩn đoán hình ảnh (giả lập)", IsReporting: false, BedCount: null),
+        };
+        var hematologyNurse = Guid.NewGuid();
+        var surgeryNurse = Guid.NewGuid();
+        var office = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        NursingDailyReport Submitted(Guid department, Guid nurse, Dictionary<string, int> values, string? issue = null)
+        {
+            var checks = NursingReportForm.Checks.ToDictionary(
+                c => c.Key, c => c.Key == issue ? NursingReportForm.CheckIssue : NursingReportForm.CheckOk, StringComparer.Ordinal);
+            var report = NursingDailyReport.Create(
+                department,
+                Today,
+                new NursingReportFigures(values, checks).ToJson(),
+                null,
+                nurse,
+                now);
+            report.Submit(nurse, now);
+            return report;
+        }
+
+        var summary = NursingSummaryBuilder.Build(
+            Today,
+            departments,
+            [
+                // "ĐD thực hiện thuốc" không có trên bảng tổng hợp (mục E): báo không ổn dòng này không tính người báo cáo mục E.
+                Submitted(surgery, surgeryNurse, new() { ["cvp"] = 1 }, issue: "drugAdministration"),
+                Submitted(hematology, hematologyNurse, new() { ["boneMarrow"] = 4, ["marrowBiopsy"] = 1 }),
+            ],
+            // Người gửi báo cáo khoa Ngoại B không còn tài khoản.
+            new Dictionary<Guid, string> { [hematologyNurse] = "Điều dưỡng HHNL1 (giả lập)", [office] = "Phòng Điều dưỡng Demo" },
+            new NursingStatisticsValues(
+                new Dictionary<string, int>
+                {
+                    [NursingHisIndicators.OutpatientVisits] = 686, [NursingHisIndicators.Ultrasound] = 40, [NursingHisIndicators.XRay] = 65,
+                    [NursingHisIndicators.Mri] = 3,
+                },
+                new Dictionary<Guid, int>()),
+            new NursingStatisticsInfoDto(
+                true, true, NursingStatisticsSource.Manual, now, "Phòng Điều dưỡng Demo",
+                [new NursingHisEntryStatusDto(imaging, "Khoa Chẩn đoán hình ảnh (giả lập)", [NursingHisIndicators.Ultrasound], now, "KTV CĐHA (giả lập)")],
+                true),
+            new Dictionary<string, Guid> { [NursingHisIndicators.Ultrasound] = imaging });
+
+        Assert.Equal(["HHNL1", "NGOAIB"], summary.Rows.Select(r => r.DepartmentCode));
+        Assert.Equal(["Điều dưỡng HHNL1 (giả lập)", null], summary.Rows.Select(r => r.SubmittedBy));
+        Assert.Equal("Phòng Điều dưỡng Demo (Phòng Điều dưỡng)", summary.Reporters.Outpatient);
+        // X-quang và MRI cùng do Phòng Điều dưỡng nhập: ghi một lần.
+        Assert.Equal("KTV CĐHA (giả lập) (CDHA); Phòng Điều dưỡng Demo (Phòng Điều dưỡng)", summary.Reporters.Imaging);
+        Assert.Equal("CDHA", summary.Imaging.Single(l => l.Key == NursingHisIndicators.Ultrasound).EnteredBy);
+        Assert.Equal("Điều dưỡng HHNL1 (giả lập) (HHNL1); Không rõ (NGOAIB)", summary.Reporters.Procedures);
+        Assert.Equal(NursingReportForm.AllSubmittedReporters, summary.Reporters.Situation);
     }
 
     [Fact]
@@ -811,17 +919,30 @@ public sealed class NursingReportServiceTests
             ["I. NHÂN SỰ", "II. NHÂN VIÊN TRONG NGÀY", "III. TÌNH HÌNH NGƯỜI BỆNH", "IV. PHẢN ỨNG CÓ HẠI THUỐC (ADR)",
              "V. SỐ CA ĐI NGOẠI VIỆN", "VI. SỐ LƯỢNG NB"],
             form.Sections.Select(s => s.Title));
-        Assert.Equal([4, 8, 30, 0, 4, 9], form.Sections.Select(s => s.Items.Count));
+        Assert.Equal([4, 8, 30, 0, 4, 11], form.Sections.Select(s => s.Items.Count));
         Assert.Equal("adr", form.Sections[3].ValueKey);
         Assert.Equal(8, form.Checks.Count);
-        Assert.Equal(56, NursingReportForm.ValueKeys.Count);
-        // Bảng A: cột "Số ca nhập viện ngày hôm trước" của bản giấy tách thành nhập khoa từ PK và do CK (quyết định 38).
+        Assert.Equal(58, NursingReportForm.ValueKeys.Count);
+        // Bảng A: cột "Số ca nhập viện ngày hôm trước" của bản giấy tách thành nhập khoa từ PK và do CK (quyết định 38); thêm
+        // "Người nước ngoài" sau số NB hiện tại và "Chuyển khoa" sau cột xuất viện (quyết định 44).
         Assert.Equal(
-            ["beds", "currentPatients", "admissionsFromClinic", "admissionsByTransfer", "dischargesYesterday", "expectedDischarges",
-             "scheduledAdmissions", "newAdmissions", "waitingAdmission", "noBed", "adr", "outsideVisits"],
+            ["beds", "currentPatients", "foreignPatients", "admissionsFromClinic", "admissionsByTransfer", "dischargesYesterday",
+             "transfersOutYesterday", "expectedDischarges", "scheduledAdmissions", "newAdmissions", "waitingAdmission", "noBed", "adr",
+             "outsideVisits"],
             NursingReportForm.SummaryColumns.Select(c => c.Key));
-        Assert.Equal("Nhập khoa từ PK", NursingReportForm.SummaryColumns[2].Header);
-        Assert.Equal("Nhập khoa do CK", NursingReportForm.SummaryColumns[3].Header);
+        Assert.Equal(
+            ["Người nước ngoài", "Nhập khoa từ PK", "Nhập khoa do CK", "Số ca Xuất viện ngày hôm trước", "Chuyển khoa"],
+            NursingReportForm.SummaryColumns.Skip(2).Take(5).Select(c => c.Header));
+        // Báo cáo khoa nhập hai dòng mới ở mục VI, ngay sau dòng tương ứng; báo cáo lưu bằng mẫu cũ để trống hai cột này.
+        var counts = form.Sections[5].Items.Select(i => i.Key).ToList();
+        Assert.Equal("foreignPatients", counts[counts.IndexOf("currentPatients") + 1]);
+        Assert.Equal("transfersOutYesterday", counts[counts.IndexOf("dischargesYesterday") + 1]);
+        Assert.Equal(
+            ["Số NB người nước ngoài", "Số ca chuyển khoa ngày hôm trước"],
+            form.Sections[5].Items.Where(i => i.Since == 2).Select(i => i.Label));
+        Assert.Equal(2, NursingReportForm.Since("foreignPatients"));
+        Assert.Equal(1, NursingReportForm.Since("currentPatients"));
+        Assert.Equal(1, NursingReportForm.Since(NursingReportForm.BedsColumn));
         Assert.Equal(
             ["Số ca nhập khoa từ PK ngày hôm trước", "Số ca nhập khoa do CK ngày hôm trước"],
             form.Sections[5].Items.Where(i => NursingReportForm.AdmissionKeys.Contains(i.Key)).Select(i => i.Label));

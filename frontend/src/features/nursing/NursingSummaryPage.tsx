@@ -18,6 +18,7 @@ import {
   Select,
   Spin,
   Table,
+  Tooltip,
   Typography,
   type TableColumnsType,
 } from 'antd'
@@ -196,19 +197,35 @@ function HisEntryStatusLine({ summary }: { summary: NursingSummary }) {
   )
 }
 
-/** Mục A–F như bản giấy. */
+/** Người báo cáo của một mục (quyết định 44); mục chưa có số liệu ghi "chưa có". */
+function Reporters({ text }: { text: string | null }) {
+  return (
+    <Typography.Paragraph type="secondary" style={{ marginTop: -8, marginBottom: 16 }}>
+      Người báo cáo: {text ?? 'chưa có'}
+    </Typography.Paragraph>
+  )
+}
+
+/** Mục A–F như bản giấy; khoa ghi bằng mã khoa (tên viết tắt), mỗi mục có người báo cáo (quyết định 44). */
 export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOpen: (row: NursingSummaryRow) => void }) {
   const columns: TableColumnsType<NursingSummaryRow> = [
     {
       title: 'Khoa phòng',
-      dataIndex: 'departmentName',
+      dataIndex: 'departmentCode',
       fixed: 'left',
-      width: 220,
-      render: (name: string, row) => (
+      width: 110,
+      render: (code: string, row) => (
         <Flex vertical gap={2}>
-          <Button type="link" style={{ padding: 0, height: 'auto', alignSelf: 'flex-start', textAlign: 'start', whiteSpace: 'normal' }} onClick={() => onOpen(row)}>
-            {name}
-          </Button>
+          <Tooltip title={row.departmentName}>
+            <Button
+              type="link"
+              aria-label={`${code} – ${row.departmentName}`}
+              style={{ padding: 0, height: 'auto', alignSelf: 'flex-start', textAlign: 'start', whiteSpace: 'normal' }}
+              onClick={() => onOpen(row)}
+            >
+              {code}
+            </Button>
+          </Tooltip>
           <span>{statusTag(row.status)}</span>
         </Flex>
       ),
@@ -217,10 +234,11 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: c.header,
       key: c.key,
       align: 'right' as const,
-      // 12 cột số (quyết định 38) vẫn vừa màn hình rộng 1366 điểm ảnh, không phải cuộn ngang.
-      width: 84,
+      // 14 cột số và cột người báo cáo (quyết định 44) vẫn vừa màn hình rộng 1366 điểm ảnh, không phải cuộn ngang.
+      width: 72,
       render: (_: unknown, row: NursingSummaryRow) => number(row.cells[c.key]),
     })),
+    { title: 'Người báo cáo', key: 'submittedBy', dataIndex: 'submittedBy', width: 150 },
   ]
 
   return (
@@ -246,6 +264,7 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
                   <b>{number(summary.totals[c.key])}</b>
                 </Table.Summary.Cell>
               ))}
+              <Table.Summary.Cell index={summary.columns.length + 1} />
             </Table.Summary.Row>
           </Table.Summary>
         )}
@@ -253,13 +272,13 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       />
       <Row gutter={16}>
         <Col xs={24} lg={8}>
-          <LineTable title="B. Số liệu khoa khám bệnh" lines={summary.outpatient} />
+          <LineTable title="B. Số liệu khoa khám bệnh" lines={summary.outpatient} reporters={summary.reporters.outpatient} />
         </Col>
         <Col xs={24} lg={8}>
-          <LineTable title="C. Số liệu PTTT" lines={summary.procedures} />
+          <LineTable title="C. Số liệu PTTT" lines={summary.procedures} reporters={summary.reporters.procedures} />
         </Col>
         <Col xs={24} lg={8}>
-          <LineTable title="D. Số liệu CĐHA" lines={summary.imaging} />
+          <LineTable title="D. Số liệu CĐHA" lines={summary.imaging} reporters={summary.reporters.imaging} />
         </Col>
       </Row>
       <Typography.Title level={5}>E. Tình hình trong ngày</Typography.Title>
@@ -280,6 +299,7 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
         ]}
         style={{ marginBottom: 16 }}
       />
+      <Reporters text={summary.reporters.situation} />
       <Typography.Title level={5}>F. Báo cáo cụ thể sự cố (nếu có)</Typography.Title>
       {summary.incidents.length === 0 ? (
         <Typography.Paragraph type="secondary">Không có.</Typography.Paragraph>
@@ -291,20 +311,27 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
           pagination={false}
           dataSource={summary.incidents}
           columns={[
-            { title: 'Khoa', dataIndex: 'departmentName', width: '25%' },
+            {
+              title: 'Khoa',
+              dataIndex: 'departmentCode',
+              width: '15%',
+              render: (code: string, note) => <Tooltip title={note.departmentName}>{code}</Tooltip>,
+            },
             {
               title: 'Nội dung báo cáo sự cố',
               dataIndex: 'text',
               render: (text: string) => <span style={{ whiteSpace: 'pre-wrap' }}>{text}</span>,
             },
           ]}
+          style={{ marginBottom: 16 }}
         />
       )}
+      <Reporters text={summary.reporters.incidents} />
     </>
   )
 }
 
-function LineTable({ title, lines }: { title: string; lines: NursingSummaryLine[] }) {
+function LineTable({ title, lines, reporters }: { title: string; lines: NursingSummaryLine[]; reporters: string | null }) {
   return (
     <>
       <Typography.Title level={5}>{title}</Typography.Title>
@@ -334,6 +361,7 @@ function LineTable({ title, lines }: { title: string; lines: NursingSummaryLine[
         ]}
         style={{ marginBottom: 16 }}
       />
+      <Reporters text={reporters} />
     </>
   )
 }

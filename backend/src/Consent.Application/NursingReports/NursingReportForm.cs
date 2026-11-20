@@ -4,9 +4,10 @@ namespace Consent.Application.NursingReports;
 
 /// <summary>
 /// Một dòng số liệu của báo cáo khoa. <paramref name="CarryOver"/>: báo cáo mới điền sẵn theo báo cáo đã gửi gần nhất của
-/// khoa (số ít thay đổi như nhân sự, chỉ tiêu), vẫn sửa được.
+/// khoa (số ít thay đổi như nhân sự, chỉ tiêu), vẫn sửa được. <paramref name="Since"/>: phiên bản mẫu thêm dòng này
+/// (<see cref="NursingReportForm.FormVersion"/>); báo cáo lưu bằng mẫu cũ hơn để trống dòng này trên bảng tổng hợp, không ghi 0.
 /// </summary>
-public sealed record NursingReportItem(string Key, string Label, bool CarryOver = false);
+public sealed record NursingReportItem(string Key, string Label, bool CarryOver = false, int Since = 1);
 
 /// <summary>
 /// Một mục (I–VI) của phần số liệu. <paramref name="ValueKey"/>: dòng tiêu đề mục cũng là ô nhập số (mục IV. ADR, bản giấy
@@ -87,6 +88,32 @@ public static class NursingReportForm
     /// <summary>Hai dòng tách từ "Số ca nhập viện ngày hôm trước" (quyết định 38).</summary>
     public static IReadOnlyList<string> AdmissionKeys { get; } = [AdmissionsFromClinicKey, AdmissionsByTransferKey];
 
+    /// <summary>Số người bệnh người nước ngoài (quyết định 44).</summary>
+    public const string ForeignPatientsKey = "foreignPatients";
+
+    /// <summary>Số ca chuyển khoa (chuyển sang khoa khác) ngày hôm trước (quyết định 44).</summary>
+    public const string TransfersOutKey = "transfersOutYesterday";
+
+    /// <summary>
+    /// Phiên bản mẫu báo cáo khoa, ghi kèm số liệu khi lưu (<see cref="NursingReportFigures.Version"/>). 1: mẫu ban đầu (quyết
+    /// định 31, 38); 2: thêm số người bệnh người nước ngoài và số ca chuyển khoa (quyết định 44).
+    /// </summary>
+    public const int FormVersion = 2;
+
+    /// <summary>Cột cuối bảng A: người gửi báo cáo của khoa (quyết định 44).</summary>
+    public const string ReporterHeader = "Người báo cáo";
+
+    /// <summary>
+    /// Người báo cáo của mục C, E, F khi không khoa nào có số liệu PTTT, báo "Không ổn" hay báo cáo sự cố: mục đó tổng hợp từ báo
+    /// cáo của mọi khoa đã gửi.
+    /// </summary>
+    public const string AllSubmittedReporters = "Các khoa đã gửi báo cáo (cột Người báo cáo, mục A)";
+
+    /// <summary>Chỗ ký cuối bảng tổng hợp (quyết định 44).</summary>
+    public const string SignatureTitle = "PHÒNG ĐIỀU DƯỠNG";
+
+    public const string SignatureHint = "(Ký, ghi rõ họ tên)";
+
     public static IReadOnlyList<NursingReportSection> Sections { get; } =
     [
         new("I. NHÂN SỰ",
@@ -152,12 +179,14 @@ public static class NursingReportForm
         [
             new("quotaPatients", "Số NB theo chỉ tiêu", CarryOver: true),
             new("currentPatients", "Số NB hiện tại"),
+            new(ForeignPatientsKey, "Số NB người nước ngoài", Since: 2),
             new("expectedDischarges", "Dự kiến xuất viện"),
             new("scheduledAdmissions", "Hẹn nhập viện"),
             new("newAdmissions", "Nhận mới"),
             new(AdmissionsFromClinicKey, "Số ca nhập khoa từ PK ngày hôm trước"),
             new(AdmissionsByTransferKey, "Số ca nhập khoa do CK ngày hôm trước"),
             new("dischargesYesterday", "Số ca xuất viện ngày hôm trước"),
+            new(TransfersOutKey, "Số ca chuyển khoa ngày hôm trước", Since: 2),
             new("noBed", "* Chưa có giường"),
         ]),
     ];
@@ -184,15 +213,18 @@ public static class NursingReportForm
 
     /// <summary>
     /// Cột số của bảng A, theo thứ tự bản giấy; cột "Số ca nhập viện ngày hôm trước" của bản giấy tách thành nhập khoa từ PK và
-    /// do CK (quyết định 38).
+    /// do CK (quyết định 38); thêm "Người nước ngoài" sau "Số NB hiện tại" và "Chuyển khoa" sau cột xuất viện (quyết định 44).
+    /// Sau các cột số là cột <see cref="ReporterHeader"/>.
     /// </summary>
     public static IReadOnlyList<NursingSummaryColumn> SummaryColumns { get; } =
     [
         new(BedsColumn, "Số giường thực kê (Không tính băng ca)"),
         new("currentPatients", "Số NB hiện tại"),
+        new(ForeignPatientsKey, "Người nước ngoài"),
         new(AdmissionsFromClinicKey, "Nhập khoa từ PK"),
         new(AdmissionsByTransferKey, "Nhập khoa do CK"),
         new("dischargesYesterday", "Số ca Xuất viện ngày hôm trước"),
+        new(TransfersOutKey, "Chuyển khoa"),
         new("expectedDischarges", "Dự kiến xuất viện"),
         new("scheduledAdmissions", "Hẹn nhập viện"),
         new("newAdmissions", "Dự kiến Nhận mới"),
@@ -245,6 +277,12 @@ public static class NursingReportForm
 
     public static IReadOnlyList<string> CarryOverKeys { get; } =
         [.. Sections.SelectMany(s => s.Items).Where(i => i.CarryOver).Select(i => i.Key)];
+
+    /// <summary>Phiên bản mẫu thêm dòng <paramref name="key"/> (1 với dòng có từ đầu và cột không phải dòng của báo cáo khoa).</summary>
+    public static int Since(string key) => SinceVersions.GetValueOrDefault(key, 1);
+
+    private static readonly Dictionary<string, int> SinceVersions =
+        Sections.SelectMany(s => s.Items).Where(i => i.Since > 1).ToDictionary(i => i.Key, i => i.Since, StringComparer.Ordinal);
 
     public static NursingReportFormDto Definition { get; } = new(
         Title, Category, Sections, Checks, IssueLabel, OkLabel, NotesLabel, MaxValue, NursingDailyReport.NotesMaxLength);

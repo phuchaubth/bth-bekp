@@ -75,9 +75,14 @@ public sealed record SaveNursingReportRequest(
 
 public sealed record ReopenNursingReportRequest(string? Reason);
 
-/// <summary>Một dòng (khoa) của bảng A. <paramref name="Cells"/>: theo khóa cột, <c>null</c> là ô trống.</summary>
+/// <summary>
+/// Một dòng (khoa) của bảng A. <paramref name="DepartmentCode"/>: mã khoa (tên viết tắt) in ở cột khoa phòng (quyết định 44).
+/// <paramref name="SubmittedBy"/>: người gửi báo cáo, in ở cột "Người báo cáo". <paramref name="Cells"/>: theo khóa cột,
+/// <c>null</c> là ô trống.
+/// </summary>
 public sealed record NursingSummaryRowDto(
     Guid DepartmentId,
+    string DepartmentCode,
     string DepartmentName,
     bool IsReporting,
     Guid? ReportId,
@@ -86,14 +91,21 @@ public sealed record NursingSummaryRowDto(
     DateTimeOffset? SubmittedAtUtc,
     IReadOnlyDictionary<string, int?> Cells);
 
-/// <summary>Một dòng mục B, C, D. <paramref name="EnteredBy"/>: tên khoa đã nhập tay số này khi HIS lỗi (mục B, D).</summary>
+/// <summary>Một dòng mục B, C, D. <paramref name="EnteredBy"/>: mã khoa đã nhập tay số này khi HIS lỗi (mục B, D).</summary>
 public sealed record NursingSummaryLineDto(string Key, string Label, int? Value, string? EnteredBy = null);
 
-/// <summary>Một dòng mục E: "Ổn", "Không ổn: khoa…" hoặc trống khi chưa khoa nào gửi.</summary>
+/// <summary>Một dòng mục E: "Ổn", "Không ổn: mã khoa…" hoặc trống khi chưa khoa nào gửi.</summary>
 public sealed record NursingSummaryCheckDto(string Key, string Label, string? Text, IReadOnlyList<string> IssueDepartments);
 
-/// <summary>Một dòng mục F: phần báo cáo nhập thêm của khoa.</summary>
-public sealed record NursingSummaryNoteDto(Guid DepartmentId, string DepartmentName, string Text);
+/// <summary>Một dòng mục F: phần báo cáo nhập thêm của khoa (mã khoa in ở cột khoa).</summary>
+public sealed record NursingSummaryNoteDto(Guid DepartmentId, string DepartmentCode, string DepartmentName, string Text);
+
+/// <summary>
+/// Người báo cáo từng mục B–F (quyết định 44), dạng "Họ tên (mã khoa)" cách nhau bởi dấu chấm phẩy; <c>null</c> khi mục chưa
+/// có số liệu. B, D: người khoa nhập tay khi HIS lỗi, hoặc người lấy số liệu từ HIS. C, E, F: người gửi báo cáo của các khoa có
+/// số liệu PTTT, báo "Không ổn", báo cáo sự cố; không khoa nào có thì là <see cref="NursingReportForm.AllSubmittedReporters"/>.
+/// </summary>
+public sealed record NursingSummaryReportersDto(string? Outpatient, string? Procedures, string? Imaging, string? Situation, string? Incidents);
 
 /// <summary>
 /// Số liệu HIS của ngày: số lấy từ HIS (lúc lấy, người bấm; <paramref name="Source"/> <c>Manual</c> là số Phòng Điều dưỡng
@@ -130,7 +142,8 @@ public sealed record NursingSummaryDto(
     IReadOnlyList<NursingSummaryNoteDto> Incidents,
     NursingStatisticsInfoDto Statistics,
     int SubmittedCount,
-    int ReportingCount);
+    int ReportingCount,
+    NursingSummaryReportersDto Reporters);
 
 /// <summary>
 /// Một khoa trên màn hình cài khoa báo cáo: có phải báo cáo không, số giường thực kê, các chỉ số toàn viện khoa nhập tay khi

@@ -106,6 +106,8 @@ export interface NursingSummaryColumn {
 
 export interface NursingSummaryRow {
   departmentId: string
+  /** Mã khoa (tên viết tắt), in ở cột khoa phòng của bảng tổng hợp. */
+  departmentCode: string
   departmentName: string
   isReporting: boolean
   reportId: string | null
@@ -119,7 +121,7 @@ export interface NursingSummaryLine {
   key: string
   label: string
   value: number | null
-  /** Tên khoa đã nhập tay số này khi HIS lỗi (mục B, D). */
+  /** Mã khoa đã nhập tay số này khi HIS lỗi (mục B, D). */
   enteredBy?: string | null
 }
 
@@ -132,8 +134,20 @@ export interface NursingSummaryCheck {
 
 export interface NursingSummaryNote {
   departmentId: string
+  departmentCode: string
   departmentName: string
   text: string
+}
+
+/**
+ * Người báo cáo từng mục B–F ("Họ tên (mã khoa)", cách nhau bởi dấu chấm phẩy); `null` khi mục chưa có số liệu.
+ */
+export interface NursingSummaryReporters {
+  outpatient: string | null
+  procedures: string | null
+  imaging: string | null
+  situation: string | null
+  incidents: string | null
 }
 
 export interface NursingStatisticsInfo {
@@ -173,6 +187,7 @@ export interface NursingSummary {
   statistics: NursingStatisticsInfo
   submittedCount: number
   reportingCount: number
+  reporters: NursingSummaryReporters
 }
 
 export interface NursingReportDepartment {

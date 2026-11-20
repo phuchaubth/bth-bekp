@@ -118,8 +118,20 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(47, row.GetProperty("cells").GetProperty("currentPatients").GetInt32());
         Assert.Equal(1, row.GetProperty("cells").GetProperty("outsideVisits").GetInt32());
         Assert.Equal(2, summary.GetProperty("procedures")[0].GetProperty("value").GetInt32());
-        Assert.StartsWith("Không ổn", summary.GetProperty("situation")[1].GetProperty("text").GetString(), StringComparison.Ordinal);
+        Assert.Equal("Không ổn: NOI", summary.GetProperty("situation")[1].GetProperty("text").GetString());
         Assert.Equal(Notes, summary.GetProperty("incidents")[0].GetProperty("text").GetString());
+        // Quyết định 44: mã khoa (tên viết tắt), hai cột mới (báo cáo gửi sau khi có hai dòng: bỏ trống là 0), người báo cáo
+        // ở cột cuối mục A và dưới mỗi mục B–F.
+        Assert.Equal("NOI", row.GetProperty("departmentCode").GetString());
+        Assert.Equal("NOI", summary.GetProperty("incidents")[0].GetProperty("departmentCode").GetString());
+        Assert.Equal(0, row.GetProperty("cells").GetProperty("foreignPatients").GetInt32());
+        Assert.Equal(0, row.GetProperty("cells").GetProperty("transfersOutYesterday").GetInt32());
+        Assert.Equal("Điều dưỡng Demo", row.GetProperty("submittedBy").GetString());
+        var reporters = summary.GetProperty("reporters");
+        Assert.Equal(JsonValueKind.Null, reporters.GetProperty("outpatient").ValueKind);
+        Assert.Equal("Điều dưỡng Demo (NOI)", reporters.GetProperty("procedures").GetString());
+        Assert.Equal("Điều dưỡng Demo (NOI)", reporters.GetProperty("situation").GetString());
+        Assert.Equal("Điều dưỡng Demo (NOI)", reporters.GetProperty("incidents").GetString());
 
         using (var pdf = await _client.SendAsync(Authorized(HttpMethod.Get, $"/api/v1/nursing-reports/summary/pdf?date={Today}", office)))
         {
@@ -203,7 +215,9 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         var (summaryStatus, summary) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
         Assert.Equal(HttpStatusCode.OK, summaryStatus);
         Assert.Equal(686, summary.GetProperty("outpatient")[0].GetProperty("value").GetInt32());
-        Assert.False(string.IsNullOrEmpty(summary.GetProperty("outpatient")[0].GetProperty("enteredBy").GetString()));
+        Assert.Equal("NOI", summary.GetProperty("outpatient")[0].GetProperty("enteredBy").GetString());
+        // Người báo cáo mục B là người khoa đã nhập tay (quyết định 44).
+        Assert.Equal("Điều dưỡng Demo (NOI)", summary.GetProperty("reporters").GetProperty("outpatient").GetString());
         var row = summary.GetProperty("rows").EnumerateArray().Single(r => r.GetProperty("departmentId").GetString() == noi);
         Assert.Equal(2, row.GetProperty("cells").GetProperty("waitingAdmission").GetInt32());
         var statistics = summary.GetProperty("statistics");

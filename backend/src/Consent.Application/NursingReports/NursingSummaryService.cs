@@ -49,7 +49,7 @@ public sealed class NursingSummaryService(
         var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
         var summaryDepartments = allDepartments
             .Select(d => new NursingSummaryDepartment(
-                d.Id, d.Name, d.IsActive && configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))
+                d.Id, d.Code, d.Name, d.IsActive && configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))
             .ToList();
 
         // Khoa phải nhập tay khi HIS lỗi: khoa phải báo cáo (NB PK chờ nhập viện) và khoa được giao chỉ số toàn viện.
@@ -85,7 +85,7 @@ public sealed class NursingSummaryService(
             names,
             merged.Values,
             info,
-            merged.HospitalEnteredBy.ToDictionary(p => p.Key, p => departmentNames.GetValueOrDefault(p.Value) ?? string.Empty, StringComparer.Ordinal));
+            merged.HospitalEnteredBy);
     }
 
     public async Task<NursingReportFile> RenderPdfAsync(DateOnly reportDate, CancellationToken cancellationToken)

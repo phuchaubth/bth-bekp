@@ -92,6 +92,7 @@ const summary: NursingSummary = {
   rows: [
     {
       departmentId: 'd-ngoai',
+      departmentCode: 'NGOAIB',
       departmentName: 'Khoa Ngoại B (giả lập)',
       isReporting: true,
       reportId: null,
@@ -102,6 +103,7 @@ const summary: NursingSummary = {
     },
     {
       departmentId: 'd-noi',
+      departmentCode: 'NOI',
       departmentName: 'Khoa Nội tổng hợp',
       isReporting: true,
       reportId: 'r-noi',
@@ -117,9 +119,18 @@ const summary: NursingSummary = {
   imaging: [{ key: 'xray', label: 'TS X-quang', value: 65 }],
   situation: [
     { key: 'professional', label: 'Vấn đề chuyên môn', text: 'Ổn', issueDepartments: [] },
-    { key: 'drugSupply', label: 'Tình hình cung cấp thuốc', text: 'Không ổn: Khoa Nội tổng hợp', issueDepartments: ['Khoa Nội tổng hợp'] },
+    { key: 'drugSupply', label: 'Tình hình cung cấp thuốc', text: 'Không ổn: NOI', issueDepartments: ['NOI'] },
   ],
-  incidents: [{ departmentId: 'd-noi', departmentName: 'Khoa Nội tổng hợp', text: 'Người bệnh A (giả lập) sốt về đêm\nĐã báo bác sĩ trực' }],
+  incidents: [
+    { departmentId: 'd-noi', departmentCode: 'NOI', departmentName: 'Khoa Nội tổng hợp', text: 'Người bệnh A (giả lập) sốt về đêm\nĐã báo bác sĩ trực' },
+  ],
+  reporters: {
+    outpatient: 'Phòng Điều dưỡng Demo (lấy từ HIS)',
+    procedures: 'Điều dưỡng Demo (NOI)',
+    imaging: null,
+    situation: 'Điều dưỡng Demo (NOI)',
+    incidents: 'Điều dưỡng Demo (NOI)',
+  },
   statistics: {
     hisAvailable: true,
     hasValues: true,
@@ -429,14 +440,33 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     expect(screen.getByText(/Khoa đã gửi:/)).toHaveTextContent('Khoa đã gửi: 1/2')
     expect(screen.getByText(/Số liệu HIS lấy lúc/)).toBeInTheDocument()
     const table = screen.getAllByRole('table')[0]
-    expect(within(table).getByText('Khoa Ngoại B (giả lập)')).toBeInTheDocument()
+    // Quyết định 44: cột khoa phòng ghi mã khoa (tên đầy đủ khi rê chuột, đọc được qua nhãn nút); cột cuối là người báo cáo.
+    expect(within(table).getByRole('button', { name: 'NGOAIB – Khoa Ngoại B (giả lập)' })).toHaveTextContent('NGOAIB')
+    expect(within(table).queryByText('Khoa Ngoại B (giả lập)')).not.toBeInTheDocument()
+    expect(within(table).getAllByRole('columnheader').at(-1)).toHaveTextContent('Người báo cáo')
+    const noiRow = within(table).getByRole('button', { name: 'NOI – Khoa Nội tổng hợp' }).closest('tr')!
+    expect(within(noiRow).getAllByRole('cell').at(-1)).toHaveTextContent('Điều dưỡng Demo')
     expect(within(table).getByText('Tổng')).toBeInTheDocument()
+    // Dòng tổng có đủ ô tới cột người báo cáo (kẻ viền thẳng hàng với tiêu đề).
+    const totalRow = within(table).getByText('Tổng').closest('tr')!
+    expect(totalRow.querySelectorAll('td')).toHaveLength(within(table).getAllByRole('columnheader').length)
     expect(within(table).getByText('65')).toBeInTheDocument()
     expect(screen.getByText('686')).toBeInTheDocument()
-    expect(screen.getByText('Không ổn: Khoa Nội tổng hợp')).toBeInTheDocument()
+    expect(screen.getByText('Không ổn: NOI')).toBeInTheDocument()
     expect(screen.getByText(/Người bệnh A \(giả lập\) sốt về đêm/)).toBeInTheDocument()
+    // Mục F: cột khoa ghi mã khoa.
+    const incidentRow = screen.getByText(/Người bệnh A \(giả lập\) sốt về đêm/).closest('tr')!
+    expect(within(incidentRow).getAllByRole('cell')[0]).toHaveTextContent(/^NOI$/)
+    // Mỗi mục B–F có dòng người báo cáo; mục chưa có số liệu ghi "chưa có".
+    expect(screen.getAllByText(/^Người báo cáo: /).map((p) => p.textContent)).toEqual([
+      'Người báo cáo: Phòng Điều dưỡng Demo (lấy từ HIS)',
+      'Người báo cáo: Điều dưỡng Demo (NOI)',
+      'Người báo cáo: chưa có',
+      'Người báo cáo: Điều dưỡng Demo (NOI)',
+      'Người báo cáo: Điều dưỡng Demo (NOI)',
+    ])
 
-    await user.click(within(table).getByText('Khoa Nội tổng hợp'))
+    await user.click(within(table).getByRole('button', { name: 'NOI – Khoa Nội tổng hợp' }))
     const drawer = await screen.findByRole('dialog', { name: /Khoa Nội tổng hợp/ })
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain('departmentId=d-noi')
     expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
@@ -454,6 +484,11 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     expect(await screen.findByText('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')).toBeInTheDocument()
     expect(await within(drawer).findByText(/^Đã trả lại khoa lúc .* bởi Phòng Điều dưỡng Demo$/)).toBeInTheDocument()
     expect(within(drawer).getByText('Lý do: Sai số NB hiện tại')).toBeInTheDocument()
+
+    // Rê chuột vào mã khoa thấy tên khoa đầy đủ. Kiểm tra sau cùng: AntD trong môi trường test đặt cùng id cho chú thích và
+    // tiêu đề ngăn kéo, nên chú thích mở trước sẽ làm sai tên ngăn kéo. Chú thích của mã NOI (đã bấm) vẫn còn trong trang.
+    await user.hover(within(table).getByRole('button', { name: 'NGOAIB – Khoa Ngoại B (giả lập)' }))
+    await waitFor(() => expect(screen.getAllByRole('tooltip').map((t) => t.textContent)).toContain('Khoa Ngoại B (giả lập)'))
   })
 
   it('xuất Excel, lấy số liệu HIS (báo mã khoa không khớp), lỗi HIS thì báo các khoa nhập tay', { timeout: 20_000 }, async () => {
