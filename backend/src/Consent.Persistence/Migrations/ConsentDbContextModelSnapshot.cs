@@ -503,6 +503,10 @@ namespace Consent.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("ShortName")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
@@ -951,6 +955,9 @@ namespace Consent.Persistence.Migrations
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");

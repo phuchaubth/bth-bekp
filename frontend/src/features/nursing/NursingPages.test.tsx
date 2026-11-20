@@ -145,9 +145,9 @@ const summary: NursingSummary = {
 }
 
 const departments: NursingReportDepartment[] = [
-  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', isActive: true, isReporting: false, bedCount: null, hisIndicators: ['outpatientVisits'] },
-  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', isActive: true, isReporting: true, bedCount: 25, hisIndicators: [] },
-  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', isActive: true, isReporting: true, bedCount: 40, hisIndicators: [] },
+  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', shortName: null, isActive: true, isReporting: false, bedCount: null, hisIndicators: ['outpatientVisits'] },
+  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', shortName: null, isActive: true, isReporting: true, bedCount: 25, hisIndicators: [] },
+  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', shortName: null, isActive: true, isReporting: true, bedCount: 40, hisIndicators: [] },
 ]
 
 /** Số liệu HIS khoa nhập khi HIS lỗi (quyết định 35). */
@@ -542,11 +542,13 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
 
     await waitFor(() =>
       expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/departments')?.body).toEqual({
+        // Khoa mới chọn xếp sau các khoa đang báo cáo (quyết định 45).
         items: [
-          { departmentId: 'd-kkb', bedCount: 10 },
           { departmentId: 'd-noi', bedCount: 40 },
+          { departmentId: 'd-kkb', bedCount: 10 },
         ],
         hisEntry: { outpatientVisits: 'd-kkb', xray: 'd-noi' },
+        shortNames: {},
       }),
     )
   })
@@ -555,10 +557,10 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     // Bệnh viện báo (20/11): chọn khoa HIS mới rồi Lưu thì báo "Dữ liệu không hợp lệ", vì khoa cũ đã ngừng sử dụng vẫn được gửi lên.
     const user = userEvent.setup()
     const stoppedIcu: NursingReportDepartment = {
-      departmentId: 'd-hstc', code: 'HSTC', name: 'Khoa Hồi sức tích cực (giả lập)', isActive: false, isReporting: true, bedCount: 20, hisIndicators: ['xray'],
+      departmentId: 'd-hstc', code: 'HSTC', name: 'Khoa Hồi sức tích cực (giả lập)', shortName: null, isActive: false, isReporting: true, bedCount: 20, hisIndicators: ['xray'],
     }
     const hisIcu: NursingReportDepartment = {
-      departmentId: 'd-hhtccd', code: 'HHTCCD', name: 'Hồi Sức Tích Cực - Chống Độc (giả lập)', isActive: true, isReporting: false, bedCount: null, hisIndicators: [],
+      departmentId: 'd-hhtccd', code: 'HHTCCD', name: 'Hồi Sức Tích Cực - Chống Độc (giả lập)', shortName: null, isActive: true, isReporting: false, bedCount: null, hisIndicators: [],
     }
     let saves = 0
     const { calls } = mockApi({
@@ -584,6 +586,9 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     const stoppedBox = within(modal).getByRole('checkbox', { name: 'Khoa Hồi sức tích cực (giả lập) phải báo cáo' })
     expect(stoppedBox).toBeDisabled()
     expect(stoppedBox).not.toBeChecked()
+    // Không xếp thứ tự, không đặt tên viết tắt cho khoa ngừng sử dụng.
+    expect(within(modal).queryByRole('textbox', { name: 'Thứ tự Khoa Hồi sức tích cực (giả lập)' })).not.toBeInTheDocument()
+    expect(within(modal).getByRole('textbox', { name: 'Tên viết tắt Khoa Hồi sức tích cực (giả lập)' })).toBeDisabled()
     // Chỉ số đang giao cho khoa ngừng sử dụng: ô chọn để trống, có nhắc; danh sách chọn không có khoa ngừng sử dụng.
     expect(within(modal).getByText(/Đang giao Khoa Hồi sức tích cực \(giả lập\) \(HSTC\), khoa này đã ngừng sử dụng/)).toBeInTheDocument()
     expect(within(modal).getByRole('combobox', { name: 'Khoa nhập TS X-quang' }).closest('.ant-select')).not.toHaveTextContent('Khoa Hồi sức')
@@ -601,11 +606,12 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     await waitFor(() =>
       expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/departments')?.body).toEqual({
         items: [
-          { departmentId: 'd-hhtccd', bedCount: 22 },
           { departmentId: 'd-ngoai', bedCount: 25 },
           { departmentId: 'd-noi', bedCount: 40 },
+          { departmentId: 'd-hhtccd', bedCount: 22 },
         ],
         hisEntry: { outpatientVisits: null, xray: null },
+        shortNames: {},
       }),
     )
     // Máy chủ vẫn từ chối (ví dụ khoa vừa ngừng sử dụng): thông báo ghi rõ khoa, không chỉ "Dữ liệu không hợp lệ".
@@ -616,6 +622,100 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     ).toBeInTheDocument()
     // Báo lỗi xong thì nút Lưu dùng được ngay (không chờ thông báo đóng).
     await user.click(within(modal).getByRole('button', { name: 'Lưu' }))
+    expect(await screen.findByText('Đã lưu danh sách khoa báo cáo.')).toBeInTheDocument()
+  })
+
+  it('Phòng Điều dưỡng xếp thứ tự các khoa ở mục A và đặt tên viết tắt in trên bảng tổng hợp (quyết định 45)', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...baseRoutes(officeSession()),
+      'GET /api/v1/nursing-reports/summary': summary,
+      // Máy chủ trả khoa phải báo cáo trước, theo thứ tự đã lưu, rồi các khoa khác.
+      'GET /api/v1/nursing-reports/departments': [departments[1], { ...departments[2], shortName: 'Nội' }, departments[0]],
+      'PUT /api/v1/nursing-reports/departments': departments,
+    })
+    renderApp('/dieu-duong/tong-hop')
+
+    await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
+    const modal = await screen.findByRole('dialog', { name: 'Khoa báo cáo và số giường thực kê' })
+    await within(modal).findByRole('checkbox', { name: 'Khoa Khám bệnh phải báo cáo' })
+    const order = () => within(modal).getAllByRole('row').slice(1).map((row) => row.textContent)
+    const position = (name: string) => within(modal).queryByRole('textbox', { name: `Thứ tự ${name}` })
+    const moveTo = async (name: string, typed: string) => {
+      await user.clear(position(name)!)
+      await user.type(position(name)!, typed)
+    }
+    expect(order()).toEqual(['Khoa Ngoại B (giả lập) (NGOAIB)', 'Khoa Nội tổng hợp (NOI)', 'Khoa Khám bệnh (KKB)'])
+    expect(position('Khoa Ngoại B (giả lập)')).toHaveValue('1')
+    expect(position('Khoa Nội tổng hợp')).toHaveValue('2')
+    expect(position('Khoa Khám bệnh')).not.toBeInTheDocument()
+    expect(within(modal).getByRole('button', { name: 'Đưa Khoa Ngoại B (giả lập) lên' })).toBeDisabled()
+    expect(within(modal).getByRole('button', { name: 'Đưa Khoa Nội tổng hợp xuống' })).toBeDisabled()
+
+    // Đổi chỗ bằng mũi tên; khoa mới chọn xếp cuối; gõ số thứ tự rồi Enter hoặc rời ô (số ngoài khoảng thì về đầu, cuối).
+    await user.click(within(modal).getByRole('button', { name: 'Đưa Khoa Nội tổng hợp lên' }))
+    expect(order()).toEqual(['Khoa Nội tổng hợp (NOI)', 'Khoa Ngoại B (giả lập) (NGOAIB)', 'Khoa Khám bệnh (KKB)'])
+    await user.click(within(modal).getByRole('checkbox', { name: 'Khoa Khám bệnh phải báo cáo' }))
+    expect(position('Khoa Khám bệnh')).toHaveValue('3')
+    await user.type(within(modal).getByRole('spinbutton', { name: 'Số giường Khoa Khám bệnh' }), '12')
+    await moveTo('Khoa Khám bệnh', '1{Enter}')
+    expect(order()).toEqual(['Khoa Khám bệnh (KKB)', 'Khoa Nội tổng hợp (NOI)', 'Khoa Ngoại B (giả lập) (NGOAIB)'])
+    expect(position('Khoa Ngoại B (giả lập)')).toHaveValue('3')
+    await moveTo('Khoa Khám bệnh', '99{Enter}')
+    expect(order()).toEqual(['Khoa Nội tổng hợp (NOI)', 'Khoa Ngoại B (giả lập) (NGOAIB)', 'Khoa Khám bệnh (KKB)'])
+    await moveTo('Khoa Ngoại B (giả lập)', 'x')
+    expect(position('Khoa Ngoại B (giả lập)')).toHaveValue('')
+    await user.click(within(modal).getByText(/Các khoa được chọn đứng đầu danh sách/))
+    expect(position('Khoa Ngoại B (giả lập)')).toHaveValue('2')
+    await moveTo('Khoa Ngoại B (giả lập)', '0')
+    await user.click(within(modal).getByText(/Các khoa được chọn đứng đầu danh sách/))
+    expect(order()).toEqual(['Khoa Ngoại B (giả lập) (NGOAIB)', 'Khoa Nội tổng hợp (NOI)', 'Khoa Khám bệnh (KKB)'])
+    // Bỏ chọn thì ra khỏi thứ tự, chọn lại thì xếp cuối.
+    await user.click(within(modal).getByRole('checkbox', { name: 'Khoa Nội tổng hợp phải báo cáo' }))
+    expect(position('Khoa Nội tổng hợp')).not.toBeInTheDocument()
+    expect(position('Khoa Khám bệnh')).toHaveValue('2')
+    await user.click(within(modal).getByRole('checkbox', { name: 'Khoa Nội tổng hợp phải báo cáo' }))
+    expect(order()).toEqual(['Khoa Ngoại B (giả lập) (NGOAIB)', 'Khoa Khám bệnh (KKB)', 'Khoa Nội tổng hợp (NOI)'])
+
+    // Tên viết tắt: để trống thì in mã khoa; trùng tên viết tắt hoặc mã của khoa khác (không phân biệt hoa thường) thì báo ngay.
+    const shortName = (name: string) => within(modal).getByRole('textbox', { name: `Tên viết tắt ${name}` })
+    expect(shortName('Khoa Nội tổng hợp')).toHaveValue('Nội')
+    expect(shortName('Khoa Khám bệnh')).toHaveAttribute('placeholder', 'KKB')
+    await user.type(shortName('Khoa Khám bệnh'), 'nội')
+    expect(within(modal).getByText('Trùng với Khoa Nội tổng hợp (NOI)')).toBeInTheDocument()
+    expect(within(modal).getByText('Trùng với Khoa Khám bệnh (KKB)')).toBeInTheDocument()
+    expect(shortName('Khoa Khám bệnh')).toHaveClass('ant-input-status-error')
+    expect(shortName('Khoa Nội tổng hợp')).toHaveClass('ant-input-status-error')
+    expect(shortName('Khoa Ngoại B (giả lập)')).not.toHaveClass('ant-input-status-error')
+    // Gõ kiểu tổ hợp (một số bộ gõ tiếng Việt) vẫn là trùng.
+    await user.clear(shortName('Khoa Khám bệnh'))
+    await user.type(shortName('Khoa Khám bệnh'), 'NO\u0302\u0323I')
+    expect(within(modal).getByText('Trùng với Khoa Nội tổng hợp (NOI)')).toBeInTheDocument()
+    await user.clear(shortName('Khoa Khám bệnh'))
+    await user.type(shortName('Khoa Khám bệnh'), 'ngoaib')
+    expect(within(modal).getByText('Trùng với Khoa Ngoại B (giả lập) (NGOAIB)')).toBeInTheDocument()
+    await user.clear(shortName('Khoa Khám bệnh'))
+    await user.type(shortName('Khoa Khám bệnh'), '  KB ')
+    expect(within(modal).queryByText(/Trùng với/)).not.toBeInTheDocument()
+    expect(shortName('Khoa Khám bệnh')).not.toHaveClass('ant-input-status-error')
+    // Gõ rồi xóa hết (vẫn như cũ) thì không gửi; xóa tên viết tắt đang có thì gửi null.
+    await user.type(shortName('Khoa Ngoại B (giả lập)'), 'x')
+    await user.clear(shortName('Khoa Ngoại B (giả lập)'))
+    await user.clear(shortName('Khoa Nội tổng hợp'))
+    await user.click(within(modal).getByRole('button', { name: 'Lưu' }))
+
+    // Gửi khoa theo thứ tự đã xếp và chỉ các tên viết tắt đã đổi (bỏ khoảng trắng hai đầu; xóa tên viết tắt đang có là null).
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/departments')?.body).toEqual({
+        items: [
+          { departmentId: 'd-ngoai', bedCount: 25 },
+          { departmentId: 'd-kkb', bedCount: 12 },
+          { departmentId: 'd-noi', bedCount: 40 },
+        ],
+        hisEntry: { outpatientVisits: 'd-kkb', xray: null },
+        shortNames: { 'd-kkb': 'KB', 'd-noi': null },
+      }),
+    )
     expect(await screen.findByText('Đã lưu danh sách khoa báo cáo.')).toBeInTheDocument()
   })
 

@@ -1203,22 +1203,22 @@ Lưu ý:
    - **Khoa đã gửi**: số khoa đã gửi trên số khoa phải báo cáo.
    - Số liệu HIS lấy lúc nào, bởi ai.
    - Khi HIS lỗi: dòng **Khoa nhập tay khi HIS lỗi** cho biết khoa nào đã nhập số liệu HIS, khoa nào chưa nhập (mục 9.5).
-3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **mã khoa** (tên viết tắt) và xếp theo mã. Rê chuột vào mã để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **tên viết tắt** của khoa (khoa chưa đặt tên viết tắt thì ghi mã khoa), theo **thứ tự Phòng Điều dưỡng xếp**. Phòng Điều dưỡng đặt thứ tự và tên viết tắt ở mục 9.4. Rê chuột vào tên viết tắt để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
    - Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
    - Cột **Người nước ngoài** và cột **Chuyển khoa** lấy từ hai dòng cùng tên ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có hai dòng này thì hai cột để trống.
    - Cột cuối **Người báo cáo** là người gửi báo cáo của khoa.
 4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
-5. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm mã khoa:
+5. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm tên viết tắt của khoa:
    - Mục B, D: người của khoa đã nhập tay số liệu HIS, hoặc người đã bấm **Lấy số liệu HIS** (ghi *lấy từ HIS*).
    - Mục C, E, F: người gửi báo cáo của các khoa có số thủ thuật (mục C), báo **Không ổn** (mục E), có phần nhập thêm (mục F). Không khoa nào có thì ghi *Các khoa đã gửi báo cáo (cột Người báo cáo, mục A)*.
    - Mục chưa có số liệu thì ghi *chưa có*.
 
    ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)
 
-   *Hình 9.7. Bảng tổng hợp ngày HIS lỗi. Mục A ghi mã khoa, có cột **Người nước ngoài**, **Chuyển khoa** và **Người báo cáo**. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
+   *Hình 9.7. Bảng tổng hợp ngày HIS lỗi. Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Người nước ngoài**, **Chuyển khoa** và **Người báo cáo**. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
 
-6. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm mã khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
-7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi mã khoa), giữ nguyên xuống dòng như khoa đã ghi.
+6. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
+7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi.
 
    ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
 
@@ -1234,7 +1234,7 @@ Lưu ý:
 
 ### 9.3. Xem và trả lại báo cáo cho khoa (Phòng Điều dưỡng)
 
-1. Trong mục A, bấm **mã khoa**. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
+1. Trong mục A, bấm **tên viết tắt** của khoa. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
 
    ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
 
@@ -1246,24 +1246,31 @@ Lưu ý:
 
    *Hình 9.11. Bắt buộc ghi lý do. Lý do được ghi vào nhật ký và hiện cho khoa.*
 
-### 9.4. Cài khoa báo cáo, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
+### 9.4. Cài khoa báo cáo, thứ tự, tên viết tắt, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
 
 1. Trên trang **Tổng hợp hằng ngày**, bấm **Khoa báo cáo và số giường**.
 2. Tick các khoa phải gửi báo cáo, nhập **số giường thực kê** (không tính băng ca).
+3. Xếp **thứ tự** các khoa ở mục A của bảng tổng hợp. Các khoa được tick đứng đầu danh sách; cột **Thứ tự** ghi số thứ tự của khoa trên bảng tổng hợp.
+   - Gõ số thứ tự mới rồi bấm **Enter** (hoặc bấm ra ngoài ô): khoa chuyển tới vị trí đó, các khoa khác dịch xuống. Gõ số lớn hơn số khoa thì khoa xuống cuối.
+   - Bấm mũi tên **↑**, **↓** để đổi chỗ với khoa liền trên, liền dưới.
+   - Khoa mới tick xếp cuối. Bỏ tick thì khoa ra khỏi thứ tự.
+4. Đặt **tên viết tắt** của khoa ở cột **Tên viết tắt**, ví dụ *Nội TH*, tối đa 20 ký tự. Tên viết tắt in ở cột khoa phòng của mục A, ở mục E, mục F và dòng người báo cáo. Để trống thì in mã khoa (chữ mờ trong ô).
+   - Hai khoa không được trùng tên viết tắt, kể cả trùng mã của khoa khác; chữ hoa, chữ thường coi như nhau. Ô bị trùng có viền đỏ và dòng **Trùng với** tên khoa kia. Bấm **Lưu** khi còn trùng thì phần mềm báo lỗi, không lưu gì.
+   - Tên viết tắt không đổi khi quản trị lấy lại danh mục khoa/phòng từ HIS (mục 8.2). Phần mềm vẫn dùng mã khoa HIS để ghép số liệu.
 
    ![Hộp khoa báo cáo và số giường](huong-dan-su-dung/dd-09-khoa-bao-cao.png)
 
-   *Hình 9.12. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
+   *Hình 9.12. Các khoa được tick đứng đầu, theo thứ tự in ở mục A. Khoa HSTC để trống tên viết tắt nên bảng tổng hợp in mã khoa. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
 
-3. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
-4. Bấm **Lưu**.
+5. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
+6. Bấm **Lưu**.
 
    ![Phần giao khoa nhập số liệu HIS](huong-dan-su-dung/dd-09b-giao-khoa-nhap-his.png)
 
    *Hình 9.13. Giao khoa nhập từng chỉ số mục B, D khi HIS lỗi. Không cần giao **NB PK chờ nhập viện**: mỗi khoa phải báo cáo tự nhập số của khoa mình.*
 
-5. Khi khoa đổi số giường, có khoa mới phải báo cáo, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
-6. Sau khi quản trị **lấy danh mục khoa/phòng từ HIS** (mục 8.2), khoa cũ không còn trên HIS chuyển sang ngừng sử dụng. Trong hộp này, khoa đó có nhãn **Ngừng sử dụng**, nằm cuối danh sách và không chọn được; đầu hộp có khung vàng ghi tên các khoa này. Bấm **Lưu** thì khoa ngừng sử dụng được bỏ khỏi danh sách khoa báo cáo. Chỉ số mục B, D đang giao cho khoa ngừng sử dụng để trống, có dòng nhắc; chọn khoa thay thế (thường là khoa cùng tên trên HIS) rồi lưu.
+7. Khi khoa đổi số giường, có khoa mới phải báo cáo, cần đổi thứ tự, tên viết tắt, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+8. Sau khi quản trị **lấy danh mục khoa/phòng từ HIS** (mục 8.2), khoa cũ không còn trên HIS chuyển sang ngừng sử dụng. Trong hộp này, khoa đó có nhãn **Ngừng sử dụng**, nằm cuối danh sách và không chọn được; đầu hộp có khung vàng ghi tên các khoa này. Bấm **Lưu** thì khoa ngừng sử dụng được bỏ khỏi danh sách khoa báo cáo. Chỉ số mục B, D đang giao cho khoa ngừng sử dụng để trống, có dòng nhắc; chọn khoa thay thế (thường là khoa cùng tên trên HIS) rồi lưu.
 
 Người nhập số liệu HIS cho một khoa cần tài khoản thuộc đúng khoa đó, có vai trò **Điều dưỡng** (quyền **Lập và gửi báo cáo điều dưỡng của khoa**). Khoa được giao nhập không cần được tick báo cáo. Quản trị tạo hoặc sửa tài khoản ở mục 8.1.
 
@@ -1295,12 +1302,12 @@ Ngày đã có số liệu HIS (lấy được một phần) thì thẻ ghi rõ,
 Bảng tổng hợp dùng số như sau:
 
 - Số lấy từ HIS được dùng trước. Ô HIS không có số mới dùng số khoa nhập. Khi HIS chạy lại, bấm **Lấy số liệu HIS**: ô nào HIS có số thì dùng số HIS.
-- Số do khoa nhập có dòng chữ nhỏ ghi mã khoa đã nhập, ví dụ *KKB nhập tay*. Dòng **Người báo cáo** dưới mục ghi người đã nhập.
+- Số do khoa nhập có dòng chữ nhỏ ghi tên viết tắt (hoặc mã) của khoa đã nhập, ví dụ *KKB nhập tay*. Dòng **Người báo cáo** dưới mục ghi người đã nhập.
 - Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô trên cùng (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
 
 ![Mục B, C, D với số khoa nhập tay](huong-dan-su-dung/dd-05b-tong-hop-b-d.png)
 
-*Hình 9.16. Mục B và mục D ghi mã khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+*Hình 9.16. Mục B và mục D ghi tên viết tắt (hoặc mã) của khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
 
 ---
 

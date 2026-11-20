@@ -149,20 +149,32 @@ public sealed record NursingSummaryDto(
 /// Một khoa trên màn hình cài khoa báo cáo: có phải báo cáo không, số giường thực kê, các chỉ số toàn viện khoa nhập tay khi
 /// HIS lỗi (quyết định 35). <paramref name="IsActive"/> <c>false</c>: khoa đã ngừng sử dụng (ví dụ không còn trong danh mục khoa lấy
 /// từ HIS, quyết định 42) nhưng còn trong danh sách báo cáo hoặc còn được giao chỉ số; lưu lại thì phải bỏ khoa này.
+/// <paramref name="ShortName"/>: tên viết tắt in trên bảng tổng hợp (<c>null</c> là dùng mã khoa, quyết định 45). Danh sách trả về
+/// theo thứ tự: khoa phải báo cáo theo thứ tự trên bảng tổng hợp, rồi các khoa khác theo tên.
 /// </summary>
 public sealed record NursingReportDepartmentDto(
-    Guid DepartmentId, string Code, string Name, bool IsActive, bool IsReporting, int? BedCount, IReadOnlyList<string> HisIndicators);
+    Guid DepartmentId,
+    string Code,
+    string Name,
+    string? ShortName,
+    bool IsActive,
+    bool IsReporting,
+    int? BedCount,
+    IReadOnlyList<string> HisIndicators);
 
 public sealed record NursingReportDepartmentItem(Guid DepartmentId, int BedCount);
 
 /// <summary>
-/// Đặt danh sách khoa phải báo cáo (khoa không có trong danh sách thì bỏ ra) và số giường từng khoa. <paramref name="HisEntry"/>:
-/// khoa nhập tay từng chỉ số toàn viện khi HIS lỗi (quyết định 35), đủ cả bảng (chỉ số không có hoặc <c>null</c> là chưa giao);
-/// bỏ trống thì giữ nguyên.
+/// Đặt danh sách khoa phải báo cáo (khoa không có trong danh sách thì bỏ ra) và số giường từng khoa; thứ tự trong
+/// <paramref name="Items"/> là thứ tự các khoa trên bảng tổng hợp (quyết định 45). <paramref name="HisEntry"/>: khoa nhập tay từng
+/// chỉ số toàn viện khi HIS lỗi (quyết định 35), đủ cả bảng (chỉ số không có hoặc <c>null</c> là chưa giao); bỏ trống thì giữ
+/// nguyên. <paramref name="ShortNames"/>: tên viết tắt của các khoa cần đổi (rỗng hoặc <c>null</c> là dùng lại mã khoa); khoa
+/// không có trong đây giữ nguyên.
 /// </summary>
 public sealed record UpdateNursingReportDepartmentsRequest(
     IReadOnlyList<NursingReportDepartmentItem>? Items,
-    IReadOnlyDictionary<string, Guid?>? HisEntry = null);
+    IReadOnlyDictionary<string, Guid?>? HisEntry = null,
+    IReadOnlyDictionary<Guid, string?>? ShortNames = null);
 
 public sealed record RefreshNursingStatisticsRequest(DateOnly ReportDate);
 

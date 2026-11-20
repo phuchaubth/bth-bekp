@@ -15,6 +15,7 @@ internal sealed class DepartmentConfiguration : IEntityTypeConfiguration<Departm
         builder.HasIndex(d => d.Code).IsUnique();
         builder.Property(d => d.Name).HasMaxLength(Department.NameMaxLength).IsRequired()
             .UseCollation(Collations.AccentInsensitive);
+        builder.Property(d => d.ShortName).HasMaxLength(Department.ShortNameMaxLength);
         builder.HasRowVersion();
     }
 }

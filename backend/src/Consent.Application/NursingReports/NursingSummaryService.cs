@@ -3,6 +3,7 @@ using Consent.Application.Abstractions;
 using Consent.Application.Common;
 using Consent.Application.ConsentForms;
 using Consent.Application.Settings;
+using Consent.Domain.Departments;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Settings;
 using Consent.Shared;
@@ -49,7 +50,12 @@ public sealed class NursingSummaryService(
         var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
         var summaryDepartments = allDepartments
             .Select(d => new NursingSummaryDepartment(
-                d.Id, d.Code, d.Name, d.IsActive && configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))
+                d.Id,
+                d.ShortName ?? d.Code,
+                d.Name,
+                d.IsActive && configured.ContainsKey(d.Id),
+                configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
+                configured.TryGetValue(d.Id, out var o) ? o.SortOrder : null))
             .ToList();
 
         // Khoa phải nhập tay khi HIS lỗi: khoa phải báo cáo (NB PK chờ nhập viện) và khoa được giao chỉ số toàn viện.
@@ -168,21 +174,27 @@ public sealed class NursingSummaryService(
     }
 
     /// <summary>
-    /// Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo hoặc còn được giao chỉ số), kèm phải báo cáo không, số
-    /// giường và các chỉ số toàn viện khoa nhập tay khi HIS lỗi.
+    /// Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo hoặc còn được giao chỉ số), kèm tên viết tắt, phải báo
+    /// cáo không, số giường và các chỉ số toàn viện khoa nhập tay khi HIS lỗi. Khoa phải báo cáo đứng trước theo thứ tự trên bảng
+    /// tổng hợp (quyết định 45), rồi các khoa khác theo tên.
     /// </summary>
     public async Task<IReadOnlyList<NursingReportDepartmentDto>> ListDepartmentsAsync(CancellationToken cancellationToken)
     {
         var configured = (await reports.ListDepartmentsAsync(cancellationToken).ConfigureAwait(false))
             .ToDictionary(d => d.DepartmentId);
         var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
+        bool Reporting(Department d) => d.IsActive && configured.ContainsKey(d.Id);
         return [.. (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
             .Where(d => d.IsActive || configured.ContainsKey(d.Id) || assignments.Values.Contains(d.Id))
-            .OrderBy(d => d.Name, VietnameseComparer.Instance)
+            .OrderBy(d => Reporting(d) ? 0 : 1)
+            .ThenBy(d => Reporting(d) ? configured[d.Id].SortOrder : 0)
+            .ThenBy(d => Reporting(d) ? d.ShortName ?? d.Code : string.Empty, VietnameseComparer.Instance)
+            .ThenBy(d => d.Name, VietnameseComparer.Instance)
             .Select(d => new NursingReportDepartmentDto(
                 d.Id,
                 d.Code,
                 d.Name,
+                d.ShortName,
                 d.IsActive,
                 configured.ContainsKey(d.Id),
                 configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
@@ -245,9 +257,48 @@ public sealed class NursingSummaryService(
             }
         }
 
+        // Tên viết tắt (quyết định 45): chỉ khoa đang dùng; tối đa 20 ký tự; không trùng tên viết tắt (hoặc mã, khi chưa có tên viết
+        // tắt) của khoa đang dùng khác, để mục A, E, F không lẫn khoa.
+        var shortNames = new Dictionary<Guid, string?>();
+        foreach (var (departmentId, value) in request.ShortNames ?? new Dictionary<Guid, string?>())
+        {
+            var key = $"shortNames.{departmentId}";
+            var normalized = Department.NormalizeShortName(value);
+            if (Unusable(departmentId, "không đặt tên viết tắt được") is { } problem)
+            {
+                errors[key] = [problem];
+            }
+            else if (normalized is { Length: > Department.ShortNameMaxLength } || (normalized?.Any(char.IsControl) ?? false))
+            {
+                errors[key] = [$"Tên viết tắt tối đa {Department.ShortNameMaxLength} ký tự."];
+            }
+            else
+            {
+                shortNames[departmentId] = normalized;
+            }
+        }
+
+        var labels = known.Values
+            .Where(d => d.IsActive)
+            .Select(d => (Department: d, Label: shortNames.TryGetValue(d.Id, out var name) ? name ?? d.Code : d.ShortName ?? d.Code))
+            .ToList();
+        foreach (var same in labels.GroupBy(l => l.Label, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+        {
+            foreach (var (department, label) in same.Where(l => shortNames.ContainsKey(l.Department.Id)))
+            {
+                var other = same.First(l => l.Department.Id != department.Id).Department;
+                errors[$"shortNames.{department.Id}"] = [$"Tên viết tắt \"{label}\" trùng với {other.Name} ({other.Code})."];
+            }
+        }
+
         if (errors.Count > 0)
         {
             return Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);
+        }
+
+        foreach (var (departmentId, name) in shortNames)
+        {
+            known[departmentId].SetShortName(name);
         }
 
         if (request.HisEntry is not null)
@@ -255,14 +306,16 @@ public sealed class NursingSummaryService(
             await StoreAssignmentsAsync(hisEntry, cancellationToken).ConfigureAwait(false);
         }
 
+        // Thứ tự trên bảng tổng hợp là thứ tự trong danh sách gửi lên, đánh số từ 1 (quyết định 45).
         var now = clock.UtcNow;
         var existing = await reports.ListDepartmentsAsync(cancellationToken).ConfigureAwait(false);
-        var wanted = items.ToDictionary(i => i.DepartmentId, i => i.BedCount);
+        var wanted = items.Select((item, index) => (item, index)).ToDictionary(p => p.item.DepartmentId, p => (p.item.BedCount, Order: p.index + 1));
         foreach (var department in existing)
         {
-            if (wanted.TryGetValue(department.DepartmentId, out var beds))
+            if (wanted.TryGetValue(department.DepartmentId, out var want))
             {
-                department.SetBedCount(beds, now);
+                department.SetBedCount(want.BedCount, now);
+                department.SetSortOrder(want.Order, now);
             }
             else
             {
@@ -272,7 +325,7 @@ public sealed class NursingSummaryService(
 
         foreach (var item in items.Where(i => existing.All(e => e.DepartmentId != i.DepartmentId)))
         {
-            reports.AddDepartment(NursingReportDepartment.Create(item.DepartmentId, item.BedCount, now));
+            reports.AddDepartment(NursingReportDepartment.Create(item.DepartmentId, item.BedCount, now, wanted[item.DepartmentId].Order));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

@@ -194,6 +194,8 @@ export interface NursingReportDepartment {
   departmentId: string
   code: string
   name: string
+  /** Tên viết tắt Phòng Điều dưỡng đặt, in trên bảng tổng hợp thay cho mã khoa (quyết định 45); `null` thì in mã khoa. */
+  shortName: string | null
   /**
    * `false`: khoa đã ngừng sử dụng (không còn trong danh mục khoa/phòng, ví dụ sau khi lấy danh mục từ HIS) nhưng còn trong danh
    * sách báo cáo hoặc còn được giao chỉ số. Máy chủ không nhận khoa này khi lưu.
@@ -232,10 +234,17 @@ export const nursingReportsApi = {
   summaryWorkbook: (date: string) => apiBlob(`${base}/summary/xlsx?date=${date}`),
   refreshStatistics: (date: string) =>
     apiRequest<NursingStatisticsRefresh>(`${base}/statistics/refresh`, { method: 'POST', body: { reportDate: date } }),
+  /** Khoa phải báo cáo đứng trước theo thứ tự trên bảng tổng hợp, rồi các khoa khác theo tên. */
   departments: (signal?: AbortSignal) => apiRequest<NursingReportDepartment[]>(`${base}/departments`, { signal }),
-  /** `hisEntry`: khoa nhập tay từng chỉ số toàn viện khi HIS lỗi (đủ cả bảng; null là chưa giao). */
-  updateDepartments: (items: { departmentId: string; bedCount: number }[], hisEntry: Record<string, string | null>) =>
-    apiRequest<NursingReportDepartment[]>(`${base}/departments`, { method: 'PUT', body: { items, hisEntry } }),
+  /**
+   * `items`: khoa phải báo cáo theo thứ tự in trên bảng tổng hợp (quyết định 45). `hisEntry`: khoa nhập tay từng chỉ số toàn
+   * viện khi HIS lỗi (đủ cả bảng; null là chưa giao). `shortNames`: chỉ các tên viết tắt đổi (null là bỏ, in lại mã khoa).
+   */
+  updateDepartments: (
+    items: { departmentId: string; bedCount: number }[],
+    hisEntry: Record<string, string | null>,
+    shortNames: Record<string, string | null> = {},
+  ) => apiRequest<NursingReportDepartment[]>(`${base}/departments`, { method: 'PUT', body: { items, hisEntry, shortNames } }),
 }
 
 export const nursingKeys = {

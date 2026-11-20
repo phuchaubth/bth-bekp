@@ -170,6 +170,56 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task ReportingDepartments_KeepTheOfficeOrder_AndShortNames_OnTheSummary()
+    {
+        var (_, office, _) = await LoginAsync();
+        var (_, listed) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/departments", office);
+        var ids = listed.EnumerateArray().ToDictionary(d => d.GetProperty("code").GetString()!, d => d.GetProperty("departmentId").GetString()!);
+        Assert.All(listed.EnumerateArray(), d => Assert.Equal(JsonValueKind.Null, d.GetProperty("shortName").ValueKind));
+
+        async Task<(HttpStatusCode Status, JsonElement Body)> SaveAsync(string[] order, Dictionary<string, string?> shortNames) =>
+            await _client.SendJsonAsync(
+                HttpMethod.Put,
+                "/api/v1/nursing-reports/departments",
+                office,
+                new
+                {
+                    items = order.Select(code => new { departmentId = ids[code], bedCount = 30 }),
+                    shortNames = shortNames.ToDictionary(p => ids[p.Key], p => p.Value),
+                });
+        async Task<string[]> SummaryLabelsAsync()
+        {
+            var (status, summary) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
+            Assert.Equal(HttpStatusCode.OK, status);
+            return [.. summary.GetProperty("rows").EnumerateArray().Select(r => r.GetProperty("departmentCode").GetString()!)];
+        }
+
+        // Quyết định 45: thứ tự trên bảng tổng hợp là thứ tự Phòng Điều dưỡng gửi lên (không theo mã); tên viết tắt in thay mã.
+        var (savedStatus, saved) = await SaveAsync(["NOI", "KKB"], new() { ["NOI"] = " Nội ", ["KKB"] = "KB" });
+        Assert.True(savedStatus == HttpStatusCode.OK, saved.ToString());
+        Assert.Equal(
+            [("NOI", "Nội", true), ("KKB", "KB", true), ("PDD", null, false), ("KHTH", null, false)],
+            saved.EnumerateArray().Select(d => (
+                d.GetProperty("code").GetString(), d.GetProperty("shortName").GetString(), d.GetProperty("isReporting").GetBoolean())));
+        Assert.Equal(["Nội", "KB"], await SummaryLabelsAsync());
+
+        // Tên viết tắt trùng tên viết tắt hoặc mã của khoa khác (không phân biệt hoa thường), quá dài: không lưu gì.
+        var (duplicate, duplicateBody) = await SaveAsync(["KKB", "NOI"], new() { ["KHTH"] = "kb", ["PDD"] = new string('x', 21) });
+        Assert.Equal(HttpStatusCode.BadRequest, duplicate);
+        var errors = duplicateBody.GetProperty("errors");
+        Assert.Equal(
+            "Tên viết tắt \"kb\" trùng với Khoa Khám bệnh (KKB).",
+            errors.GetProperty($"shortNames.{ids["KHTH"]}")[0].GetString());
+        Assert.Equal("Tên viết tắt tối đa 20 ký tự.", errors.GetProperty($"shortNames.{ids["PDD"]}")[0].GetString());
+        Assert.Equal(["Nội", "KB"], await SummaryLabelsAsync());
+
+        // Đổi thứ tự; bỏ tên viết tắt thì in lại mã khoa.
+        var (reorderedStatus, reordered) = await SaveAsync(["KKB", "NOI"], new() { ["NOI"] = null });
+        Assert.True(reorderedStatus == HttpStatusCode.OK, reordered.ToString());
+        Assert.Equal(["KB", "NOI"], await SummaryLabelsAsync());
+    }
+
+    [Fact]
     public async Task HisFigures_AreTypedInByEachDepartment_WhenHisIsUnavailable()
     {
         var (nurse, office, _) = await LoginAsync();

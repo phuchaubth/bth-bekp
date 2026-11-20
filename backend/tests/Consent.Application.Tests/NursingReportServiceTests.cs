@@ -818,6 +818,102 @@ public sealed class NursingReportServiceTests
         Assert.Empty(_ctx.Store.SystemSettings);
     }
 
+    /// <summary>
+    /// Phòng Điều dưỡng xếp thứ tự khoa và đặt tên viết tắt (quyết định 45): bảng tổng hợp (mục A, E, F, người báo cáo) theo thứ
+    /// tự và tên viết tắt; danh sách cài đặt trả khoa báo cáo theo thứ tự trước; tên viết tắt để trống thì dùng lại mã; không cho
+    /// trùng, quá dài, đặt cho khoa ngừng sử dụng; mã HIS giữ nguyên.
+    /// </summary>
+    [Fact]
+    public async Task ReportingDepartments_FollowTheOfficeOrder_AndShortNames()
+    {
+        ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
+        var (clinic, _) = Clinic();
+
+        // Nội A trước Ngoại B (ngược thứ tự mã); Nội A viết tắt "Nội A", Khoa Khám bệnh (không phải báo cáo) "KB".
+        var saved = await _ctx.CreateNursingSummaryService().UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_ward.Id, 48), new(_surgery.Id, 25)],
+                null,
+                new Dictionary<Guid, string?> { [_ward.Id] = "  Nội A ", [clinic.Id] = "KB" }),
+            CancellationToken.None);
+        Assert.True(saved.IsSuccess, saved.Error?.Message);
+        Assert.Equal(["NOIA", "NGOAIB", "KKB"], saved.Value.Select(d => d.Code));
+        Assert.Equal(["Nội A", null, "KB"], saved.Value.Select(d => d.ShortName));
+        Assert.Equal(
+            [(_ward.Id, 1), (_surgery.Id, 2)],
+            _ctx.Store.NursingDepartments.OrderBy(d => d.SortOrder).Select(d => (d.DepartmentId, d.SortOrder)));
+        Assert.Equal("NOIA", _ward.Code);
+
+        var checks = AllOk();
+        checks["drugSupply"] = NursingReportForm.CheckIssue;
+        await SubmitAsync(_ward, _nurse, new() { ["currentPatients"] = 40 }, notes: "Ghi chú khoa Nội A (giả lập)", checks);
+        var surgeryNurse = _ctx.AddUser("dieuduong.ngoaib", SystemRoles.Nurse, departmentId: _surgery.Id);
+        await SubmitAsync(_surgery, surgeryNurse, new() { ["currentPatients"] = 20 }, notes: "Ghi chú khoa Ngoại B (giả lập)", checks);
+        ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
+        var summary = await _ctx.CreateNursingSummaryService().GetAsync(Today, CancellationToken.None);
+        Assert.Equal(["Nội A", "NGOAIB"], summary.Rows.Select(r => r.DepartmentCode));
+        Assert.Equal("Không ổn: Nội A, NGOAIB", summary.Situation.Single(c => c.Key == "drugSupply").Text);
+        Assert.Equal(["Nội A", "NGOAIB"], summary.Incidents.Select(i => i.DepartmentCode));
+        Assert.Equal($"{_nurse.FullName} (Nội A); {surgeryNurse.FullName} (NGOAIB)", summary.Reporters.Incidents);
+
+        // Đổi thứ tự: Ngoại B lên đầu; Khoa Khám bệnh mới phải báo cáo, xếp cuối.
+        var service = _ctx.CreateNursingSummaryService();
+        Assert.True((await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest([new(_surgery.Id, 25), new(_ward.Id, 48), new(clinic.Id, 0)]),
+            CancellationToken.None)).IsSuccess);
+        Assert.Equal(
+            [(_surgery.Id, 1), (_ward.Id, 2), (clinic.Id, 3)],
+            _ctx.Store.NursingDepartments.OrderBy(d => d.SortOrder).Select(d => (d.DepartmentId, d.SortOrder)));
+        Assert.Equal(["NGOAIB", "Nội A", "KB"], (await service.GetAsync(Today, CancellationToken.None)).Rows.Select(r => r.DepartmentCode));
+        Assert.Equal(["NGOAIB", "NOIA", "KKB"], (await service.ListDepartmentsAsync(CancellationToken.None)).Select(d => d.Code));
+
+        // Trùng tên viết tắt (không phân biệt hoa thường) hoặc trùng mã khoa khác, quá dài, khoa ngừng sử dụng: báo lỗi, không lưu gì.
+        var closed = _ctx.AddDepartment("DONG", "Khoa đã đóng (giả lập)", active: false);
+        var invalid = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_surgery.Id, 25), new(_ward.Id, 48)],
+                null,
+                new Dictionary<Guid, string?> { [_surgery.Id] = "kb", [_ward.Id] = new string('X', 21), [closed.Id] = "DONG2" }),
+            CancellationToken.None);
+        Assert.Equal(
+            new[] { $"shortNames.{closed.Id}", $"shortNames.{_surgery.Id}", $"shortNames.{_ward.Id}" }.Order(StringComparer.Ordinal),
+            invalid.Error!.FieldErrors!.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            "Tên viết tắt \"kb\" trùng với Khoa Khám bệnh (giả lập) (KKB).",
+            Assert.Single(invalid.Error.FieldErrors[$"shortNames.{_surgery.Id}"]));
+        Assert.Equal("Tên viết tắt tối đa 20 ký tự.", Assert.Single(invalid.Error.FieldErrors[$"shortNames.{_ward.Id}"]));
+        Assert.Equal("Nội A", _ward.ShortName);
+        Assert.Null(_surgery.ShortName);
+
+        // Gõ kiểu tổ hợp (một số bộ gõ tiếng Việt) vẫn nhận ra trùng: tên viết tắt chuẩn hóa như tên khoa lấy từ HIS.
+        var decomposed = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_surgery.Id, 25), new(_ward.Id, 48)], null, new Dictionary<Guid, string?> { [_surgery.Id] = " Nội a " }),
+            CancellationToken.None);
+        Assert.Equal(
+            "Tên viết tắt \"Nội a\" trùng với Khoa Nội A (giả lập) (NOIA).",
+            Assert.Single(decomposed.Error!.FieldErrors![$"shortNames.{_surgery.Id}"]));
+        Assert.Null(_surgery.ShortName);
+
+        // Để trống thì bỏ tên viết tắt, dùng lại mã khoa.
+        Assert.True((await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_surgery.Id, 25), new(_ward.Id, 48)], null, new Dictionary<Guid, string?> { [_ward.Id] = "  " }),
+            CancellationToken.None)).IsSuccess);
+        Assert.Null(_ward.ShortName);
+        Assert.Equal(["NGOAIB", "NOIA"], (await service.GetAsync(Today, CancellationToken.None)).Rows.Select(r => r.DepartmentCode));
+
+        // Khoa Nội A nay lại hiện mã NOIA: không đặt "noia" làm tên viết tắt cho khoa khác.
+        var takenCode = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_surgery.Id, 25), new(_ward.Id, 48)], null, new Dictionary<Guid, string?> { [_surgery.Id] = "noia" }),
+            CancellationToken.None);
+        Assert.Equal(
+            "Tên viết tắt \"noia\" trùng với Khoa Nội A (giả lập) (NOIA).",
+            Assert.Single(takenCode.Error!.FieldErrors![$"shortNames.{_surgery.Id}"]));
+        Assert.Null(_surgery.ShortName);
+    }
+
     [Fact]
     public async Task SummaryFiles_ShareOneDocument_WithThePrintTimeAndSources()
     {

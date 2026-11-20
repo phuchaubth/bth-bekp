@@ -4,10 +4,11 @@ using Consent.Domain.NursingReports;
 namespace Consent.Application.NursingReports;
 
 /// <summary>
-/// Một khoa trên bảng tổng hợp: mã khoa (mã HIS, in thay tên khoa trên bảng tổng hợp, quyết định 44), có trong danh sách phải
-/// báo cáo không, số giường Phòng Điều dưỡng cài.
+/// Một khoa trên bảng tổng hợp: tên viết tắt (Phòng Điều dưỡng đặt, không có thì mã khoa HIS; in thay tên khoa, quyết định 44,
+/// 45), có trong danh sách phải báo cáo không, số giường và thứ tự Phòng Điều dưỡng cài (<c>null</c>: không trong danh sách, đứng
+/// cuối).
 /// </summary>
-public sealed record NursingSummaryDepartment(Guid Id, string Code, string Name, bool IsReporting, int? BedCount);
+public sealed record NursingSummaryDepartment(Guid Id, string Code, string Name, bool IsReporting, int? BedCount, int? SortOrder = null);
 
 /// <summary>
 /// Dựng bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" từ báo cáo các khoa và số liệu HIS của ngày (quyết định 31).
@@ -40,13 +41,15 @@ public static class NursingSummaryBuilder
         var reportByDepartment = reports.Where(r => r.ReportDate == reportDate).ToDictionary(r => r.DepartmentId);
         var submitted = reportByDepartment.Values.Where(r => r.IsSubmitted).ToDictionary(r => r.DepartmentId);
 
-        // Khoa phải báo cáo, cộng khoa đã gửi dù đã bị bỏ khỏi danh sách (không giấu báo cáo đã gửi). Sắp theo mã khoa, mã in ở
-        // cột khoa phòng (quyết định 44).
+        // Khoa phải báo cáo, cộng khoa đã gửi dù đã bị bỏ khỏi danh sách (không giấu báo cáo đã gửi). Theo thứ tự Phòng Điều dưỡng
+        // xếp (quyết định 45); chưa xếp hoặc cùng thứ tự thì theo tên viết tắt; khoa không trong danh sách đứng cuối.
         var shown = departments
             .Where(d => d.IsReporting || submitted.ContainsKey(d.Id))
-            .OrderBy(d => d.Code, VietnameseComparer.Instance)
+            .OrderBy(d => d.SortOrder ?? int.MaxValue)
+            .ThenBy(d => d.Code, VietnameseComparer.Instance)
             .ThenBy(d => d.Name, VietnameseComparer.Instance)
             .ToList();
+        var rank = shown.Select((d, index) => (d.Id, index)).ToDictionary(p => p.Id, p => p.index);
         var byId = departments.ToDictionary(d => d.Id);
         string Code(Guid departmentId) => byId.TryGetValue(departmentId, out var d) ? d.Code : string.Empty;
         string Reporter(NursingDailyReport report) =>
@@ -80,7 +83,8 @@ public static class NursingSummaryBuilder
 
         var submittedFigures = submitted.Values
             .Select(r => (Report: r, Figures: NursingReportFigures.Parse(r.FiguresJson)))
-            .OrderBy(r => Code(r.Report.DepartmentId), VietnameseComparer.Instance)
+            // Mục C, E, F theo đúng thứ tự khoa của mục A.
+            .OrderBy(r => rank.GetValueOrDefault(r.Report.DepartmentId, int.MaxValue))
             .ToList();
 
         var procedures = NursingReportForm.ProcedureLines

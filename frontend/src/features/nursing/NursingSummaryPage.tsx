@@ -1,4 +1,12 @@
-import { CloudDownloadOutlined, FileExcelOutlined, FilePdfOutlined, RollbackOutlined, SettingOutlined } from '@ant-design/icons'
+import {
+  ArrowDownOutlined,
+  ArrowUpOutlined,
+  CloudDownloadOutlined,
+  FileExcelOutlined,
+  FilePdfOutlined,
+  RollbackOutlined,
+  SettingOutlined,
+} from '@ant-design/icons'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
@@ -476,38 +484,82 @@ interface DepartmentRow {
   departmentId: string
   code: string
   name: string
+  shortName: string | null
   isActive: boolean
   isReporting: boolean
   bedCount: number | null
 }
 
+/** Phần đang sửa của một khoa: số giường, tên viết tắt (chữ đang gõ). */
+interface DepartmentEdit {
+  bedCount?: number | null
+  shortName?: string
+}
+
+/**
+ * Khoa ghi trên bảng tổng hợp bằng tên viết tắt (bỏ khoảng trắng hai đầu), để trống thì bằng mã khoa (quyết định 45). Dạng so
+ * trùng: Unicode dựng sẵn, chữ hoa, như máy chủ (gõ kiểu tổ hợp vẫn nhận ra trùng).
+ */
+const departmentLabelKey = (row: Pick<DepartmentRow, 'code' | 'shortName'>) =>
+  (row.shortName?.trim() || row.code).normalize('NFC').toUpperCase()
+
 /**
  * Phòng Điều dưỡng chọn khoa phải gửi báo cáo, cài số giường thực kê (không tính băng ca) của từng khoa, và giao khoa nhập tay
- * từng chỉ số mục B, D khi HIS lỗi (quyết định 35). Khoa đã ngừng sử dụng (ví dụ khoa nhập tay trước đây không còn trong danh mục
- * khoa lấy từ HIS) có nhãn "Ngừng sử dụng", không chọn được và được bỏ khi lưu, kể cả phần giao chỉ số; nếu không máy chủ từ chối
- * cả lần lưu ("Dữ liệu không hợp lệ").
+ * từng chỉ số mục B, D khi HIS lỗi (quyết định 35). Khoa được chọn đứng đầu danh sách theo thứ tự in ở mục A của bảng tổng hợp,
+ * Phòng Điều dưỡng đổi chỗ được; mỗi khoa có tên viết tắt in thay mã khoa (quyết định 45). Khoa đã ngừng sử dụng (ví dụ khoa nhập
+ * tay trước đây không còn trong danh mục khoa lấy từ HIS) có nhãn "Ngừng sử dụng", không chọn được và được bỏ khi lưu, kể cả phần
+ * giao chỉ số; nếu không máy chủ từ chối cả lần lưu ("Dữ liệu không hợp lệ").
  */
 function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onClose: () => void }) {
   const departments = useNursingReportDepartments(true)
-  const [edits, setEdits] = useState<Record<string, Pick<DepartmentRow, 'isReporting' | 'bedCount'>>>({})
+  const [edits, setEdits] = useState<Record<string, DepartmentEdit>>({})
+  // Khoa phải báo cáo theo thứ tự trên bảng tổng hợp; null là chưa đổi, theo máy chủ (khoa phải báo cáo đứng đầu, đúng thứ tự).
+  const [order, setOrder] = useState<string[] | null>(null)
   const [assignmentEdits, setAssignmentEdits] = useState<Record<string, string | null>>({})
   const queryClient = useQueryClient()
   const { message } = App.useApp()
-  // Khoa ngừng sử dụng xuống cuối danh sách (sắp xếp giữ thứ tự tên của máy chủ).
-  const rows: DepartmentRow[] = useMemo(
-    () =>
-      (departments.data ?? [])
-        .map((d) => ({ ...d, ...edits[d.departmentId] }))
-        .sort((a, b) => Number(!a.isActive) - Number(!b.isActive)),
-    [departments.data, edits],
+  const saved = departments.data
+  const reporting = useMemo(
+    () => order ?? (saved ?? []).filter((d) => d.isActive && d.isReporting).map((d) => d.departmentId),
+    [order, saved],
   )
-  const stopped = useMemo(() => (departments.data ?? []).filter((d) => !d.isActive), [departments.data])
+  // Khoa phải báo cáo theo thứ tự, rồi các khoa khác (theo tên như máy chủ), khoa ngừng sử dụng xuống cuối.
+  const { rows, ordered } = useMemo(() => {
+    const all = (saved ?? []).map(
+      (d): DepartmentRow => ({
+        ...d,
+        ...edits[d.departmentId],
+        isReporting: d.isActive ? reporting.includes(d.departmentId) : d.isReporting,
+      }),
+    )
+    const byId = new Map(all.map((r) => [r.departmentId, r]))
+    const reportingRows = reporting.flatMap((id) => {
+      const row = byId.get(id)
+      return row?.isActive ? [row] : []
+    })
+    return {
+      ordered: reportingRows.map((r) => r.departmentId),
+      rows: [...reportingRows, ...all.filter((r) => r.isActive && !r.isReporting), ...all.filter((r) => !r.isActive)],
+    }
+  }, [saved, edits, reporting])
+  const stopped = useMemo(() => (saved ?? []).filter((d) => !d.isActive), [saved])
+  // Tên viết tắt (hoặc mã khoa khi để trống) trùng với khoa đang dùng khác: bảng tổng hợp lẫn khoa, máy chủ không nhận khi lưu.
+  const duplicates = useMemo(() => {
+    const active = rows.filter((r) => r.isActive)
+    return Object.fromEntries(
+      active.flatMap((r) => {
+        const label = departmentLabelKey(r)
+        const other = active.find((o) => o.departmentId !== r.departmentId && departmentLabelKey(o) === label)
+        return other ? [[r.departmentId, other] as const] : []
+      }),
+    ) as Record<string, DepartmentRow>
+  }, [rows])
   const current = useMemo(
     () =>
       Object.fromEntries(
-        (departments.data ?? []).flatMap((d) => d.hisIndicators.map((key) => [key, d.departmentId] as const)),
+        (saved ?? []).flatMap((d) => d.hisIndicators.map((key) => [key, d.departmentId] as const)),
       ) as Record<string, string>,
-    [departments.data],
+    [saved],
   )
   // Chỉ số đang giao cho khoa ngừng sử dụng: coi như chưa giao (khi lưu gửi null) cho tới khi chọn khoa khác.
   const assignments = useMemo(() => {
@@ -520,6 +572,14 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
       nursingReportsApi.updateDepartments(
         rows.filter((r) => r.isActive && r.isReporting).map((r) => ({ departmentId: r.departmentId, bedCount: r.bedCount ?? 0 })),
         assignments,
+        // Chỉ gửi tên viết tắt đã đổi; để trống là bỏ tên viết tắt, in lại mã khoa.
+        Object.fromEntries(
+          (saved ?? []).flatMap((d) => {
+            const typed = edits[d.departmentId]?.shortName
+            const value = typed?.trim() || null
+            return d.isActive && typed !== undefined && value !== d.shortName ? [[d.departmentId, value] as const] : []
+          }),
+        ),
       ),
     onSuccess: (saved) => {
       queryClient.setQueryData(nursingKeys.departments, saved)
@@ -532,22 +592,38 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
       message.error(errorMessageWithDetails(e))
     },
   })
-  const update = (row: DepartmentRow, change: Partial<Pick<DepartmentRow, 'isReporting' | 'bedCount'>>) =>
-    setEdits((current) => ({ ...current, [row.departmentId]: { isReporting: row.isReporting, bedCount: row.bedCount, ...change } }))
+  const update = (row: DepartmentRow, change: DepartmentEdit) =>
+    setEdits((edited) => ({ ...edited, [row.departmentId]: { ...edited[row.departmentId], ...change } }))
+  // Khoa mới chọn xếp cuối các khoa phải báo cáo; khoa bỏ chọn ra khỏi thứ tự.
+  const setReporting = (row: DepartmentRow, checked: boolean) => {
+    const others = ordered.filter((id) => id !== row.departmentId)
+    setOrder(checked ? [...others, row.departmentId] : others)
+  }
+  // Chuyển khoa tới vị trí index (tính từ 0); ngoài khoảng thì về đầu hoặc cuối.
+  const move = (row: DepartmentRow, index: number) => {
+    const next = ordered.filter((id) => id !== row.departmentId)
+    next.splice(Math.min(Math.max(index, 0), next.length), 0, row.departmentId)
+    setOrder(next)
+  }
 
   return (
     <Modal
       open
-      width="min(760px, 96vw)"
+      width="min(980px, 96vw)"
       title="Khoa báo cáo và số giường thực kê"
       okText="Lưu"
       cancelText="Đóng"
-      okButtonProps={{ loading: save.isPending, disabled: !departments.data }}
+      okButtonProps={{ loading: save.isPending, disabled: !saved }}
       onOk={() => save.mutate()}
       onCancel={onClose}
     >
       <Typography.Paragraph type="secondary">
         Khoa được chọn mới lập được báo cáo và có dòng trên bảng tổng hợp. Số giường thực kê không tính băng ca.
+      </Typography.Paragraph>
+      <Typography.Paragraph type="secondary">
+        Các khoa được chọn đứng đầu danh sách, theo thứ tự in ở mục A của bảng tổng hợp: gõ số thứ tự rồi bấm Enter, hoặc bấm mũi tên
+        để đổi chỗ; khoa mới chọn xếp cuối. Tên viết tắt in ở cột khoa phòng của bảng tổng hợp thay cho mã khoa (để trống thì in mã
+        khoa), không trùng nhau.
       </Typography.Paragraph>
       {stopped.length > 0 && (
         <Alert
@@ -571,15 +647,49 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
           columns={[
             {
               title: 'Báo cáo',
-              width: 80,
+              width: 84,
               render: (_, row) => (
                 <Checkbox
                   aria-label={`${row.name} phải báo cáo`}
                   checked={row.isActive && row.isReporting}
                   disabled={!row.isActive}
-                  onChange={(e) => update(row, { isReporting: e.target.checked })}
+                  onChange={(e) => setReporting(row, e.target.checked)}
                 />
               ),
+            },
+            {
+              title: 'Thứ tự',
+              width: 128,
+              render: (_, row) => {
+                const index = ordered.indexOf(row.departmentId)
+                return (
+                  index >= 0 && (
+                    <Flex align="center" gap={2}>
+                      <PositionInput
+                        label={`Thứ tự ${row.name}`}
+                        position={index + 1}
+                        onCommit={(position) => move(row, position - 1)}
+                      />
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<ArrowUpOutlined />}
+                        aria-label={`Đưa ${row.name} lên`}
+                        disabled={index === 0}
+                        onClick={() => move(row, index - 1)}
+                      />
+                      <Button
+                        size="small"
+                        type="text"
+                        icon={<ArrowDownOutlined />}
+                        aria-label={`Đưa ${row.name} xuống`}
+                        disabled={index === ordered.length - 1}
+                        onClick={() => move(row, index + 1)}
+                      />
+                    </Flex>
+                  )
+                )
+              },
             },
             {
               title: 'Khoa/phòng',
@@ -590,6 +700,31 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
                   {!row.isActive && <Tag style={{ marginInlineStart: 8 }}>Ngừng sử dụng</Tag>}
                 </>
               ),
+            },
+            {
+              title: 'Tên viết tắt',
+              width: 170,
+              render: (_, row) => {
+                const other = duplicates[row.departmentId]
+                return (
+                  <Flex vertical gap={2}>
+                    <Input
+                      aria-label={`Tên viết tắt ${row.name}`}
+                      placeholder={row.code}
+                      maxLength={20}
+                      disabled={!row.isActive}
+                      status={other ? 'error' : undefined}
+                      value={row.shortName ?? ''}
+                      onChange={(e) => update(row, { shortName: e.target.value })}
+                    />
+                    {other && (
+                      <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                        Trùng với {other.name} ({other.code})
+                      </Typography.Text>
+                    )}
+                  </Flex>
+                )
+              },
             },
             {
               title: 'Số giường',
@@ -629,7 +764,7 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
               showSearch
               optionFilterProp="label"
               placeholder="Chưa giao khoa nào"
-              disabled={!departments.data}
+              disabled={!saved}
               status={stale ? 'warning' : undefined}
               value={assignments[line.key] ?? undefined}
               options={rows.filter((r) => r.isActive).map((r) => ({ value: r.departmentId, label: r.name }))}
@@ -645,5 +780,33 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
         )
       })}
     </Modal>
+  )
+}
+
+/**
+ * Ô số thứ tự của khoa trên bảng tổng hợp: gõ số rồi bấm Enter (hoặc rời ô) để chuyển khoa tới vị trí đó, các khoa khác dịch
+ * xuống. Chỉ nhận chữ số; để trống thì giữ thứ tự cũ.
+ */
+function PositionInput({ label, position, onCommit }: { label: string; position: number; onCommit: (position: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const commit = () => {
+    const value = Number.parseInt(draft ?? '', 10)
+    setDraft(null)
+    if (Number.isInteger(value) && value !== position) {
+      onCommit(value)
+    }
+  }
+  return (
+    <Input
+      aria-label={label}
+      size="small"
+      inputMode="numeric"
+      maxLength={4}
+      style={{ width: 44, textAlign: 'center' }}
+      value={draft ?? String(position)}
+      onChange={(e) => setDraft(e.target.value.replace(/\D/g, ''))}
+      onBlur={commit}
+      onPressEnter={commit}
+    />
   )
 }
