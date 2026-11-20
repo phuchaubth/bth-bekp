@@ -243,8 +243,9 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: c.header,
       key: c.key,
       align: 'right' as const,
-      // 14 cột số và cột người báo cáo (quyết định 44) vẫn vừa màn hình rộng 1366 điểm ảnh, không phải cuộn ngang.
-      width: 72,
+      // 15 cột số (thêm "Số NB ngày hôm trước", quyết định 46) và cột người báo cáo vẫn vừa màn hình rộng 1366 điểm ảnh, không
+      // phải cuộn ngang.
+      width: 66,
       render: (_: unknown, row: NursingSummaryRow) => number(row.cells[c.key]),
     })),
     { title: 'Người báo cáo', key: 'submittedBy', dataIndex: 'submittedBy', width: 150 },

@@ -6,10 +6,22 @@ export type NursingReportState = 'New' | 'Draft' | 'Submitted'
 
 export type NursingCheckValue = 'ok' | 'issue'
 
+/**
+ * Dòng tính tự động (quyết định 46): `base` cộng các dòng `add`, trừ các dòng `subtract`; ô trống tính 0, riêng `base` trống thì
+ * chưa tính được.
+ */
+export interface NursingReportFormula {
+  base: string
+  add: string[]
+  subtract: string[]
+}
+
 export interface NursingReportItem {
   key: string
   label: string
   carryOver: boolean
+  /** Có công thức: khoa không nhập, máy chủ tính khi lưu (Số NB hiện tại, quyết định 46). */
+  formula?: NursingReportFormula | null
 }
 
 /** Một mục (I–VI) của phần số liệu; `valueKey`: dòng tiêu đề mục là ô nhập (mục IV. ADR). */

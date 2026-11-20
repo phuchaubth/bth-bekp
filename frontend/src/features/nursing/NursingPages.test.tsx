@@ -25,7 +25,21 @@ const definition: NursingReportFormDefinition = {
       ],
     },
     { title: 'IV. PHẢN ỨNG CÓ HẠI THUỐC (ADR)', valueKey: 'adr', items: [] },
-    { title: 'VI. SỐ LƯỢNG NB', valueKey: null, items: [{ key: 'currentPatients', label: 'Số NB hiện tại', carryOver: false }] },
+    {
+      title: 'VI. SỐ LƯỢNG NB',
+      valueKey: null,
+      items: [
+        { key: 'previousDayPatients', label: 'Số NB ngày hôm trước', carryOver: false },
+        {
+          key: 'currentPatients',
+          label: 'Số NB hiện tại',
+          carryOver: false,
+          formula: { base: 'previousDayPatients', add: ['admissionsFromClinic'], subtract: ['dischargesYesterday'] },
+        },
+        { key: 'admissionsFromClinic', label: 'Số ca nhập khoa từ PK ngày hôm trước', carryOver: false },
+        { key: 'dischargesYesterday', label: 'Số ca xuất viện ngày hôm trước', carryOver: false },
+      ],
+    },
   ],
   checks: [
     { key: 'professional', label: 'Vấn đề chuyên môn', inSummary: true },
@@ -171,14 +185,17 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     const { calls } = mockApi({
       ...baseRoutes(nurseSession()),
       'GET /api/v1/nursing-reports/form': definition,
-      // Như máy chủ: sau khi lưu, tải lại trả báo cáo vừa lưu.
-      'GET /api/v1/nursing-reports/daily': () => saved.at(-1) ?? report(),
+      // Như máy chủ: sau khi lưu, tải lại trả báo cáo vừa lưu. Báo cáo mới điền sẵn số NB ngày hôm trước (quyết định 46).
+      'GET /api/v1/nursing-reports/daily': () =>
+        saved.at(-1) ?? report({ values: { nurses: 18, previousDayPatients: 45 }, carriedOverKeys: ['nurses', 'previousDayPatients'] }),
       'PUT /api/v1/nursing-reports/daily': (call: ApiCall) => {
         const body = call.body as { values: Record<string, number | null>; checks: Record<string, string | null>; notes: string | null; submit: boolean }
+        const values = Object.fromEntries(Object.entries(body.values).filter(([, v]) => v !== null)) as Record<string, number>
         const next = report({
           id: 'r-noi',
           status: body.submit ? 'Submitted' : 'Draft',
-          values: Object.fromEntries(Object.entries(body.values).filter(([, v]) => v !== null)) as Record<string, number>,
+          // Máy chủ tính Số NB hiện tại khi lưu.
+          values: { ...values, currentPatients: values.previousDayPatients + (values.admissionsFromClinic ?? 0) - (values.dischargesYesterday ?? 0) },
           checks: Object.fromEntries(Object.entries(body.checks).filter(([, v]) => v !== null)) as NursingReport['checks'],
           notes: body.notes,
           canEdit: !body.submit,
@@ -194,13 +211,31 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     })
     renderApp('/dieu-duong/bao-cao-khoa')
 
-    expect(await screen.findByText(/Đã điền sẵn nhân sự và chỉ tiêu/)).toBeInTheDocument()
+    expect(
+      await screen.findByText(
+        'Đã điền sẵn nhân sự và chỉ tiêu theo báo cáo đã gửi gần nhất của khoa; số NB ngày hôm trước theo báo cáo đã gửi hôm trước. Kiểm tra lại trước khi gửi.',
+      ),
+    ).toBeInTheDocument()
     // Tài khoản một khoa: không có ô chọn khoa.
     expect(screen.queryByRole('combobox', { name: 'Khoa' })).not.toBeInTheDocument()
     expect(screen.getByRole('spinbutton', { name: 'Điều dưỡng' })).toHaveValue('18')
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toMatch(/^\?date=\d{4}-\d{2}-\d{2}$/)
 
-    await user.type(screen.getByRole('spinbutton', { name: 'Số NB hiện tại' }), '47')
+    // Số NB hiện tại không nhập được, tự tính = số NB ngày hôm trước + nhập khoa − xuất viện (quyết định 46).
+    const current = screen.getByRole('spinbutton', { name: 'Số NB hiện tại' })
+    expect(current).toBeDisabled()
+    expect(current).toHaveValue('45')
+    expect(screen.getByText('Tự tính: Số NB ngày hôm trước + Số ca nhập khoa từ PK ngày hôm trước − Số ca xuất viện ngày hôm trước')).toBeInTheDocument()
+    await user.type(screen.getByRole('spinbutton', { name: 'Số ca nhập khoa từ PK ngày hôm trước' }), '3')
+    const discharges = screen.getByRole('spinbutton', { name: 'Số ca xuất viện ngày hôm trước' })
+    // Nhập nhầm làm số âm: ô có viền đỏ.
+    await user.type(discharges, '99')
+    expect(current).toHaveValue('-51')
+    expect(current.closest('.ant-input-number')).toHaveClass('ant-input-number-status-error')
+    await user.clear(discharges)
+    await user.type(discharges, '1')
+    expect(current).toHaveValue('47')
+    expect(current.closest('.ant-input-number')).not.toHaveClass('ant-input-number-status-error')
     await user.type(screen.getByRole('spinbutton', { name: 'Số ca' }), '0')
     await user.type(screen.getByRole('textbox', { name: /Báo cáo các vấn đề bất thường/ }), 'Người bệnh A (giả lập) sốt')
     await user.click(screen.getByRole('button', { name: /Lưu nháp/ }))
@@ -208,11 +243,13 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     await waitFor(() => expect(saved).toHaveLength(1))
     const draft = lastCall(calls, 'PUT', '/api/v1/nursing-reports/daily')!.body as Record<string, unknown>
     expect(draft).toMatchObject({
-      values: { nurses: 18, orderlies: null, adr: 0, currentPatients: 47 },
+      values: { nurses: 18, orderlies: null, adr: 0, previousDayPatients: 45, admissionsFromClinic: 3, dischargesYesterday: 1 },
       checks: { professional: null, security: null },
       notes: 'Người bệnh A (giả lập) sốt',
       submit: false,
     })
+    // Không gửi dòng tính tự động: máy chủ tự tính.
+    expect(draft.values).not.toHaveProperty('currentPatients')
     expect(await screen.findByText('Đã lưu nháp.')).toBeInTheDocument()
 
     // Gửi khi chưa chọn đủ phần tick: không gọi máy chủ.
@@ -224,6 +261,14 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     for (const label of ['Vấn đề chuyên môn', 'An ninh trật tự']) {
       await user.click(within(screen.getByRole('radiogroup', { name: label })).getByRole('radio', { name: 'Không có sự cố/ Ổn' }))
     }
+    // Thiếu số NB ngày hôm trước thì chưa tính được số NB hiện tại: báo ngay, không gọi máy chủ.
+    await user.clear(screen.getByRole('spinbutton', { name: 'Số NB ngày hôm trước' }))
+    expect(screen.getByRole('spinbutton', { name: 'Số NB hiện tại' })).toHaveValue('')
+    await user.click(screen.getByRole('button', { name: /Gửi báo cáo/ }))
+    await user.click(await screen.findByRole('button', { name: 'Gửi' }))
+    expect(await screen.findAllByText('Nhập Số NB ngày hôm trước để tính Số NB hiện tại.')).not.toHaveLength(0)
+    expect(saved).toHaveLength(1)
+    await user.type(screen.getByRole('spinbutton', { name: 'Số NB ngày hôm trước' }), '45')
     await user.click(screen.getByRole('button', { name: /Gửi báo cáo/ }))
     await user.click(await screen.findByRole('button', { name: 'Gửi' }))
 
@@ -233,7 +278,9 @@ describe('Báo cáo điều dưỡng của khoa', () => {
       submit: true,
     })
     expect(await screen.findByText('Báo cáo đã gửi Phòng Điều dưỡng.')).toBeInTheDocument()
+    // Báo cáo đã gửi hiện số máy chủ đã tính.
     expect(screen.getByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
+    expect(screen.getByRole('spinbutton', { name: 'Số NB hiện tại' })).toHaveValue('47')
     expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /In PDF/ })).toBeInTheDocument()
   })
@@ -470,6 +517,8 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     const drawer = await screen.findByRole('dialog', { name: /Khoa Nội tổng hợp/ })
     expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain('departmentId=d-noi')
     expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
+    // Xem báo cáo đã lưu: hiện số đã lưu (báo cáo cũ khoa nhập tay, chưa có số NB ngày hôm trước), không tính lại.
+    expect(within(drawer).getByRole('spinbutton', { name: 'Số NB hiện tại' })).toHaveValue('47')
 
     await user.click(within(drawer).getByRole('button', { name: /Trả lại khoa/ }))
     // Hộp thoại mở trên ngăn kéo: AntD trong môi trường test đặt cùng id tiêu đề, nên tìm theo chữ thay vì theo tên.

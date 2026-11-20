@@ -3,6 +3,8 @@ import type {
   NursingCheckValue,
   NursingReport,
   NursingReportFormDefinition,
+  NursingReportFormula,
+  NursingReportItem,
   NursingReportState,
   SaveNursingReportInput,
 } from '../../api/nursingReports'
@@ -18,7 +20,26 @@ export function toFormValues(report: NursingReport): NursingReportFormValues {
   return { values: { ...report.values }, checks: { ...report.checks }, notes: report.notes ?? '' }
 }
 
-/** Đổi giá trị form thành yêu cầu lưu: ô trống gửi null, phần nhập thêm trống gửi null. */
+/** Các dòng tính tự động của mẫu (quyết định 46). */
+export function formulaItems(definition: NursingReportFormDefinition): (NursingReportItem & { formula: NursingReportFormula })[] {
+  return definition.sections.flatMap((s) => s.items).filter((i): i is NursingReportItem & { formula: NursingReportFormula } => !!i.formula)
+}
+
+/** Kết quả công thức như máy chủ tính: ô trống tính 0, `base` trống thì chưa tính được (null). */
+export function evaluateFormula(formula: NursingReportFormula, values: Record<string, number | null | undefined> | undefined) {
+  const of = (key: string) => {
+    const value = values?.[key]
+    return typeof value === 'number' ? value : null
+  }
+  const base = of(formula.base)
+  if (base === null) {
+    return null
+  }
+  const sum = (keys: string[]) => keys.reduce((total, key) => total + (of(key) ?? 0), 0)
+  return base + sum(formula.add) - sum(formula.subtract)
+}
+
+/** Đổi giá trị form thành yêu cầu lưu: ô trống gửi null, phần nhập thêm trống gửi null; không gửi dòng tính tự động. */
 export function toSaveInput(
   definition: NursingReportFormDefinition,
   form: NursingReportFormValues,
@@ -27,7 +48,7 @@ export function toSaveInput(
 ): SaveNursingReportInput {
   const values: Record<string, number | null> = {}
   for (const section of definition.sections) {
-    for (const key of [...(section.valueKey ? [section.valueKey] : []), ...section.items.map((i) => i.key)]) {
+    for (const key of [...(section.valueKey ? [section.valueKey] : []), ...section.items.filter((i) => !i.formula).map((i) => i.key)]) {
       const value = form.values?.[key]
       values[key] = typeof value === 'number' ? value : null
     }

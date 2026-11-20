@@ -2,10 +2,10 @@ import { FilePdfOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Col, ConfigProvider, Form, Input, InputNumber, Modal, Radio, Row, Spin, Typography, type FormInstance } from 'antd'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useMemo, type ReactNode } from 'react'
-import type { NursingReport, NursingReportFormDefinition } from '../../api/nursingReports'
+import type { NursingReport, NursingReportFormDefinition, NursingReportFormula, NursingReportItem } from '../../api/nursingReports'
 import { errorMessage } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
-import { statusTag, toFormValues, type NursingReportFormValues } from './nursingReportUtils'
+import { evaluateFormula, statusTag, toFormValues, type NursingReportFormValues } from './nursingReportUtils'
 
 /** Dòng trạng thái: ai gửi lúc nào, ai lưu nháp lúc nào. */
 export function ReportStatus({ report }: { report: NursingReport }) {
@@ -30,7 +30,8 @@ export function ReportStatus({ report }: { report: NursingReport }) {
 
 /**
  * Các ô nhập của báo cáo khoa theo bản giấy: phần số liệu (mục I–VI), phần tick, phần báo cáo nhập thêm. Khóa cả form khi
- * không sửa được (đã gửi, không phải khoa mình), chữ vẫn đậm để dễ đọc.
+ * không sửa được (đã gửi, không phải khoa mình), chữ vẫn đậm để dễ đọc. Dòng có công thức (Số NB hiện tại, quyết định 46) không
+ * nhập được: đang sửa thì tính ngay theo các ô khác như máy chủ sẽ tính khi lưu; xem báo cáo đã lưu thì hiện số đã lưu.
  */
 export function NursingReportFields({
   definition,
@@ -62,6 +63,44 @@ export function NursingReportFields({
       <InputNumber min={0} max={definition.maxValue} precision={0} style={{ width: '100%' }} aria-label={typeof label === 'string' ? label : key} />
     </Form.Item>
   )
+  const labels = Object.fromEntries(definition.sections.flatMap((s) => s.items.map((i) => [i.key, i.label] as const)))
+  const computed = (item: NursingReportItem & { formula: NursingReportFormula }) => {
+    const { base, add, subtract } = item.formula
+    const formulaText = `Tự tính: ${[base, ...add].map((k) => labels[k] ?? k).join(' + ')}${subtract.map((k) => ` − ${labels[k] ?? k}`).join('')}`
+    return (
+      <>
+        <Form.Item
+          label={item.label}
+          labelCol={{ flex: 'auto' }}
+          wrapperCol={{ flex: '120px' }}
+          labelAlign="start"
+          colon={false}
+          style={{ marginBottom: 2 }}
+        >
+          <Form.Item noStyle shouldUpdate>
+            {() => {
+              const value = editable
+                ? evaluateFormula(item.formula, form.getFieldValue('values') as NursingReportFormValues['values'] | undefined)
+                : (report.values[item.key] ?? null)
+              return (
+                <InputNumber
+                  aria-label={item.label}
+                  disabled
+                  status={value !== null && value < 0 ? 'error' : undefined}
+                  value={value}
+                  style={{ width: '100%' }}
+                />
+              )
+            }}
+          </Form.Item>
+        </Form.Item>
+        {/* Công thức ghi dưới ô, rộng cả cột (để trong nhãn thì nhãn cao hơn ô, đè lên ô số). */}
+        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
+          {formulaText}
+        </Typography.Paragraph>
+      </>
+    )
+  }
 
   return (
     <ConfigProvider theme={{ token: { colorTextDisabled: 'rgba(0, 0, 0, 0.82)' } }}>
@@ -73,7 +112,7 @@ export function NursingReportFields({
             <Row gutter={24}>
               {section.items.map((item) => (
                 <Col key={item.key} xs={24} md={12}>
-                  {number(item.key, item.label)}
+                  {item.formula ? computed({ ...item, formula: item.formula }) : number(item.key, item.label)}
                 </Col>
               ))}
             </Row>

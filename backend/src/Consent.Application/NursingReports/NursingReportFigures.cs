@@ -100,6 +100,25 @@ public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Value
         return new JsonObject { ["values"] = values, ["checks"] = checks, ["form"] = Version }.ToJsonString();
     }
 
+    /// <summary>
+    /// Tính lại các dòng tính tự động (<see cref="NursingReportForm.FormulaItems"/>, quyết định 46) theo công thức, bỏ số gửi lên
+    /// cho các dòng đó; chưa tính được thì để trống.
+    /// </summary>
+    public NursingReportFigures WithFormulas()
+    {
+        var values = new Dictionary<string, int>(Values, StringComparer.Ordinal);
+        foreach (var item in NursingReportForm.FormulaItems)
+        {
+            values.Remove(item.Key);
+            if (item.Formula!.Evaluate(values) is { } result)
+            {
+                values[item.Key] = result;
+            }
+        }
+
+        return new NursingReportFigures(values, Checks) { Version = Version };
+    }
+
     /// <summary>Chỉ giữ các dòng điền sẵn cho báo cáo mới (nhân sự, chỉ tiêu) từ báo cáo trước.</summary>
     public NursingReportFigures CarryOver() => new(
         NursingReportForm.CarryOverKeys.Where(Values.ContainsKey).ToDictionary(k => k, k => Values[k], StringComparer.Ordinal),

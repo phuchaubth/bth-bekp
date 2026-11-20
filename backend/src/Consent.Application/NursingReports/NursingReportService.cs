@@ -73,11 +73,23 @@ public sealed class NursingReportService(
 
         var previous = await reports.FindLatestSubmittedBeforeAsync(id, reportDate, cancellationToken).ConfigureAwait(false);
         var carried = previous is null ? NursingReportFigures.Empty : NursingReportFigures.Parse(previous.FiguresJson).CarryOver();
+        // Số NB ngày hôm trước (quyết định 46): Số NB hiện tại của báo cáo đã gửi đúng ngày hôm trước; hôm trước chưa gửi thì khoa
+        // tự nhập.
+        if (previous is not null && previous.ReportDate.AddDays(1) == reportDate
+            && NursingReportFigures.Parse(previous.FiguresJson).Value(NursingReportForm.CurrentPatientsKey) is { } yesterday)
+        {
+            carried = new NursingReportFigures(
+                new Dictionary<string, int>(carried.Values, StringComparer.Ordinal) { [NursingReportForm.PreviousDayPatientsKey] = yesterday },
+                carried.Checks);
+        }
+
+        var carriedOverKeys = carried.Values.Keys.ToList();
+        carried = carried.WithFormulas();
         var reporting = await IsReportingAsync(id, cancellationToken).ConfigureAwait(false);
         return new NursingReportDto(
             null, department.Id, department.Name, reportDate, NursingReportState.New, carried.Values, carried.Checks, null,
             CanEdit: CanEdit(id) && reporting && IsEditableDate(reportDate), CanReopen: false,
-            null, null, null, null, null, null, null, [.. carried.Values.Keys], reporting,
+            null, null, null, null, null, null, null, carriedOverKeys, reporting,
             await HisEntryAsync(id, reportDate, reporting, cancellationToken).ConfigureAwait(false));
     }
 
@@ -123,10 +135,15 @@ public sealed class NursingReportService(
             return invalid;
         }
 
-        var figures = Figures(request);
+        var figures = Figures(request).WithFormulas();
         if (request.Submit && !figures.AllChecksAnswered)
         {
             return Error.ValidationField("checks", "Chọn \"Ổn\" hoặc \"Không ổn\" cho mọi dòng của phần tick trước khi gửi.");
+        }
+
+        if (FormulaError(figures, request.Submit) is { } formulaError)
+        {
+            return formulaError;
         }
 
         var now = clock.UtcNow;
@@ -346,6 +363,33 @@ public sealed class NursingReportService(
         if (request.Notes is { Length: > NursingDailyReport.NotesMaxLength })
         {
             errors["notes"] = [$"Phần báo cáo nhập thêm tối đa {NursingDailyReport.NotesMaxLength} ký tự."];
+        }
+
+        return errors.Count == 0 ? null : Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);
+    }
+
+    /// <summary>
+    /// Dòng tính tự động (quyết định 46): gửi báo cáo thì phải có số gốc (Số NB ngày hôm trước); kết quả phải từ 0 đến
+    /// <see cref="NursingReportForm.MaxValue"/>, nếu không là khoa nhập nhầm một trong các số của công thức.
+    /// </summary>
+    private static Error? FormulaError(NursingReportFigures figures, bool submit)
+    {
+        var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
+        foreach (var item in NursingReportForm.FormulaItems)
+        {
+            var formula = item.Formula!;
+            if (submit && figures.Value(formula.Base) is null)
+            {
+                errors[$"values.{formula.Base}"] = [$"Nhập {NursingReportForm.LabelOf(formula.Base)} để tính {item.Label}."];
+            }
+            else if (figures.Value(item.Key) is { } value and (< 0 or > NursingReportForm.MaxValue))
+            {
+                errors[$"values.{item.Key}"] =
+                [
+                    $"{item.Label} tính ra {value}, phải từ 0 đến {NursingReportForm.MaxValue}: kiểm tra lại "
+                    + $"{string.Join(", ", formula.Keys.Select(NursingReportForm.LabelOf))}.",
+                ];
+            }
         }
 
         return errors.Count == 0 ? null : Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);

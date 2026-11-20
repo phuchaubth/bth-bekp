@@ -75,7 +75,12 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(40, departments.EnumerateArray().Single(d => d.GetProperty("departmentId").GetString() == noi).GetProperty("bedCount").GetInt32());
 
         // Điều dưỡng lưu nháp rồi gửi; gửi xong thì khóa.
-        var values = new Dictionary<string, int?> { ["nurses"] = 18, ["currentPatients"] = 47, ["boneMarrow"] = 2, ["outsideExams"] = 1 };
+        // Số NB hiện tại máy chủ tính (quyết định 46): 46 + 2 nhập khoa từ PK − 1 xuất viện = 47; số gửi lên bị bỏ qua.
+        var values = new Dictionary<string, int?>
+        {
+            ["nurses"] = 18, ["previousDayPatients"] = 46, ["admissionsFromClinic"] = 2, ["dischargesYesterday"] = 1, ["currentPatients"] = 5,
+            ["boneMarrow"] = 2, ["outsideExams"] = 1,
+        };
         var (draftStatus, draft) = await _client.SendJsonAsync(
             HttpMethod.Put, "/api/v1/nursing-reports/daily", nurse, new { reportDate = Today, values, notes = Notes });
         Assert.True(draftStatus == HttpStatusCode.OK, draft.ToString());
@@ -165,7 +170,7 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal("Phòng Điều dưỡng Demo", reopened.GetProperty("reopenedBy").GetString());
         var (fixedStatus, _) = await _client.SendJsonAsync(
             HttpMethod.Put, "/api/v1/nursing-reports/daily", nurse,
-            new { reportDate = Today, values = new { currentPatients = 46 }, checks = AllOk(), submit = true });
+            new { reportDate = Today, values = new { previousDayPatients = 46 }, checks = AllOk(), submit = true });
         Assert.Equal(HttpStatusCode.OK, fixedStatus);
     }
 
@@ -290,6 +295,15 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(HttpStatusCode.OK, status);
         Assert.Equal(6, form.GetProperty("sections").GetArrayLength());
         Assert.Equal(8, form.GetProperty("checks").GetArrayLength());
+        // Quyết định 46: giao diện tính Số NB hiện tại theo công thức máy chủ gửi kèm; dòng khác không có công thức.
+        var items = form.GetProperty("sections")[5].GetProperty("items").EnumerateArray().ToList();
+        var formula = items.Single(i => i.GetProperty("key").GetString() == "currentPatients").GetProperty("formula");
+        Assert.Equal("previousDayPatients", formula.GetProperty("base").GetString());
+        Assert.Equal(["admissionsFromClinic", "admissionsByTransfer"], formula.GetProperty("add").EnumerateArray().Select(k => k.GetString()));
+        Assert.Equal(["dischargesYesterday", "transfersOutYesterday"], formula.GetProperty("subtract").EnumerateArray().Select(k => k.GetString()));
+        Assert.Equal(
+            JsonValueKind.Null,
+            items.Single(i => i.GetProperty("key").GetString() == "previousDayPatients").GetProperty("formula").ValueKind);
 
         using var anonymous = await _client.GetAsync("/api/v1/nursing-reports/form");
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);

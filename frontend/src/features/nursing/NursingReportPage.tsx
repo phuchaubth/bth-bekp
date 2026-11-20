@@ -14,10 +14,10 @@ import {
 } from '../../api/nursingReports'
 import { useAuth } from '../../auth/authContext'
 import { PageHeader } from '../../components/PageHeader'
-import { errorMessage } from '../../utils/formErrors'
+import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { HisEntryCard } from './HisEntryCard'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
-import { toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
+import { formulaItems, toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
 
 const DATE = 'YYYY-MM-DD'
 
@@ -132,8 +132,12 @@ function ReportEditor({
       void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
       message.success(submit ? 'Đã gửi báo cáo cho Phòng Điều dưỡng.' : 'Đã lưu nháp.')
     },
-    onError: (e) => message.error(errorMessage(e)),
+    // Không trả về kết quả của message.error: React Query sẽ chờ thông báo đóng (3 giây) rồi mới hết trạng thái đang lưu.
+    onError: (e) => {
+      message.error(errorMessageWithDetails(e))
+    },
   })
+  const labels = Object.fromEntries(definition.sections.flatMap((s) => s.items.map((i) => [i.key, i.label] as const)))
 
   const submit = () => {
     const checks = form.getFieldValue('checks') as Record<string, string | null | undefined> | undefined
@@ -143,8 +147,24 @@ function ReportEditor({
       message.error('Chọn "Ổn" hoặc "Không ổn" cho mọi dòng của phần tick trước khi gửi.')
       return
     }
+    // Dòng tính tự động (quyết định 46) cần số gốc, ví dụ Số NB ngày hôm trước để tính Số NB hiện tại.
+    const values = form.getFieldValue('values') as NursingReportFormValues['values'] | undefined
+    const noBase = formulaItems(definition).filter((i) => typeof values?.[i.formula.base] !== 'number')
+    if (noBase.length > 0) {
+      const texts = noBase.map((i) => `Nhập ${labels[i.formula.base] ?? i.formula.base} để tính ${i.label}.`)
+      form.setFields(noBase.map((i, index) => ({ name: ['values', i.formula.base], errors: [texts[index]] })))
+      message.error(texts.join(' '))
+      return
+    }
     save.mutate(true)
   }
+  const bases = new Set(formulaItems(definition).map((i) => i.formula.base))
+  const prefilled = [
+    ...(report.carriedOverKeys.some((k) => !bases.has(k)) ? ['nhân sự và chỉ tiêu theo báo cáo đã gửi gần nhất của khoa'] : []),
+    ...report.carriedOverKeys
+      .filter((k) => bases.has(k))
+      .map((k) => `${(labels[k] ?? k).toLowerCase().replace(/^số nb/, 'số NB')} theo báo cáo đã gửi hôm trước`),
+  ]
 
   const title = `${definition.title} – ${report.departmentName}`
   return (
@@ -184,12 +204,12 @@ function ReportEditor({
           description={`Lý do: ${report.reopenReason}. Sửa rồi bấm "Gửi báo cáo" lại.`}
         />
       )}
-      {report.status === 'New' && report.carriedOverKeys.length > 0 && (
+      {report.status === 'New' && prefilled.length > 0 && (
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          title="Đã điền sẵn nhân sự và chỉ tiêu theo báo cáo đã gửi gần nhất của khoa. Kiểm tra lại trước khi gửi."
+          title={`Đã điền sẵn ${prefilled.join('; ')}. Kiểm tra lại trước khi gửi.`}
         />
       )}
       {report.status === 'Submitted' && (
