@@ -1263,6 +1263,7 @@ Lưu ý:
    *Hình 9.13. Giao khoa nhập từng chỉ số mục B, D khi HIS lỗi. Không cần giao **NB PK chờ nhập viện**: mỗi khoa phải báo cáo tự nhập số của khoa mình.*
 
 5. Khi khoa đổi số giường, có khoa mới phải báo cáo, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+6. Sau khi quản trị **lấy danh mục khoa/phòng từ HIS** (mục 8.2), khoa cũ không còn trên HIS chuyển sang ngừng sử dụng. Trong hộp này, khoa đó có nhãn **Ngừng sử dụng**, nằm cuối danh sách và không chọn được; đầu hộp có khung vàng ghi tên các khoa này. Bấm **Lưu** thì khoa ngừng sử dụng được bỏ khỏi danh sách khoa báo cáo. Chỉ số mục B, D đang giao cho khoa ngừng sử dụng để trống, có dòng nhắc; chọn khoa thay thế (thường là khoa cùng tên trên HIS) rồi lưu.
 
 Người nhập số liệu HIS cho một khoa cần tài khoản thuộc đúng khoa đó, có vai trò **Điều dưỡng** (quyền **Lập và gửi báo cáo điều dưỡng của khoa**). Khoa được giao nhập không cần được tick báo cáo. Quản trị tạo hoặc sửa tài khoản ở mục 8.1.
 

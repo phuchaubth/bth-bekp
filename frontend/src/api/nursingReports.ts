@@ -194,6 +194,11 @@ export interface NursingReportDepartment {
   departmentId: string
   code: string
   name: string
+  /**
+   * `false`: khoa đã ngừng sử dụng (không còn trong danh mục khoa/phòng, ví dụ sau khi lấy danh mục từ HIS) nhưng còn trong danh
+   * sách báo cáo hoặc còn được giao chỉ số. Máy chủ không nhận khoa này khi lưu.
+   */
+  isActive: boolean
   isReporting: boolean
   bedCount: number | null
   /** Chỉ số toàn viện (mục B, D) khoa nhập tay khi HIS lỗi. */

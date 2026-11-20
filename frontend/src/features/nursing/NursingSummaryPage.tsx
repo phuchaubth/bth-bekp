@@ -18,6 +18,7 @@ import {
   Select,
   Spin,
   Table,
+  Tag,
   Tooltip,
   Typography,
   type TableColumnsType,
@@ -40,7 +41,7 @@ import {
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
-import { errorMessage } from '../../utils/formErrors'
+import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
 import { saveBlob, statusTag, type NursingReportFormValues } from './nursingReportUtils'
@@ -475,13 +476,16 @@ interface DepartmentRow {
   departmentId: string
   code: string
   name: string
+  isActive: boolean
   isReporting: boolean
   bedCount: number | null
 }
 
 /**
  * Phòng Điều dưỡng chọn khoa phải gửi báo cáo, cài số giường thực kê (không tính băng ca) của từng khoa, và giao khoa nhập tay
- * từng chỉ số mục B, D khi HIS lỗi (quyết định 35).
+ * từng chỉ số mục B, D khi HIS lỗi (quyết định 35). Khoa đã ngừng sử dụng (ví dụ khoa nhập tay trước đây không còn trong danh mục
+ * khoa lấy từ HIS) có nhãn "Ngừng sử dụng", không chọn được và được bỏ khi lưu, kể cả phần giao chỉ số; nếu không máy chủ từ chối
+ * cả lần lưu ("Dữ liệu không hợp lệ").
  */
 function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onClose: () => void }) {
   const departments = useNursingReportDepartments(true)
@@ -489,20 +493,32 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
   const [assignmentEdits, setAssignmentEdits] = useState<Record<string, string | null>>({})
   const queryClient = useQueryClient()
   const { message } = App.useApp()
+  // Khoa ngừng sử dụng xuống cuối danh sách (sắp xếp giữ thứ tự tên của máy chủ).
   const rows: DepartmentRow[] = useMemo(
-    () => (departments.data ?? []).map((d) => ({ ...d, ...edits[d.departmentId] })),
+    () =>
+      (departments.data ?? [])
+        .map((d) => ({ ...d, ...edits[d.departmentId] }))
+        .sort((a, b) => Number(!a.isActive) - Number(!b.isActive)),
     [departments.data, edits],
   )
+  const stopped = useMemo(() => (departments.data ?? []).filter((d) => !d.isActive), [departments.data])
+  const current = useMemo(
+    () =>
+      Object.fromEntries(
+        (departments.data ?? []).flatMap((d) => d.hisIndicators.map((key) => [key, d.departmentId] as const)),
+      ) as Record<string, string>,
+    [departments.data],
+  )
+  // Chỉ số đang giao cho khoa ngừng sử dụng: coi như chưa giao (khi lưu gửi null) cho tới khi chọn khoa khác.
   const assignments = useMemo(() => {
-    const current = Object.fromEntries(
-      (departments.data ?? []).flatMap((d) => d.hisIndicators.map((key) => [key, d.departmentId] as const)),
-    ) as Record<string, string>
-    return Object.fromEntries(lines.map((l) => [l.key, l.key in assignmentEdits ? assignmentEdits[l.key] : (current[l.key] ?? null)]))
-  }, [departments.data, assignmentEdits, lines])
+    const usable = (departmentId: string | null | undefined) =>
+      departmentId && rows.some((r) => r.departmentId === departmentId && r.isActive) ? departmentId : null
+    return Object.fromEntries(lines.map((l) => [l.key, usable(l.key in assignmentEdits ? assignmentEdits[l.key] : current[l.key])]))
+  }, [rows, current, assignmentEdits, lines])
   const save = useMutation({
     mutationFn: () =>
       nursingReportsApi.updateDepartments(
-        rows.filter((r) => r.isReporting).map((r) => ({ departmentId: r.departmentId, bedCount: r.bedCount ?? 0 })),
+        rows.filter((r) => r.isActive && r.isReporting).map((r) => ({ departmentId: r.departmentId, bedCount: r.bedCount ?? 0 })),
         assignments,
       ),
     onSuccess: (saved) => {
@@ -511,7 +527,10 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
       message.success('Đã lưu danh sách khoa báo cáo.')
       onClose()
     },
-    onError: (e) => message.error(errorMessage(e)),
+    // Không trả về kết quả của message.error: React Query sẽ chờ thông báo đóng (3 giây) rồi mới hết trạng thái đang lưu.
+    onError: (e) => {
+      message.error(errorMessageWithDetails(e))
+    },
   })
   const update = (row: DepartmentRow, change: Partial<Pick<DepartmentRow, 'isReporting' | 'bedCount'>>) =>
     setEdits((current) => ({ ...current, [row.departmentId]: { isReporting: row.isReporting, bedCount: row.bedCount, ...change } }))
@@ -530,6 +549,15 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
       <Typography.Paragraph type="secondary">
         Khoa được chọn mới lập được báo cáo và có dòng trên bảng tổng hợp. Số giường thực kê không tính băng ca.
       </Typography.Paragraph>
+      {stopped.length > 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 12 }}
+          title="Có khoa đã ngừng sử dụng"
+          description={`${stopped.map((d) => `${d.name} (${d.code})`).join(', ')}: không còn trong danh mục khoa/phòng. Khi lưu, các khoa này được bỏ khỏi danh sách khoa báo cáo và không còn được giao nhập số liệu HIS. Chọn khoa thay thế trong danh sách nếu cần.`}
+        />
+      )}
       {departments.isError ? (
         <Alert type="error" showIcon title={errorMessage(departments.error)} />
       ) : (
@@ -545,10 +573,24 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
               title: 'Báo cáo',
               width: 80,
               render: (_, row) => (
-                <Checkbox aria-label={`${row.name} phải báo cáo`} checked={row.isReporting} onChange={(e) => update(row, { isReporting: e.target.checked })} />
+                <Checkbox
+                  aria-label={`${row.name} phải báo cáo`}
+                  checked={row.isActive && row.isReporting}
+                  disabled={!row.isActive}
+                  onChange={(e) => update(row, { isReporting: e.target.checked })}
+                />
               ),
             },
-            { title: 'Khoa/phòng', dataIndex: 'name', render: (name: string, row) => `${name} (${row.code})` },
+            {
+              title: 'Khoa/phòng',
+              dataIndex: 'name',
+              render: (name: string, row) => (
+                <>
+                  {`${name} (${row.code})`}
+                  {!row.isActive && <Tag style={{ marginInlineStart: 8 }}>Ngừng sử dụng</Tag>}
+                </>
+              ),
+            },
             {
               title: 'Số giường',
               width: 130,
@@ -558,7 +600,7 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
                   min={0}
                   max={10000}
                   precision={0}
-                  disabled={!row.isReporting}
+                  disabled={!row.isActive || !row.isReporting}
                   value={row.bedCount}
                   onChange={(value) => update(row, { bedCount: value })}
                 />
@@ -574,23 +616,34 @@ function DepartmentsModal({ lines, onClose }: { lines: NursingSummaryLine[]; onC
         Khi không lấy được số liệu từ HIS, mỗi khoa nhập số thuộc nhiệm vụ của khoa ở trang Báo cáo của khoa; Phòng Điều dưỡng chỉ
         tổng hợp. Khoa phải báo cáo tự nhập "NB PK chờ nhập viện" của khoa mình. Chọn khoa nhập từng chỉ số dưới đây.
       </Typography.Paragraph>
-      {lines.map((line) => (
-        <Flex key={line.key} align="center" gap={12} wrap style={{ marginBottom: 8 }}>
-          <span style={{ flex: '1 1 200px' }}>{line.label}</span>
-          <Select
-            aria-label={`Khoa nhập ${line.label}`}
-            style={{ flex: '1 1 260px' }}
-            allowClear
-            showSearch
-            optionFilterProp="label"
-            placeholder="Chưa giao khoa nào"
-            disabled={!departments.data}
-            value={assignments[line.key] ?? undefined}
-            options={rows.map((r) => ({ value: r.departmentId, label: r.name }))}
-            onChange={(value: string | undefined) => setAssignmentEdits((current) => ({ ...current, [line.key]: value ?? null }))}
-          />
-        </Flex>
-      ))}
+      {lines.map((line) => {
+        // Đang giao cho khoa ngừng sử dụng (chưa chọn lại): nhắc chọn khoa khác.
+        const stale = line.key in assignmentEdits ? undefined : stopped.find((d) => d.departmentId === current[line.key])
+        return (
+          <Flex key={line.key} align="center" gap={12} wrap style={{ marginBottom: 8 }}>
+            <span style={{ flex: '1 1 200px' }}>{line.label}</span>
+            <Select
+              aria-label={`Khoa nhập ${line.label}`}
+              style={{ flex: '1 1 260px' }}
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder="Chưa giao khoa nào"
+              disabled={!departments.data}
+              status={stale ? 'warning' : undefined}
+              value={assignments[line.key] ?? undefined}
+              options={rows.filter((r) => r.isActive).map((r) => ({ value: r.departmentId, label: r.name }))}
+              onChange={(value: string | undefined) => setAssignmentEdits((edited) => ({ ...edited, [line.key]: value ?? null }))}
+            />
+            {stale && (
+              <Typography.Text type="warning" style={{ flexBasis: '100%' }}>
+                Đang giao {stale.name} ({stale.code}), khoa này đã ngừng sử dụng. Chọn khoa khác; để trống thì khi lưu chỉ số này không
+                giao khoa nào.
+              </Typography.Text>
+            )}
+          </Flex>
+        )
+      })}
     </Modal>
   )
 }

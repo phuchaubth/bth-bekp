@@ -761,6 +761,63 @@ public sealed class NursingReportServiceTests
         Assert.Equal(2, _ctx.Store.NursingDepartments.Count);
     }
 
+    /// <summary>
+    /// Khoa nhập tay trước đây đã cài báo cáo và được giao nhập số liệu HIS, rồi ngừng sử dụng khi lấy danh mục khoa từ HIS
+    /// (quyết định 42); khoa trên HIS là một khoa mới. Danh sách ghi rõ khoa ngừng sử dụng; gửi lại khoa đó (như giao diện cũ, bệnh
+    /// viện báo "Dữ liệu không hợp lệ" 20/11) thì lỗi ghi tên khoa; bỏ khoa đó thì lưu được.
+    /// </summary>
+    [Fact]
+    public async Task ReportingDepartments_ADepartmentStoppedByTheHisList_IsFlagged_AndSavingWithoutItWorks()
+    {
+        ActAs(_office, Permissions.NursingReportsRead, Permissions.NursingReportsManage);
+        var oldIcu = _ctx.AddDepartment("HSTC", "Khoa Hồi sức tích cực (giả lập)");
+        var hisIcu = _ctx.AddDepartment("HHTCCD", "Hồi Sức Tích Cực - Chống Độc (giả lập)");
+        var service = _ctx.CreateNursingSummaryService();
+        var before = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_ward.Id, 48), new(_surgery.Id, 25), new(oldIcu.Id, 20)],
+                new Dictionary<string, Guid?> { [NursingHisIndicators.Ultrasound] = oldIcu.Id }),
+            CancellationToken.None);
+        Assert.True(before.IsSuccess, before.Error?.Message);
+        oldIcu.Deactivate();
+
+        var listed = await service.ListDepartmentsAsync(CancellationToken.None);
+        var stopped = listed.Single(d => d.DepartmentId == oldIcu.Id);
+        Assert.False(stopped.IsActive);
+        Assert.True(stopped.IsReporting);
+        Assert.Equal([NursingHisIndicators.Ultrasound], stopped.HisIndicators);
+        Assert.True(listed.Single(d => d.DepartmentId == hisIcu.Id).IsActive);
+        Assert.True(listed.Single(d => d.DepartmentId == _ward.Id).IsActive);
+
+        // Gửi lại khoa ngừng sử dụng: lỗi ghi rõ khoa nào và cách sửa, không lưu gì.
+        var rejected = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_ward.Id, 48), new(_surgery.Id, 25), new(oldIcu.Id, 20), new(hisIcu.Id, 22)],
+                new Dictionary<string, Guid?> { [NursingHisIndicators.Ultrasound] = oldIcu.Id }),
+            CancellationToken.None);
+        Assert.Equal(["hisEntry.ultrasound", "items[2].departmentId"], rejected.Error!.FieldErrors!.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(
+            "Khoa Hồi sức tích cực (giả lập) (HSTC) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), bỏ chọn khoa này.",
+            Assert.Single(rejected.Error.FieldErrors["items[2].departmentId"]));
+        Assert.Equal(
+            "Khoa Hồi sức tích cực (giả lập) (HSTC) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), chọn khoa khác.",
+            Assert.Single(rejected.Error.FieldErrors["hisEntry.ultrasound"]));
+        Assert.DoesNotContain(_ctx.Store.NursingDepartments, d => d.DepartmentId == hisIcu.Id);
+
+        // Bỏ khoa ngừng sử dụng và bỏ giao chỉ số của khoa đó (như giao diện mới gửi): lưu được, khoa cũ ra khỏi danh sách.
+        var saved = await service.UpdateDepartmentsAsync(
+            new UpdateNursingReportDepartmentsRequest(
+                [new(_ward.Id, 48), new(_surgery.Id, 25), new(hisIcu.Id, 22)],
+                new Dictionary<string, Guid?> { [NursingHisIndicators.Ultrasound] = null }),
+            CancellationToken.None);
+        Assert.True(saved.IsSuccess, saved.Error?.Message);
+        Assert.DoesNotContain(saved.Value, d => d.DepartmentId == oldIcu.Id);
+        var icu = saved.Value.Single(d => d.DepartmentId == hisIcu.Id);
+        Assert.Equal((true, true, (int?)22), (icu.IsActive, icu.IsReporting, icu.BedCount));
+        Assert.DoesNotContain(_ctx.Store.NursingDepartments, d => d.DepartmentId == oldIcu.Id);
+        Assert.Empty(_ctx.Store.SystemSettings);
+    }
+
     [Fact]
     public async Task SummaryFiles_ShareOneDocument_WithThePrintTimeAndSources()
     {

@@ -183,6 +183,7 @@ public sealed class NursingSummaryService(
                 d.Id,
                 d.Code,
                 d.Name,
+                d.IsActive,
                 configured.ContainsKey(d.Id),
                 configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
                 [.. NursingHisEntry.HospitalLines.Where(l => assignments.TryGetValue(l.Key, out var assigned) && assigned == d.Id).Select(l => l.Key)]))];
@@ -197,15 +198,21 @@ public sealed class NursingSummaryService(
     {
         ArgumentNullException.ThrowIfNull(request);
         var items = request.Items ?? [];
-        var active = (await departments.ListAsync(includeInactive: false, cancellationToken).ConfigureAwait(false))
-            .Select(d => d.Id)
-            .ToHashSet();
+        var known = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false)).ToDictionary(d => d.Id);
+
+        // Khoa không dùng được: không có, hoặc đã ngừng sử dụng (khoa nhập tay trước đây không còn trong danh mục khoa lấy từ HIS,
+        // quyết định 42). Thông báo ghi tên khoa để Phòng Điều dưỡng biết sửa dòng nào.
+        string? Unusable(Guid departmentId, string fix) =>
+            !known.TryGetValue(departmentId, out var department) ? "Khoa không tồn tại."
+            : department.IsActive ? null
+            : $"{department.Name} ({department.Code}) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), {fix}.";
+
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         for (var i = 0; i < items.Count; i++)
         {
-            if (!active.Contains(items[i].DepartmentId))
+            if (Unusable(items[i].DepartmentId, "bỏ chọn khoa này") is { } problem)
             {
-                errors[$"items[{i}].departmentId"] = ["Khoa không tồn tại hoặc đã ngừng sử dụng."];
+                errors[$"items[{i}].departmentId"] = [problem];
             }
             else if (items.Take(i).Any(other => other.DepartmentId == items[i].DepartmentId))
             {
@@ -227,9 +234,9 @@ public sealed class NursingSummaryService(
             }
             else if (departmentId is { } id)
             {
-                if (!active.Contains(id))
+                if (Unusable(id, "chọn khoa khác") is { } problem)
                 {
-                    errors[$"hisEntry.{key}"] = ["Khoa không tồn tại hoặc đã ngừng sử dụng."];
+                    errors[$"hisEntry.{key}"] = [problem];
                 }
                 else
                 {

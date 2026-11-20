@@ -147,10 +147,11 @@ public sealed record NursingSummaryDto(
 
 /// <summary>
 /// Một khoa trên màn hình cài khoa báo cáo: có phải báo cáo không, số giường thực kê, các chỉ số toàn viện khoa nhập tay khi
-/// HIS lỗi (quyết định 35).
+/// HIS lỗi (quyết định 35). <paramref name="IsActive"/> <c>false</c>: khoa đã ngừng sử dụng (ví dụ không còn trong danh mục khoa lấy
+/// từ HIS, quyết định 42) nhưng còn trong danh sách báo cáo hoặc còn được giao chỉ số; lưu lại thì phải bỏ khoa này.
 /// </summary>
 public sealed record NursingReportDepartmentDto(
-    Guid DepartmentId, string Code, string Name, bool IsReporting, int? BedCount, IReadOnlyList<string> HisIndicators);
+    Guid DepartmentId, string Code, string Name, bool IsActive, bool IsReporting, int? BedCount, IReadOnlyList<string> HisIndicators);
 
 public sealed record NursingReportDepartmentItem(Guid DepartmentId, int BedCount);
 

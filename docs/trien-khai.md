@@ -467,7 +467,7 @@ Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 
    - khoa/phòng có **mã trùng** mã trên HIS: cập nhật tên theo HIS (đang ngừng sử dụng thì dùng lại);
    - khoa/phòng nhập tay trước đây có **tên trùng** tên trên HIS (không phân biệt hoa thường, khoảng trắng thừa): nhận mã HIS, giữ nguyên người dùng, phiếu, báo cáo đã gắn;
    - khoa/phòng chỉ có trên HIS: thêm mới;
-   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*).
+   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*). Phòng Điều dưỡng mở *Báo cáo điều dưỡng → Tổng hợp hằng ngày → Khoa báo cáo và số giường*: khoa ngừng sử dụng có nhãn **Ngừng sử dụng**, chọn khoa thay thế trên HIS (khoa báo cáo, số giường, khoa nhập số liệu HIS) rồi **Lưu**; khoa ngừng sử dụng được bỏ khỏi danh sách khi lưu. Bản trước 20/11/2026 báo "Dữ liệu không hợp lệ" ở bước này nếu còn khoa ngừng sử dụng trong danh sách: xem khoa nào ghi *Ngừng sử dụng* ở *Quản trị → Khoa/phòng*, bỏ chọn khoa đó và chọn lại khoa nhập số liệu HIS đang giao cho khoa đó rồi lưu.
 
    HIS lỗi, API chưa có câu truy vấn hoặc HIS trả về rỗng thì danh mục giữ nguyên. Mỗi thay đổi ghi nhật ký hệ thống. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm lại nút này.
 5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.

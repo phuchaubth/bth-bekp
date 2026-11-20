@@ -145,9 +145,9 @@ const summary: NursingSummary = {
 }
 
 const departments: NursingReportDepartment[] = [
-  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', isReporting: false, bedCount: null, hisIndicators: ['outpatientVisits'] },
-  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', isReporting: true, bedCount: 25, hisIndicators: [] },
-  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', isReporting: true, bedCount: 40, hisIndicators: [] },
+  { departmentId: 'd-kkb', code: 'KKB', name: 'Khoa Khám bệnh', isActive: true, isReporting: false, bedCount: null, hisIndicators: ['outpatientVisits'] },
+  { departmentId: 'd-ngoai', code: 'NGOAIB', name: 'Khoa Ngoại B (giả lập)', isActive: true, isReporting: true, bedCount: 25, hisIndicators: [] },
+  { departmentId: 'd-noi', code: 'NOI', name: 'Khoa Nội tổng hợp', isActive: true, isReporting: true, bedCount: 40, hisIndicators: [] },
 ]
 
 /** Số liệu HIS khoa nhập khi HIS lỗi (quyết định 35). */
@@ -549,6 +549,74 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
         hisEntry: { outpatientVisits: 'd-kkb', xray: 'd-noi' },
       }),
     )
+  })
+
+  it('khoa ngừng sử dụng (không còn trong danh mục HIS) có nhãn, không chọn được, bỏ khi lưu; lỗi máy chủ ghi rõ khoa', { timeout: 20_000 }, async () => {
+    // Bệnh viện báo (20/11): chọn khoa HIS mới rồi Lưu thì báo "Dữ liệu không hợp lệ", vì khoa cũ đã ngừng sử dụng vẫn được gửi lên.
+    const user = userEvent.setup()
+    const stoppedIcu: NursingReportDepartment = {
+      departmentId: 'd-hstc', code: 'HSTC', name: 'Khoa Hồi sức tích cực (giả lập)', isActive: false, isReporting: true, bedCount: 20, hisIndicators: ['xray'],
+    }
+    const hisIcu: NursingReportDepartment = {
+      departmentId: 'd-hhtccd', code: 'HHTCCD', name: 'Hồi Sức Tích Cực - Chống Độc (giả lập)', isActive: true, isReporting: false, bedCount: null, hisIndicators: [],
+    }
+    let saves = 0
+    const { calls } = mockApi({
+      ...baseRoutes(officeSession()),
+      'GET /api/v1/nursing-reports/summary': summary,
+      'GET /api/v1/nursing-reports/departments': [hisIcu, stoppedIcu, ...departments.slice(1)],
+      'PUT /api/v1/nursing-reports/departments': () =>
+        ++saves === 1
+          ? problem(400, 'Dữ liệu không hợp lệ.', {
+              errors: { 'items[0].departmentId': ['Khoa X (giả lập) (KX) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), bỏ chọn khoa này.'] },
+            })
+          : json([{ ...hisIcu, isReporting: true, bedCount: 22 }, ...departments.slice(1)]),
+    })
+    renderApp('/dieu-duong/tong-hop')
+
+    await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
+    const modal = await screen.findByRole('dialog', { name: 'Khoa báo cáo và số giường thực kê' })
+    expect(await within(modal).findByText('Có khoa đã ngừng sử dụng')).toBeInTheDocument()
+    expect(within(modal).getByText(/Khoa Hồi sức tích cực \(giả lập\) \(HSTC\): không còn trong danh mục khoa\/phòng/)).toBeInTheDocument()
+    // Khoa ngừng sử dụng xuống cuối bảng, có nhãn, không chọn được.
+    const rows = within(modal).getAllByRole('row').slice(1)
+    expect(rows.at(-1)).toHaveTextContent('Khoa Hồi sức tích cực (giả lập) (HSTC)Ngừng sử dụng')
+    const stoppedBox = within(modal).getByRole('checkbox', { name: 'Khoa Hồi sức tích cực (giả lập) phải báo cáo' })
+    expect(stoppedBox).toBeDisabled()
+    expect(stoppedBox).not.toBeChecked()
+    // Chỉ số đang giao cho khoa ngừng sử dụng: ô chọn để trống, có nhắc; danh sách chọn không có khoa ngừng sử dụng.
+    expect(within(modal).getByText(/Đang giao Khoa Hồi sức tích cực \(giả lập\) \(HSTC\), khoa này đã ngừng sử dụng/)).toBeInTheDocument()
+    expect(within(modal).getByRole('combobox', { name: 'Khoa nhập TS X-quang' }).closest('.ant-select')).not.toHaveTextContent('Khoa Hồi sức')
+    await user.click(within(modal).getByRole('combobox', { name: 'Khoa nhập TS X-quang' }))
+    expect(await screen.findByTitle('Hồi Sức Tích Cực - Chống Độc (giả lập)')).toBeInTheDocument()
+    expect(screen.queryByTitle('Khoa Hồi sức tích cực (giả lập)')).not.toBeInTheDocument()
+    // Đóng danh sách chọn (Esc sẽ đóng cả hộp thoại).
+    await user.click(within(modal).getByRole('combobox', { name: 'Khoa nhập TS X-quang' }))
+
+    await user.click(within(modal).getByRole('checkbox', { name: 'Hồi Sức Tích Cực - Chống Độc (giả lập) phải báo cáo' }))
+    await user.type(within(modal).getByRole('spinbutton', { name: 'Số giường Hồi Sức Tích Cực - Chống Độc (giả lập)' }), '22')
+    await user.click(within(modal).getByRole('button', { name: 'Lưu' }))
+
+    // Không gửi khoa ngừng sử dụng, bỏ giao chỉ số của khoa đó.
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/departments')?.body).toEqual({
+        items: [
+          { departmentId: 'd-hhtccd', bedCount: 22 },
+          { departmentId: 'd-ngoai', bedCount: 25 },
+          { departmentId: 'd-noi', bedCount: 40 },
+        ],
+        hisEntry: { outpatientVisits: null, xray: null },
+      }),
+    )
+    // Máy chủ vẫn từ chối (ví dụ khoa vừa ngừng sử dụng): thông báo ghi rõ khoa, không chỉ "Dữ liệu không hợp lệ".
+    expect(
+      await screen.findByText(
+        'Dữ liệu không hợp lệ. Khoa X (giả lập) (KX) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), bỏ chọn khoa này.',
+      ),
+    ).toBeInTheDocument()
+    // Báo lỗi xong thì nút Lưu dùng được ngay (không chờ thông báo đóng).
+    await user.click(within(modal).getByRole('button', { name: 'Lưu' }))
+    expect(await screen.findByText('Đã lưu danh sách khoa báo cáo.')).toBeInTheDocument()
   })
 
   it('HIS lỗi: số do khoa nhập có ghi tên khoa, và cho biết khoa nào chưa nhập', async () => {

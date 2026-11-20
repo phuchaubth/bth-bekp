@@ -191,6 +191,8 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
             ["outpatientVisits"],
             assigned.EnumerateArray().Single(d => d.GetProperty("departmentId").GetString() == noi)
                 .GetProperty("hisIndicators").EnumerateArray().Select(i => i.GetString()));
+        // Khoa đang dùng có isActive = true; khoa ngừng sử dụng còn trong danh sách thì false (giao diện bỏ khoa đó khi lưu).
+        Assert.True(assigned.EnumerateArray().Single(d => d.GetProperty("departmentId").GetString() == noi).GetProperty("isActive").GetBoolean());
 
         // Phòng Điều dưỡng không nhập thay khoa; lệnh nhập tay của Phòng Điều dưỡng không còn.
         Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(
