@@ -43,6 +43,8 @@ export const navItems: NavItem[] = [
     children: [
       { path: '/dieu-duong/bao-cao-khoa', label: 'Báo cáo của khoa', permission: Permissions.NursingReportsSubmit },
       { path: '/dieu-duong/tong-hop', label: 'Tổng hợp hằng ngày', permission: Permissions.NursingReportsRead },
+      // Quyết định 47: số liệu nhiều ngày dạng biểu đồ cho Phòng Điều dưỡng.
+      { path: '/dieu-duong/dashboard', label: 'Dashboard', permission: Permissions.NursingReportsRead },
     ],
   },
   {

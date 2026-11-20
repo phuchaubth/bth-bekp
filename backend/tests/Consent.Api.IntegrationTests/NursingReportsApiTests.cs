@@ -138,7 +138,40 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal("Điều dưỡng Demo (NOI)", reporters.GetProperty("situation").GetString());
         Assert.Equal("Điều dưỡng Demo (NOI)", reporters.GetProperty("incidents").GetString());
 
-        using (var pdf = await _client.SendAsync(Authorized(HttpMethod.Get, $"/api/v1/nursing-reports/summary/pdf?date={Today}", office)))
+        // Dashboard (quyết định 47): chỉ người xem được bảng tổng hợp; số liệu lấy từ báo cáo đã gửi, chỉ biết báo cáo có phần
+        // nhập thêm, không đọc nội dung.
+        var dashboardUrl = $"/api/v1/nursing-reports/dashboard?to={Today}&days=7";
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, dashboardUrl, nurse)).Status);
+        var (dashboardStatus, dashboard) = await _client.SendJsonAsync(HttpMethod.Get, dashboardUrl, office);
+        Assert.Equal(HttpStatusCode.OK, dashboardStatus);
+        Assert.Equal(1, dashboard.GetProperty("reportingCount").GetInt32());
+        var dashboardDays = dashboard.GetProperty("days").EnumerateArray().ToList();
+        Assert.Equal(7, dashboardDays.Count);
+        Assert.Equal(JsonValueKind.Null, dashboardDays[0].GetProperty("values").GetProperty("currentPatients").ValueKind);
+        var lastDay = dashboardDays[^1];
+        Assert.Equal(Today, lastDay.GetProperty("date").GetString());
+        Assert.Equal(1, lastDay.GetProperty("submitted").GetInt32());
+        Assert.Equal(47, lastDay.GetProperty("values").GetProperty("currentPatients").GetInt32());
+        Assert.Equal(2, lastDay.GetProperty("values").GetProperty("admissions").GetInt32());
+        Assert.Equal(1, lastDay.GetProperty("patientChange").GetInt32());
+        Assert.Equal(40, lastDay.GetProperty("beds").GetInt32());
+        Assert.Equal(47, lastDay.GetProperty("bedPatients").GetInt32());
+        Assert.Equal(1, lastDay.GetProperty("issueDepartments").GetInt32());
+        Assert.Equal(1, lastDay.GetProperty("incidents").GetInt32());
+        var dashboardRow = Assert.Single(dashboard.GetProperty("departments").EnumerateArray());
+        Assert.Equal("NOI", dashboardRow.GetProperty("code").GetString());
+        Assert.Equal(1, dashboardRow.GetProperty("submittedDays").GetInt32());
+        Assert.True(dashboardRow.GetProperty("hasIncident").GetBoolean());
+        Assert.Equal(new[] { "drugSupply" }, dashboardRow.GetProperty("issues").EnumerateArray().Select(i => i.GetString()).ToArray());
+        Assert.Equal(1, dashboard.GetProperty("checks").EnumerateArray().Single(c => c.GetProperty("key").GetString() == "drugSupply")
+            .GetProperty("issueCount").GetInt32());
+        Assert.DoesNotContain("Nguyễn Văn An", dashboard.ToString(), StringComparison.Ordinal);
+        var (defaultStatus, defaultDashboard) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/dashboard", office);
+        Assert.Equal(HttpStatusCode.OK, defaultStatus);
+        Assert.Equal(30, defaultDashboard.GetProperty("days").GetArrayLength());
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/dashboard?days=93", office)).Status);
+
+        using (var pdf =await _client.SendAsync(Authorized(HttpMethod.Get, $"/api/v1/nursing-reports/summary/pdf?date={Today}", office)))
         {
             Assert.Equal(HttpStatusCode.OK, pdf.StatusCode);
             Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
@@ -168,6 +201,9 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(HttpStatusCode.OK, reopenedStatus);
         Assert.Equal("Draft", reopened.GetProperty("status").GetString());
         Assert.Equal("Phòng Điều dưỡng Demo", reopened.GetProperty("reopenedBy").GetString());
+        // Báo cáo bị trả lại (nháp) không còn được dashboard tính.
+        var (_, afterReopen) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/dashboard?to={Today}&days=1", office);
+        Assert.Equal(0, afterReopen.GetProperty("days")[0].GetProperty("submitted").GetInt32());
         var (fixedStatus, _) = await _client.SendJsonAsync(
             HttpMethod.Put, "/api/v1/nursing-reports/daily", nurse,
             new { reportDate = Today, values = new { previousDayPatients = 46 }, checks = AllOk(), submit = true });

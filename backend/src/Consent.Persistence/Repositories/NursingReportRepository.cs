@@ -1,4 +1,5 @@
 using Consent.Application.Abstractions;
+using Consent.Application.NursingReports;
 using Consent.Domain.NursingReports;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,15 @@ internal sealed class NursingReportRepository(ConsentDbContext db) : INursingRep
 
     public async Task<IReadOnlyList<NursingDailyReport>> ListByDateAsync(DateOnly reportDate, CancellationToken cancellationToken) =>
         await db.NursingDailyReports.Where(r => r.ReportDate == reportDate).ToListAsync(cancellationToken).ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<NursingSubmittedFigures>> ListSubmittedFiguresAsync(
+        DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        await db.NursingDailyReports
+            .Where(r => r.ReportDate >= from && r.ReportDate <= to && r.Status == NursingReportStatus.Submitted)
+            // So với null không qua bộ mã hóa: SQL chỉ kiểm tra cột NotesEncrypted có giá trị, không giải mã nội dung.
+            .Select(r => new NursingSubmittedFigures(r.DepartmentId, r.ReportDate, r.FiguresJson, r.Notes != null))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
 
     public void Add(NursingDailyReport report) => db.NursingDailyReports.Add(report);
 

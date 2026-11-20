@@ -48,15 +48,7 @@ public sealed class NursingSummaryService(
                 .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId)),
             cancellationToken).ConfigureAwait(false);
         var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
-        var summaryDepartments = allDepartments
-            .Select(d => new NursingSummaryDepartment(
-                d.Id,
-                d.ShortName ?? d.Code,
-                d.Name,
-                d.IsActive && configured.ContainsKey(d.Id),
-                configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
-                configured.TryGetValue(d.Id, out var o) ? o.SortOrder : null))
-            .ToList();
+        var summaryDepartments = NursingSummaryDepartment.From(allDepartments, configured);
 
         // Khoa phải nhập tay khi HIS lỗi: khoa phải báo cáo (NB PK chờ nhập viện) và khoa được giao chỉ số toàn viện.
         var expected = summaryDepartments.Where(d => d.IsReporting).Select(d => d.Id)

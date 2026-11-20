@@ -1,4 +1,5 @@
 using Consent.Application.Common;
+using Consent.Domain.Departments;
 using Consent.Domain.NursingReports;
 
 namespace Consent.Application.NursingReports;
@@ -8,7 +9,26 @@ namespace Consent.Application.NursingReports;
 /// 45), có trong danh sách phải báo cáo không, số giường và thứ tự Phòng Điều dưỡng cài (<c>null</c>: không trong danh sách, đứng
 /// cuối).
 /// </summary>
-public sealed record NursingSummaryDepartment(Guid Id, string Code, string Name, bool IsReporting, int? BedCount, int? SortOrder = null);
+public sealed record NursingSummaryDepartment(Guid Id, string Code, string Name, bool IsReporting, int? BedCount, int? SortOrder = null)
+{
+    /// <summary>
+    /// Mọi khoa (kể cả khoa ngừng sử dụng) kèm cài đặt báo cáo điều dưỡng (<paramref name="configured"/>, theo mã khoa trong phần
+    /// mềm): khoa đang dùng có trong danh sách thì phải báo cáo. Dùng chung cho bảng tổng hợp và dashboard (quyết định 47).
+    /// </summary>
+    public static IReadOnlyList<NursingSummaryDepartment> From(
+        IEnumerable<Department> departments, IReadOnlyDictionary<Guid, NursingReportDepartment> configured)
+    {
+        ArgumentNullException.ThrowIfNull(departments);
+        ArgumentNullException.ThrowIfNull(configured);
+        return [.. departments.Select(d => new NursingSummaryDepartment(
+            d.Id,
+            d.ShortName ?? d.Code,
+            d.Name,
+            d.IsActive && configured.ContainsKey(d.Id),
+            configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
+            configured.TryGetValue(d.Id, out var o) ? o.SortOrder : null))];
+    }
+}
 
 /// <summary>
 /// Dựng bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" từ báo cáo các khoa và số liệu HIS của ngày (quyết định 31).
@@ -206,7 +226,8 @@ public static class NursingSummaryBuilder
             _ => figures.Value(column) ?? 0,
         };
 
-    private static int? Sum(IEnumerable<int?> values)
+    /// <summary>Tổng các số có giá trị; <c>null</c> khi không có số nào (ô trống, không ghi 0).</summary>
+    internal static int? Sum(IEnumerable<int?> values)
     {
         int? total = null;
         foreach (var value in values)

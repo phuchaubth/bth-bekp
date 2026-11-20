@@ -265,6 +265,11 @@ internal sealed class AppTestContext
         NursingDocuments,
         new InMemorySystemSettingRepository(Store));
 
+    public NursingDashboardService CreateNursingDashboardService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        Clock);
+
     /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
     public void TurnOnEncounters()
     {

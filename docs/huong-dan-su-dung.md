@@ -1147,7 +1147,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 |---|---|---|
 | Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày (mục 9.6). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1315,6 +1315,39 @@ Bảng tổng hợp dùng số như sau:
 ![Mục B, C, D với số khoa nhập tay](huong-dan-su-dung/dd-05b-tong-hop-b-d.png)
 
 *Hình 9.16. Mục B và mục D ghi tên viết tắt (hoặc mã) của khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+
+### 9.6. Dashboard điều dưỡng (Phòng Điều dưỡng)
+
+Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ số và biểu đồ. Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang chỉ để xem; muốn sửa số liệu thì trả lại báo cáo cho khoa (mục 9.3).
+
+1. Bấm **Điều dưỡng** → **Dashboard**.
+2. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày**, và ngày cuối ở ô ngày (mặc định hôm nay). Đổi lựa chọn thì số cũ mờ đi trong lúc tải số mới.
+3. Phần trên là **tám ô chỉ số của ngày cuối**:
+   - **Khoa đã gửi báo cáo**, kèm tên viết tắt các khoa chưa gửi để nhắc.
+   - **Số NB hiện tại**, tăng hay giảm bao nhiêu so với ngày hôm trước (tính trên các báo cáo có Số NB ngày hôm trước).
+   - **Công suất giường**: Số NB hiện tại chia số giường của các khoa đã gửi. Vượt 100% có biểu tượng cảnh báo và chữ **Vượt số giường**.
+   - **NB chăm sóc cấp 1**, kèm số NB thở máy, theo dõi monitor, thở oxy.
+   - **Nhập khoa**, **Xuất viện**, **Chuyển khoa**: số ca của ngày hôm trước.
+   - **Khoa báo "Không ổn"**, kèm số ca ADR và số báo cáo có nội dung bất thường (phần nhập thêm).
+
+   ![Dashboard điều dưỡng: ô chỉ số và biểu đồ theo ngày](huong-dan-su-dung/dd-14-dashboard.png)
+
+   *Hình 9.17. Dashboard 30 ngày. Rê chuột vào biểu đồ để xem số của từng ngày: khung gợi ý ghi cả số khoa đã gửi và công suất giường của ngày đó.*
+
+4. Bốn **biểu đồ theo ngày**: Số NB hiện tại; nhập khoa, xuất viện, chuyển khoa; NB chăm sóc cấp 1, thở máy, monitor; số khoa đã gửi báo cáo (đường đứt nét là số khoa phải báo cáo). Rê chuột, hoặc bấm vào biểu đồ rồi dùng phím mũi tên trái, phải, để xem số từng ngày. Bấm **Xem bảng** để đọc số dạng bảng (ngày mới nhất ở trên).
+5. Phần dưới:
+   - **Công suất giường theo khoa** của ngày cuối, khoa cao nhất ở trên.
+   - **"Không ổn" theo nội dung**: số lượt khoa báo "Không ổn" trong cả kỳ theo từng dòng của phần tick (mỗi khoa, mỗi ngày, mỗi dòng tính một lượt), kèm khoa báo trong ngày cuối. Có tính cả dòng **ĐD thực hiện thuốc** (bảng tổng hợp giấy không có dòng này).
+   - **Theo khoa**: số liệu từng khoa ngày cuối, và số ngày khoa đã gửi báo cáo trong kỳ.
+
+   ![Dashboard điều dưỡng: công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa](huong-dan-su-dung/dd-14b-dashboard-khoa.png)
+
+   *Hình 9.18. Phần dưới dashboard. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**.*
+
+Lưu ý khi đọc:
+
+- Ngày ít khoa gửi báo cáo thì tổng Số NB hiện tại thấp hơn thực tế. Xem biểu đồ **Khoa đã gửi báo cáo** cùng ngày đó.
+- Công suất giường dùng số giường đang cài trong hộp **Khoa báo cáo và số giường** (mục 9.4), kể cả khi xem ngày cũ.
 
 ---
 

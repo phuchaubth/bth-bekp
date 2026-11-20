@@ -1,6 +1,7 @@
 using Consent.Application.Auditing;
 using Consent.Application.ConsentForms;
 using Consent.Application.Exports;
+using Consent.Application.NursingReports;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Users;
@@ -218,6 +219,12 @@ public interface INursingReportRepository
 
     /// <summary>Mọi báo cáo (nháp và đã gửi) của một ngày.</summary>
     Task<IReadOnlyList<NursingDailyReport>> ListByDateAsync(DateOnly reportDate, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Báo cáo đã gửi từ ngày <paramref name="from"/> đến ngày <paramref name="to"/> (dashboard, quyết định 47): chỉ số liệu và có
+    /// phần nhập thêm không, không đọc (giải mã) nội dung phần nhập thêm.
+    /// </summary>
+    Task<IReadOnlyList<NursingSubmittedFigures>> ListSubmittedFiguresAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
     void Add(NursingDailyReport report);
 

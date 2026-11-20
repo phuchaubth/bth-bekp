@@ -28,12 +28,12 @@ describe('navigation', () => {
     expect(filterNavItems(navItems, () => false).map((i) => i.label)).toEqual(['Tổng quan'])
   })
 
-  it('báo cáo điều dưỡng: điều dưỡng thấy báo cáo của khoa, Phòng Điều dưỡng thấy bảng tổng hợp', () => {
+  it('báo cáo điều dưỡng: điều dưỡng thấy báo cáo của khoa, Phòng Điều dưỡng thấy bảng tổng hợp và dashboard', () => {
     const nursing = (granted: string[]) =>
       filterNavItems(navItems, (p) => granted.includes(p)).find((i) => i.label === 'Báo cáo điều dưỡng')?.children?.map((c) => c.label)
 
     expect(nursing([Permissions.NursingReportsSubmit])).toEqual(['Báo cáo của khoa'])
-    expect(nursing([Permissions.NursingReportsRead, Permissions.NursingReportsManage])).toEqual(['Tổng hợp hằng ngày'])
+    expect(nursing([Permissions.NursingReportsRead, Permissions.NursingReportsManage])).toEqual(['Tổng hợp hằng ngày', 'Dashboard'])
     expect(nursing([Permissions.ConsentsRead])).toBeUndefined()
   })
 })

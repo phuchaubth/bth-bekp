@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { apiBlob, apiRequest } from './http'
 
 /** Báo cáo điều dưỡng hằng ngày (quyết định 31). "New": chưa lưu lần nào (mẫu trống hoặc điền sẵn). */
@@ -225,6 +225,61 @@ export interface NursingStatisticsRefresh {
   unmatchedDepartmentCodes: string[]
 }
 
+/**
+ * Một ngày của dashboard điều dưỡng (quyết định 47), theo ngày báo cáo. `values`: tổng từng chỉ số của các báo cáo đã gửi
+ * (`null` khi chưa khoa nào gửi). `patientChange`: Số NB hiện tại trừ Số NB ngày hôm trước, trên các báo cáo có cả hai số.
+ * `beds`, `bedPatients`: số giường và Số NB hiện tại của các khoa đã gửi có cài số giường (công suất = bedPatients / beds).
+ */
+export interface NursingDashboardDay {
+  date: string
+  submitted: number
+  values: Record<string, number | null>
+  patientChange: number | null
+  beds: number | null
+  bedPatients: number | null
+  /** Số khoa báo "Không ổn" ít nhất một dòng. */
+  issueDepartments: number
+  /** Số báo cáo có phần nhập thêm (sự cố, bất thường). */
+  incidents: number
+}
+
+/** Một khoa của dashboard (theo thứ tự bảng tổng hợp), số liệu ngày cuối kỳ. */
+export interface NursingDashboardDepartment {
+  departmentId: string
+  /** Tên viết tắt (như bảng tổng hợp). */
+  code: string
+  name: string
+  isReporting: boolean
+  bedCount: number | null
+  /** Số ngày đã gửi báo cáo trong kỳ. */
+  submittedDays: number
+  /** Đã gửi báo cáo ngày cuối kỳ; chưa gửi thì `values` rỗng. */
+  submitted: boolean
+  values: Record<string, number | null>
+  /** Khóa các dòng tick báo "Không ổn" ngày cuối kỳ. */
+  issues: string[]
+  hasIncident: boolean
+}
+
+/** Một dòng tick: số lượt khoa báo "Không ổn" trong kỳ, các khoa báo ngày cuối kỳ. */
+export interface NursingDashboardCheck {
+  key: string
+  label: string
+  issueCount: number
+  lastDayDepartments: string[]
+}
+
+/** Dashboard điều dưỡng của Phòng Điều dưỡng (quyết định 47): chỉ báo cáo đã gửi được tính. */
+export interface NursingDashboard {
+  from: string
+  to: string
+  /** Số khoa phải báo cáo (danh sách hiện tại). */
+  reportingCount: number
+  days: NursingDashboardDay[]
+  departments: NursingDashboardDepartment[]
+  checks: NursingDashboardCheck[]
+}
+
 /** Mã chỉ số HIS của cột "NB PK chờ nhập viện" (theo khoa). */
 export const WAITING_ADMISSION = 'waitingAdmission'
 
@@ -244,6 +299,9 @@ export const nursingReportsApi = {
   summary: (date: string, signal?: AbortSignal) => apiRequest<NursingSummary>(`${base}/summary?date=${date}`, { signal }),
   summaryPdf: (date: string) => apiBlob(`${base}/summary/pdf?date=${date}`),
   summaryWorkbook: (date: string) => apiBlob(`${base}/summary/xlsx?date=${date}`),
+  /** Dashboard `days` ngày (1–92) đến hết ngày `to` (quyết định 47). */
+  dashboard: (to: string, days: number, signal?: AbortSignal) =>
+    apiRequest<NursingDashboard>(`${base}/dashboard?to=${to}&days=${days}`, { signal }),
   refreshStatistics: (date: string) =>
     apiRequest<NursingStatisticsRefresh>(`${base}/statistics/refresh`, { method: 'POST', body: { reportDate: date } }),
   /** Khoa phải báo cáo đứng trước theo thứ tự trên bảng tổng hợp, rồi các khoa khác theo tên. */
@@ -265,6 +323,7 @@ export const nursingKeys = {
   daily: (date: string, departmentId?: string) => ['nursing-reports', 'daily', date, departmentId ?? 'mine'] as const,
   summary: (date: string) => ['nursing-reports', 'summary', date] as const,
   departments: ['nursing-reports', 'departments'] as const,
+  dashboard: (to: string, days: number) => ['nursing-reports', 'dashboard', to, days] as const,
 }
 
 export function useNursingReportForm() {
@@ -287,6 +346,15 @@ export function useNursingSummary(date: string) {
   return useQuery({
     queryKey: nursingKeys.summary(date),
     queryFn: ({ signal }) => nursingReportsApi.summary(date, signal),
+  })
+}
+
+/** Đổi khoảng ngày thì giữ số liệu cũ trên màn hình (mờ đi) cho tới khi có số liệu mới, không nháy trang. */
+export function useNursingDashboard(to: string, days: number) {
+  return useQuery({
+    queryKey: nursingKeys.dashboard(to, days),
+    queryFn: ({ signal }) => nursingReportsApi.dashboard(to, days, signal),
+    placeholderData: keepPreviousData,
   })
 }
 
