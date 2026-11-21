@@ -8,7 +8,8 @@
     1. Kiểm tra mã SHA256 của file gói (mã ghi ở trang GitHub Actions); sai thì dừng.
     2. Prod: gói phải đã cài thành công lên UAT (theo nhật ký cài đặt), trừ khi có -BoQuaKiemTraUAT.
     3. Kiểm tra hai môi trường tách biệt: UAT chạy Staging và có nhãn App__EnvironmentLabel; Prod chạy Production, không
-       có nhãn; hai môi trường không dùng chung CSDL, khóa hay thư mục PDF.
+       có nhãn; hai môi trường không dùng chung CSDL, khóa hay thư mục PDF; web.config của API không ghi đè sang môi
+       trường khác (ASPNETCORE_ENVIRONMENT trong web.config được ưu tiên hơn biến của Application Pool).
     4. Hỏi xác nhận (gõ đúng tên môi trường), hỏi mật khẩu tài khoản migrator (không hiện, không ghi ra file).
     5. Sao lưu CSDL (COPY_ONLY, vào thư mục sao lưu mặc định của SQL Server) và các thư mục ứng dụng đang chạy.
     6. Dừng Application Pool (người dùng thấy trang bảo trì vài phút), cập nhật lược đồ CSDL (efbundle.exe), chép file mới
@@ -224,14 +225,31 @@ function Copy-ThuMuc([string]$nguon, [string]$dich, [string[]]$boQuaFile = @(), 
 }
 
 # Cài lần đầu (thư mục chưa có web.config): lấy web.config mẫu trong gói; web.config của giao diện chuyển tiếp /api tới cổng API
-# của môi trường (gói ghi sẵn cổng 5080 của Prod). Đã có web.config thì giữ nguyên (cấu hình riêng của máy chủ).
-function Copy-WebConfigLanDau([string]$nguon, [string]$dich, [int]$congApi) {
+# của môi trường (gói ghi sẵn cổng 5080 của Prod); web.config của API ghi ASPNETCORE_ENVIRONMENT của môi trường (gói ghi sẵn
+# Production, giá trị này ghi đè biến của Application Pool). Đã có web.config thì giữ nguyên (cấu hình riêng của máy chủ).
+function Copy-WebConfigLanDau([string]$nguon, [string]$dich, [int]$congApi, [string]$moiTruongAsp) {
     $fileDich = Join-Path $dich 'web.config'
     if (Test-Path -LiteralPath $fileDich) { return $false }
     $noiDung = [System.IO.File]::ReadAllText((Join-Path $nguon 'web.config'))
     $noiDung = $noiDung.Replace('http://127.0.0.1:5080/', "http://127.0.0.1:$congApi/")
+    $noiDung = [regex]::Replace($noiDung, '(<environmentVariable\s+name="ASPNETCORE_ENVIRONMENT"\s+value=")[^"]*(")', ('${1}' + $moiTruongAsp + '${2}'))
     [System.IO.File]::WriteAllText($fileDich, $noiDung, (New-Object System.Text.UTF8Encoding($false)))
     return $true
+}
+
+# ASPNETCORE_ENVIRONMENT đặt trong web.config của API ghi đè biến của Application Pool (ASP.NET Core Module): UAT có web.config
+# chép từ Prod sẽ chạy như Production. Trả câu báo lỗi khi web.config đặt môi trường khác; $null khi đúng, không đặt hoặc chưa có file.
+function Get-LoiWebConfig([string]$thuMuc, [string]$moiTruongAsp) {
+    $file = Join-Path $thuMuc 'web.config'
+    if (-not (Test-Path -LiteralPath $file)) { return $null }
+    $xml = New-Object System.Xml.XmlDocument
+    $xml.XmlResolver = $null
+    $xml.Load($file)
+    $nut = $xml.SelectSingleNode("//aspNetCore/environmentVariables/environmentVariable[@name='ASPNETCORE_ENVIRONMENT']")
+    if ($null -eq $nut) { return $null }
+    $giaTri = $nut.GetAttribute('value')
+    if ($giaTri -eq $moiTruongAsp) { return $null }
+    return "web.config trong $thuMuc đặt ASPNETCORE_ENVIRONMENT=$giaTri, ghi đè biến của Application Pool (ứng dụng sẽ chạy như $giaTri). Sửa thành $moiTruongAsp."
 }
 
 function Invoke-SaoLuuCsdl([string]$ketNoi, [string]$csdl, [string]$tenFile) {
@@ -311,13 +329,15 @@ function Invoke-CapNhat {
     $bien = Get-BienPool $cfg.PoolApi
     if ($null -eq $bien) { throw "Chưa có Application Pool $($cfg.PoolApi). Tạo môi trường $MoiTruong trước (docs/trien-khai.md, mục 5.10)." }
     $bienKhac = Get-BienPool $CauHinh[$khac].PoolApi
+    $thuMucApi = Join-Path $cfg.ThuMuc 'ConsentApi'
     $loi = Get-LoiTachBiet $MoiTruong $bien $bienKhac $cfg.MoiTruongAsp
+    $loiWebConfig = Get-LoiWebConfig $thuMucApi $cfg.MoiTruongAsp
+    if ($loiWebConfig) { $loi += $loiWebConfig }
     if ($loi.Count -gt 0) {
         $loi | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-        throw "Cấu hình môi trường $MoiTruong chưa đúng; sửa biến môi trường của Application Pool $($cfg.PoolApi) rồi chạy lại."
+        throw "Cấu hình môi trường $MoiTruong chưa đúng; sửa biến môi trường của Application Pool $($cfg.PoolApi) hoặc web.config như trên rồi chạy lại."
     }
     $ketNoi = Get-ThongTinKetNoi $bien['ConnectionStrings__Default']
-    $thuMucApi = Join-Path $cfg.ThuMuc 'ConsentApi'
     $thuMucWeb = Join-Path $cfg.ThuMuc 'ConsentWeb'
     $thuMucHis = Join-Path $cfg.ThuMuc 'PatientInfoApi'
     $coHis = (Test-Path -LiteralPath $thuMucHis) -and (Test-Path "IIS:\AppPools\$($cfg.PoolHis)")
@@ -373,8 +393,10 @@ function Invoke-CapNhat {
         Write-Buoc "6. Chép file mới (giữ web.config) và khởi động lại"
         Copy-ThuMuc (Join-Path $giaiNen 'ConsentApi') $thuMucApi @('web.config') @('logs')
         Copy-ThuMuc (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb @('web.config')
-        if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentApi') $thuMucApi $cfg.CongApi) { Write-Host "Cài lần đầu: đã chép web.config mẫu vào $thuMucApi" }
-        if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb $cfg.CongApi) {
+        if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentApi') $thuMucApi $cfg.CongApi $cfg.MoiTruongAsp) {
+            Write-Host "Cài lần đầu: đã chép web.config mẫu vào $thuMucApi (ASPNETCORE_ENVIRONMENT=$($cfg.MoiTruongAsp))"
+        }
+        if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb $cfg.CongApi $cfg.MoiTruongAsp) {
             Write-Host "Cài lần đầu: đã chép web.config mẫu vào $thuMucWeb (chuyển tiếp /api tới cổng $($cfg.CongApi))"
         }
         if ($coHis -and (Test-Path -LiteralPath (Join-Path $giaiNen 'PatientInfoApi'))) {
