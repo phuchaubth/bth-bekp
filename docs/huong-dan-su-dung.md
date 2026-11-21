@@ -60,6 +60,10 @@ Lưu ý:
 - Khi phiên đăng nhập hết hạn, phần mềm đưa bạn về trang đăng nhập. Đăng nhập lại, phần mềm mở lại đúng trang bạn đang làm.
 - Đầu trang có **dải vàng "UAT: môi trường kiểm thử"** (tab trình duyệt ghi `[UAT]`): bạn đang ở **môi trường kiểm thử**, dùng để thử bản mới trước khi đưa vào chạy thật (quyết định 50). Phiếu, báo cáo lập ở đây không có giá trị; không dùng cho người bệnh thật. Môi trường chạy thật không có dải này. Tài khoản và mật khẩu trên hai môi trường là riêng.
 
+  ![Trang đăng nhập trên môi trường kiểm thử UAT: dải vàng UAT ở đầu trang](huong-dan-su-dung/uat-dang-nhap.png)
+
+  *Hình 1.1a. Môi trường kiểm thử UAT: dải vàng ở đầu mọi trang, kể cả trang đăng nhập.*
+
 ### 1.2. Đổi mật khẩu lần đầu
 
 Tài khoản mới, hoặc tài khoản vừa được quản trị đặt lại mật khẩu, phải đổi mật khẩu ngay sau khi đăng nhập. Trang **Đổi mật khẩu** tự hiện ra.

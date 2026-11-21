@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi, type AuthResponse, type CurrentUser } from '../api/auth'
+import { environmentKeys } from '../api/environment'
 import { ApiError, setRefreshHandler } from '../api/http'
 import { AuthContext, type AuthContextValue, type AuthStatus } from './authContext'
 import { tokenStore } from './tokenStore'
@@ -41,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tokenStore.set(null)
     setUser(null)
     setStatus('anonymous')
-    queryClient.clear()
+    // Xóa dữ liệu đã cache của phiên. Giữ nhãn môi trường: không thuộc phiên nào, và có thể còn đang tải khi khôi phục phiên
+    // thất bại (xóa sẽ hủy yêu cầu đó, trang đăng nhập UAT mất dải báo, quyết định 50).
+    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== environmentKeys.info[0] })
+    queryClient.getMutationCache().clear()
   }, [queryClient])
 
   const applySession = useCallback((session: AuthResponse) => {
