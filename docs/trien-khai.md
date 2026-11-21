@@ -122,7 +122,9 @@ Gói migration áp dụng lần lượt các migration còn thiếu (idempotent;
 | `ConsentWeb\` | `D:\Apps\ConsentWeb` | Đã gồm `web.config` mẫu (`deploy/iis/web.frontend.config`) |
 | `PatientInfoApi\` | `C:\Apps\PatientInfoApi` | Tùy chọn: API thông tin người bệnh (mục 5.5); đã gồm `web.config` mẫu (`deploy/iis/web.patientinfo.config`) |
 | `efbundle.exe` | Thư mục tạm trên máy chủ | Cập nhật lược đồ CSDL (mục 4.2) |
-| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql` |
+| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql`, `05-uat-create-login.sql`; `06-xoa-du-lieu-chay-thu.sql` (dùng qua script bên dưới, mục 5.11) |
+| `cap-nhat-moi-truong.ps1` | Chạy tại thư mục gói | Cài gói lên UAT rồi Prod (mục 5.10) |
+| `xoa-du-lieu-chay-thu.ps1` | Chạy tại thư mục gói | Xóa phiếu, báo cáo điều dưỡng chạy thử trước khi dùng thật (mục 5.11) |
 | `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Mã commit và ngày đóng gói |
 
 **Cách 2: tự build** trên một máy có .NET SDK 10 và Node.js 24.15 trở lên (kết quả giống cách 1):
@@ -574,6 +576,42 @@ Script đọc máy chủ SQL và tên CSDL từ chuỗi kết nối của chính
 3. CSDL: phần lớn bản nâng cấp chỉ **thêm** bảng, cột (ghi rõ ở từng quyết định), bản cũ chạy được trên CSDL mới nên **không cần** khôi phục CSDL. Chỉ khi bản mới làm sai dữ liệu mới khôi phục bản sao lưu `<tên CSDL>_truoc-cap-nhat_<thời điểm>.bak` (mục 7, `03-restore.sql`); dữ liệu nhập sau thời điểm đó sẽ mất.
 4. Khởi động lại Application Pool, kiểm tra `/health/ready`, báo nhóm phát triển kèm `lich-su-cai-dat.csv` và log lỗi.
 
+### 5.11. Xóa dữ liệu chạy thử trước khi dùng thật (quyết định 52)
+
+Sau thời gian chạy thử, bệnh viện xóa hết phiếu, báo cáo điều dưỡng đã làm thử để bắt đầu dùng thật với dữ liệu sạch. Script [`xoa-du-lieu-chay-thu.ps1`](../deploy/iis/xoa-du-lieu-chay-thu.ps1) có trong gói (cạnh `cap-nhat-moi-truong.ps1`), dùng file [`sql\06-xoa-du-lieu-chay-thu.sql`](../deploy/sql/06-xoa-du-lieu-chay-thu.sql) của gói. **Chạy trước ngày dùng thật**: sau khi đã dùng thật, script xóa cả phiếu, báo cáo thật.
+
+| Xóa | Giữ nguyên |
+|---|---|
+| Phiếu đồng thuận ở mọi trạng thái (nháp, chờ ký, hoàn tất, đã hủy, đã thu hồi), chữ ký trên phiếu, liên kết ký qua mã QR | Người dùng, vai trò và quyền, khoa/phòng, mẫu phiếu và các phiên bản |
+| File PDF đã ký của các phiếu đó: **chuyển** sang thư mục sao lưu, không xóa hẳn | Cấu hình hệ thống: tên đơn vị, logo, khung chữ ký (file nằm cùng thư mục PDF, không bị đụng tới), kiosk, lượt tiếp nhận |
+| Hồ sơ người bệnh và người đại diện (giữ lại nếu thêm `-GiuNguoiBenh`) | Khoa báo cáo và số giường, thứ tự, tên viết tắt, khoa được giao nhập số liệu HIS |
+| Báo cáo điều dưỡng của khoa (mọi ngày, mọi trạng thái) | Ủy quyền báo cáo, phân công kiểm thử |
+| Số liệu HIS của báo cáo điều dưỡng (toàn viện, các khoa nhập khi HIS lỗi) | Lịch sử xuất dữ liệu; **nhật ký hệ thống** (CSDL chặn sửa, xóa nhật ký; script ghi thêm một dòng **Xóa dữ liệu chạy thử**) |
+
+**Số phiếu** mặc định chạy tiếp, để số phiếu thật không trùng số phiếu chạy thử còn ghi trong nhật ký. Muốn phiếu thật bắt đầu lại từ `PDT-<năm>-000001` thì thêm `-DanhSoLaiTu1`.
+
+Cách chạy: mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS, ngoài giờ làm việc (người dùng thấy trang bảo trì khoảng một phút).
+
+1. Giải nén gói (đã so mã SHA256, mục 5.1) và `cd` vào thư mục gói. File tải từ Internet có thể bị Windows chặn chạy script: gói đã so đúng mã thì chạy `Unblock-File .\xoa-du-lieu-chay-thu.ps1`. Máy đặt chính sách chỉ chạy script đã ký thì gọi `powershell -ExecutionPolicy Bypass -File .\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod` (chỉ áp dụng cho lần chạy này).
+2. Chạy `.\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod`, thêm `-DanhSoLaiTu1`, `-GiuNguoiBenh` nếu cần. Môi trường UAT dùng `-MoiTruong UAT`.
+3. Script đọc CSDL và thư mục PDF từ cấu hình của Application Pool `ConsentApi` (không gõ tay, không nhầm môi trường), hỏi mật khẩu `consent_migrator` (không hiện, không ghi ra file), rồi **đếm và in số dòng sẽ xóa** từng loại dữ liệu (kèm ngày sớm nhất, muộn nhất) và số file PDF. **Bước này chưa thay đổi gì.**
+4. Đọc kỹ bảng đếm. Thấy có dữ liệu thật (ví dụ một khoa đã dùng thật từ một ngày) thì gõ khác để hủy. Đúng thì gõ `XOA <tên CSDL>`, ví dụ `XOA ConsentManagement` (đúng chữ hoa, chữ thường).
+5. Script làm tiếp, không cần thao tác:
+   - sao lưu CSDL vào file `<tên CSDL>_truoc-xoa-du-lieu-chay-thu_<thời điểm>.bak` (`COPY_ONLY`, thư mục sao lưu mặc định của SQL Server);
+   - dừng `ConsentWeb`, `ConsentApi`;
+   - xóa trong **một giao dịch**: lỗi ở đâu thì CSDL giữ nguyên như trước, file PDF chưa bị đụng tới;
+   - chuyển file PDF của các phiếu vừa xóa sang `C:\Backup\Consent\Prod\xoa-du-lieu-chay-thu-<thời điểm>\pdf`, ghi `ket-qua.txt` cùng thư mục;
+   - khởi động lại ứng dụng, chờ `/health/ready`.
+6. Đăng nhập kiểm tra: danh sách phiếu, người bệnh, báo cáo điều dưỡng trống; người dùng, mẫu phiếu, cấu hình, khoa báo cáo còn nguyên; *Nhật ký hệ thống* có dòng **Xóa dữ liệu chạy thử** ghi tài khoản Windows đã chạy và số dòng đã xóa. Nhấn **Ctrl+F5** trên các máy đang mở phần mềm.
+
+Chạy lại khi không còn gì để xóa thì script báo *Không có dữ liệu chạy thử để xóa* và dừng: không hỏi xác nhận, không dừng ứng dụng.
+
+**Khôi phục khi lỡ xóa nhầm** (làm ngay, vì dữ liệu nhập sau lúc xóa sẽ mất): dừng hai Application Pool; khôi phục file `.bak` ở bước 5 (mục 7, `03-restore.sql`); chép thư mục `pdf` trong thư mục sao lưu trở lại thư mục PDF (`robocopy C:\Backup\Consent\Prod\xoa-du-lieu-chay-thu-<thời điểm>\pdf <Storage__DocumentsPath> /E`); khởi động lại.
+
+Bản sao lưu (file `.bak`, thư mục `pdf`) vẫn chứa dữ liệu chạy thử: giữ hoặc xóa theo quy định lưu trữ của bệnh viện. Nếu khi chạy thử có dùng thông tin người bệnh thật (lấy từ HIS), nên xóa bản sao lưu khi không cần nữa.
+
+Script chỉ chạy được trên CSDL của phần mềm (file SQL kiểm tra các bảng trước khi làm). Chạy thẳng file SQL mà không qua script thì SQL Server báo thiếu tham số, không xóa gì.
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).
@@ -737,6 +775,7 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 12. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
 13. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
 14. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+15. Trước ngày dùng thật: xóa phiếu, báo cáo điều dưỡng chạy thử (kể cả phiếu thử ở các bước trên) bằng `xoa-du-lieu-chay-thu.ps1` (mục 5.11).
 
 ## 11. Sự cố thường gặp
 

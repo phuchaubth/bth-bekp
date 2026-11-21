@@ -259,6 +259,8 @@ export const auditActionLabels: Record<string, string> = {
   'ConsentForms.Completed': 'Hoàn tất phiếu',
   'ConsentForms.Revoked': 'Thu hồi phiếu',
   'Exports.ConsentForms': 'Xuất dữ liệu phiếu',
+  // Ghi bởi script xoa-du-lieu-chay-thu.ps1 (quyết định 52), không phải bởi người dùng trên giao diện.
+  'Maintenance.TrialDataPurged': 'Xóa dữ liệu chạy thử',
 }
 
 export const auditEntityLabels: Record<string, string> = {

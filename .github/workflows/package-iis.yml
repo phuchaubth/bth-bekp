@@ -3,7 +3,8 @@ name: Gói triển khai IIS
 # Đóng gói sẵn bản triển khai IIS (docs/trien-khai.md, mục 5) để phòng CNTT không cần máy build:
 # ConsentApi (API đã publish cho win-x64, chạy bằng ASP.NET Core Hosting Bundle 10), ConsentWeb (giao diện đã build),
 # PatientInfoApi (API thông tin người bệnh, tùy chọn), efbundle.exe (gói cập nhật lược đồ CSDL), các file web.config mẫu, script SQL
-# và script cài lên môi trường UAT/Prod (cap-nhat-moi-truong.ps1, quyết định 50). Không chứa bí mật.
+# và script cài lên môi trường UAT/Prod (cap-nhat-moi-truong.ps1, quyết định 50), script xóa dữ liệu chạy thử
+# (xoa-du-lieu-chay-thu.ps1, quyết định 52). Không chứa bí mật.
 # Tải về ở trang Actions của lần chạy: mục "Artifacts", file goi-trien-khai-iis-<mã commit>.
 
 on:
@@ -71,6 +72,8 @@ jobs:
           cp deploy/sql/*.sql "$OUT/sql/"
           # Script cài gói lên UAT hoặc Prod (giữ nguyên BOM UTF-8 để Windows PowerShell đọc đúng tiếng Việt).
           cp deploy/iis/cap-nhat-moi-truong.ps1 "$OUT/"
+          # Script xóa dữ liệu chạy thử (quyết định 52), dùng file sql\06-xoa-du-lieu-chay-thu.sql cạnh nó.
+          cp deploy/iis/xoa-du-lieu-chay-thu.ps1 "$OUT/"
           {
             echo "Quan ly Phieu dong thuan - goi trien khai IIS"
             echo "Ma commit: ${GITHUB_SHA}"
@@ -85,6 +88,7 @@ jobs:
             echo "sql\\04-patientinfo-reader.sql: tai khoan chi doc CSDL benh vien cho PatientInfoApi (muc 5.5)"
             echo "sql\\05-uat-create-login.sql: CSDL va tai khoan rieng cho moi truong UAT (muc 5.10)"
             echo "cap-nhat-moi-truong.ps1: cai goi len UAT roi Prod, kiem tra SHA256, sao luu, efbundle, kiem tra suc khoe (muc 5.10)"
+            echo "xoa-du-lieu-chay-thu.ps1: xoa phieu, bao cao dieu duong chay thu truoc khi dung that; xem truoc, sao luu, hoi xac nhan (muc 5.11)"
             echo "Huong dan day du: docs/trien-khai.md, muc 5"
           } > "$OUT/PHIEN-BAN.txt"
 

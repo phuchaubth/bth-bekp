@@ -636,6 +636,7 @@ Hành động (`action`) được ghi:
 | `ConsentForms.Viewed`, `ConsentForms.PdfViewed` | Xem chi tiết phiếu; tải/xem PDF phiếu |
 | `ConsentForms.SigningStarted`, `ConsentForms.PatientSigned`, `ConsentForms.Completed`, `ConsentForms.Revoked` | Mở phiên ký; người bệnh ký (kèm quyết định, người ký; thiết bị lưu ở chữ ký); phía bệnh viện xác nhận (kèm SHA-256 của PDF); thu hồi |
 | `Exports.ConsentForms` | Xuất dữ liệu phiếu (`details`: định dạng, số dòng, cột, kèm nội dung, dữ liệu nhạy cảm, bộ lọc, SHA-256 của file; `entityId` = mã lần xuất) |
+| `Maintenance.TrialDataPurged` | Xóa dữ liệu chạy thử bằng script `xoa-du-lieu-chay-thu.ps1` trên máy chủ (quyết định 52, không có API). `userName` = tài khoản Windows chạy script, `userId` trống; `details`: `keepPatients`, `restartFormNumbers`, `deleted` (số dòng đã xóa từng bảng). Các dòng nhật ký cũ giữ nguyên |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
 
