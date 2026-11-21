@@ -106,7 +106,7 @@ Ví dụ lỗi kiểm tra dữ liệu:
 |---|---|
 | `auth.invalid_credentials` | Sai tên đăng nhập hoặc mật khẩu (cùng một thông báo cho cả hai trường hợp) |
 | `auth.locked_out` | Tài khoản đang tạm khóa do đăng nhập sai nhiều lần (thông báo kèm số phút còn lại) |
-| `auth.inactive` | Tài khoản bị quản trị viên khóa (chỉ báo khi mật khẩu đúng) |
+| `auth.inactive` | Tài khoản đã ngưng sử dụng (chỉ báo khi mật khẩu đúng). Tài khoản đã xóa báo `auth.invalid_credentials` |
 | `auth.refresh_invalid` | Refresh token không có, hết hạn, đã thu hồi hoặc bị phát hiện dùng lại |
 | `auth.refresh_superseded` | Refresh token vừa được thay ở yêu cầu khác (ví dụ tab khác); client có thể thử lại sau giây lát |
 | `auth.session_invalid` | Tài khoản không còn hợp lệ cho phiên hiện tại |
@@ -138,12 +138,13 @@ Dữ liệu gửi: `{ "code": "KKB", "name": "Khoa Khám bệnh", "isActive": tr
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
-| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng"). `departmentId` khớp khoa chính hoặc khoa khác; mỗi dòng có `departmentName` (khoa chính) và `additionalDepartmentNames` |
+| GET | `/api/v1/users?keyword=&departmentId=&isActive=&page=1&pageSize=20` | `users.read` | Tìm kiếm có phân trang. `keyword` tìm theo họ tên/tên đăng nhập/chức danh, **không phân biệt dấu** ("dieu duong" khớp "Điều dưỡng"). `departmentId` khớp khoa chính hoặc khoa khác; mỗi dòng có `departmentName` (khoa chính) và `additionalDepartmentNames`. `isActive=true` là thẻ Đang sử dụng, `isActive=false` là thẻ Ngưng sử dụng (quyết định 51); tài khoản đã xóa không có trong kết quả |
 | GET | `/api/v1/users/{id}` | `users.read` | Chi tiết, có `additionalDepartments: [{ id, name }]` |
 | POST | `/api/v1/users` | `users.manage` | Tạo người dùng với mật khẩu tạm; người dùng phải đổi mật khẩu ở lần đăng nhập đầu |
 | PUT | `/api/v1/users/{id}` | `users.manage` | Sửa hồ sơ, khoa chính và khoa khác, vai trò, mã SmartCA (gửi đủ các trường; bỏ `additionalDepartmentIds` là không còn khoa khác) |
-| POST | `/api/v1/users/{id}/lock` | `users.manage` | Khóa tài khoản và thu hồi mọi phiên → `204` |
-| POST | `/api/v1/users/{id}/unlock` | `users.manage` | Mở khóa (kể cả khóa tạm do đăng nhập sai và khóa tra cứu của tài khoản kiosk) → `204`. Danh sách người dùng có `isLockedOut` (khóa tạm do đăng nhập sai) và `isKioskLookupLocked` (tài khoản kiosk đang tạm khóa tra cứu) |
+| POST | `/api/v1/users/{id}/lock` | `users.manage` | **Ngưng sử dụng** tài khoản (`isActive = false`) và thu hồi mọi phiên → `204` |
+| POST | `/api/v1/users/{id}/unlock` | `users.manage` | **Sử dụng lại** tài khoản đã ngưng, và mở khóa tạm (khóa do đăng nhập sai, khóa tra cứu của tài khoản kiosk) → `204`. Danh sách người dùng có `isLockedOut` (khóa tạm do đăng nhập sai) và `isKioskLookupLocked` (tài khoản kiosk đang tạm khóa tra cứu) |
+| DELETE | `/api/v1/users/{id}` | `users.manage` | **Xóa** tài khoản đã ngưng sử dụng (quyết định 51) → `204`. Không xóa dòng khỏi CSDL: đánh dấu đã xóa (`DeletedAtUtc`, `DeletedByUserId`), gỡ vai trò và khoa; phiếu, báo cáo, nhật ký vẫn giữ tên người này. Tài khoản đang sử dụng → `422 users.delete_active`; tự xóa → `422 users.cannot_delete_self`; không có hoặc đã xóa → `404` |
 | POST | `/api/v1/users/{id}/reset-password` | `users.manage` | Đặt mật khẩu tạm `{ "newPassword": "…" }`, thu hồi mọi phiên, bắt buộc đổi ở lần đăng nhập sau → `204` |
 
 Dữ liệu tạo người dùng:
@@ -165,7 +166,7 @@ Dữ liệu tạo người dùng:
 
 `departmentId` là khoa chính; `additionalDepartmentIds` là các khoa/phòng khác (quyết định 41): tối đa 20, khoa trùng khoa chính hay lặp lại thì bỏ qua; có khoa khác mà không có khoa chính, hoặc khoa không tồn tại/ngừng dùng → `400` ở `additionalDepartmentIds`; tài khoản kiosk không có khoa khác.
 
-Quy tắc nghiệp vụ: không tự khóa chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists`. Đổi vai trò, khoa của tài khoản có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút) hoặc khi đăng nhập lại.
+Quy tắc nghiệp vụ: không tự ngưng sử dụng chính mình (`422 users.cannot_lock_self`); hệ thống luôn phải còn ít nhất một quản trị viên đang hoạt động (`422 users.last_administrator`); tên đăng nhập trùng → `409 users.username_exists` (kể cả tên đăng nhập của tài khoản đã xóa: không dùng lại được, thông báo ghi rõ). Tài khoản đã xóa (quyết định 51): `GET`, `PUT`, `lock`, `unlock`, `reset-password`, `DELETE` đều trả `404`; đăng nhập trả `401 auth.invalid_credentials` như tài khoản không tồn tại. Đổi vai trò, khoa của tài khoản có hiệu lực ở lần làm mới token tiếp theo (≤ 15 phút) hoặc khi đăng nhập lại.
 
 ---
 

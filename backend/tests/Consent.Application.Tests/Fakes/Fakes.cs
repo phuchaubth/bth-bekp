@@ -161,9 +161,6 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
     public Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Find(u => u.UserName == normalizedUserName));
 
-    public Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken) =>
-        Task.FromResult(store.Users.Exists(u => u.UserName == normalizedUserName));
-
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Exists(u => u.DepartmentIds.Contains(departmentId)));
 
@@ -181,6 +178,7 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
     public Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
         var items = store.Users
+            .Where(u => !u.IsDeleted && (query.IsActive is null || u.IsActive == query.IsActive))
             .Where(u => query.Keyword is null || u.FullName.Contains(query.Keyword, StringComparison.OrdinalIgnoreCase))
             .Select(u => new UserListItemDto(u.Id, u.UserName, u.FullName, u.Title, u.DepartmentId, null, [], u.IsActive, u.IsLockedOut(nowUtc), u.LastLoginAtUtc, u.IsKioskLookupLocked(nowUtc)))
             .ToList();

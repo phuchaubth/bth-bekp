@@ -25,8 +25,6 @@ public interface IUserRepository
 
     Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken);
 
-    Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken);
-
     Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken);
 
     Task<bool> AnyAsync(CancellationToken cancellationToken);

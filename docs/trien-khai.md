@@ -531,6 +531,8 @@ Bệnh viện chạy **hai môi trường tách biệt** trên cùng máy chủ 
 6. **Cài gói đầu tiên** bằng script ở mục dưới (`-MoiTruong UAT`). Lần đầu, script chép `web.config` mẫu vào hai thư mục, tự đổi địa chỉ chuyển tiếp `/api` của giao diện sang cổng 5090 và ghi `ASPNETCORE_ENVIRONMENT` = `Staging` trong `web.config` của API. `web.config` mẫu trong gói ghi `Production`, và giá trị trong `web.config` **ghi đè** biến của Application Pool: nếu chép `web.config` bằng tay vào `C:\Apps\UAT\ConsentApi` thì sửa `Production` thành `Staging`, nếu không API UAT chạy như Production và không khởi động được khi bật `Seed__DemoData`. Script kiểm tra và không cài khi `web.config` của API ghi môi trường khác.
 7. Mở `https://phieudongthuan-uat.bth.org.vn`: phải thấy dải vàng **UAT**. Đăng nhập `admin`, đổi mật khẩu, xóa biến `Seed__AdminPassword`, tạo tài khoản cho từng người kiểm thử (*Quản trị → Người dùng*), giao vai trò như thật để thử đúng quyền.
 
+**Ngưng sử dụng, xóa tài khoản (quyết định 51):** bản có tính năng này kèm migration `AddUserDeletion` (thêm cột `DeletedAtUtc`, `DeletedByUserId` vào bảng `Users`, chỉ thêm; tài khoản cũ không bị ảnh hưởng). Tài khoản trước đây "khóa" nay nằm ở thẻ **Ngưng sử dụng**.
+
 **Phân công kiểm thử (quyết định 49):** trang *Quản trị → Phân công kiểm thử* dùng quyền mới `testing.manage`; vai trò **Quản trị hệ thống** tự có khi API khởi động, muốn giao cho người khác (ví dụ trưởng nhóm kiểm thử) thì thêm quyền này vào vai trò ở *Vai trò và quyền*. Bản có tính năng này kèm migration `AddTestAssignments` (bảng mới `TestAssignments`, chỉ thêm); script dưới đây tự chạy migration.
 
 **Đưa bản mới lên: UAT trước, Prod sau**
@@ -636,7 +638,7 @@ Khuyến nghị: bảo vệ hai khóa `DataProtection__*` như bảo vệ CSDL (
 - **Giám sát:** `GET /health` (tiến trình) và `GET /health/ready` (SQL Server) cho công cụ giám sát (Zabbix, PRTG, Uptime Kuma…); theo dõi dung lượng ổ `Storage__DocumentsPath` và ổ CSDL.
 - **Log ứng dụng:** ghi ra stdout/Event Log (IIS: bật `stdoutLogEnabled` tạm thời khi chẩn đoán; Docker: `docker compose logs api`). Log không chứa dữ liệu cá nhân; mỗi dòng có mã truy vết (`CorrelationId`) trùng với mã hiển thị cho người dùng khi lỗi và với nhật ký audit.
 - **Nhật ký audit** nằm trong CSDL (bảng `AuditLogs`, chỉ ghi thêm): xem tại **Nhật ký hệ thống**; lưu theo thời hạn hồ sơ bệnh án, không xóa.
-- **Tài khoản:** quản trị tạo tài khoản cho nhân viên tại **Quản trị → Người dùng** (mật khẩu tạm, bắt buộc đổi), gán vai trò và khoa. Khóa tài khoản khi nhân viên nghỉ việc (không xóa, để giữ nhật ký).
+- **Tài khoản:** quản trị tạo tài khoản cho nhân viên tại **Quản trị → Người dùng** (mật khẩu tạm, bắt buộc đổi), gán vai trò và khoa. Nhân viên nghỉ việc, chuyển công tác thì **Ngưng sử dụng** tài khoản (thẻ **Ngưng sử dụng**, sử dụng lại được); tài khoản tạo nhầm, không còn cần thì **Xóa** ở thẻ đó (quyết định 51: chỉ ẩn và gỡ vai trò, khoa; phiếu, báo cáo, nhật ký vẫn giữ tên; tên đăng nhập không dùng lại được).
 - **Điện thoại ký phiếu:** xem mục 9a.
 - **Dữ liệu demo:** không bao giờ bật `Seed__DemoData` ở môi trường chính thức (API từ chối khởi động). Dữ liệu người bệnh thật không được nhập vào môi trường thử nghiệm.
 

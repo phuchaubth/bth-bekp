@@ -982,11 +982,11 @@ Quản trị hệ thống có toàn quyền: mọi chức năng ở các phần 
 
 ### 8.1. Người dùng
 
-Bấm **Quản trị** → **Người dùng**. Tìm theo họ tên, tên đăng nhập, chức danh. Lọc theo **Khoa/phòng**, **Trạng thái**. Cột **Trạng thái**: **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Đã khóa**.
+Bấm **Quản trị** → **Người dùng**. Danh sách chia hai thẻ: **Đang sử dụng** và **Ngưng sử dụng** (số trong ngoặc là số tài khoản của thẻ, quyết định 51). Tìm theo họ tên, tên đăng nhập, chức danh; lọc theo **Khoa/phòng**. Cột **Trạng thái** (thẻ Đang sử dụng): **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Tạm khóa tra cứu** (tài khoản kiosk).
 
 ![Danh sách người dùng](huong-dan-su-dung/90-nguoi-dung.png)
 
-*Hình 8.1. Danh sách người dùng: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
+*Hình 8.1. Thẻ **Đang sử dụng**: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
 
 Thêm người dùng:
 
@@ -1001,17 +1001,34 @@ Thêm người dùng:
 
 *Hình 8.2. Hộp **Thêm người dùng**: điều dưỡng khoa chính Khoa Khám bệnh, làm thêm ở Khoa Nội tổng hợp.*
 
-Sửa, khóa, mở khóa, đặt lại mật khẩu:
+Sửa, ngưng sử dụng, mở khóa, đặt lại mật khẩu (thẻ **Đang sử dụng**):
 
 - Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng chính, khoa/phòng khác, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
 - Bấm nút **⋯** ở cột **Thao tác** để chọn:
-  - **Khóa tài khoản**: người dùng bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho đến khi mở khóa. Khi nhân viên nghỉ việc, hãy khóa tài khoản thay vì xóa, để giữ nhật ký;
-  - **Mở khóa**: chỉ có khi tài khoản đang bị khóa, tạm khóa (nhập sai mật khẩu), hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
+  - **Ngưng sử dụng**: khi nhân viên nghỉ việc, chuyển công tác, nghỉ dài ngày. Người dùng bị đăng xuất khỏi mọi thiết bị, không đăng nhập được; tài khoản chuyển sang thẻ **Ngưng sử dụng**. Phiếu, báo cáo, nhật ký đã có vẫn giữ nguyên;
+  - **Mở khóa**: chỉ có khi tài khoản đang **Tạm khóa** (nhập sai mật khẩu) hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
   - **Đặt lại mật khẩu**: đặt mật khẩu tạm. Mọi phiên đăng nhập của người dùng bị đăng xuất. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.
 
 <img src="huong-dan-su-dung/92-thao-tac-nguoi-dung.png" alt="Menu thao tác khác của một người dùng" width="600">
 
-*Hình 8.3. Menu **⋯**: **Khóa tài khoản**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang khóa).*
+*Hình 8.3. Menu **⋯**: **Ngưng sử dụng**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang tạm khóa).*
+
+Thẻ **Ngưng sử dụng** (quyết định 51): các tài khoản đã ngưng sử dụng, mỗi dòng có **Sửa**, **Sử dụng lại**, **Xóa**.
+
+- **Sử dụng lại**: khi nhân viên quay lại làm việc. Người dùng đăng nhập lại được ngay với mật khẩu hiện tại (quên mật khẩu thì **Đặt lại mật khẩu** ở thẻ **Đang sử dụng**). Nên kiểm tra lại khoa, vai trò bằng nút **Sửa** trước khi sử dụng lại.
+- **Xóa**: khi tài khoản tạo nhầm, trùng, hoặc không còn cần giữ trong danh sách. Chỉ xóa được tài khoản đã ngưng sử dụng (ngưng sử dụng trước, rồi xóa ở thẻ này). Bấm **Xóa**, đọc hộp xác nhận rồi bấm **Xóa**:
+  - tài khoản biến khỏi cả hai thẻ, không đăng nhập và không sử dụng lại được; vai trò, khoa của tài khoản được gỡ;
+  - **tên đăng nhập đó không tạo lại được** (để nhật ký không nhầm người); cần tài khoản mới thì đặt tên đăng nhập khác;
+  - phiếu đã ký, báo cáo, nhật ký vẫn giữ tên người này; nhật ký hệ thống ghi người xóa, lúc xóa;
+  - **không hoàn tác được**.
+
+![Thẻ Ngưng sử dụng: các tài khoản đã ngưng, nút Sửa, Sử dụng lại, Xóa](huong-dan-su-dung/92a-ngung-su-dung.png)
+
+*Hình 8.3a. Thẻ **Ngưng sử dụng**: tài khoản nghỉ việc, chuyển công tác và một tài khoản tạo nhầm (dữ liệu giả lập).*
+
+![Hộp xác nhận xóa tài khoản](huong-dan-su-dung/92b-xoa-tai-khoan.png)
+
+*Hình 8.3b. Hộp xác nhận **Xóa tài khoản**: tài khoản tạo nhầm được xóa; tên đăng nhập không tạo lại được.*
 
 Dữ liệu theo khoa:
 

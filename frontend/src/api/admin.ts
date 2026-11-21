@@ -164,6 +164,8 @@ export const adminApi = {
     apiRequest<UserDetail>(`/api/v1/users/${id}`, { method: 'PUT', body: input }),
   lockUser: (id: string) => apiRequest<void>(`/api/v1/users/${id}/lock`, { method: 'POST' }),
   unlockUser: (id: string) => apiRequest<void>(`/api/v1/users/${id}/unlock`, { method: 'POST' }),
+  /** Xóa tài khoản đã ngưng sử dụng (quyết định 51). */
+  deleteUser: (id: string) => apiRequest<void>(`/api/v1/users/${id}`, { method: 'DELETE' }),
   resetPassword: (id: string, newPassword: string) =>
     apiRequest<void>(`/api/v1/users/${id}/reset-password`, { method: 'POST', body: { newPassword } }),
 }

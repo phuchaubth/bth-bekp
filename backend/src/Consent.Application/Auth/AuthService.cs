@@ -47,11 +47,12 @@ public sealed class AuthService(
         var userName = User.NormalizeUserName(request.UserName);
         var user = await users.GetByUserNameAsync(userName, cancellationToken).ConfigureAwait(false);
 
-        if (user is null)
+        // Tài khoản đã xóa (quyết định 51) đăng nhập như tài khoản không tồn tại.
+        if (user is null || user.IsDeleted)
         {
             // Vẫn băm mật khẩu để thời gian phản hồi không tiết lộ tài khoản có tồn tại hay không.
             passwordHasher.Verify(GetDummyPasswordHash(), request.Password);
-            AddAudit(AuditActions.LoginFailed, null, userName, new { reason = "unknown_user" });
+            AddAudit(AuditActions.LoginFailed, user?.Id, userName, new { reason = user is null ? "unknown_user" : "deleted_user" });
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return Result<AuthSession>.Failure(AuthErrors.InvalidCredentials);
         }
