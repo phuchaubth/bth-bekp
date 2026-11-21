@@ -2,7 +2,13 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { NursingReport, NursingReportDepartment, NursingReportFormDefinition, NursingSummary } from '../../api/nursingReports'
+import type {
+  NursingDelegation,
+  NursingReport,
+  NursingReportDepartment,
+  NursingReportFormDefinition,
+  NursingSummary,
+} from '../../api/nursingReports'
 import { Permissions } from '../../auth/permissions'
 import { baseRoutes, doctorPermissions, session } from '../../test/fixtures'
 import { json, mockApi, problem, type ApiCall } from '../../test/mockApi'
@@ -73,6 +79,7 @@ const report = (overrides: Partial<NursingReport> = {}): NursingReport => ({
   carriedOverKeys: ['nurses'],
   isReportingDepartment: true,
   hisEntry: null,
+  reportVisible: true,
   ...overrides,
 })
 
@@ -177,6 +184,32 @@ const hisEntry = (overrides: Partial<NonNullable<NursingReport['hisEntry']>> = {
 
 const lastCall = (calls: ApiCall[], method: string, path: string) =>
   calls.filter((c) => c.method === method && c.path === path).at(-1)
+
+const day = (offset: number) => dayjs().add(offset, 'day')
+
+/** Điều dưỡng Demo được ủy quyền làm báo cáo Khoa Nhi từ hôm qua đến ngày mai (quyết định 48). */
+const nhiDelegation = (overrides: Partial<NursingDelegation> = {}): NursingDelegation => ({
+  id: 'dl-nhi',
+  departmentId: 'd-nhi',
+  departmentCode: 'NHI',
+  departmentName: 'Khoa Nhi (giả lập)',
+  delegatorUserId: 'u-nhi',
+  delegatorName: 'Điều dưỡng Nhi (giả lập)',
+  delegateUserId: 'u-dieuduong',
+  delegateName: 'Điều dưỡng Demo',
+  startDate: day(-1).format('YYYY-MM-DD'),
+  endDate: day(1).format('YYYY-MM-DD'),
+  contents: ['report'],
+  reason: 'Nghỉ phép',
+  status: 'Active',
+  createdAtUtc: '2026-11-19T01:00:00Z',
+  revokedBy: null,
+  revokedAtUtc: null,
+  canRevoke: false,
+  ...overrides,
+})
+
+const nhi = { departmentId: 'd-nhi', departmentName: 'Khoa Nhi (giả lập)' }
 
 describe('Báo cáo điều dưỡng của khoa', () => {
   it('điều dưỡng lưu nháp với số điền sẵn, phải chọn đủ phần tick mới gửi được, gửi xong thì khóa', { timeout: 20_000 }, async () => {
@@ -429,6 +462,116 @@ describe('Báo cáo điều dưỡng của khoa', () => {
     expect(screen.queryByText('Khoa chưa có trong danh sách khoa báo cáo điều dưỡng.')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('spinbutton', { name: 'Điều dưỡng' })).not.toBeInTheDocument()
+  })
+
+  // Quyết định 48: người được ủy quyền chọn khoa được ủy quyền, chỉ các ngày trong thời gian ủy quyền.
+  it('người được ủy quyền chọn khoa được ủy quyền: chuyển về ngày trong thời gian ủy quyền, thấy đang làm thay ai', { timeout: 20_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/delegations': [
+        nhiDelegation(),
+        // Ủy quyền đã hết hạn hoặc mình là người ủy quyền: không thêm khoa vào danh sách chọn.
+        nhiDelegation({ id: 'dl-old', departmentId: 'd-tmh', departmentName: 'Khoa Tai Mũi Họng (giả lập)', status: 'Expired' }),
+        nhiDelegation({ id: 'dl-given', departmentId: 'd-noi', delegatorUserId: 'u-dieuduong', delegateUserId: 'u-nhi' }),
+      ],
+      'GET /api/v1/nursing-reports/daily': (call: ApiCall) =>
+        call.search.includes('departmentId=d-nhi') ? report({ ...nhi, reportDate: new URLSearchParams(call.search).get('date')! }) : report(),
+      'PUT /api/v1/nursing-reports/daily': (call: ApiCall) =>
+        report({ ...nhi, id: 'r-nhi', status: 'Draft', updatedAtUtc: '2026-11-20T01:00:00Z', updatedBy: 'Điều dưỡng Demo', reportDate: (call.body as { reportDate: string }).reportDate }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa')
+
+    expect(await screen.findByText(`${definition.title} – Khoa Nội tổng hợp`)).toBeInTheDocument()
+    // Danh sách ủy quyền đã tải (ô khoa hiện ra): khoa của mình không ghi "làm thay", kể cả khoa mình đã ủy quyền cho người khác.
+    await screen.findByRole('combobox', { name: 'Khoa' })
+    expect(screen.queryByText(/^Bạn làm thay theo ủy quyền/)).not.toBeInTheDocument()
+    // Khoa của mình: chọn ngày 3 hôm trước được (trong 7 ngày gần nhất).
+    const dateInput = screen.getByRole('textbox', { name: 'Ngày báo cáo' })
+    await user.clear(dateInput)
+    await user.type(dateInput, `${day(-3).format('DD/MM/YYYY')}{Enter}`)
+    await waitFor(() => expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toContain(`date=${day(-3).format('YYYY-MM-DD')}`))
+
+    await user.click(screen.getByRole('combobox', { name: 'Khoa' }))
+    expect(screen.queryByTitle('Khoa Tai Mũi Họng (giả lập) (được ủy quyền)')).not.toBeInTheDocument()
+    await user.click(await screen.findByTitle('Khoa Nhi (giả lập) (được ủy quyền)'))
+
+    // Ngày 3 hôm trước ở ngoài thời gian ủy quyền: chuyển về ngày bắt đầu ủy quyền.
+    expect(await screen.findByText(`${definition.title} – Khoa Nhi (giả lập)`)).toBeInTheDocument()
+    expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toBe(`?date=${day(-1).format('YYYY-MM-DD')}&departmentId=d-nhi`)
+    expect(screen.getByText(/^Bạn làm thay theo ủy quyền của Điều dưỡng Nhi \(giả lập\) \(Khoa Nhi \(giả lập\)\)/)).toBeInTheDocument()
+    expect(screen.getByText('Nội dung được ủy quyền: Báo cáo của khoa. Bảng tổng hợp ghi "được Điều dưỡng Nhi (giả lập) ủy quyền".')).toBeInTheDocument()
+
+    // Ngày trước thời gian ủy quyền không nhận.
+    await user.clear(dateInput)
+    await user.type(dateInput, `${day(-2).format('DD/MM/YYYY')}{Enter}`)
+    expect(calls.some((c) => c.path === '/api/v1/nursing-reports/daily' && c.search.includes(`date=${day(-2).format('YYYY-MM-DD')}&departmentId=d-nhi`))).toBe(false)
+
+    await user.click(screen.getByRole('button', { name: /Lưu nháp/ }))
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/nursing-reports/daily')?.body).toMatchObject({ departmentId: 'd-nhi', reportDate: day(-1).format('YYYY-MM-DD') }),
+    )
+  })
+
+  it('mở từ trang Ủy quyền (?khoa=) thì tải ngay báo cáo của khoa được ủy quyền', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/delegations': [nhiDelegation()],
+      'GET /api/v1/nursing-reports/daily': (call: ApiCall) => (call.search.includes('departmentId=d-nhi') ? report(nhi) : report()),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa?khoa=d-nhi')
+
+    expect(await screen.findByText(`${definition.title} – Khoa Nhi (giả lập)`)).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === '/api/v1/nursing-reports/daily').every((c) => c.search.includes('departmentId=d-nhi'))).toBe(true)
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Khoa' }).closest('.ant-select')).toHaveTextContent('Khoa Nhi (giả lập) (được ủy quyền)'))
+    expect(await screen.findByText(/^Bạn làm thay theo ủy quyền của Điều dưỡng Nhi \(giả lập\)/)).toBeInTheDocument()
+  })
+
+  it('tài khoản nhiều khoa mở ?khoa= khi danh sách ủy quyền chưa tải xong: ô khoa không hiện mã khoa thô', async () => {
+    mockApi({
+      ...baseRoutes(
+        session({
+          ...nurseSession().user,
+          departments: [
+            { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+            { id: 'd-ngoai', name: 'Khoa Ngoại B (giả lập)' },
+          ],
+        }),
+      ),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/delegations': () => new Promise(() => {}),
+      'GET /api/v1/nursing-reports/daily': report(nhi),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa?khoa=d-nhi')
+
+    expect(await screen.findByText(`${definition.title} – Khoa Nhi (giả lập)`)).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Khoa' }).closest('.ant-select')).not.toHaveTextContent('d-nhi')
+  })
+
+  it('chỉ được ủy quyền nhập số liệu HIS: không thấy báo cáo của khoa, chỉ thẻ số liệu HIS', async () => {
+    mockApi({
+      ...baseRoutes(nurseSession()),
+      'GET /api/v1/nursing-reports/form': definition,
+      'GET /api/v1/nursing-reports/delegations': [nhiDelegation({ contents: ['hisEntry'] })],
+      'GET /api/v1/nursing-reports/daily': report({
+        ...nhi,
+        reportVisible: false,
+        values: {},
+        canEdit: false,
+        carriedOverKeys: [],
+        hisEntry: hisEntry(),
+      }),
+    })
+    renderApp('/dieu-duong/bao-cao-khoa?khoa=d-nhi')
+
+    expect(await screen.findByText('Bạn chỉ được ủy quyền nhập số liệu HIS của Khoa Nhi (giả lập).')).toBeInTheDocument()
+    expect(screen.getByText('Số liệu HIS khoa nhập khi HIS lỗi')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Lưu số liệu HIS/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lưu nháp/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton', { name: 'Điều dưỡng' })).not.toBeInTheDocument()
+    expect(await screen.findByText('Nội dung được ủy quyền: Số liệu HIS khi HIS lỗi. Bảng tổng hợp ghi "được Điều dưỡng Nhi (giả lập) ủy quyền".')).toBeInTheDocument()
   })
 
   it('Phòng Điều dưỡng không có quyền lập báo cáo khoa', async () => {
@@ -797,5 +940,64 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     expect(screen.getByText(/NB PK chờ nhập viện: 1\/2 khoa đã nhập \(chưa nhập: Khoa Ngoại B \(giả lập\)\)/)).toBeInTheDocument()
     expect(screen.getByText('Khoa Khám bệnh nhập tay')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Nhập số liệu HIS/ })).not.toBeInTheDocument()
+  })
+
+  // Quyết định 48: bảng tổng hợp ghi người được ủy quyền làm và ghi rõ được ai ủy quyền.
+  it('ủy quyền: liệt kê ủy quyền trong ngày, người báo cáo và người nhập số liệu HIS ghi "được … ủy quyền"', async () => {
+    mockApi({
+      ...baseRoutes(officeSession()),
+      'GET /api/v1/nursing-reports/summary': {
+        ...summary,
+        rows: summary.rows.map((r) =>
+          r.departmentId === 'd-noi' ? { ...r, submittedBy: 'Điều dưỡng Ngoại B (giả lập) (được Điều dưỡng Demo ủy quyền)' } : r,
+        ),
+        statistics: {
+          ...summary.statistics,
+          hasValues: false,
+          usesDepartmentEntries: true,
+          entries: [
+            {
+              departmentId: 'd-kkb',
+              departmentName: 'Khoa Khám bệnh',
+              keys: ['outpatientVisits'],
+              enteredAtUtc: '2026-11-16T02:10:00Z',
+              enteredBy: 'Điều dưỡng Ngoại B (giả lập)',
+              enteredByDelegator: 'Điều dưỡng KKB (giả lập)',
+            },
+          ],
+        },
+        delegations: [
+          {
+            departmentId: 'd-noi',
+            departmentCode: 'NOI',
+            departmentName: 'Khoa Nội tổng hợp',
+            delegateName: 'Điều dưỡng Ngoại B (giả lập)',
+            delegatorName: 'Điều dưỡng Demo',
+            startDate: '2026-11-16',
+            endDate: '2026-11-18',
+            contents: ['report', 'hisEntry'],
+          },
+        ],
+      },
+    })
+    renderApp('/dieu-duong/tong-hop')
+
+    expect(await screen.findByText('Ủy quyền báo cáo trong ngày (1)')).toBeInTheDocument()
+    const item = screen.getByText('NOI', { selector: 'b' }).closest('li')!
+    expect(item).toHaveTextContent(
+      'NOI: Điều dưỡng Ngoại B (giả lập) được Điều dưỡng Demo ủy quyền, 16/11 – 18/11/2026 (Báo cáo của khoa, Số liệu HIS khi HIS lỗi)',
+    )
+    expect(screen.getByRole('cell', { name: 'Điều dưỡng Ngoại B (giả lập) (được Điều dưỡng Demo ủy quyền)' })).toBeInTheDocument()
+    expect(
+      screen.getByText(/Khoa Khám bệnh \(TSNB đến khám\): đã nhập lúc 16\/11\/2026 \d\d:\d\d \(Điều dưỡng Ngoại B \(giả lập\), được Điều dưỡng KKB \(giả lập\) ủy quyền\)/),
+    ).toBeInTheDocument()
+  })
+
+  it('không có ủy quyền trong ngày thì không hiện mục ủy quyền', async () => {
+    mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/summary': { ...summary, delegations: [] } })
+    renderApp('/dieu-duong/tong-hop')
+
+    expect(await screen.findByText(/Khoa đã gửi:/)).toBeInTheDocument()
+    expect(screen.queryByText(/Ủy quyền báo cáo trong ngày/)).not.toBeInTheDocument()
   })
 })

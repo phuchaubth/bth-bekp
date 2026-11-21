@@ -31,8 +31,11 @@ public sealed class NursingDepartmentStatistics : Entity, IAuditableEntity
 
     public DateTimeOffset UpdatedAtUtc { get; private set; }
 
+    /// <summary>Ủy quyền mà người nhập lần cuối dùng (quyết định 48); <c>null</c> khi người của khoa tự nhập.</summary>
+    public Guid? DelegationId { get; private set; }
+
     public static NursingDepartmentStatistics Create(
-        Guid departmentId, DateOnly reportDate, string valuesJson, Guid userId, DateTimeOffset nowUtc)
+        Guid departmentId, DateOnly reportDate, string valuesJson, Guid userId, DateTimeOffset nowUtc, Guid? delegationId = null)
     {
         if (departmentId == Guid.Empty)
         {
@@ -40,11 +43,11 @@ public sealed class NursingDepartmentStatistics : Entity, IAuditableEntity
         }
 
         var statistics = new NursingDepartmentStatistics(Guid.CreateVersion7(), departmentId, reportDate);
-        statistics.Set(valuesJson, userId, nowUtc);
+        statistics.Set(valuesJson, userId, nowUtc, delegationId);
         return statistics;
     }
 
-    public void Set(string valuesJson, Guid userId, DateTimeOffset nowUtc)
+    public void Set(string valuesJson, Guid userId, DateTimeOffset nowUtc, Guid? delegationId = null)
     {
         var values = (valuesJson ?? string.Empty).Trim();
         if (values.Length == 0 || values.Length > ValuesMaxLength)
@@ -60,5 +63,6 @@ public sealed class NursingDepartmentStatistics : Entity, IAuditableEntity
         ValuesJson = values;
         UpdatedByUserId = userId;
         UpdatedAtUtc = nowUtc;
+        DelegationId = delegationId;
     }
 }

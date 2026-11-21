@@ -47,6 +47,9 @@ export const NursingDashboardPage = lazy(() =>
 export const NursingSummaryPage = lazy(() =>
   import('../features/nursing/NursingSummaryPage').then((m) => ({ default: m.NursingSummaryPage })),
 )
+export const NursingDelegationsPage = lazy(() =>
+  import('../features/nursing/NursingDelegationsPage').then((m) => ({ default: m.NursingDelegationsPage })),
+)
 export const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })))
 export const SettingsPage = lazy(() => import('../features/admin/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))

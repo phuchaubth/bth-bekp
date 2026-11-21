@@ -211,6 +211,143 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task DelegatedReporting_WorksOnlyWithinTheDates_AndIsShownOnTheSummary()
+    {
+        var (nurse, office, admin) = await LoginAsync();
+        var noi = await InternalMedicineIdAsync(office);
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/nursing-reports/departments", office, new { items = new[] { new { departmentId = noi, bedCount = 40 } } })).Status);
+
+        // Điều dưỡng của khoa khác (giả lập) sẽ được ủy quyền.
+        var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", admin);
+        var nurseRole = roles.EnumerateArray().Single(r => r.GetProperty("code").GetString() == "NURSE").GetProperty("id").GetString();
+        var (_, departments) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/departments", admin);
+        var kkb = departments.EnumerateArray().Single(d => d.GetProperty("code").GetString() == "KKB").GetProperty("id").GetString();
+        var (created, _) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/users", admin, new
+        {
+            userName = "dieuduong.kkb",
+            fullName = "Điều dưỡng Khám bệnh (giả lập)",
+            departmentId = kkb,
+            roleIds = new[] { nurseRole },
+            password = "Mat-Khau-Tam-2026",
+        });
+        Assert.Equal(HttpStatusCode.Created, created);
+        var first = await _client.LoginAsync("dieuduong.kkb", "Mat-Khau-Tam-2026");
+        var (_, session) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/auth/change-password", first.AccessToken,
+            new { currentPassword = "Mat-Khau-Tam-2026", newPassword = "Dieu-Duong-Gia-Lap-2026!" });
+        var colleague = session.GetProperty("accessToken").GetString()!;
+        var dailyUrl = $"/api/v1/nursing-reports/daily?date={Today}&departmentId={noi}";
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, dailyUrl, colleague)).Status);
+
+        // Người ủy quyền chọn người trong danh sách, ủy quyền báo cáo của khoa từ hôm nay đến ngày mai.
+        var (_, candidates) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/delegations/candidates", nurse);
+        var delegateId = candidates.EnumerateArray()
+            .Single(c => c.GetProperty("fullName").GetString() == "Điều dưỡng Khám bệnh (giả lập)").GetProperty("userId").GetString();
+        var tomorrow = DateOnly.Parse(Today, CultureInfo.InvariantCulture).AddDays(1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var (delegated, delegation) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/nursing-reports/delegations", nurse, new
+        {
+            departmentId = noi,
+            delegateUserId = delegateId,
+            startDate = Today,
+            endDate = tomorrow,
+            report = true,
+            hisEntry = false,
+            reason = "Nghỉ phép (giả lập)",
+        });
+        Assert.True(delegated == HttpStatusCode.OK, delegation.ToString());
+        Assert.Equal("Active", delegation.GetProperty("status").GetString());
+        Assert.Equal(new[] { "report" }, delegation.GetProperty("contents").EnumerateArray().Select(c => c.GetString()).ToArray());
+        var delegationId = delegation.GetProperty("id").GetString();
+
+        // Người được ủy quyền thấy ủy quyền giao cho mình (không hủy được).
+        var (_, received) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/delegations", colleague);
+        var mine = Assert.Single(received.EnumerateArray());
+        Assert.Equal(delegationId, mine.GetProperty("id").GetString());
+        Assert.False(mine.GetProperty("canRevoke").GetBoolean());
+
+        // Người được ủy quyền lập và gửi báo cáo khoa Nội hôm nay; ngày trước thời gian ủy quyền thì không.
+        var (sentStatus, sent) = await _client.SendJsonAsync(HttpMethod.Put, "/api/v1/nursing-reports/daily", colleague, new
+        {
+            departmentId = noi,
+            reportDate = Today,
+            values = new { nurses = 18, previousDayPatients = 40, admissionsFromClinic = 2 },
+            checks = AllOk(),
+            submit = true,
+        });
+        Assert.True(sentStatus == HttpStatusCode.OK, sent.ToString());
+        Assert.Equal("Điều dưỡng Khám bệnh (giả lập) (được Điều dưỡng Demo ủy quyền)", sent.GetProperty("submittedBy").GetString());
+        var yesterday = DateOnly.Parse(Today, CultureInfo.InvariantCulture).AddDays(-1).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(
+            HttpMethod.Put, "/api/v1/nursing-reports/daily", colleague, new { departmentId = noi, reportDate = yesterday, values = new { nurses = 18 } })).Status);
+
+        // Bảng tổng hợp ghi người được ủy quyền và việc ủy quyền, kèm ủy quyền có hiệu lực trong ngày.
+        var (_, summary) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
+        var row = Assert.Single(summary.GetProperty("rows").EnumerateArray());
+        Assert.Equal("Điều dưỡng Khám bệnh (giả lập) (được Điều dưỡng Demo ủy quyền)", row.GetProperty("submittedBy").GetString());
+        Assert.Equal("Điều dưỡng Khám bệnh (giả lập) (NOI, được Điều dưỡng Demo ủy quyền)",
+            summary.GetProperty("reporters").GetProperty("situation").GetString());
+        var active = Assert.Single(summary.GetProperty("delegations").EnumerateArray());
+        Assert.Equal("Điều dưỡng Khám bệnh (giả lập)", active.GetProperty("delegateName").GetString());
+        Assert.Equal("Điều dưỡng Demo", active.GetProperty("delegatorName").GetString());
+
+        // Hủy ủy quyền: chỉ người ủy quyền (hoặc Phòng Điều dưỡng); người được ủy quyền không làm được nữa, báo cáo đã gửi vẫn ghi
+        // ủy quyền.
+        var revokeUrl = $"/api/v1/nursing-reports/delegations/{delegationId}/revoke";
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Post, revokeUrl, colleague)).Status);
+        var (revokedStatus, revoked) = await _client.SendJsonAsync(HttpMethod.Post, revokeUrl, nurse);
+        Assert.Equal(HttpStatusCode.OK, revokedStatus);
+        Assert.Equal("Revoked", revoked.GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, dailyUrl, colleague)).Status);
+        var (_, after) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
+        Assert.Equal("Điều dưỡng Khám bệnh (giả lập) (được Điều dưỡng Demo ủy quyền)", after.GetProperty("rows")[0].GetProperty("submittedBy").GetString());
+        Assert.Equal(0, after.GetProperty("delegations").GetArrayLength());
+        var (_, all) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/delegations?all=true", office);
+        Assert.Equal("Revoked", Assert.Single(all.EnumerateArray()).GetProperty("status").GetString());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/nursing-reports/delegations?all=true", nurse)).Status);
+
+        // Ủy quyền đã hết hạn (đặt lùi ngày trực tiếp trong CSDL): không làm được báo cáo của ngày trong thời gian ủy quyền nữa,
+        // không còn trong danh sách ủy quyền của bảng tổng hợp hôm nay.
+        var (_, again) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/nursing-reports/delegations", nurse, new
+        {
+            departmentId = noi,
+            delegateUserId = delegateId,
+            startDate = Today,
+            endDate = Today,
+            report = true,
+            hisEntry = false,
+        });
+        var past = DateOnly.Parse(Today, CultureInfo.InvariantCulture);
+        await using (var connection = new SqlConnection(_factory.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = new SqlCommand(
+                "UPDATE NursingReportDelegations SET StartDate = @start, EndDate = @end WHERE Id = @id", connection);
+            command.Parameters.AddWithValue("@start", past.AddDays(-3).ToDateTime(TimeOnly.MinValue));
+            command.Parameters.AddWithValue("@end", past.AddDays(-2).ToDateTime(TimeOnly.MinValue));
+            command.Parameters.AddWithValue("@id", Guid.Parse(again.GetProperty("id").GetString()!));
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        var inWindow = past.AddDays(-2).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(
+            HttpMethod.Get, $"/api/v1/nursing-reports/daily?date={inWindow}&departmentId={noi}", colleague)).Status);
+        // Ủy quyền từ ngày mai: chưa có trong bảng tổng hợp hôm nay.
+        var (upcomingStatus, _) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/nursing-reports/delegations", nurse, new
+        {
+            departmentId = noi,
+            delegateUserId = delegateId,
+            startDate = tomorrow,
+            endDate = tomorrow,
+            report = true,
+            hisEntry = false,
+        });
+        Assert.Equal(HttpStatusCode.OK, upcomingStatus);
+        var (_, later) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/nursing-reports/summary?date={Today}", office);
+        Assert.Equal(0, later.GetProperty("delegations").GetArrayLength());
+    }
+
+    [Fact]
     public async Task ReportingDepartments_KeepTheOfficeOrder_AndShortNames_OnTheSummary()
     {
         var (_, office, _) = await LoginAsync();

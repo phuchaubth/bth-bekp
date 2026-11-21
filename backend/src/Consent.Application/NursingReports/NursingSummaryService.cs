@@ -42,11 +42,20 @@ public sealed class NursingSummaryService(
         var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
         var merged = NursingHisEntry.Merge(NursingStatisticsValues.Parse(statistics?.ValuesJson), entries);
 
+        // Ủy quyền (quyết định 48): của báo cáo đã gửi và số liệu HIS khoa nhập theo ủy quyền (kể cả ủy quyền đã hủy sau đó), và các
+        // ủy quyền có hiệu lực trong ngày.
+        var used = await reports.GetDelegationsAsync(
+            [.. dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedDelegationId).Concat(entries.Select(e => e.DelegationId)).OfType<Guid>().Distinct()],
+            cancellationToken).ConfigureAwait(false);
+        var covering = await reports.ListDelegationsCoveringAsync(reportDate, cancellationToken).ConfigureAwait(false);
+
         var names = await NamesAsync(
             dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedByUserId)
                 .Append(statistics?.UpdatedByUserId)
-                .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId)),
+                .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId))
+                .Concat(used.Concat(covering).SelectMany(d => new Guid?[] { d.DelegatorUserId, d.DelegateUserId })),
             cancellationToken).ConfigureAwait(false);
+        var delegators = used.ToDictionary(d => d.Id, d => names.GetValueOrDefault(d.DelegatorUserId, "Không rõ"));
         var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
         var summaryDepartments = NursingSummaryDepartment.From(allDepartments, configured);
 
@@ -64,7 +73,8 @@ public sealed class NursingSummaryService(
                     departmentNames[d.Id],
                     [.. d.Keys.Select(k => k.Key)],
                     entry?.UpdatedAtUtc,
-                    entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId));
+                    entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId),
+                    entry?.DelegationId is { } delegationId ? delegators.GetValueOrDefault(delegationId) : null);
             })
             .OrderBy(d => d.DepartmentName, VietnameseComparer.Instance)
             .ToList();
@@ -76,6 +86,19 @@ public sealed class NursingSummaryService(
             statistics is null ? null : names.GetValueOrDefault(statistics.UpdatedByUserId),
             expected,
             merged.UsesDepartmentEntries);
+        var codes = summaryDepartments.ToDictionary(d => d.Id, d => d.Code);
+        IReadOnlyList<NursingSummaryDelegationDto> active = [.. covering
+            .Select(d => new NursingSummaryDelegationDto(
+                d.DepartmentId,
+                codes.GetValueOrDefault(d.DepartmentId, string.Empty),
+                departmentNames.GetValueOrDefault(d.DepartmentId, string.Empty),
+                names.GetValueOrDefault(d.DelegateUserId, "Không rõ"),
+                names.GetValueOrDefault(d.DelegatorUserId, "Không rõ"),
+                d.StartDate,
+                d.EndDate,
+                NursingDelegationText.Contents(d.Scope)))
+            .OrderBy(d => d.DepartmentCode, VietnameseComparer.Instance)
+            .ThenBy(d => d.StartDate)];
         return NursingSummaryBuilder.Build(
             reportDate,
             summaryDepartments,
@@ -83,7 +106,9 @@ public sealed class NursingSummaryService(
             names,
             merged.Values,
             info,
-            merged.HospitalEnteredBy);
+            merged.HospitalEnteredBy,
+            delegators,
+            active);
     }
 
     public async Task<NursingReportFile> RenderPdfAsync(DateOnly reportDate, CancellationToken cancellationToken)

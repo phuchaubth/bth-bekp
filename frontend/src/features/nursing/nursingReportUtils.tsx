@@ -1,12 +1,15 @@
 import { Tag } from 'antd'
-import type {
-  NursingCheckValue,
-  NursingReport,
-  NursingReportFormDefinition,
-  NursingReportFormula,
-  NursingReportItem,
-  NursingReportState,
-  SaveNursingReportInput,
+import dayjs from 'dayjs'
+import {
+  DELEGATION_CONTENT_LABELS,
+  type NursingCheckValue,
+  type NursingDelegationContent,
+  type NursingReport,
+  type NursingReportFormDefinition,
+  type NursingReportFormula,
+  type NursingReportItem,
+  type NursingReportState,
+  type SaveNursingReportInput,
 } from '../../api/nursingReports'
 
 /** Giá trị của form nhập báo cáo khoa: số theo khóa dòng, phần tick theo khóa dòng, phần nhập thêm. */
@@ -80,4 +83,19 @@ export function saveBlob(blob: Blob, fileName: string) {
   anchor.download = fileName
   anchor.click()
   URL.revokeObjectURL(url)
+}
+
+/** Thời gian ủy quyền (quyết định 48): "20/11 – 22/11/2026"; một ngày thì "20/11/2026"; khác năm thì ghi đủ năm cả hai ngày. */
+export function delegationPeriod({ startDate, endDate }: { startDate: string; endDate: string }) {
+  const start = dayjs(startDate)
+  const end = dayjs(endDate)
+  if (startDate === endDate) {
+    return end.format('DD/MM/YYYY')
+  }
+  return `${start.format(start.year() === end.year() ? 'DD/MM' : 'DD/MM/YYYY')} – ${end.format('DD/MM/YYYY')}`
+}
+
+/** Nội dung được ủy quyền, cách nhau dấu phẩy: "Báo cáo của khoa, Số liệu HIS khi HIS lỗi". */
+export function delegationContents(contents: readonly NursingDelegationContent[]) {
+  return contents.map((c) => DELEGATION_CONTENT_LABELS[c]).join(', ')
 }

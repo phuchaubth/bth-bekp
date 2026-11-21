@@ -50,4 +50,33 @@ internal sealed class NursingReportRepository(ConsentDbContext db) : INursingRep
         await db.NursingDepartmentStatistics.Where(s => s.ReportDate == reportDate).ToListAsync(cancellationToken).ConfigureAwait(false);
 
     public void AddDepartmentStatistics(NursingDepartmentStatistics statistics) => db.NursingDepartmentStatistics.Add(statistics);
+
+    public void AddDelegation(NursingReportDelegation delegation) => db.NursingReportDelegations.Add(delegation);
+
+    public Task<NursingReportDelegation?> GetDelegationAsync(Guid id, CancellationToken cancellationToken) =>
+        db.NursingReportDelegations.FirstOrDefaultAsync(d => d.Id == id, cancellationToken);
+
+    /// <summary>Tối đa 300 ủy quyền mới nhất (đủ cho màn hình danh sách).</summary>
+    public async Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsAsync(Guid? userId, CancellationToken cancellationToken) =>
+        await db.NursingReportDelegations
+            .Where(d => userId == null || d.DelegatorUserId == userId || d.DelegateUserId == userId)
+            .OrderByDescending(d => d.CreatedAtUtc)
+            .Take(300)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsCoveringAsync(DateOnly date, CancellationToken cancellationToken) =>
+        await db.NursingReportDelegations
+            .Where(d => d.RevokedAtUtc == null && d.StartDate <= date && d.EndDate >= date)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<IReadOnlyList<NursingReportDelegation>> GetDelegationsAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+        return ids.Count == 0
+            ? []
+            : await db.NursingReportDelegations.Where(d => ids.Contains(d.Id)).ToListAsync(cancellationToken).ConfigureAwait(false);
+    }
 }

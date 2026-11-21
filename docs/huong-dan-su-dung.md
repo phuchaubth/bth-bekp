@@ -1145,9 +1145,9 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 
 | Ai | Làm gì | Menu |
 |---|---|---|
-| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
+| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5). Khi vắng: ủy quyền cho người khác làm thay; được ủy quyền thì làm báo cáo của khoa khác trong thời gian được ủy quyền (mục 9.7) | **Điều dưỡng** → **Báo cáo của khoa**, **Ủy quyền báo cáo** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày (mục 9.6). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard**, **Ủy quyền báo cáo** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1348,6 +1348,58 @@ Lưu ý khi đọc:
 
 - Ngày ít khoa gửi báo cáo thì tổng Số NB hiện tại thấp hơn thực tế. Xem biểu đồ **Khoa đã gửi báo cáo** cùng ngày đó.
 - Công suất giường dùng số giường đang cài trong hộp **Khoa báo cáo và số giường** (mục 9.4), kể cả khi xem ngày cũ.
+
+### 9.7. Ủy quyền báo cáo khi vắng
+
+Khi vắng (nghỉ phép, đi học, đi công tác…), người lập báo cáo của khoa **ủy quyền** cho người khác làm thay trong một khoảng ngày. Người được ủy quyền chỉ làm được **trong đúng thời gian đó** và **đúng nội dung được ủy quyền**. Bảng tổng hợp ghi rõ báo cáo nào do người được ủy quyền làm, được ai ủy quyền.
+
+**Người ủy quyền (người lập báo cáo của khoa):**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**, rồi bấm **Ủy quyền mới**.
+2. Điền hộp **Ủy quyền báo cáo điều dưỡng**:
+   - **Khoa**: khoa của mình (tài khoản thuộc nhiều khoa chọn khoa cần ủy quyền).
+   - **Người được ủy quyền**: gõ tên để tìm. Danh sách chỉ có tài khoản đang dùng, thuộc một khoa, được quyền lập báo cáo điều dưỡng (điều dưỡng cùng khoa hoặc khoa khác).
+   - **Thời gian ủy quyền**: từ ngày, đến ngày, tính cả hai ngày; bắt đầu từ hôm nay trở đi, tối đa 366 ngày.
+   - **Nội dung ủy quyền**: **Báo cáo của khoa** (lập, lưu nháp, gửi báo cáo hằng ngày), **Số liệu HIS khi HIS lỗi** (nhập số liệu HIS của khoa, mục 9.5), hoặc cả hai.
+   - **Lý do** (không bắt buộc), ví dụ "Nghỉ phép".
+3. Bấm **Ủy quyền**.
+
+   ![Hộp Ủy quyền mới: khoa, người được ủy quyền, thời gian, nội dung, lý do](huong-dan-su-dung/dd-15-uy-quyen-moi.png)
+
+   *Hình 9.19. Điều dưỡng Khoa Nhi ủy quyền cho điều dưỡng Khoa Ngoại tổng hợp làm báo cáo và nhập số liệu HIS của Khoa Nhi trong hai ngày.*
+
+4. Ủy quyền hiện ở bảng **Tôi đã ủy quyền**, có trạng thái **Sắp tới** (chưa tới ngày bắt đầu), **Đang hiệu lực**, **Đã hết hạn** hoặc **Đã hủy**. Đi làm lại sớm hoặc ủy quyền nhầm thì bấm **Hủy ủy quyền**: người được ủy quyền không làm được nữa; báo cáo đã gửi theo ủy quyền vẫn giữ nguyên và vẫn ghi là được ủy quyền.
+
+**Người được ủy quyền:**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**. Bảng **Tôi được ủy quyền** liệt kê các ủy quyền giao cho mình; ủy quyền đang hiệu lực có nút **Mở báo cáo của khoa**.
+
+   ![Trang Ủy quyền của người được ủy quyền: ủy quyền đang hiệu lực có nút Mở báo cáo của khoa](huong-dan-su-dung/dd-15b-duoc-uy-quyen.png)
+
+   *Hình 9.20. Điều dưỡng Khoa Nội được Khoa Nhi ủy quyền (đang hiệu lực); một ủy quyền khác đã bị hủy.*
+
+2. Bấm **Mở báo cáo của khoa**, hoặc vào **Báo cáo của khoa** rồi chọn khoa có chữ **(được ủy quyền)** ở ô khoa đầu trang. Dòng xanh trên cùng ghi đang làm thay ai, thời gian và nội dung được ủy quyền. Ô ngày chỉ chọn được các ngày trong thời gian ủy quyền.
+
+   ![Báo cáo của khoa khi làm thay theo ủy quyền](huong-dan-su-dung/dd-15c-bao-cao-thay.png)
+
+   *Hình 9.21. Điều dưỡng Khoa Nội làm báo cáo của Khoa Nhi theo ủy quyền.*
+
+3. Lập, lưu nháp và gửi báo cáo như mục 9.1; khi HIS lỗi, nhập số liệu HIS của khoa như mục 9.5. Người chỉ được ủy quyền số liệu HIS thì chỉ thấy thẻ số liệu HIS, không xem được báo cáo của khoa.
+4. Hết thời gian ủy quyền hoặc ủy quyền bị hủy thì khoa đó không còn trong ô khoa, và phần mềm không cho xem, sửa báo cáo của khoa đó nữa, kể cả báo cáo của các ngày trong thời gian ủy quyền. Báo cáo đã gửi cần sửa thì Phòng Điều dưỡng **Trả lại khoa** (mục 9.3) để người của khoa sửa.
+
+**Phòng Điều dưỡng:**
+
+- Bảng tổng hợp (mục 9.2) có ô **Ủy quyền báo cáo trong ngày**: khoa nào, ai làm thay, được ai ủy quyền, thời gian và nội dung. Báo cáo gửi theo ủy quyền ghi "Họ tên (được … ủy quyền)" ở cột **Người báo cáo**; dòng **Người báo cáo** dưới các mục B–F cũng ghi như vậy. PDF và Excel ghi giống màn hình.
+
+   ![Bảng tổng hợp: ô Ủy quyền báo cáo trong ngày và cột Người báo cáo ghi được ủy quyền](huong-dan-su-dung/dd-15d-tong-hop-uy-quyen.png)
+
+   *Hình 9.22. Báo cáo Khoa Nhi do Điều dưỡng Demo gửi theo ủy quyền của Điều dưỡng Nhi Demo.*
+
+- Trang **Ủy quyền báo cáo** của Phòng Điều dưỡng có bảng **Mọi ủy quyền** của các khoa. Tài khoản có quyền quản lý báo cáo điều dưỡng (vai trò Phòng Điều dưỡng) hủy được ủy quyền chưa hết hạn.
+
+   ![Mọi ủy quyền của các khoa](huong-dan-su-dung/dd-15e-moi-uy-quyen.png)
+
+   *Hình 9.23. Phòng Điều dưỡng xem mọi ủy quyền: đang hiệu lực, sắp tới, đã hủy.*
 
 ---
 

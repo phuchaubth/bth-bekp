@@ -44,6 +44,23 @@ internal sealed class InMemoryNursingReportRepository(InMemoryStore store) : INu
         Task.FromResult<IReadOnlyList<NursingDepartmentStatistics>>([.. store.NursingDepartmentStatistics.Where(s => s.ReportDate == reportDate)]);
 
     public void AddDepartmentStatistics(NursingDepartmentStatistics statistics) => store.NursingDepartmentStatistics.Add(statistics);
+
+    public void AddDelegation(NursingReportDelegation delegation) => store.NursingDelegations.Add(delegation);
+
+    public Task<NursingReportDelegation?> GetDelegationAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.NursingDelegations.Find(d => d.Id == id));
+
+    public Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsAsync(Guid? userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NursingReportDelegation>>([.. store.NursingDelegations
+            .Where(d => userId is null || d.DelegatorUserId == userId || d.DelegateUserId == userId)
+            .OrderByDescending(d => d.CreatedAtUtc)]);
+
+    public Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsCoveringAsync(DateOnly date, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NursingReportDelegation>>([.. store.NursingDelegations
+            .Where(d => !d.IsRevoked && d.StartDate <= date && d.EndDate >= date)]);
+
+    public Task<IReadOnlyList<NursingReportDelegation>> GetDelegationsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<NursingReportDelegation>>([.. store.NursingDelegations.Where(d => ids.Contains(d.Id))]);
 }
 
 internal sealed class StubDailyStatisticsSource : IDailyStatisticsSource

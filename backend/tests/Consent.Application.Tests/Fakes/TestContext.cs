@@ -265,6 +265,16 @@ internal sealed class AppTestContext
         NursingDocuments,
         new InMemorySystemSettingRepository(Store));
 
+    public NursingDelegationService CreateNursingDelegationService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryRoleRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        new InMemorySystemSettingRepository(Store));
+
     public NursingDashboardService CreateNursingDashboardService() => new(
         new InMemoryNursingReportRepository(Store),
         new InMemoryDepartmentRepository(Store),

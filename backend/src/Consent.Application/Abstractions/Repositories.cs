@@ -38,6 +38,9 @@ public interface IUserRepository
 
     Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken);
 
+    /// <summary>Người dùng đang hoạt động có ít nhất một vai trò trong <paramref name="roleIds"/>, kèm khoa của từng người.</summary>
+    Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
+
     void Add(User user);
 }
 
@@ -242,6 +245,22 @@ public interface INursingReportRepository
     Task<IReadOnlyList<NursingDepartmentStatistics>> ListDepartmentStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken);
 
     void AddDepartmentStatistics(NursingDepartmentStatistics statistics);
+
+    void AddDelegation(NursingReportDelegation delegation);
+
+    Task<NursingReportDelegation?> GetDelegationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ủy quyền báo cáo điều dưỡng (quyết định 48) mà <paramref name="userId"/> là người ủy quyền hoặc người được ủy quyền;
+    /// <c>null</c> là mọi ủy quyền (Phòng Điều dưỡng). Mới tạo trước.
+    /// </summary>
+    Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsAsync(Guid? userId, CancellationToken cancellationToken);
+
+    /// <summary>Ủy quyền chưa hủy có ngày <paramref name="date"/> (bảng tổng hợp ghi người được ủy quyền trong ngày).</summary>
+    Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsCoveringAsync(DateOnly date, CancellationToken cancellationToken);
+
+    /// <summary>Các ủy quyền theo mã (kể cả đã hủy), để ghi người ủy quyền của báo cáo đã gửi theo ủy quyền.</summary>
+    Task<IReadOnlyList<NursingReportDelegation>> GetDelegationsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 }
 
 public interface ISystemSettingRepository

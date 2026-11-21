@@ -853,6 +853,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid?>("SubmittedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("SubmittedDelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -862,6 +865,8 @@ namespace Consent.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ReportDate");
+
+                    b.HasIndex("SubmittedDelegationId");
 
                     b.HasIndex("DepartmentId", "ReportDate")
                         .IsUnique();
@@ -910,6 +915,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("DelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -934,10 +942,66 @@ namespace Consent.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DelegationId");
+
                     b.HasIndex("ReportDate", "DepartmentId")
                         .IsUnique();
 
                     b.ToTable("NursingDepartmentStatistics", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DelegateUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DelegatorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DelegateUserId");
+
+                    b.HasIndex("DelegatorUserId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("StartDate", "EndDate");
+
+                    b.ToTable("NursingReportDelegations", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDepartment", b =>
@@ -1325,6 +1389,28 @@ namespace Consent.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingDailyReport", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedDelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingDepartmentStatistics", b =>
+                {
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("DelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
                 {
                     b.HasOne("Consent.Domain.Departments.Department", null)
                         .WithMany()

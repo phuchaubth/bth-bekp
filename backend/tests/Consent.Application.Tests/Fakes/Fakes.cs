@@ -139,6 +139,8 @@ internal sealed class InMemoryStore : IUnitOfWork
 
     public List<NursingDepartmentStatistics> NursingDepartmentStatistics { get; } = [];
 
+    public List<NursingReportDelegation> NursingDelegations { get; } = [];
+
     public int SaveCount { get; private set; }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -169,6 +171,9 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
 
     public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Count(u => u.RoleIds.Contains(roleId)));
+
+    public Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<User>>([.. store.Users.Where(u => u.IsActive && u.RoleIds.Any(roleIds.Contains))]);
 
     public Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {

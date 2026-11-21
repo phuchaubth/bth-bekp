@@ -54,7 +54,8 @@ public sealed class NursingReportService(
             return Error.ValidationField("departmentId", "Vui lòng chọn khoa.");
         }
 
-        if (!CanView(id))
+        var access = await AccessAsync(id, reportDate, cancellationToken).ConfigureAwait(false);
+        if (!CanView(id) && !access.CanReport && !access.CanHis)
         {
             return Forbidden;
         }
@@ -65,10 +66,21 @@ public sealed class NursingReportService(
             return Error.NotFound("departments.not_found", "Không tìm thấy khoa.");
         }
 
+        if (!CanView(id) && !access.CanReport)
+        {
+            // Chỉ được ủy quyền nhập số liệu HIS (quyết định 48): không xem báo cáo của khoa.
+            var hisReporting = await IsReportingAsync(id, cancellationToken).ConfigureAwait(false);
+            return new NursingReportDto(
+                null, department.Id, department.Name, reportDate, NursingReportState.New, new Dictionary<string, int>(), new Dictionary<string, string>(),
+                null, CanEdit: false, CanReopen: false, null, null, null, null, null, null, null, [], hisReporting,
+                await HisEntryAsync(id, reportDate, hisReporting, access.CanHis, cancellationToken).ConfigureAwait(false),
+                ReportVisible: false);
+        }
+
         var report = await reports.FindAsync(id, reportDate, cancellationToken).ConfigureAwait(false);
         if (report is not null)
         {
-            return await ToDtoAsync(report, department, cancellationToken).ConfigureAwait(false);
+            return await ToDtoAsync(report, department, access, cancellationToken).ConfigureAwait(false);
         }
 
         var previous = await reports.FindLatestSubmittedBeforeAsync(id, reportDate, cancellationToken).ConfigureAwait(false);
@@ -88,9 +100,9 @@ public sealed class NursingReportService(
         var reporting = await IsReportingAsync(id, cancellationToken).ConfigureAwait(false);
         return new NursingReportDto(
             null, department.Id, department.Name, reportDate, NursingReportState.New, carried.Values, carried.Checks, null,
-            CanEdit: CanEdit(id) && reporting && IsEditableDate(reportDate), CanReopen: false,
+            CanEdit: access.CanReport && reporting && IsEditableDate(reportDate), CanReopen: false,
             null, null, null, null, null, null, null, carriedOverKeys, reporting,
-            await HisEntryAsync(id, reportDate, reporting, cancellationToken).ConfigureAwait(false));
+            await HisEntryAsync(id, reportDate, reporting, access.CanHis, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>Lưu báo cáo của khoa trong ngày (tạo mới nếu chưa có); <see cref="SaveNursingReportRequest.Submit"/> thì gửi luôn.</summary>
@@ -102,7 +114,8 @@ public sealed class NursingReportService(
             return Error.ValidationField("departmentId", "Vui lòng chọn khoa.");
         }
 
-        if (!CanEdit(id) || currentUser.UserId is not { } userId)
+        var access = await AccessAsync(id, request.ReportDate, cancellationToken).ConfigureAwait(false);
+        if (!access.CanReport || currentUser.UserId is not { } userId)
         {
             return Forbidden;
         }
@@ -167,11 +180,12 @@ public sealed class NursingReportService(
 
         if (request.Submit)
         {
-            report.Submit(userId, now);
+            // Người được ủy quyền gửi (kể cả người cùng khoa đang có ủy quyền): ghi ủy quyền để bảng tổng hợp ghi rõ (quyết định 48).
+            report.Submit(userId, now, access.Report?.Id);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        return await ToDtoAsync(report, department, cancellationToken).ConfigureAwait(false);
+        return await ToDtoAsync(report, department, access, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -187,7 +201,8 @@ public sealed class NursingReportService(
             return Error.ValidationField("departmentId", "Vui lòng chọn khoa.");
         }
 
-        if (!CanEdit(id) || currentUser.UserId is not { } userId)
+        var access = await AccessAsync(id, request.ReportDate, cancellationToken).ConfigureAwait(false);
+        if (!access.CanHis || currentUser.UserId is not { } userId)
         {
             return Forbidden;
         }
@@ -245,11 +260,12 @@ public sealed class NursingReportService(
             .FirstOrDefault(s => s.DepartmentId == id);
         if (existing is null)
         {
-            reports.AddDepartmentStatistics(NursingDepartmentStatistics.Create(id, request.ReportDate, values.ToJson(), userId, clock.UtcNow));
+            reports.AddDepartmentStatistics(
+                NursingDepartmentStatistics.Create(id, request.ReportDate, values.ToJson(), userId, clock.UtcNow, access.His?.Id));
         }
         else
         {
-            existing.Set(values.ToJson(), userId, clock.UtcNow);
+            existing.Set(values.ToJson(), userId, clock.UtcNow, access.His?.Id);
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
@@ -285,23 +301,25 @@ public sealed class NursingReportService(
         report.Reopen(reason, userId, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         var department = await departments.GetByIdAsync(report.DepartmentId, cancellationToken).ConfigureAwait(false);
-        return await ToDtoAsync(report, department!, cancellationToken).ConfigureAwait(false);
+        var access = await AccessAsync(report.DepartmentId, report.ReportDate, cancellationToken).ConfigureAwait(false);
+        return await ToDtoAsync(report, department!, access, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>PDF báo cáo của khoa theo bố cục bản giấy (bản nháp có ghi chú "Bản nháp" ở cuối trang).</summary>
     public async Task<Result<NursingReportFile>> RenderPdfAsync(Guid id, CancellationToken cancellationToken)
     {
         var report = await reports.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
-        if (report is null || !CanView(report.DepartmentId))
+        if (report is null
+            || !(CanView(report.DepartmentId) || (await AccessAsync(report.DepartmentId, report.ReportDate, cancellationToken).ConfigureAwait(false)).CanReport))
         {
             return NotFound;
         }
 
         var department = await departments.GetByIdAsync(report.DepartmentId, cancellationToken).ConfigureAwait(false);
         var hospital = await settings.ResolveHospitalAsync(cancellationToken).ConfigureAwait(false);
-        var names = await NamesAsync([report.SubmittedByUserId], cancellationToken).ConfigureAwait(false);
+        var submitter = await SubmitterAsync(report, cancellationToken).ConfigureAwait(false);
         var status = report.IsSubmitted
-            ? $"Đã gửi lúc {Local(report.SubmittedAtUtc!.Value)}{By(names, report.SubmittedByUserId)}"
+            ? $"Đã gửi lúc {Local(report.SubmittedAtUtc!.Value)}{(submitter is null ? string.Empty : $" bởi {submitter}")}"
             : $"Bản nháp, chưa gửi Phòng Điều dưỡng (in lúc {Local(clock.UtcNow)})";
         var content = pdf.RenderReport(new NursingReportPdfDocument(
             hospital.Name,
@@ -319,14 +337,64 @@ public sealed class NursingReportService(
     internal static string Local(DateTimeOffset utc) =>
         utc.ToOffset(ConsentFormService.VietnamOffset).ToString("HH:mm dd/MM/yyyy", CultureInfo.InvariantCulture);
 
-    private static string By(IReadOnlyDictionary<Guid, string> names, Guid? userId) =>
-        userId is { } id && names.TryGetValue(id, out var name) ? $" bởi {name}" : string.Empty;
-
     /// <summary>Lập, sửa báo cáo của một khoa của mình (khoa chính hoặc khoa khác, quyết định 41), hoặc mọi khoa khi xem toàn viện.</summary>
     private bool CanEdit(Guid departmentId) =>
         CanSubmit && (currentUser.HasPermission(Permissions.ScopeAllDepartments) || currentUser.DepartmentIds.Contains(departmentId));
 
     private bool CanView(Guid departmentId) => CanReadAll || CanEdit(departmentId);
+
+    /// <summary>
+    /// Quyền làm báo cáo và nhập số liệu HIS của khoa trong ngày báo cáo: người của khoa (<see cref="Own"/>), hoặc người được ủy
+    /// quyền (quyết định 48) khi hôm nay và ngày báo cáo đều trong thời gian ủy quyền.
+    /// </summary>
+    private sealed record Access(bool Own, NursingReportDelegation? Report, NursingReportDelegation? His)
+    {
+        public bool CanReport => Own || Report is not null;
+
+        public bool CanHis => Own || His is not null;
+    }
+
+    private async Task<Access> AccessAsync(Guid departmentId, DateOnly reportDate, CancellationToken cancellationToken)
+    {
+        var own = CanEdit(departmentId);
+        if (!CanSubmit || currentUser.UserId is not { } userId)
+        {
+            return new Access(own, null, null);
+        }
+
+        // Ủy quyền chưa hủy có hiệu lực hôm nay (ít, không giới hạn số dòng như danh sách ủy quyền) của người dùng cho khoa này;
+        // ngày báo cáo cũng phải trong thời gian ủy quyền, đúng nội dung.
+        var mine = (await reports.ListDelegationsCoveringAsync(Today, cancellationToken).ConfigureAwait(false))
+            .Where(d => d.DelegateUserId == userId && d.DepartmentId == departmentId)
+            .OrderBy(d => d.StartDate)
+            .ToList();
+        NursingReportDelegation? For(NursingDelegationScope scope) => mine.FirstOrDefault(d => d.Covers(reportDate, scope));
+        return new Access(own, For(NursingDelegationScope.Report), For(NursingDelegationScope.HisEntry));
+    }
+
+    /// <summary>Người gửi báo cáo, kèm người ủy quyền khi gửi theo ủy quyền; chưa gửi thì <c>null</c>.</summary>
+    private async Task<string?> SubmitterAsync(NursingDailyReport report, CancellationToken cancellationToken)
+    {
+        if (!report.IsSubmitted || report.SubmittedByUserId is not { } submittedBy)
+        {
+            return null;
+        }
+
+        var names = await NamesAsync([submittedBy], cancellationToken).ConfigureAwait(false);
+        return names.TryGetValue(submittedBy, out var name)
+            ? NursingDelegationText.Person(name, await DelegatorAsync(report.SubmittedDelegationId, cancellationToken).ConfigureAwait(false))
+            : null;
+    }
+
+    private async Task<string?> DelegatorAsync(Guid? delegationId, CancellationToken cancellationToken)
+    {
+        if (delegationId is not { } id || await reports.GetDelegationAsync(id, cancellationToken).ConfigureAwait(false) is not { } delegation)
+        {
+            return null;
+        }
+
+        return (await NamesAsync([delegation.DelegatorUserId], cancellationToken).ConfigureAwait(false)).GetValueOrDefault(delegation.DelegatorUserId, "Không rõ");
+    }
 
     private bool IsEditableDate(DateOnly date) => date <= Today && Today.DayNumber - date.DayNumber <= MaxDaysBack;
 
@@ -403,11 +471,10 @@ public sealed class NursingReportService(
             .Where(p => p.Value is not null)
             .ToDictionary(p => p.Key, p => p.Value!, StringComparer.Ordinal));
 
-    private async Task<NursingReportDto> ToDtoAsync(NursingDailyReport report, Department department, CancellationToken cancellationToken)
+    private async Task<NursingReportDto> ToDtoAsync(NursingDailyReport report, Department department, Access access, CancellationToken cancellationToken)
     {
         var figures = NursingReportFigures.Parse(report.FiguresJson);
-        var names = await NamesAsync([report.UpdatedByUserId, report.SubmittedByUserId, report.ReopenedByUserId], cancellationToken)
-            .ConfigureAwait(false);
+        var names = await NamesAsync([report.UpdatedByUserId, report.ReopenedByUserId], cancellationToken).ConfigureAwait(false);
         var reporting = await IsReportingAsync(department.Id, cancellationToken).ConfigureAwait(false);
         return new NursingReportDto(
             report.Id,
@@ -418,22 +485,23 @@ public sealed class NursingReportService(
             figures.Values,
             figures.Checks,
             report.Notes,
-            CanEdit: !report.IsSubmitted && CanEdit(department.Id) && reporting && IsEditableDate(report.ReportDate),
+            CanEdit: !report.IsSubmitted && access.CanReport && reporting && IsEditableDate(report.ReportDate),
             CanReopen: report.IsSubmitted && CanManage,
             names.GetValueOrDefault(report.UpdatedByUserId),
             report.UpdatedAtUtc,
-            report.SubmittedByUserId is { } submittedBy && report.IsSubmitted ? names.GetValueOrDefault(submittedBy) : null,
+            await SubmitterAsync(report, cancellationToken).ConfigureAwait(false),
             report.IsSubmitted ? report.SubmittedAtUtc : null,
             report.ReopenedByUserId is { } reopenedBy ? names.GetValueOrDefault(reopenedBy) : null,
             report.ReopenedAtUtc,
             report.ReopenReason,
             [],
             reporting,
-            await HisEntryAsync(department.Id, report.ReportDate, reporting, cancellationToken).ConfigureAwait(false));
+            await HisEntryAsync(department.Id, report.ReportDate, reporting, access.CanHis, cancellationToken).ConfigureAwait(false));
     }
 
     /// <summary>Phần số liệu HIS khoa nhập khi HIS lỗi; <c>null</c> khi khoa không có dòng nào phải nhập.</summary>
-    private async Task<NursingHisEntryDto?> HisEntryAsync(Guid departmentId, DateOnly reportDate, bool reporting, CancellationToken cancellationToken)
+    private async Task<NursingHisEntryDto?> HisEntryAsync(
+        Guid departmentId, DateOnly reportDate, bool reporting, bool canEdit, CancellationToken cancellationToken)
     {
         var lines = NursingHisEntry.LinesFor(departmentId, reporting, await AssignmentsAsync(cancellationToken).ConfigureAwait(false));
         if (lines.Count == 0)
@@ -453,10 +521,12 @@ public sealed class NursingReportService(
                 l.Label,
                 NursingHisEntry.Value(entered, departmentId, l.Key),
                 NursingHisEntry.Value(hisValues, departmentId, l.Key)))],
-            CanEdit: CanEdit(departmentId) && IsEditableDate(reportDate),
+            CanEdit: canEdit && IsEditableDate(reportDate),
             HisHasValues: his is not null,
             HisUpdatedAtUtc: his?.UpdatedAtUtc,
-            UpdatedBy: entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId),
+            UpdatedBy: entry is null || !names.TryGetValue(entry.UpdatedByUserId, out var enteredBy)
+                ? null
+                : NursingDelegationText.Person(enteredBy, await DelegatorAsync(entry.DelegationId, cancellationToken).ConfigureAwait(false)),
             UpdatedAtUtc: entry?.UpdatedAtUtc);
     }
 

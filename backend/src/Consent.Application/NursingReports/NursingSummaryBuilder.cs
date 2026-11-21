@@ -50,7 +50,9 @@ public static class NursingSummaryBuilder
         IReadOnlyDictionary<Guid, string> userNames,
         NursingStatisticsValues statistics,
         NursingStatisticsInfoDto statisticsInfo,
-        IReadOnlyDictionary<string, Guid>? hospitalEnteredBy = null)
+        IReadOnlyDictionary<string, Guid>? hospitalEnteredBy = null,
+        IReadOnlyDictionary<Guid, string>? delegators = null,
+        IReadOnlyList<NursingSummaryDelegationDto>? delegations = null)
     {
         ArgumentNullException.ThrowIfNull(departments);
         ArgumentNullException.ThrowIfNull(reports);
@@ -72,8 +74,11 @@ public static class NursingSummaryBuilder
         var rank = shown.Select((d, index) => (d.Id, index)).ToDictionary(p => p.Id, p => p.index);
         var byId = departments.ToDictionary(d => d.Id);
         string Code(Guid departmentId) => byId.TryGetValue(departmentId, out var d) ? d.Code : string.Empty;
+        // Báo cáo gửi theo ủy quyền (quyết định 48): ghi kèm người ủy quyền.
+        string? Delegator(NursingDailyReport report) =>
+            report.SubmittedDelegationId is { } id && delegators is not null ? delegators.GetValueOrDefault(id) : null;
         string Reporter(NursingDailyReport report) =>
-            Person(report.SubmittedByUserId is { } id ? userNames.GetValueOrDefault(id) : null, Code(report.DepartmentId));
+            Person(report.SubmittedByUserId is { } id ? userNames.GetValueOrDefault(id) : null, Code(report.DepartmentId), Delegator(report));
 
         var rows = new List<NursingSummaryRowDto>(shown.Count);
         foreach (var department in shown)
@@ -91,7 +96,9 @@ public static class NursingSummaryBuilder
                 department.IsReporting,
                 report?.Id,
                 report is null ? NursingReportState.New : report.IsSubmitted ? NursingReportState.Submitted : NursingReportState.Draft,
-                report?.SubmittedByUserId is { } submittedBy && report.IsSubmitted ? userNames.GetValueOrDefault(submittedBy) : null,
+                report?.SubmittedByUserId is { } submittedBy && report.IsSubmitted && userNames.GetValueOrDefault(submittedBy) is { } name
+                    ? NursingDelegationText.Person(name, Delegator(report))
+                    : null,
                 report is { IsSubmitted: true } ? report.SubmittedAtUtc : null,
                 cells));
         }
@@ -173,11 +180,13 @@ public static class NursingSummaryBuilder
             statisticsInfo,
             rows.Count(r => r.Status == NursingReportState.Submitted),
             departments.Count(d => d.IsReporting),
-            reporters);
+            reporters,
+            delegations ?? []);
     }
 
-    /// <summary>"Họ tên (mã khoa)"; tài khoản không còn thì ghi "Không rõ".</summary>
-    private static string Person(string? name, string where) => $"{name ?? UnknownPerson} ({where})";
+    /// <summary>"Họ tên (mã khoa)", làm theo ủy quyền thì "Họ tên (mã khoa, được … ủy quyền)"; tài khoản không còn thì ghi "Không rõ".</summary>
+    private static string Person(string? name, string where, string? delegator = null) =>
+        delegator is null ? $"{name ?? UnknownPerson} ({where})" : $"{name ?? UnknownPerson} ({where}, được {delegator} ủy quyền)";
 
     private const string UnknownPerson = "Không rõ";
 
@@ -204,7 +213,10 @@ public static class NursingSummaryBuilder
         foreach (var line in lines.Where(l => statistics.HospitalValue(l.Key) is not null))
         {
             people.Add(hospitalEnteredBy is not null && hospitalEnteredBy.TryGetValue(line.Key, out var departmentId)
-                ? Person(info.Entries.FirstOrDefault(e => e.DepartmentId == departmentId)?.EnteredBy, code(departmentId))
+                ? Person(
+                    info.Entries.FirstOrDefault(e => e.DepartmentId == departmentId)?.EnteredBy,
+                    code(departmentId),
+                    info.Entries.FirstOrDefault(e => e.DepartmentId == departmentId)?.EnteredByDelegator)
                 : Person(info.UpdatedBy, info.Source == NursingStatisticsSource.Manual ? NursingReportForm.SummaryUnit : "lấy từ HIS"));
         }
 

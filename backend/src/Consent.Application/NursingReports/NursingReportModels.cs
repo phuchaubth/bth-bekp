@@ -12,7 +12,9 @@ public enum NursingReportState
 /// Báo cáo điều dưỡng của một khoa trong một ngày. <paramref name="CarriedOverKeys"/>: các dòng điền sẵn theo báo cáo đã gửi
 /// gần nhất (chỉ khi báo cáo còn là <see cref="NursingReportState.New"/>). <paramref name="IsReportingDepartment"/>: khoa có
 /// trong danh sách khoa báo cáo do Phòng Điều dưỡng cài (chưa có thì chưa lập được). <paramref name="HisEntry"/>: số liệu HIS
-/// khoa nhập khi HIS lỗi (quyết định 35); <c>null</c> khi khoa không có dòng nào phải nhập.
+/// khoa nhập khi HIS lỗi (quyết định 35); <c>null</c> khi khoa không có dòng nào phải nhập. <paramref name="SubmittedBy"/>: người
+/// gửi, gửi theo ủy quyền thì ghi kèm người ủy quyền (quyết định 48). <paramref name="ReportVisible"/> <c>false</c>: người xem
+/// chỉ được ủy quyền nhập số liệu HIS của khoa, không xem báo cáo (các ô báo cáo để trống).
 /// </summary>
 public sealed record NursingReportDto(
     Guid? Id,
@@ -34,7 +36,8 @@ public sealed record NursingReportDto(
     string? ReopenReason,
     IReadOnlyList<string> CarriedOverKeys,
     bool IsReportingDepartment,
-    NursingHisEntryDto? HisEntry);
+    NursingHisEntryDto? HisEntry,
+    bool ReportVisible = true);
 
 /// <summary>
 /// Một dòng số liệu HIS khoa nhập. <paramref name="Value"/>: số khoa đã nhập. <paramref name="HisValue"/>: số lấy từ HIS của
@@ -121,13 +124,31 @@ public sealed record NursingStatisticsInfoDto(
     IReadOnlyList<NursingHisEntryStatusDto> Entries,
     bool UsesDepartmentEntries);
 
-/// <summary>Một khoa phải nhập số liệu HIS khi HIS lỗi: các dòng (mã chỉ số) của khoa, đã nhập lúc nào, bởi ai.</summary>
+/// <summary>
+/// Một khoa phải nhập số liệu HIS khi HIS lỗi: các dòng (mã chỉ số) của khoa, đã nhập lúc nào, bởi ai.
+/// <paramref name="EnteredByDelegator"/>: người ủy quyền khi người nhập làm theo ủy quyền (quyết định 48).
+/// </summary>
 public sealed record NursingHisEntryStatusDto(
     Guid DepartmentId,
     string DepartmentName,
     IReadOnlyList<string> Keys,
     DateTimeOffset? EnteredAtUtc,
-    string? EnteredBy);
+    string? EnteredBy,
+    string? EnteredByDelegator = null);
+
+/// <summary>
+/// Một ủy quyền báo cáo điều dưỡng có hiệu lực trong ngày của bảng tổng hợp (quyết định 48): khoa (tên viết tắt), người được ủy
+/// quyền, người ủy quyền, thời gian, nội dung (<c>report</c>, <c>hisEntry</c>).
+/// </summary>
+public sealed record NursingSummaryDelegationDto(
+    Guid DepartmentId,
+    string DepartmentCode,
+    string DepartmentName,
+    string DelegateName,
+    string DelegatorName,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    IReadOnlyList<string> Contents);
 
 /// <summary>Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" của một ngày (mục A–F như bản giấy).</summary>
 public sealed record NursingSummaryDto(
@@ -143,7 +164,8 @@ public sealed record NursingSummaryDto(
     NursingStatisticsInfoDto Statistics,
     int SubmittedCount,
     int ReportingCount,
-    NursingSummaryReportersDto Reporters);
+    NursingSummaryReportersDto Reporters,
+    IReadOnlyList<NursingSummaryDelegationDto>? Delegations = null);
 
 /// <summary>
 /// Một khoa trên màn hình cài khoa báo cáo: có phải báo cáo không, số giường thực kê, các chỉ số toàn viện khoa nhập tay khi

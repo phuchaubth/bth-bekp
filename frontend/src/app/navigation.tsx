@@ -10,7 +10,7 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
-import { Permissions } from '../auth/permissions'
+import { Permissions, hasAnyPermission } from '../auth/permissions'
 
 export interface NavItem {
   path: string
@@ -20,8 +20,8 @@ export interface NavItem {
   icon?: ReactNode
   /** Sprint dự kiến hoàn thành chức năng (hiển thị trên trang đang phát triển). */
   sprint?: number
-  /** Quyền cần có để thấy mục menu và mở trang. */
-  permission?: string
+  /** Quyền cần có để thấy mục menu và mở trang; danh sách là cần một trong các quyền. */
+  permission?: string | readonly string[]
   children?: NavItem[]
 }
 
@@ -45,6 +45,12 @@ export const navItems: NavItem[] = [
       { path: '/dieu-duong/tong-hop', label: 'Tổng hợp hằng ngày', permission: Permissions.NursingReportsRead },
       // Quyết định 47: số liệu nhiều ngày dạng biểu đồ cho Phòng Điều dưỡng.
       { path: '/dieu-duong/dashboard', label: 'Dashboard', permission: Permissions.NursingReportsRead },
+      // Quyết định 48: người lập báo cáo ủy quyền khi vắng; Phòng Điều dưỡng xem mọi ủy quyền.
+      {
+        path: '/dieu-duong/uy-quyen',
+        label: 'Ủy quyền báo cáo',
+        permission: [Permissions.NursingReportsSubmit, Permissions.NursingReportsRead],
+      },
     ],
   },
   {
@@ -63,7 +69,7 @@ export const navItems: NavItem[] = [
 /** Lọc menu theo quyền; bỏ nhóm không còn mục con nào. */
 export function filterNavItems(items: NavItem[], hasPermission: (permission: string) => boolean): NavItem[] {
   return items.flatMap((item) => {
-    if (item.permission && !hasPermission(item.permission)) {
+    if (item.permission && !hasAnyPermission(item.permission, hasPermission)) {
       return []
     }
     if (!item.children) {

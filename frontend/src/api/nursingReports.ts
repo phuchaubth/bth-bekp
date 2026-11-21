@@ -74,6 +74,10 @@ export interface NursingReport {
   isReportingDepartment: boolean
   /** Số liệu HIS khoa nhập khi HIS lỗi (quyết định 35); null khi khoa không có dòng nào phải nhập. */
   hisEntry: NursingHisEntry | null
+  /**
+   * `false`: người xem chỉ được ủy quyền nhập số liệu HIS của khoa (quyết định 48), không xem báo cáo (các ô báo cáo để trống).
+   */
+  reportVisible: boolean
 }
 
 /** Một dòng số liệu HIS khoa nhập. `hisValue`: số lấy từ HIS của ngày (nếu có, bảng tổng hợp dùng số này). */
@@ -183,6 +187,8 @@ export interface NursingHisEntryStatus {
   keys: string[]
   enteredAtUtc: string | null
   enteredBy: string | null
+  /** Người ủy quyền khi người nhập làm theo ủy quyền (quyết định 48). */
+  enteredByDelegator?: string | null
 }
 
 /** Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (mục A–F). */
@@ -200,6 +206,70 @@ export interface NursingSummary {
   submittedCount: number
   reportingCount: number
   reporters: NursingSummaryReporters
+  /** Ủy quyền báo cáo có hiệu lực trong ngày (quyết định 48). */
+  delegations?: NursingSummaryDelegation[] | null
+}
+
+/** Nội dung ủy quyền: báo cáo của khoa, số liệu HIS khi HIS lỗi. */
+export type NursingDelegationContent = 'report' | 'hisEntry'
+
+export const DELEGATION_CONTENT_LABELS: Record<NursingDelegationContent, string> = {
+  report: 'Báo cáo của khoa',
+  hisEntry: 'Số liệu HIS khi HIS lỗi',
+}
+
+/** Một ủy quyền có hiệu lực trong ngày của bảng tổng hợp. */
+export interface NursingSummaryDelegation {
+  departmentId: string
+  departmentCode: string
+  departmentName: string
+  delegateName: string
+  delegatorName: string
+  startDate: string
+  endDate: string
+  contents: NursingDelegationContent[]
+}
+
+export type NursingDelegationStatus = 'Upcoming' | 'Active' | 'Expired' | 'Revoked'
+
+/** Ủy quyền báo cáo điều dưỡng khi người báo cáo vắng (quyết định 48). */
+export interface NursingDelegation {
+  id: string
+  departmentId: string
+  /** Tên viết tắt của khoa (như bảng tổng hợp). */
+  departmentCode: string
+  departmentName: string
+  delegatorUserId: string
+  delegatorName: string
+  delegateUserId: string
+  delegateName: string
+  startDate: string
+  endDate: string
+  contents: NursingDelegationContent[]
+  reason: string | null
+  status: NursingDelegationStatus
+  createdAtUtc: string
+  revokedBy: string | null
+  revokedAtUtc: string | null
+  canRevoke: boolean
+}
+
+export interface CreateNursingDelegationInput {
+  departmentId?: string
+  delegateUserId: string
+  startDate: string
+  endDate: string
+  report: boolean
+  hisEntry: boolean
+  reason: string | null
+}
+
+/** Người có thể được ủy quyền: tài khoản đang dùng, thuộc một khoa, có quyền lập báo cáo điều dưỡng. */
+export interface NursingDelegateCandidate {
+  userId: string
+  fullName: string
+  title: string | null
+  departmentName: string
 }
 
 export interface NursingReportDepartment {
@@ -299,6 +369,13 @@ export const nursingReportsApi = {
   summary: (date: string, signal?: AbortSignal) => apiRequest<NursingSummary>(`${base}/summary?date=${date}`, { signal }),
   summaryPdf: (date: string) => apiBlob(`${base}/summary/pdf?date=${date}`),
   summaryWorkbook: (date: string) => apiBlob(`${base}/summary/xlsx?date=${date}`),
+  /** Ủy quyền của tôi (đã tạo hoặc được giao); `all` (Phòng Điều dưỡng) là mọi ủy quyền (quyết định 48). */
+  delegations: (all: boolean, signal?: AbortSignal) =>
+    apiRequest<NursingDelegation[]>(`${base}/delegations${all ? '?all=true' : ''}`, { signal }),
+  delegationCandidates: (signal?: AbortSignal) => apiRequest<NursingDelegateCandidate[]>(`${base}/delegations/candidates`, { signal }),
+  createDelegation: (input: CreateNursingDelegationInput) =>
+    apiRequest<NursingDelegation>(`${base}/delegations`, { method: 'POST', body: input }),
+  revokeDelegation: (id: string) => apiRequest<NursingDelegation>(`${base}/delegations/${id}/revoke`, { method: 'POST' }),
   /** Dashboard `days` ngày (1–92) đến hết ngày `to` (quyết định 47). */
   dashboard: (to: string, days: number, signal?: AbortSignal) =>
     apiRequest<NursingDashboard>(`${base}/dashboard?to=${to}&days=${days}`, { signal }),
@@ -324,6 +401,8 @@ export const nursingKeys = {
   summary: (date: string) => ['nursing-reports', 'summary', date] as const,
   departments: ['nursing-reports', 'departments'] as const,
   dashboard: (to: string, days: number) => ['nursing-reports', 'dashboard', to, days] as const,
+  delegations: (all: boolean) => ['nursing-reports', 'delegations', all ? 'all' : 'mine'] as const,
+  delegationCandidates: ['nursing-reports', 'delegation-candidates'] as const,
 }
 
 export function useNursingReportForm() {
@@ -355,6 +434,22 @@ export function useNursingDashboard(to: string, days: number) {
     queryKey: nursingKeys.dashboard(to, days),
     queryFn: ({ signal }) => nursingReportsApi.dashboard(to, days, signal),
     placeholderData: keepPreviousData,
+  })
+}
+
+export function useNursingDelegations(all: boolean, enabled = true) {
+  return useQuery({
+    queryKey: nursingKeys.delegations(all),
+    queryFn: ({ signal }) => nursingReportsApi.delegations(all, signal),
+    enabled,
+  })
+}
+
+export function useNursingDelegationCandidates(enabled: boolean) {
+  return useQuery({
+    queryKey: nursingKeys.delegationCandidates,
+    queryFn: ({ signal }) => nursingReportsApi.delegationCandidates(signal),
+    enabled,
   })
 }
 

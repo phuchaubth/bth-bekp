@@ -372,6 +372,8 @@ Từ quyết định 46, mục VI của báo cáo khoa có thêm **Số NB ngày
 
 Từ quyết định 47, Phòng Điều dưỡng có thêm trang **Dashboard** (menu **Điều dưỡng**): xem số liệu 7, 30 hoặc 90 ngày từ báo cáo các khoa đã gửi. Trang chỉ đọc, dùng quyền `nursingreports.read` có sẵn của vai trò Phòng Điều dưỡng. Không có migration, không cần cấu hình thêm.
 
+Từ quyết định 48, người lập báo cáo của khoa **ủy quyền** cho người khác làm báo cáo của khoa và/hoặc nhập số liệu HIS khi vắng (menu **Điều dưỡng → Ủy quyền báo cáo**). Bản này kèm migration `AddNursingReportDelegations` (bảng mới `NursingReportDelegations`; thêm cột `SubmittedDelegationId` vào bảng `NursingDailyReports`, cột `DelegationId` vào bảng `NursingDepartmentStatistics`; chỉ thêm, không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Không thêm quyền mới: người được ủy quyền phải có vai trò được quyền `nursingreports.submit` (vai trò **Điều dưỡng** có sẵn) và thuộc một khoa. Phòng Điều dưỡng xem mọi ủy quyền bằng quyền `nursingreports.read` có sẵn; hủy ủy quyền của người khác cần `nursingreports.manage`.
+
 1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, trả lại báo cáo cho khoa sửa (nút **Trả lại khoa**), cài khoa báo cáo, số giường, khoa nhập số liệu HIS và bấm lấy số liệu HIS. Phòng Điều dưỡng không nhập số liệu thay khoa. Ban giám đốc chỉ cần xem: tạo vai trò riêng (ví dụ *Ban giám đốc*) ở *Quản trị → Vai trò và quyền → Thêm vai trò*, chỉ đánh dấu quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp* (và các quyền xem khác nếu cần), rồi gán cho tài khoản ban giám đốc (quyết định 40).
 2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa chính của người dùng; điều dưỡng làm ở nhiều khoa thì thêm các khoa đó ở ô *Khoa/phòng khác* và chọn khoa ở đầu trang báo cáo, mục 5.8). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
 3. **Khoa báo cáo và số giường:** Phòng Điều dưỡng vào *Báo cáo điều dưỡng → Tổng hợp hằng ngày*, bấm **Khoa báo cáo và số giường**, chọn các khoa phải gửi báo cáo và nhập số giường thực kê (không tính băng ca). Khoa chưa được chọn thì chưa lập được báo cáo.
@@ -477,6 +479,8 @@ Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 
 
    HIS lỗi, API chưa có câu truy vấn hoặc HIS trả về rỗng thì danh mục giữ nguyên. Mỗi thay đổi ghi nhật ký hệ thống. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm lại nút này.
 5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.
+
+
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

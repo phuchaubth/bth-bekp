@@ -32,3 +32,8 @@ export type Permission = (typeof Permissions)[keyof typeof Permissions]
 
 /** Mã vai trò Kiosk: tài khoản máy kiosk chỉ dùng màn hình kiosk. */
 export const KIOSK_ROLE_CODE = 'KIOSK'
+
+/** Có quyền, hoặc có một trong các quyền khi truyền danh sách (mục menu mở cho nhiều nhóm người dùng). */
+export function hasAnyPermission(permission: string | readonly string[], hasPermission: (permission: string) => boolean): boolean {
+  return typeof permission === 'string' ? hasPermission(permission) : permission.some((p) => hasPermission(p))
+}

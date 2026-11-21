@@ -43,6 +43,7 @@ import {
   useNursingSummary,
   type NursingHisEntryStatus,
   type NursingSummary,
+  type NursingSummaryDelegation,
   type NursingSummaryLine,
   type NursingSummaryRow,
 } from '../../api/nursingReports'
@@ -52,7 +53,7 @@ import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
-import { saveBlob, statusTag, type NursingReportFormValues } from './nursingReportUtils'
+import { delegationContents, delegationPeriod, saveBlob, statusTag, type NursingReportFormValues } from './nursingReportUtils'
 
 const DATE = 'YYYY-MM-DD'
 
@@ -145,6 +146,9 @@ export function NursingSummaryPage() {
               )}
             </Flex>
           </Card>
+          {summary.data.delegations && summary.data.delegations.length > 0 && (
+            <DelegationsAlert delegations={summary.data.delegations} />
+          )}
           <SummaryView summary={summary.data} onOpen={setSelected} />
         </>
       )}
@@ -191,7 +195,7 @@ function HisEntryStatusLine({ summary }: { summary: NursingSummary }) {
   const waiting = info.entries.filter((e) => e.keys.includes(WAITING_ADMISSION))
   const missingWaiting = waiting.filter((e) => !e.enteredAtUtc)
   const status = (e: NursingHisEntryStatus) =>
-    e.enteredAtUtc ? `đã nhập lúc ${formatDateTime(e.enteredAtUtc)}${e.enteredBy ? ` (${e.enteredBy})` : ''}` : 'chưa nhập'
+    e.enteredAtUtc ? `đã nhập lúc ${formatDateTime(e.enteredAtUtc)}${e.enteredBy ? ` (${enteredBy(e)})` : ''}` : 'chưa nhập'
   return (
     <Typography.Text type="secondary">
       Khoa nhập tay khi HIS lỗi:{' '}
@@ -203,6 +207,36 @@ function HisEntryStatusLine({ summary }: { summary: NursingSummary }) {
       NB PK chờ nhập viện: {waiting.length - missingWaiting.length}/{waiting.length} khoa đã nhập
       {missingWaiting.length > 0 ? ` (chưa nhập: ${missingWaiting.map((e) => e.departmentName).join(', ')})` : ''}.
     </Typography.Text>
+  )
+}
+
+/** Người nhập số liệu HIS của khoa, kèm người ủy quyền khi nhập theo ủy quyền (quyết định 48). */
+const enteredBy = (e: NursingHisEntryStatus) =>
+  e.enteredByDelegator ? `${e.enteredBy}, được ${e.enteredByDelegator} ủy quyền` : e.enteredBy
+
+/**
+ * Ủy quyền báo cáo có hiệu lực trong ngày tổng hợp (quyết định 48): Phòng Điều dưỡng biết khoa nào do người được ủy quyền
+ * làm. Báo cáo gửi theo ủy quyền ghi "được … ủy quyền" ở cột Người báo cáo (cả PDF và Excel).
+ */
+function DelegationsAlert({ delegations }: { delegations: NursingSummaryDelegation[] }) {
+  return (
+    <Alert
+      type="info"
+      showIcon
+      style={{ marginBottom: 16 }}
+      title={`Ủy quyền báo cáo trong ngày (${delegations.length})`}
+      description={
+        <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+          {delegations.map((d, index) => (
+            // Ủy quyền trong bảng tổng hợp không kèm mã: khóa ghép từ các trường, thêm vị trí cho chắc chắn không trùng.
+            <li key={`${d.departmentId}-${d.delegateName}-${d.startDate}-${index}`}>
+              <b>{d.departmentCode}</b>: {d.delegateName} được {d.delegatorName} ủy quyền, {delegationPeriod(d)} (
+              {delegationContents(d.contents)})
+            </li>
+          ))}
+        </ul>
+      }
+    />
   )
 }
 

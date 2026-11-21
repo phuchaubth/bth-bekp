@@ -41,6 +41,18 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
     public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
         db.Users.CountAsync(u => u.Roles.Any(r => r.RoleId == roleId), cancellationToken);
 
+    public async Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+        return roleIds.Count == 0
+            ? []
+            : await db.Users.Include(u => u.Roles).Include(u => u.AdditionalDepartments)
+                .AsSingleQuery()
+                .Where(u => u.IsActive && u.Roles.Any(r => roleIds.Contains(r.RoleId)))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+    }
+
     public async Task<PagedResult<UserListItemDto>> SearchAsync(
         UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
