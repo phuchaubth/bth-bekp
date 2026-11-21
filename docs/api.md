@@ -628,3 +628,4 @@ Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ I
 | GET | `/health` | Không cần đăng nhập | Tiến trình còn chạy |
 | GET | `/health/ready` | Không cần đăng nhập | Kết nối được SQL Server (`503` nếu không) |
 | GET | `/openapi/v1.json` | Không cần đăng nhập | Chỉ có ở môi trường Development |
+| GET | `/api/v1/environment` | Không cần đăng nhập | Nhãn môi trường (quyết định 50): `{ label }`, lấy từ cấu hình `App:EnvironmentLabel` (bỏ ký tự điều khiển, khoảng trắng hai đầu, tối đa 30 ký tự). Môi trường kiểm thử (UAT) đặt `"UAT"` để giao diện hiện dải báo trên mọi trang; môi trường chạy thật không đặt nên `label: null` |

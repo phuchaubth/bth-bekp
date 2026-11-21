@@ -481,6 +481,94 @@ Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 
 5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.
 
 
+### 5.10. Môi trường UAT (kiểm thử) và Production (chạy thật) (quyết định 50)
+
+Bệnh viện chạy **hai môi trường tách biệt** trên cùng máy chủ IIS (hoặc hai máy): **UAT** để kiểm thử bản mới, **Prod** để chạy thật. Mỗi bản mới đi theo một đường: **cài lên UAT → phân công kiểm thử (mục 10 hướng dẫn sử dụng, quyết định 49) → đạt thì cài đúng gói đó (cùng mã SHA256) lên Prod**. Không build lại gói cho Prod: gói đã kiểm thử trên UAT chính là gói chạy thật.
+
+| | UAT (kiểm thử) | Prod (chạy thật) |
+|---|---|---|
+| Địa chỉ | `https://phieudongthuan-uat.bth.org.vn` (tên ví dụ; bản ghi DNS nội bộ và **chứng chỉ riêng**) | `https://phieudongthuan.bth.org.vn` |
+| Thư mục | `C:\Apps\UAT\ConsentApi`, `C:\Apps\UAT\ConsentWeb` | `C:\Apps\ConsentApi`, `C:\Apps\ConsentWeb` |
+| Application Pool, site | `ConsentApi-UAT` (http `127.0.0.1:5090`), `ConsentWeb-UAT` (https 443, tên miền UAT) | `ConsentApi` (http `127.0.0.1:5080`), `ConsentWeb` |
+| CSDL, tài khoản SQL | `ConsentManagement_UAT`; `consent_app_uat`, `consent_migrator_uat` ([`05-uat-create-login.sql`](../deploy/sql/05-uat-create-login.sql)) | `ConsentManagement`; `consent_app`, `consent_migrator` |
+| `ASPNETCORE_ENVIRONMENT` | `Staging` (chạy như Production, nhưng cho dữ liệu giả lập) | `Production` |
+| `App__EnvironmentLabel` | `UAT`: mọi trang (kể cả đăng nhập, kiosk, màn hình ký) có **dải vàng "UAT: môi trường kiểm thử"**, tab trình duyệt ghi `[UAT]` | **Không đặt** |
+| Khóa `Jwt__SigningKey`, `DataProtection__*` | **Tạo mới, khác Prod** | Khóa đang dùng |
+| `Storage__DocumentsPath` | `D:\ConsentDocuments-UAT` | `D:\ConsentDocuments` |
+| Dữ liệu | **Chỉ dữ liệu giả lập** (`Seed__DemoData=true` tạo khoa, tài khoản demo); tài khoản riêng cho người kiểm thử | Dữ liệu thật |
+| HIS | `His__Provider=None` (hoặc `Fake`: HIS giả lập sinh dữ liệu không có thật, chỉ chạy được ở UAT); không nối API thông tin người bệnh với CSDL HIS thật, trừ khi HIS có CSDL thử nghiệm | Theo mục 5.5 |
+
+> **Không chép CSDL, thư mục PDF hay khóa của Prod sang UAT.** UAT có thể bị nhiều người thử, phiếu lập trên UAT không có giá trị. Muốn thử với dữ liệu giống thật thì nhập dữ liệu giả lập.
+
+**Tạo môi trường UAT (làm một lần)**
+
+1. **DNS và chứng chỉ:** trỏ `phieudongthuan-uat.bth.org.vn` về IP máy chủ, cấp chứng chỉ cho tên này như mục 2a. Dùng **tên miền riêng**, không dùng cổng khác trên tên miền chạy thật: trình duyệt dùng chung cookie đăng nhập giữa các cổng của cùng tên miền.
+2. **CSDL:** đổi hai mật khẩu mẫu trong `sql\05-uat-create-login.sql` (khác mật khẩu Prod) rồi chạy bằng tài khoản quản trị SQL Server.
+3. **Thư mục PDF:** tạo `D:\ConsentDocuments-UAT`.
+4. **Site API UAT:** làm như mục 5.2 với tên `ConsentApi-UAT`, thư mục `C:\Apps\UAT\ConsentApi` (tạo thư mục trống), binding **http `127.0.0.1` cổng 5090**. Biến môi trường của Application Pool `ConsentApi-UAT` (lệnh PowerShell ở mục 5.2 bước 3, đổi `$pool` và các giá trị):
+
+   ```powershell
+   $pool = 'ConsentApi-UAT'
+   $vars = @{
+     'ASPNETCORE_ENVIRONMENT'            = 'Staging'
+     'App__EnvironmentLabel'             = 'UAT'
+     'ConnectionStrings__Default'        = 'Server=tcp:SQL01,1433;Database=ConsentManagement_UAT;User Id=consent_app_uat;Password=…;Encrypt=True;TrustServerCertificate=True'
+     'Jwt__SigningKey'                   = '…'   # tạo mới (mục 3), khác Prod
+     'DataProtection__FieldEncryptionKey'= '…'   # tạo mới, khác Prod
+     'DataProtection__BlindIndexKey'     = '…'   # tạo mới, khác Prod và khác khóa trên
+     'Storage__DocumentsPath'            = 'D:\ConsentDocuments-UAT'
+     'AllowedHosts'                      = 'phieudongthuan-uat.bth.org.vn;localhost;127.0.0.1'
+     'ReverseProxy__TrustAllProxies'     = 'true'
+     'Seed__Enabled'                     = 'true'
+     'Seed__AdminPassword'               = '…'   # xóa sau khi đăng nhập lần đầu
+     'Seed__DemoData'                    = 'true'
+     'Seed__DemoPassword'                = '…'   # mật khẩu chung của các tài khoản demo trên UAT
+   }
+   ```
+
+   Cấp quyền *Modify* cho `IIS AppPool\ConsentApi-UAT` trên `D:\ConsentDocuments-UAT`.
+5. **Site Web UAT:** làm như mục 5.3 với tên `ConsentWeb-UAT`, thư mục `C:\Apps\UAT\ConsentWeb` (tạo thư mục trống), binding https 443, hostname `phieudongthuan-uat.bth.org.vn`, bật *Require Server Name Indication*, chọn chứng chỉ UAT. Phần cấu hình ARR ở mục 5.3 bước 1 làm một lần cho cả máy chủ, không làm lại.
+6. **Cài gói đầu tiên** bằng script ở mục dưới (`-MoiTruong UAT`). Lần đầu, script chép `web.config` mẫu vào hai thư mục và tự đổi địa chỉ chuyển tiếp `/api` của giao diện sang cổng 5090.
+7. Mở `https://phieudongthuan-uat.bth.org.vn`: phải thấy dải vàng **UAT**. Đăng nhập `admin`, đổi mật khẩu, xóa biến `Seed__AdminPassword`, tạo tài khoản cho từng người kiểm thử (*Quản trị → Người dùng*), giao vai trò như thật để thử đúng quyền.
+
+**Đưa bản mới lên: UAT trước, Prod sau**
+
+Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có trong gói (cùng thư mục với `efbundle.exe`). Mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS:
+
+1. **Lấy gói và mã SHA256** như mục 5.1: tải file `goi-trien-khai-iis-<mã commit>.zip` vào `C:\Setup`, chép mã ở dòng *SHA256 digest of uploaded artifact zip is …* trong log bước *upload-artifact* của GitHub Actions. **So mã trước khi giải nén** (script nằm trong gói, nên phải chắc gói đúng rồi mới chạy), rồi giải nén để lấy script:
+
+   ```powershell
+   (Get-FileHash C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Algorithm SHA256).Hash   # phải trùng mã trên GitHub Actions
+   Expand-Archive C:\Setup\goi-trien-khai-iis-<mã commit>.zip C:\Setup\tam-<mã commit>
+   cd C:\Setup\tam-<mã commit>
+   ```
+
+2. **Cài lên UAT:**
+
+   ```powershell
+   .\cap-nhat-moi-truong.ps1 -MoiTruong UAT -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
+   ```
+
+   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool; chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`); khởi động lại; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`.
+3. **Kiểm thử trên UAT:** người quản lý kiểm thử phân công từng tính năng mới cho từng người, có thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo.
+4. **Xem kết quả:** khi mọi phân công đã có báo cáo và đạt (hoặc lỗi còn lại được chấp nhận, ghi hướng xử lý), quyết định đưa lên Prod. Bản không đạt: gửi báo cáo (xuất Excel) cho nhóm phát triển, chờ gói sửa, quay lại bước 1 với gói mới.
+5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy trang bảo trì vài phút) **cùng file gói, cùng mã SHA256**:
+
+   ```powershell
+   .\cap-nhat-moi-truong.ps1 -MoiTruong Prod -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
+   ```
+
+   Script **từ chối** gói chưa cài thành công lên UAT (theo `lich-su-cai-dat.csv`). Chỉ khi sửa lỗi khẩn cấp mà không kịp qua UAT mới thêm `-BoQuaKiemTraUAT`, ghi lý do vào biên bản, rồi cài gói đó lên UAT ngay sau.
+6. **Kiểm tra Prod:** không có dải vàng; đăng nhập, mở một phiếu, một báo cáo. `lich-su-cai-dat.csv` ghi lại mọi lần cài (thời điểm, môi trường, mã SHA256, mã commit, người cài, kết quả) làm biên bản.
+
+Script đọc máy chủ SQL và tên CSDL từ chuỗi kết nối của chính Application Pool API nên không cập nhật nhầm CSDL của môi trường kia. Thư mục, tên Application Pool, cổng của mỗi môi trường khai ở đầu script (bảng `$CauHinh`); bệnh viện đặt khác thì sửa ở đó. Gói có `PatientInfoApi` và máy chủ có thư mục `PatientInfoApi` của môi trường đó thì script cập nhật luôn.
+
+**Khôi phục khi bản mới lỗi**
+
+1. Dừng Application Pool của môi trường đó (`Stop-WebAppPool ConsentApi`, `ConsentWeb`).
+2. Chép lại thư mục ứng dụng từ bản sao lưu script vừa tạo (dòng *Thư mục:* ở bước 4 của script): `robocopy C:\Backup\Consent\Prod\truoc-<mã>-<thời điểm>\ConsentApi C:\Apps\ConsentApi /MIR`, làm tương tự với `ConsentWeb`.
+3. CSDL: phần lớn bản nâng cấp chỉ **thêm** bảng, cột (ghi rõ ở từng quyết định), bản cũ chạy được trên CSDL mới nên **không cần** khôi phục CSDL. Chỉ khi bản mới làm sai dữ liệu mới khôi phục bản sao lưu `<tên CSDL>_truoc-cap-nhat_<thời điểm>.bak` (mục 7, `03-restore.sql`); dữ liệu nhập sau thời điểm đó sẽ mất.
+4. Khởi động lại Application Pool, kiểm tra `/health/ready`, báo nhóm phát triển kèm `lich-su-cai-dat.csv` và log lỗi.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

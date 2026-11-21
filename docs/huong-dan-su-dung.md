@@ -58,6 +58,7 @@ Lưu ý:
 - Nhập sai mật khẩu 5 lần thì tài khoản bị tạm khóa (mặc định 15 phút). Chờ hết thời gian, hoặc nhờ quản trị hệ thống mở khóa.
 - Quên mật khẩu: liên hệ bộ phận CNTT để được đặt lại mật khẩu tạm.
 - Khi phiên đăng nhập hết hạn, phần mềm đưa bạn về trang đăng nhập. Đăng nhập lại, phần mềm mở lại đúng trang bạn đang làm.
+- Đầu trang có **dải vàng "UAT: môi trường kiểm thử"** (tab trình duyệt ghi `[UAT]`): bạn đang ở **môi trường kiểm thử**, dùng để thử bản mới trước khi đưa vào chạy thật (quyết định 50). Phiếu, báo cáo lập ở đây không có giá trị; không dùng cho người bệnh thật. Môi trường chạy thật không có dải này. Tài khoản và mật khẩu trên hai môi trường là riêng.
 
 ### 1.2. Đổi mật khẩu lần đầu
 
