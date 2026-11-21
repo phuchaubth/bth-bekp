@@ -1,3 +1,4 @@
+using Consent.Api.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,6 +12,7 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/environment")]
 [AllowAnonymous]
+[AllowDuringMaintenance]
 [Produces("application/json")]
 public sealed class EnvironmentController(IConfiguration configuration) : ControllerBase
 {

@@ -1,4 +1,5 @@
 import { tokenStore } from '../auth/tokenStore'
+import { MAINTENANCE_ERROR_CODE, maintenanceStore } from './maintenanceStore'
 
 /** Lỗi trả về từ API, đọc từ ProblemDetails (RFC 9457) nếu có. */
 export class ApiError extends Error {
@@ -183,10 +184,28 @@ async function toApiError(response: Response): Promise<ApiError> {
     problem = undefined
   }
 
-  return new ApiError(problem?.title ?? `Máy chủ trả về lỗi (${response.status}).`, response.status, {
+  const error = new ApiError(problem?.title ?? `Máy chủ trả về lỗi (${response.status}).`, response.status, {
     code: problem?.code,
     traceId: problem?.traceId,
     fieldErrors: problem?.errors,
     problem: problem as Record<string, unknown> | undefined,
+  })
+  if (response.status === 503) {
+    reportUnavailable(error)
+  }
+  return error
+}
+
+/**
+ * 503 (quyết định 53): hiện màn hình "Hệ thống đang bảo trì". Có mã `system.maintenance` là quản trị đang bật bảo trì (kèm lý do,
+ * giờ dự kiến xong); không có là IIS trả khi ứng dụng đang dừng (đang cài gói, chạy script).
+ */
+function reportUnavailable(error: ApiError): void {
+  const maintenance = error.code === MAINTENANCE_ERROR_CODE
+  const text = (value: unknown) => (maintenance && typeof value === 'string' && value ? value : null)
+  maintenanceStore.report({
+    kind: maintenance ? 'maintenance' : 'unavailable',
+    reason: text(error.problem?.reason),
+    expectedEndAtUtc: text(error.problem?.expectedEndAtUtc),
   })
 }

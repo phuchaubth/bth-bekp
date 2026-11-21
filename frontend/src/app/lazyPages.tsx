@@ -58,6 +58,9 @@ export const MyTestAssignmentsPage = lazy(() =>
 )
 export const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })))
 export const SettingsPage = lazy(() => import('../features/admin/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+export const MaintenanceSettingsPage = lazy(() =>
+  import('../features/admin/maintenance/MaintenanceSettingsPage').then((m) => ({ default: m.MaintenanceSettingsPage })),
+)
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))
 
 export function Lazy({ children }: { children: ReactNode }) {

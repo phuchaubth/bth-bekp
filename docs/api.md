@@ -31,6 +31,7 @@
 | 422 | Vi phạm quy tắc nghiệp vụ (ví dụ xóa khoa đang có người dùng) |
 | 429 | Gọi quá nhiều lần trong thời gian ngắn (`code: "rate_limited"`, có header `Retry-After`) |
 | 500 | Lỗi hệ thống (không trả chi tiết nội bộ; dùng `traceId` để tra log) |
+| 503 | Hệ thống đang bảo trì (`code: "system.maintenance"`, kèm `reason`, `expectedEndAtUtc`, header `Retry-After`; mục 8a). IIS cũng trả `503` (không có nội dung JSON) khi API đang dừng, ví dụ đang cài gói |
 
 Ví dụ lỗi kiểm tra dữ liệu:
 
@@ -56,6 +57,7 @@ Ví dụ lỗi kiểm tra dữ liệu:
 - Endpoint dùng cookie (`refresh`, `logout`) bắt buộc header `X-Requested-With` (chống CSRF).
 - Đăng nhập sai **5 lần liên tiếp** → tài khoản tạm khóa **15 phút**.
 - Tài khoản mới hoặc vừa được đặt lại mật khẩu (`mustChangePassword: true`) nhận access token **không có quyền nào** cho tới khi đổi mật khẩu.
+- **Đang bảo trì** (quyết định 53, mục 8a): `login` đúng mật khẩu và `refresh` của tài khoản không có quyền `system.maintenance` trả `503 system.maintenance`; `refresh` bị từ chối vì bảo trì **không** thu hồi, không xoay vòng refresh token và không xóa cookie (tắt bảo trì là làm mới phiên được). Sai mật khẩu vẫn trả `401` như thường.
 
 | Phương thức | Đường dẫn | Quyền | Mô tả |
 |---|---|---|---|
@@ -630,12 +632,13 @@ Hành động (`action`) được ghi:
 | Hành động | Nguồn |
 |---|---|
 | `Create`, `Update`, `Delete` | Tự động cho mọi thay đổi trên khoa, người dùng, vai trò, gán vai trò, gán quyền, người bệnh, người đại diện, mẫu phiếu, phiên bản mẫu, phiếu đồng thuận, chữ ký, cấu hình hệ thống. `details` chứa giá trị (tạo/xóa) hoặc `{ "Trường": { "old": …, "new": … } }` (sửa); dữ liệu nhạy cảm (mật khẩu đã băm, số CCCD, số điện thoại, mã BHYT, nội dung phiếu) luôn hiển thị `***` |
-| `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`) |
+| `Auth.LoginSucceeded`, `Auth.LoginFailed`, `Auth.LockedOut` | Đăng nhập (`details.reason`: `unknown_user`, `invalid_password`, `locked_out`, `inactive`, `maintenance` (đúng mật khẩu nhưng đang bảo trì, quyết định 53)) |
 | `Auth.Logout`, `Auth.PasswordChanged`, `Auth.RefreshTokenReuseDetected` | Phiên đăng nhập |
 | `Patients.Viewed`, `Patients.LookedUp` | Xem hồ sơ người bệnh; tra cứu theo CCCD (không ghi số CCCD) |
 | `ConsentForms.Viewed`, `ConsentForms.PdfViewed` | Xem chi tiết phiếu; tải/xem PDF phiếu |
 | `ConsentForms.SigningStarted`, `ConsentForms.PatientSigned`, `ConsentForms.Completed`, `ConsentForms.Revoked` | Mở phiên ký; người bệnh ký (kèm quyết định, người ký; thiết bị lưu ở chữ ký); phía bệnh viện xác nhận (kèm SHA-256 của PDF); thu hồi |
 | `Exports.ConsentForms` | Xuất dữ liệu phiếu (`details`: định dạng, số dòng, cột, kèm nội dung, dữ liệu nhạy cảm, bộ lọc, SHA-256 của file; `entityId` = mã lần xuất) |
+| `Maintenance.Enabled`, `Maintenance.Updated`, `Maintenance.Disabled` | Bật, sửa (lý do, giờ dự kiến xong), tắt chế độ bảo trì (quyết định 53). `details`: `reason`, `expectedEndAtUtc` (bật, sửa); `reason`, `startedAtUtc`, `startedBy` (tắt). Các dòng `SystemSetting` (`Maintenance.*`) cũng được ghi tự động như mọi cấu hình |
 | `Maintenance.TrialDataPurged` | Xóa dữ liệu chạy thử bằng script `xoa-du-lieu-chay-thu.ps1` trên máy chủ (quyết định 52, không có API). `userName` = tài khoản Windows chạy script, `userId` trống; `details`: `keepPatients`, `restartFormNumbers`, `deleted` (số dòng đã xóa từng bảng). Các dòng nhật ký cũ giữ nguyên |
 
 Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ IP, mã truy vết (`correlationId`).
@@ -650,3 +653,28 @@ Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ I
 | GET | `/health/ready` | Không cần đăng nhập | Kết nối được SQL Server (`503` nếu không) |
 | GET | `/openapi/v1.json` | Không cần đăng nhập | Chỉ có ở môi trường Development |
 | GET | `/api/v1/environment` | Không cần đăng nhập | Nhãn môi trường (quyết định 50): `{ label }`, lấy từ cấu hình `App:EnvironmentLabel` (bỏ ký tự điều khiển, khoảng trắng hai đầu, tối đa 30 ký tự). Môi trường kiểm thử (UAT) đặt `"UAT"` để giao diện hiện dải báo trên mọi trang; môi trường chạy thật không đặt nên `label: null` |
+
+## 8a. Chế độ bảo trì (`/api/v1/maintenance`, quyết định 53)
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/api/v1/maintenance` | Không cần đăng nhập, vẫn trả lời khi đang bảo trì | `{ enabled, reason, expectedEndAtUtc }`: giao diện hiện màn hình "Hệ thống đang bảo trì" kèm lý do, giờ dự kiến xong. Không có ai bật, lúc nào bật |
+| GET | `/api/v1/maintenance/settings` | `system.maintenance` | `{ enabled, reason, expectedEndAtUtc, startedAtUtc, startedBy }` (`startedBy`: "Họ tên (tên đăng nhập)" của người bật), đọc thẳng từ CSDL |
+| PUT | `/api/v1/maintenance/settings` | `system.maintenance` | `{ enabled, reason?, expectedEndAtUtc? }`, có hiệu lực ngay. Bật: `reason` bắt buộc (ký tự xuống dòng, khoảng trắng liền nhau gộp thành một khoảng trắng; 1–200 ký tự → lỗi `400 reason`); `expectedEndAtUtc` để trống được, có thì phải sau thời điểm hiện tại và trong vòng 30 ngày (`400 expectedEndAtUtc`), chỉ để hiển thị (hết giờ không tự tắt). Đang bật thì gửi lại để sửa lý do, giờ dự kiến (giữ thời điểm và người bật). `{ "enabled": false }`: tắt (đang tắt thì không làm gì). Trả như `GET settings` |
+
+**Khi đang bảo trì**, mọi yêu cầu của người không có quyền `system.maintenance` (kể cả tài khoản kiosk, token phiên ký trên máy tính bảng, người bệnh ký qua mã QR không đăng nhập) nhận:
+
+```json
+{
+  "title": "Hệ thống đang bảo trì. Vui lòng quay lại sau.",
+  "status": 503,
+  "code": "system.maintenance",
+  "reason": "Nâng cấp phần mềm",
+  "expectedEndAtUtc": "2026-11-21T04:30:00+00:00",
+  "traceId": "…"
+}
+```
+
+kèm header `Retry-After: 30`. Vẫn trả lời như thường: `/health`, `/health/ready` (script cài đặt, công cụ giám sát), `GET /api/v1/environment`, `GET /api/v1/maintenance`, `POST /api/v1/auth/login`, `refresh`, `logout` (đăng nhập, làm mới phiên tự từ chối tài khoản không có quyền, mục 2). Token đăng nhập hết hạn hoặc sai thì vẫn trả `401` (để giao diện làm mới phiên); token còn hạn nhưng không có quyền thì `503`. Quyền `system.maintenance` lấy từ access token: tài khoản còn phải đổi mật khẩu chưa có quyền nào nên không vào được khi đang bảo trì.
+
+Trạng thái lưu ở cấu hình hệ thống (các dòng `SystemSettings` có khóa `Maintenance.Reason`, `Maintenance.ExpectedEndAtUtc`, `Maintenance.StartedAtUtc`, `Maintenance.StartedBy`; có dòng `Maintenance.Reason` là đang bảo trì) và được giữ trong bộ nhớ của API 5 giây: bật/tắt qua API có hiệu lực ngay, sửa thẳng trong CSDL (tắt khẩn cấp bằng SQL, `docs/trien-khai.md` mục 5.12) có hiệu lực sau tối đa 5 giây.

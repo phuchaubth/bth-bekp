@@ -64,6 +64,8 @@ export const baseRoutes = (refresh: object | (() => Response)) => ({
   'GET /api/v1/features': { his: false, smartCa: false, patientSource: false, departmentsFromHis: false },
   // Môi trường chạy thật: không có nhãn môi trường kiểm thử (quyết định 50).
   'GET /api/v1/environment': { label: null },
+  // Không bảo trì (quyết định 53).
+  'GET /api/v1/maintenance': { enabled: false, reason: null, expectedEndAtUtc: null },
 })
 
 export const departments: Department[] = [

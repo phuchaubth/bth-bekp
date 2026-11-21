@@ -7,6 +7,7 @@ import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../a
 import { BRAND } from '../../app/theme'
 import { useAuth } from '../../auth/authContext'
 import { BrandMark } from './BrandMark'
+import { MaintenanceBanner } from './MaintenanceBanner'
 
 const { Header, Content, Footer } = Layout
 
@@ -164,6 +165,8 @@ export function AppLayout() {
           </nav>
         </Drawer>
       )}
+      {/* Quyết định 53: tài khoản có quyền bảo trì vẫn làm việc khi đang bảo trì, thấy dải báo này. */}
+      <MaintenanceBanner />
       <Content style={{ padding: isDesktop ? '28px 24px' : 16 }}>
         <main style={CONTAINER}>
           <Outlet />

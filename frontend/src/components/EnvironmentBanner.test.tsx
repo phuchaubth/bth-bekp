@@ -59,7 +59,9 @@ describe('Dải báo môi trường kiểm thử', () => {
 
     expect(await screen.findByRole('button', { name: 'Đăng nhập' })).toBeInTheDocument()
     expect(screen.getByText(/^UAT: môi trường kiểm thử\./)).toBeInTheDocument()
-    expect(queryClient.getQueryCache().getAll().map((query) => query.queryKey)).toEqual([['environment']])
+    // Chỉ còn dữ liệu không thuộc phiên nào: nhãn môi trường, và trạng thái bảo trì trang đăng nhập vừa hỏi (quyết định 53).
+    const keys = queryClient.getQueryCache().getAll().map((query) => query.queryKey.join('/'))
+    expect(keys.sort()).toEqual(['environment', 'maintenance/status'])
     expect(calls.filter((call) => call.path === '/api/v1/environment')).toHaveLength(1)
   })
 

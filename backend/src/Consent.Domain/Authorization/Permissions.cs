@@ -51,6 +51,12 @@ public static class Permissions
     /// Người được phân công tự xem và báo cáo việc của mình, không cần quyền này.
     /// </summary>
     public const string TestingManage = "testing.manage";
+
+    /// <summary>
+    /// Bật/tắt chế độ bảo trì (quyết định 53) và vẫn đăng nhập, thao tác được khi đang bảo trì để điều chỉnh cấu hình, mẫu phiếu,
+    /// dữ liệu. Người không có quyền này (kể cả kiosk, người bệnh ký qua mã QR) không đăng nhập, không thao tác được khi đang bảo trì.
+    /// </summary>
+    public const string SystemMaintenance = "system.maintenance";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -76,6 +82,7 @@ public static class PermissionCatalog
         new(Permissions.DepartmentsManage, "Quản lý khoa/phòng", SystemGroup),
         new(Permissions.AuditRead, "Xem nhật ký hệ thống", SystemGroup),
         new(Permissions.SettingsManage, "Cấu hình hệ thống", SystemGroup),
+        new(Permissions.SystemMaintenance, "Bảo trì hệ thống: bật/tắt, vào hệ thống khi đang bảo trì", SystemGroup),
         new(Permissions.PatientsRead, "Xem người bệnh", PatientGroup),
         new(Permissions.PatientsManage, "Thêm/sửa người bệnh", PatientGroup),
         new(Permissions.TemplatesRead, "Xem mẫu phiếu", TemplateGroup),

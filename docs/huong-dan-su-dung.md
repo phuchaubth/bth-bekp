@@ -13,7 +13,7 @@
 5. [Quản lý mẫu phiếu](#quan-ly-mau-phieu): phiên bản, định nghĩa (JSON), cấu hình ký, phát hành
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
-8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
+8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu, bảo trì hệ thống
 9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
 10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
 11. [Câu hỏi thường gặp](#hoi-dap)
@@ -1158,6 +1158,37 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 Mỗi nhân viên tự ký chữ ký mẫu của mình ở **Tài khoản của tôi** (mục 1.5). Quản trị không ký thay được. Khi xác nhận phiếu, tài khoản đã có chữ ký mẫu thì ký bằng chữ ký mẫu, không phải vẽ lại. Vẫn chọn **Ký tay lần này** được. Tài khoản chưa có chữ ký mẫu thì vẽ vào khung ký mỗi lần xác nhận. Hãy nhắc nhân viên xác nhận phiếu (tiếp đón, điều dưỡng, bác sĩ) ký chữ ký mẫu trước khi dùng.
 
+<a id="bao-tri"></a>
+
+### 8.7. Bảo trì hệ thống
+
+Dùng khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà không để người khác thao tác cùng lúc. Trong lúc bảo trì, người dùng khác **không đăng nhập, không thao tác được**, kể cả kiosk và người bệnh đang ký qua mã QR. Tài khoản quản trị vẫn làm việc như thường.
+
+**Bật chế độ bảo trì.** Bấm **Quản trị** → **Bảo trì hệ thống**. Nhập **Lý do** (hiện cho người dùng, ví dụ "Nâng cấp phần mềm, cập nhật mẫu phiếu") và **Dự kiến xong lúc** (để trống nếu chưa rõ), bấm **Bật chế độ bảo trì**, đọc thông báo rồi bấm **Bật bảo trì**. Có hiệu lực ngay.
+
+![Trang Bảo trì hệ thống](huong-dan-su-dung/bt-01-trang-bao-tri.png)
+
+*Hình 8.11. Đang bảo trì: ghi lúc bật, người bật; sửa được lý do, giờ dự kiến xong.*
+
+**Người dùng thấy gì.** Mọi máy đang mở phần mềm (máy tính, máy tính bảng, kiosk, điện thoại người bệnh) hiện màn hình **"Hệ thống đang bảo trì"** kèm lý do và giờ dự kiến xong, ngay khi họ thao tác (mở trang, bấm lưu…). Người chưa đăng nhập thấy màn hình này thay cho trang đăng nhập.
+
+- Trang họ đang mở và **dữ liệu đang nhập vẫn giữ** dưới màn hình bảo trì. Màn hình tự kiểm tra lại mỗi 30 giây (hoặc bấm **Kiểm tra lại**). Bảo trì xong, màn hình tự đóng, làm tiếp được, không phải đăng nhập lại. Thao tác bấm lúc đang bảo trì chưa được lưu: bấm lưu lại.
+- Kiosk và điện thoại người bệnh có lời mời chờ hoặc liên hệ nhân viên, không có nút của nhân viên.
+
+![Màn hình Hệ thống đang bảo trì](huong-dan-su-dung/bt-02-man-hinh-bao-tri.png)
+
+*Hình 8.12. Màn hình bảo trì trên máy của một điều dưỡng: trang đang mở (ô tìm người bệnh vừa gõ) vẫn giữ bên dưới.*
+
+**Quản trị trong lúc bảo trì.** Tài khoản có quyền **Bảo trì hệ thống** (vai trò Quản trị hệ thống; thêm cho vai trò khác ở mục 8.3) vẫn đăng nhập, thao tác như thường, và thấy dải vàng **"Đang bật chế độ bảo trì"** ở đầu mọi trang. Máy đang hiện màn hình bảo trì mà quản trị cần đăng nhập: bấm **Đăng nhập bằng tài khoản quản trị** (máy đang giữ phiên của tài khoản khác thì bấm **Đăng xuất** trước). Tài khoản khác đăng nhập ở đây bị báo *Trong lúc bảo trì chỉ tài khoản có quyền bảo trì hệ thống đăng nhập được*.
+
+![Dải báo đang bảo trì cho quản trị](huong-dan-su-dung/bt-03-dai-bao-quan-tri.png)
+
+*Hình 8.13. Quản trị vẫn làm việc khi đang bảo trì, có dải vàng nhắc.*
+
+**Tắt chế độ bảo trì.** Vào lại **Bảo trì hệ thống**, bấm **Tắt chế độ bảo trì**. Mọi người làm việc lại được ngay. Giờ dự kiến xong chỉ để thông báo: **hết giờ hệ thống không tự tắt**. Bảo trì lâu hơn dự kiến thì sửa giờ, bấm **Lưu lý do, giờ dự kiến** để người dùng thấy giờ mới.
+
+Mọi lần bật, sửa, tắt đều ghi **Nhật ký hệ thống**. Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì theo hướng dẫn triển khai (mục 5.12). Khi phòng CNTT cài bản mới hoặc chạy script xóa dữ liệu chạy thử, người dùng cũng thấy màn hình bảo trì vài phút; xong thì trang tự tải lại.
+
 ---
 
 <a id="bao-cao-dieu-duong"></a>
@@ -1501,6 +1532,9 @@ Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục
 
 **Tài khoản báo bị tạm khóa?**
 Do nhập sai mật khẩu 5 lần. Chờ hết thời gian khóa (mặc định 15 phút), hoặc nhờ quản trị **Mở khóa**.
+
+**Màn hình báo "Hệ thống đang bảo trì"?**
+Quản trị đang bảo trì hoặc phòng CNTT đang cài bản mới. Không cần tải lại trang hay đăng nhập lại: chờ đến giờ dự kiến xong, màn hình tự đóng (hoặc tự tải lại trang) khi xong. Dữ liệu đang nhập vẫn giữ trên màn hình. Xem mục 8.7.
 
 **Vì sao tôi không thấy nút "Lấy thông tin"?**
 Nút này chỉ có khi bệnh viện đã kết nối hệ thống thông tin người bệnh. Nếu chưa có, hãy quét CCCD hoặc nhập trực tiếp.

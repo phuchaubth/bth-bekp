@@ -9,9 +9,11 @@
     2. Đếm và in số dòng sẽ xóa, số file PDF (chưa thay đổi gì). Không có gì để xóa thì dừng.
     3. Hỏi xác nhận: gõ đúng XOA <tên CSDL>.
     4. Sao lưu CSDL (COPY_ONLY, vào thư mục sao lưu mặc định của SQL Server).
-    5. Dừng ứng dụng; xóa trong một giao dịch (sql\06-xoa-du-lieu-chay-thu.sql): lỗi ở đâu thì CSDL giữ nguyên.
+    5. Dừng API (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì", quyết định 53); xóa trong một giao
+       dịch (sql\06-xoa-du-lieu-chay-thu.sql): lỗi ở đâu thì CSDL giữ nguyên.
     6. Chuyển file PDF đã ký của các phiếu vừa xóa sang thư mục sao lưu (không xóa hẳn; logo, khung chữ ký giữ nguyên).
-    7. Khởi động lại ứng dụng, kiểm tra /health/ready, ghi kết quả vào thư mục sao lưu (ket-qua.txt).
+    7. Chạy lại API (cả khi lỗi), kiểm tra /health/ready, ghi kết quả vào thư mục sao lưu (ket-qua.txt). Hết lúc API dừng,
+       giao diện tự tải lại.
   XÓA: phiếu đồng thuận (mọi trạng thái) và chữ ký trên phiếu; liên kết ký qua mã QR; hồ sơ người bệnh và người đại diện
   (trừ khi có -GiuNguoiBenh); báo cáo điều dưỡng của khoa; số liệu HIS của báo cáo điều dưỡng.
   GIỮ: người dùng, vai trò, khoa/phòng, mẫu phiếu, cấu hình hệ thống, khoa báo cáo và số giường, ủy quyền báo cáo, phân
@@ -43,14 +45,12 @@ $CauHinh = @{
     Prod = @{
         ThuMuc   = $ThuMucGoc
         PoolApi  = 'ConsentApi'
-        PoolWeb  = 'ConsentWeb'
         SucKhoe  = 'http://127.0.0.1:5080/health/ready'
         Migrator = 'consent_migrator'
     }
     UAT  = @{
         ThuMuc   = (Join-Path $ThuMucGoc 'UAT')
         PoolApi  = 'ConsentApi-UAT'
-        PoolWeb  = 'ConsentWeb-UAT'
         SucKhoe  = 'http://127.0.0.1:5090/health/ready'
         Migrator = 'consent_migrator_uat'
     }
@@ -375,7 +375,7 @@ function Invoke-XoaDuLieu {
 
         Write-Buoc '3. Xác nhận'
         Write-Host 'Dữ liệu trên sẽ bị xóa khỏi phần mềm; chỉ khôi phục được từ bản sao lưu tạo ở bước sau.' -ForegroundColor Yellow
-        Write-Host 'Người dùng sẽ thấy trang bảo trì trong lúc xóa (thường dưới một phút).' -ForegroundColor Yellow
+        Write-Host 'Người dùng sẽ thấy màn hình "Hệ thống đang bảo trì" trong lúc xóa (thường dưới một phút).' -ForegroundColor Yellow
         $xacNhan = "XOA $($ketNoi.Csdl)"
         $traLoi = Read-Host "Gõ $xacNhan để xóa (gõ khác để hủy)"
         if ($traLoi -cne $xacNhan) { throw 'Đã hủy, chưa thay đổi gì.' }
@@ -396,9 +396,9 @@ function Invoke-XoaDuLieu {
         $ketQua = $null
         $chuyen = $null
         try {
-            Write-Buoc '5. Dừng ứng dụng, xóa dữ liệu'
+            # Chỉ dừng API: giao diện vẫn chạy để người dùng thấy màn hình "Hệ thống đang bảo trì" (quyết định 53).
+            Write-Buoc '5. Dừng API (người dùng thấy màn hình bảo trì), xóa dữ liệu'
             $daDung = $true
-            Stop-PoolCho $cfg.PoolWeb
             Stop-PoolCho $cfg.PoolApi
             $ketQua = Invoke-SqlXoa $ketNoiMigrator $lenh $true $GiuNguoiBenh.IsPresent $DanhSoLaiTu1.IsPresent $nguoi
             Write-Host 'Đã xóa trong CSDL (một giao dịch); nhật ký hệ thống ghi thêm dòng "Xóa dữ liệu chạy thử".' -ForegroundColor Green
@@ -434,9 +434,8 @@ function Invoke-XoaDuLieu {
         }
         finally {
             if ($daDung) {
-                Write-Buoc '7. Khởi động lại ứng dụng'
+                Write-Buoc '7. Chạy lại API'
                 Start-PoolNeuCo $cfg.PoolApi
-                Start-PoolNeuCo $cfg.PoolWeb
             }
         }
         Wait-SucKhoe $cfg.SucKhoe

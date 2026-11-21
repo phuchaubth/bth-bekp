@@ -4,6 +4,7 @@ using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
+using Consent.Application.Maintenance;
 using Consent.Application.NursingReports;
 using Consent.Application.Testing;
 using Consent.Application.Patients;
@@ -111,7 +112,25 @@ internal sealed class AppTestContext
         new FakeRequestContext(),
         Microsoft.Extensions.Options.Options.Create(Options),
         new LoginRequestValidator(),
-        new ChangePasswordRequestValidator());
+        new ChangePasswordRequestValidator(),
+        CreateMaintenanceService());
+
+    /// <summary>
+    /// Trạng thái bảo trì dùng chung như singleton của ứng dụng (quyết định 53); mặc định không giữ trong bộ nhớ để test thấy ngay
+    /// thay đổi trong kho.
+    /// </summary>
+    public MaintenanceStateCache MaintenanceCache { get; set; } = new(TimeSpan.Zero);
+
+    public MaintenanceService CreateMaintenanceService() => new(
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        MaintenanceCache,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock,
+        new UpdateMaintenanceRequestValidator(Clock));
 
     public UserAdminService CreateUserAdminService() => new(
         new InMemoryUserRepository(Store),

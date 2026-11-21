@@ -12,8 +12,9 @@
        trường khác (ASPNETCORE_ENVIRONMENT trong web.config được ưu tiên hơn biến của Application Pool).
     4. Hỏi xác nhận (gõ đúng tên môi trường), hỏi mật khẩu tài khoản migrator (không hiện, không ghi ra file).
     5. Sao lưu CSDL (COPY_ONLY, vào thư mục sao lưu mặc định của SQL Server) và các thư mục ứng dụng đang chạy.
-    6. Dừng Application Pool (người dùng thấy trang bảo trì vài phút), cập nhật lược đồ CSDL (efbundle.exe), chép file mới
-       (giữ web.config và thư mục logs), khởi động lại.
+    6. Dừng API (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" vài phút, quyết định 53), cập nhật lược
+       đồ CSDL (efbundle.exe), chép file mới (giữ web.config và thư mục logs; giao diện chỉ dừng vài giây lúc chép file giao
+       diện), chạy lại.
     7. Kiểm tra /health/ready, ghi nhật ký cài đặt (lich-su-cai-dat.csv).
   Không chứa bí mật. Chạy trong Windows PowerShell mở bằng "Run as Administrator" trên máy chủ IIS.
   Hướng dẫn đầy đủ: docs/trien-khai.md, mục 5.10.
@@ -376,15 +377,15 @@ function Invoke-CapNhat {
         if ($coHis) { Copy-ThuMuc $thuMucHis (Join-Path $saoLuu 'PatientInfoApi') }
         Write-Host "Thư mục: $saoLuu"
 
-        Write-Buoc "5. Dừng ứng dụng, cập nhật lược đồ CSDL"
-        Stop-PoolCho $cfg.PoolWeb
+        # Giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" thay vì trang lỗi của IIS (quyết định 53).
+        Write-Buoc "5. Dừng API (người dùng thấy màn hình bảo trì), cập nhật lược đồ CSDL"
         Stop-PoolCho $cfg.PoolApi
         if ($coHis) { Stop-PoolCho $cfg.PoolHis }
         # efbundle đọc chuỗi kết nối từ biến môi trường của tiến trình này (không đưa mật khẩu lên dòng lệnh).
         $env:ConnectionStrings__Default = $ketNoiMigrator
         try {
             & (Join-Path $giaiNen 'efbundle.exe')
-            if ($LASTEXITCODE -ne 0) { throw "efbundle.exe lỗi (mã $LASTEXITCODE). Ứng dụng đang dừng; xem mục khôi phục ở docs/trien-khai.md, mục 5.10." }
+            if ($LASTEXITCODE -ne 0) { throw "efbundle.exe lỗi (mã $LASTEXITCODE). API đang dừng (người dùng thấy màn hình bảo trì); xem mục khôi phục ở docs/trien-khai.md, mục 5.10." }
         }
         finally {
             Remove-Item Env:\ConnectionStrings__Default -ErrorAction SilentlyContinue
@@ -392,19 +393,21 @@ function Invoke-CapNhat {
 
         Write-Buoc "6. Chép file mới (giữ web.config) và khởi động lại"
         Copy-ThuMuc (Join-Path $giaiNen 'ConsentApi') $thuMucApi @('web.config') @('logs')
-        Copy-ThuMuc (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb @('web.config')
         if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentApi') $thuMucApi $cfg.CongApi $cfg.MoiTruongAsp) {
             Write-Host "Cài lần đầu: đã chép web.config mẫu vào $thuMucApi (ASPNETCORE_ENVIRONMENT=$($cfg.MoiTruongAsp))"
         }
+        # Giao diện chỉ dừng trong lúc chép file giao diện (vài giây).
+        Stop-PoolCho $cfg.PoolWeb
+        Copy-ThuMuc (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb @('web.config')
         if (Copy-WebConfigLanDau (Join-Path $giaiNen 'ConsentWeb') $thuMucWeb $cfg.CongApi $cfg.MoiTruongAsp) {
             Write-Host "Cài lần đầu: đã chép web.config mẫu vào $thuMucWeb (chuyển tiếp /api tới cổng $($cfg.CongApi))"
         }
+        Start-PoolNeuCo $cfg.PoolWeb
         if ($coHis -and (Test-Path -LiteralPath (Join-Path $giaiNen 'PatientInfoApi'))) {
             Copy-ThuMuc (Join-Path $giaiNen 'PatientInfoApi') $thuMucHis @('web.config') @('logs')
             Start-PoolNeuCo $cfg.PoolHis
         }
         Start-PoolNeuCo $cfg.PoolApi
-        Start-PoolNeuCo $cfg.PoolWeb
 
         Write-Buoc "7. Kiểm tra ứng dụng"
         Wait-SucKhoe $cfg.SucKhoe

@@ -28,6 +28,8 @@ export const Permissions = {
   ScopeAllDepartments: 'scope.all_departments',
   /** Phân công kiểm thử tính năng mới, xem và xử lý báo cáo kiểm thử (quyết định 49). */
   TestingManage: 'testing.manage',
+  /** Bật/tắt chế độ bảo trì, vẫn vào hệ thống khi đang bảo trì (quyết định 53). */
+  SystemMaintenance: 'system.maintenance',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]

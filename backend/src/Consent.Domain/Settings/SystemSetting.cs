@@ -105,11 +105,27 @@ public static class SettingKeys
     /// </summary>
     public const string NursingHisEntryDepartments = "NursingReports.HisEntryDepartments";
 
+    /// <summary>
+    /// Chế độ bảo trì (quyết định 53): lý do hiện cho người dùng. Có dòng này là đang bảo trì; tắt bảo trì thì xóa cả bốn dòng
+    /// <c>Maintenance.*</c> (tắt khẩn cấp bằng SQL: xóa các dòng có khóa bắt đầu bằng <c>Maintenance.</c>).
+    /// </summary>
+    public const string MaintenanceReason = "Maintenance.Reason";
+
+    /// <summary>Giờ dự kiến xong bảo trì (UTC, định dạng ISO 8601), chỉ để hiển thị: hết giờ không tự tắt. Không có = chưa rõ.</summary>
+    public const string MaintenanceExpectedEndAtUtc = "Maintenance.ExpectedEndAtUtc";
+
+    /// <summary>Thời điểm bật bảo trì (UTC, ISO 8601).</summary>
+    public const string MaintenanceStartedAtUtc = "Maintenance.StartedAtUtc";
+
+    /// <summary>Người bật bảo trì: họ tên và tên đăng nhập.</summary>
+    public const string MaintenanceStartedBy = "Maintenance.StartedBy";
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
             [
                 HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled,
                 SignatureFrameStorageKey, SignatureFrameContentType, FormInheritanceDays, NursingHisEntryDepartments,
+                MaintenanceReason, MaintenanceExpectedEndAtUtc, MaintenanceStartedAtUtc, MaintenanceStartedBy,
             ],
             StringComparer.Ordinal);
 

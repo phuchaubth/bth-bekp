@@ -555,10 +555,10 @@ Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có tr
    .\cap-nhat-moi-truong.ps1 -MoiTruong UAT -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
    ```
 
-   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF; `web.config` của API không ghi môi trường khác); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool; chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`); khởi động lại; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`.
+   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF; `web.config` của API không ghi môi trường khác); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool **API** (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" thay vì trang lỗi của IIS, quyết định 53); chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`; giao diện chỉ dừng vài giây trong lúc chép file giao diện); chạy lại API; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`. Máy đang mở phần mềm tự tải lại trang khi API chạy lại.
 3. **Kiểm thử trên UAT:** người quản lý kiểm thử (vai trò Quản trị, hoặc vai trò được thêm quyền `testing.manage`) vào *Quản trị → Phân công kiểm thử*, phân công từng tính năng mới cho từng người, mỗi người một thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo (bắt buộc); trang *Tổng quan* nhắc việc chưa báo cáo.
 4. **Xem kết quả:** khi mọi phân công đã có báo cáo và đạt (hoặc lỗi còn lại được chấp nhận, ghi hướng xử lý), quyết định đưa lên Prod. Bản không đạt: gửi báo cáo (xuất Excel) cho nhóm phát triển, chờ gói sửa, quay lại bước 1 với gói mới.
-5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy trang bảo trì vài phút) **cùng file gói, cùng mã SHA256**:
+5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy màn hình "Hệ thống đang bảo trì" vài phút) **cùng file gói, cùng mã SHA256**. Muốn kiểm tra bản mới trước khi cho mọi người vào: bật **chế độ bảo trì** trước khi chạy script, kiểm tra xong bằng tài khoản quản trị rồi tắt (mục 5.12):
 
    ```powershell
    .\cap-nhat-moi-truong.ps1 -MoiTruong Prod -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
@@ -590,7 +590,7 @@ Sau thời gian chạy thử, bệnh viện xóa hết phiếu, báo cáo điề
 
 **Số phiếu** mặc định chạy tiếp, để số phiếu thật không trùng số phiếu chạy thử còn ghi trong nhật ký. Muốn phiếu thật bắt đầu lại từ `PDT-<năm>-000001` thì thêm `-DanhSoLaiTu1`.
 
-Cách chạy: mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS, ngoài giờ làm việc (người dùng thấy trang bảo trì khoảng một phút).
+Cách chạy: mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS, ngoài giờ làm việc (người dùng thấy màn hình "Hệ thống đang bảo trì" khoảng một phút).
 
 1. Giải nén gói (đã so mã SHA256, mục 5.1) và `cd` vào thư mục gói. File tải từ Internet có thể bị Windows chặn chạy script: gói đã so đúng mã thì chạy `Unblock-File .\xoa-du-lieu-chay-thu.ps1`. Máy đặt chính sách chỉ chạy script đã ký thì gọi `powershell -ExecutionPolicy Bypass -File .\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod` (chỉ áp dụng cho lần chạy này).
 2. Chạy `.\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod`, thêm `-DanhSoLaiTu1`, `-GiuNguoiBenh` nếu cần. Môi trường UAT dùng `-MoiTruong UAT`.
@@ -598,10 +598,10 @@ Cách chạy: mở **Windows PowerShell bằng Run as Administrator** trên máy
 4. Đọc kỹ bảng đếm. Thấy có dữ liệu thật (ví dụ một khoa đã dùng thật từ một ngày) thì gõ khác để hủy. Đúng thì gõ `XOA <tên CSDL>`, ví dụ `XOA ConsentManagement` (đúng chữ hoa, chữ thường).
 5. Script làm tiếp, không cần thao tác:
    - sao lưu CSDL vào file `<tên CSDL>_truoc-xoa-du-lieu-chay-thu_<thời điểm>.bak` (`COPY_ONLY`, thư mục sao lưu mặc định của SQL Server);
-   - dừng `ConsentWeb`, `ConsentApi`;
+   - dừng `ConsentApi` (giao diện `ConsentWeb` vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì", quyết định 53);
    - xóa trong **một giao dịch**: lỗi ở đâu thì CSDL giữ nguyên như trước, file PDF chưa bị đụng tới;
    - chuyển file PDF của các phiếu vừa xóa sang `C:\Backup\Consent\Prod\xoa-du-lieu-chay-thu-<thời điểm>\pdf`, ghi `ket-qua.txt` cùng thư mục;
-   - khởi động lại ứng dụng, chờ `/health/ready`.
+   - chạy lại `ConsentApi` (cả khi có lỗi), chờ `/health/ready`; máy đang mở phần mềm tự tải lại trang.
 6. Đăng nhập kiểm tra: danh sách phiếu, người bệnh, báo cáo điều dưỡng trống; người dùng, mẫu phiếu, cấu hình, khoa báo cáo còn nguyên; *Nhật ký hệ thống* có dòng **Xóa dữ liệu chạy thử** ghi tài khoản Windows đã chạy và số dòng đã xóa. Nhấn **Ctrl+F5** trên các máy đang mở phần mềm.
 
 Chạy lại khi không còn gì để xóa thì script báo *Không có dữ liệu chạy thử để xóa* và dừng: không hỏi xác nhận, không dừng ứng dụng.
@@ -611,6 +611,28 @@ Chạy lại khi không còn gì để xóa thì script báo *Không có dữ li
 Bản sao lưu (file `.bak`, thư mục `pdf`) vẫn chứa dữ liệu chạy thử: giữ hoặc xóa theo quy định lưu trữ của bệnh viện. Nếu khi chạy thử có dùng thông tin người bệnh thật (lấy từ HIS), nên xóa bản sao lưu khi không cần nữa.
 
 Script chỉ chạy được trên CSDL của phần mềm (file SQL kiểm tra các bảng trước khi làm). Chạy thẳng file SQL mà không qua script thì SQL Server báo thiếu tham số, không xóa gì.
+
+### 5.12. Chế độ bảo trì (quyết định 53)
+
+Khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà không để người khác thao tác cùng lúc, quản trị bật chế độ bảo trì tại **Quản trị → Bảo trì hệ thống** (hướng dẫn sử dụng, mục 8.7): ghi **lý do** (hiện cho người dùng) và **giờ dự kiến xong** (để trống nếu chưa rõ; chỉ để thông báo, hết giờ không tự tắt). Có hiệu lực ngay, không cần khởi động lại.
+
+- **Người không có quyền "Bảo trì hệ thống"** (kể cả tài khoản kiosk, người bệnh ký trên máy tính bảng hoặc qua mã QR) thấy màn hình **"Hệ thống đang bảo trì"** kèm lý do, giờ dự kiến xong; không đăng nhập, không thao tác được (API trả `503`). Màn hình tự kiểm tra lại mỗi 30 giây.
+- **Phiên đăng nhập không bị thu hồi**; trang đang mở và dữ liệu đang nhập vẫn giữ dưới màn hình bảo trì. Tắt bảo trì thì màn hình tự đóng, người dùng làm tiếp (thao tác lúc đang bảo trì chưa được lưu thì bấm lưu lại); kiosk không cần đăng nhập lại.
+- **Tài khoản có quyền `system.maintenance`** (vai trò Quản trị hệ thống có sẵn; thêm cho vai trò khác ở *Vai trò và quyền*, nhóm Hệ thống) vẫn đăng nhập, thao tác như thường, thấy dải vàng "Đang bật chế độ bảo trì". Đang bảo trì mà chưa đăng nhập: ở màn hình bảo trì chọn **Đăng nhập bằng tài khoản quản trị**. Tài khoản còn phải đổi mật khẩu (mới tạo, vừa đặt lại mật khẩu) không vào được khi đang bảo trì: đổi mật khẩu trước khi bật.
+- `/health`, `/health/ready` vẫn trả lời như thường: công cụ giám sát không báo động, script cài đặt vẫn kiểm tra được.
+- Mọi lần bật, sửa, tắt ghi **Nhật ký hệ thống** (*Bật chế độ bảo trì*, *Sửa thông báo bảo trì*, *Tắt chế độ bảo trì*); đăng nhập bị từ chối vì bảo trì ghi *Đăng nhập thất bại* (lý do `maintenance`).
+
+**Khi chạy script cài gói (mục 5.10) hoặc xóa dữ liệu chạy thử (mục 5.11)**, script chỉ dừng Application Pool API; giao diện vẫn chạy nên người dùng thấy cùng màn hình bảo trì (ghi "Máy chủ đang tạm dừng để cập nhật phần mềm hoặc bảo trì"), không thấy trang lỗi `503` trắng của IIS. API chạy lại thì các máy đang mở phần mềm **tự tải lại trang** (có thể đã lên phiên bản mới). Script cài gói chỉ dừng giao diện vài giây trong lúc chép file giao diện. Không cần bật chế độ bảo trì cho các script; bật khi muốn quản trị kiểm tra trước rồi mới cho mọi người vào.
+
+**Tắt khẩn cấp bằng SQL** (không còn tài khoản quản trị nào đăng nhập được, ví dụ quên mật khẩu): trên máy chủ SQL chạy
+
+```sql
+-- UAT: USE ConsentManagement_UAT;
+USE ConsentManagement;
+DELETE FROM dbo.SystemSettings WHERE [Key] LIKE N'Maintenance.%';
+```
+
+(ví dụ `sqlcmd -S localhost -E` với tài khoản Windows quản trị SQL Server). API thấy thay đổi sau tối đa 5 giây, không cần khởi động lại. Cách này không ghi nhật ký *Tắt chế độ bảo trì*: ghi vào biên bản vận hành.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
@@ -776,6 +798,7 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 13. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
 14. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
 15. Trước ngày dùng thật: xóa phiếu, báo cáo điều dưỡng chạy thử (kể cả phiếu thử ở các bước trên) bằng `xoa-du-lieu-chay-thu.ps1` (mục 5.11).
+16. Chế độ bảo trì (mục 5.12): bật thử ở **Quản trị → Bảo trì hệ thống**; một máy đăng nhập tài khoản thường và một kiosk thấy màn hình "Hệ thống đang bảo trì" kèm lý do; tài khoản quản trị vẫn mở được Cấu hình hệ thống, thấy dải vàng; tắt bảo trì: máy kia làm tiếp được, không phải đăng nhập lại.
 
 ## 11. Sự cố thường gặp
 
