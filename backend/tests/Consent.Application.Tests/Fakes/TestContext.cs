@@ -5,6 +5,7 @@ using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
 using Consent.Application.NursingReports;
+using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -274,6 +275,16 @@ internal sealed class AppTestContext
         CurrentUser,
         Clock,
         new InMemorySystemSettingRepository(Store));
+
+    public TestAssignmentService CreateTestAssignmentService() => new(
+        new InMemoryTestAssignmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryRoleRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        [XlsxWriter, CsvWriter]);
 
     public NursingDashboardService CreateNursingDashboardService() => new(
         new InMemoryNursingReportRepository(Store),

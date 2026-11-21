@@ -14,8 +14,9 @@
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
 8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
-9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel
-10. [Câu hỏi thường gặp](#hoi-dap)
+9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
+10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
+11. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
 
@@ -1408,9 +1409,75 @@ Khi vắng (nghỉ phép, đi học, đi công tác…), người lập báo cá
 
 ---
 
+<a id="kiem-thu"></a>
+
+## 10. Kiểm thử tính năng mới
+
+Mỗi bản cài mới được kiểm thử trên **môi trường kiểm thử UAT** (đầu trang có dải vàng **UAT**) trước khi đưa vào chạy thật (quyết định 50). Người quản lý kiểm thử **phân công từng tính năng mới cho từng người, mỗi người một khoảng thời gian**; người được phân công kiểm thử rồi **bắt buộc gửi báo cáo**. Báo cáo là căn cứ để sửa, nâng cấp phần mềm và quyết định đưa bản mới lên chạy thật (quyết định 49).
+
+| Ai | Làm gì | Ở đâu |
+|---|---|---|
+| Người quản lý kiểm thử: vai trò **Quản trị hệ thống**, hoặc vai trò được thêm quyền *Phân công kiểm thử, xem và xử lý báo cáo kiểm thử* (mục 8.3) | Phân công, theo dõi, xem báo cáo, ghi hướng xử lý, xuất Excel | **Quản trị** → **Phân công kiểm thử** |
+| Người được phân công (tài khoản bất kỳ) | Xem việc, kiểm thử, gửi báo cáo | Dòng nhắc trên trang **Tổng quan**, hoặc menu tài khoản (góc phải) → **Việc kiểm thử của tôi** |
+
+### 10.1. Phân công kiểm thử (người quản lý)
+
+1. Bấm **Quản trị** → **Phân công kiểm thử** → **Phân công mới**.
+2. Điền:
+   - **Đợt kiểm thử**: tên bản cài hoặc gói, ví dụ "Gói 72 – 25/11/2026". Gõ vài chữ để chọn lại đợt đã có.
+   - **Tính năng cần kiểm thử**.
+   - **Nội dung, cách kiểm thử**: các bước làm, dữ liệu dùng thử (giả lập), kết quả mong đợi.
+   - **Người kiểm thử và thời gian của từng người**: chọn người (gõ tên để tìm), chọn **từ ngày** và **hạn báo cáo**. Bấm **Thêm người kiểm thử** để thêm người; mỗi người một thời gian riêng.
+3. Bấm **Phân công**. Mỗi người có một việc riêng.
+
+   ![Hộp Phân công kiểm thử: đợt, tính năng, cách kiểm thử, người kiểm thử và thời gian của từng người](huong-dan-su-dung/kt-01-phan-cong.png)
+
+   *Hình 10.1. Phân công kiểm thử tính năng **Kiosk: quét CCCD bằng camera** cho hai người, mỗi người một thời gian.*
+
+4. Trang **Phân công kiểm thử** có:
+   - **Tổng hợp theo tính năng**: số người, số **Đạt**, **Đạt một phần**, **Không đạt**, **Chưa báo cáo** (kèm số quá hạn).
+   - **Phân công**: từng người, thời gian, trạng thái (**Chưa tới ngày**, **Đang kiểm thử**, **Quá hạn**, **Đã báo cáo**, **Trễ hạn** khi gửi sau hạn, **Đã hủy**) và kết quả.
+
+   Chọn đợt ở ô đầu trang để chỉ xem một đợt.
+
+   ![Trang Phân công kiểm thử: tổng hợp theo tính năng và bảng phân công](huong-dan-su-dung/kt-02-tong-hop.png)
+
+   *Hình 10.2. Tổng hợp một đợt kiểm thử: tính năng nào đã đạt, tính năng nào còn lỗi, ai chưa báo cáo.*
+
+5. **Sửa** hoặc **Hủy** phân công được khi người kiểm thử chưa gửi báo cáo.
+
+### 10.2. Kiểm thử và gửi báo cáo (người được phân công)
+
+1. Trang **Tổng quan** nhắc *"Bạn có … việc kiểm thử chưa báo cáo (… quá hạn)"*. Bấm **Xem và báo cáo**, hoặc menu tài khoản → **Việc kiểm thử của tôi**.
+
+   ![Trang Tổng quan nhắc việc kiểm thử chưa báo cáo](huong-dan-su-dung/kt-03-nhac-viec.png)
+
+   *Hình 10.3. Dòng nhắc trên trang **Tổng quan**: bấm **Xem và báo cáo** để mở việc kiểm thử của mình.*
+
+2. Mỗi việc ghi tính năng, đợt kiểm thử, thời gian và cách kiểm thử. Làm theo cách kiểm thử trên môi trường UAT.
+3. Bấm **Gửi báo cáo**:
+   - **Kết quả**: **Đạt**, **Đạt một phần** hoặc **Không đạt**.
+   - **Lỗi, vấn đề phát hiện**: bắt buộc khi chưa đạt. Ghi cách làm để gặp lỗi, màn hình, thông báo hiện ra. Không ghi thông tin người bệnh thật.
+   - **Đề xuất nâng cấp** (không bắt buộc).
+
+   ![Hộp Báo cáo kiểm thử: kết quả, lỗi phát hiện, đề xuất nâng cấp](huong-dan-su-dung/kt-04-bao-cao.png)
+
+   *Hình 10.4. Báo cáo kiểm thử "Không đạt" phải ghi lỗi phát hiện.*
+
+4. Chỉ gửi được báo cáo từ ngày bắt đầu kiểm thử. Gửi sau hạn vẫn được nhưng ghi **Trễ hạn**. Sửa được báo cáo (nút **Sửa báo cáo**) cho tới khi người quản lý ghi hướng xử lý; sau đó việc đó hiện hướng xử lý.
+
+### 10.3. Xem báo cáo, ghi hướng xử lý, xuất Excel (người quản lý)
+
+1. Ở dòng đã báo cáo, bấm **Xem báo cáo**: kết quả, lỗi phát hiện, đề xuất.
+2. Ghi **Hướng xử lý** (ví dụ "Sửa trong gói 73", "Giữ nguyên: đúng quy trình") rồi bấm **Lưu hướng xử lý**. Người kiểm thử thấy hướng xử lý và không sửa báo cáo được nữa.
+3. Bấm **Xuất Excel** ở đầu trang: mọi phân công và báo cáo của đợt đang chọn (người, thời gian, trạng thái, kết quả, lỗi, đề xuất, giờ gửi, trễ hạn, hướng xử lý), gửi nhóm phát triển để sửa và nâng cấp.
+4. Khi mọi tính năng của đợt đã **Đạt** (hoặc lỗi còn lại đã có hướng xử lý được chấp nhận), phòng CNTT cài **đúng gói đó** lên môi trường chạy thật ([hướng dẫn triển khai, mục 5.10](trien-khai.md)).
+
+---
+
 <a id="hoi-dap"></a>
 
-## 10. Câu hỏi thường gặp
+## 11. Câu hỏi thường gặp
 
 **Tôi quên mật khẩu thì làm sao?**
 Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục 8.1). Bạn đăng nhập bằng mật khẩu tạm rồi đổi mật khẩu mới.

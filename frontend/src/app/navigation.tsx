@@ -62,6 +62,8 @@ export const navItems: NavItem[] = [
       { path: '/quan-tri/vai-tro', label: 'Vai trò và quyền', permission: Permissions.RolesManage },
       { path: '/quan-tri/khoa-phong', label: 'Khoa/phòng', permission: Permissions.DepartmentsManage },
       { path: '/quan-tri/cau-hinh', label: 'Cấu hình hệ thống', permission: Permissions.SettingsManage },
+      // Quyết định 49: phân công kiểm thử tính năng mới, báo cáo kiểm thử.
+      { path: '/quan-tri/kiem-thu', label: 'Phân công kiểm thử', permission: Permissions.TestingManage },
     ],
   },
 ]

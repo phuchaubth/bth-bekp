@@ -1,4 +1,4 @@
-import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
+import { ExperimentOutlined, LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
@@ -87,12 +87,15 @@ export function AppLayout() {
   const userMenu: MenuProps = {
     items: [
       { key: 'account', icon: <UserOutlined />, label: 'Tài khoản của tôi' },
+      { key: 'testing', icon: <ExperimentOutlined />, label: 'Việc kiểm thử của tôi' },
       { type: 'divider' },
       { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true },
     ],
     onClick: ({ key }) => {
       if (key === 'account') {
         navigate('/tai-khoan')
+      } else if (key === 'testing') {
+        navigate('/kiem-thu')
       } else if (key === 'logout') {
         void logout()
       }

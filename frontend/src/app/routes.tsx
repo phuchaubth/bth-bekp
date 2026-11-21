@@ -23,6 +23,7 @@ import {
   ExportsPage,
   KioskPage,
   Lazy,
+  MyTestAssignmentsPage,
   NursingDashboardPage,
   NursingDelegationsPage,
   NursingReportPage,
@@ -35,6 +36,7 @@ import {
   RolesPage,
   SettingsPage,
   SigningKioskPage,
+  TestAssignmentsPage,
   UsersPage,
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
@@ -56,6 +58,7 @@ const implementedPages: Record<string, ReactNode> = {
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
   '/quan-tri/cau-hinh': <SettingsPage />,
+  '/quan-tri/kiem-thu': <TestAssignmentsPage />,
 }
 
 const featureRoutes: RouteObject[] = flattenNavItems()
@@ -135,6 +138,15 @@ export const appRoutes: RouteObject[] = [
         element: (
           <Lazy>
             <AccountPage />
+          </Lazy>
+        ),
+      },
+      // Việc kiểm thử của tôi (quyết định 49): mọi tài khoản mở được, chỉ thấy việc được phân công cho mình.
+      {
+        path: 'kiem-thu',
+        element: (
+          <Lazy>
+            <MyTestAssignmentsPage />
           </Lazy>
         ),
       },

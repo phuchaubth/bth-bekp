@@ -14,6 +14,7 @@ using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
 using Consent.Domain.Settings;
+using Consent.Domain.Testing;
 using Consent.Shared;
 
 namespace Consent.Application.Abstractions;
@@ -277,6 +278,23 @@ public interface IExportJobRepository
     void Add(ExportJob job);
 
     Task<PagedResult<ExportJobRecord>> SearchAsync(ExportJobSearch query, CancellationToken cancellationToken);
+}
+
+/// <summary>Phân công kiểm thử tính năng mới (quyết định 49).</summary>
+public interface ITestAssignmentRepository
+{
+    void Add(TestAssignment assignment);
+
+    Task<TestAssignment?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Phân công của một đợt kiểm thử (<c>null</c> là mọi đợt), mới tạo trước; tối đa 2.000 phân công.</summary>
+    Task<IReadOnlyList<TestAssignment>> ListAsync(string? version, CancellationToken cancellationToken);
+
+    /// <summary>Mọi phân công của một người (kể cả đã hủy).</summary>
+    Task<IReadOnlyList<TestAssignment>> ListForAssigneeAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Các đợt kiểm thử đã có, đợt mới phân công trước.</summary>
+    Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Cấp số phiếu tăng dần, không trùng (dùng sequence của CSDL).</summary>

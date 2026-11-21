@@ -531,6 +531,8 @@ Bệnh viện chạy **hai môi trường tách biệt** trên cùng máy chủ 
 6. **Cài gói đầu tiên** bằng script ở mục dưới (`-MoiTruong UAT`). Lần đầu, script chép `web.config` mẫu vào hai thư mục và tự đổi địa chỉ chuyển tiếp `/api` của giao diện sang cổng 5090.
 7. Mở `https://phieudongthuan-uat.bth.org.vn`: phải thấy dải vàng **UAT**. Đăng nhập `admin`, đổi mật khẩu, xóa biến `Seed__AdminPassword`, tạo tài khoản cho từng người kiểm thử (*Quản trị → Người dùng*), giao vai trò như thật để thử đúng quyền.
 
+**Phân công kiểm thử (quyết định 49):** trang *Quản trị → Phân công kiểm thử* dùng quyền mới `testing.manage`; vai trò **Quản trị hệ thống** tự có khi API khởi động, muốn giao cho người khác (ví dụ trưởng nhóm kiểm thử) thì thêm quyền này vào vai trò ở *Vai trò và quyền*. Bản có tính năng này kèm migration `AddTestAssignments` (bảng mới `TestAssignments`, chỉ thêm); script dưới đây tự chạy migration.
+
 **Đưa bản mới lên: UAT trước, Prod sau**
 
 Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có trong gói (cùng thư mục với `efbundle.exe`). Mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS:
@@ -550,7 +552,7 @@ Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có tr
    ```
 
    Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool; chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`); khởi động lại; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`.
-3. **Kiểm thử trên UAT:** người quản lý kiểm thử phân công từng tính năng mới cho từng người, có thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo.
+3. **Kiểm thử trên UAT:** người quản lý kiểm thử (vai trò Quản trị, hoặc vai trò được thêm quyền `testing.manage`) vào *Quản trị → Phân công kiểm thử*, phân công từng tính năng mới cho từng người, mỗi người một thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo (bắt buộc); trang *Tổng quan* nhắc việc chưa báo cáo.
 4. **Xem kết quả:** khi mọi phân công đã có báo cáo và đạt (hoặc lỗi còn lại được chấp nhận, ghi hướng xử lý), quyết định đưa lên Prod. Bản không đạt: gửi báo cáo (xuất Excel) cho nhóm phát triển, chờ gói sửa, quay lại bước 1 với gói mới.
 5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy trang bảo trì vài phút) **cùng file gói, cùng mã SHA256**:
 

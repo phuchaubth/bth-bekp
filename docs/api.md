@@ -595,6 +595,25 @@ Từ quyết định 35, Phòng Điều dưỡng không còn nhập tay số li�
 
 **Bảng tổng hợp:** "Số ca đi ngoại viện" là tổng 4 dòng mục V. Mục E: "Ổn" khi mọi khoa đã gửi báo ổn, "Không ổn: <mã khoa>" khi có khoa báo sự cố, trống khi chưa khoa nào gửi. Mục F: phần nhập thêm của khoa có ghi. PDF và Excel có cột "Người báo cáo" cuối bảng A, dòng "Người báo cáo: …" dưới mỗi mục B–F và chỗ ký "PHÒNG ĐIỀU DƯỠNG" cuối bảng (quyết định 44). Số liệu khoa lưu ở `FiguresJson` dạng `{ "values": {…}, "checks": {…}, "form": 2 }`; `form` là phiên bản mẫu lúc lưu (báo cáo lưu trước quyết định 44 không có, tính là 1). Phần nhập thêm có thể có thông tin người bệnh: lưu mã hóa (cột `NotesEncrypted`), nhật ký chỉ ghi `***`.
 
+
+## 6i. Phân công kiểm thử (`/api/v1/testing/assignments`, quyết định 49)
+
+Người quản lý kiểm thử (`testing.manage`) phân công từng tính năng mới cho từng người, mỗi người một khoảng thời gian; người được phân công gửi báo cáo bắt buộc. Ngày là ngày của bệnh viện (`yyyy-MM-dd`). Phân công `{ id, version, feature, instructions, assigneeUserId, assigneeName, assigneeDepartment, startDate, dueDate, status, result, findings, suggestions, reportedAtUtc, late, reviewNote, reviewedBy, reviewedAtUtc, createdBy, createdAtUtc, cancelledBy, cancelledAtUtc, canReport, canEdit }`: `status` so với hôm nay `Upcoming` (chưa tới ngày bắt đầu), `InProgress`, `Overdue` (quá hạn chưa báo cáo), `Reported`, `Cancelled`; `result` `Passed`, `PartiallyPassed`, `Failed` hoặc `null`; `late`: báo cáo gửi sau hạn; `canReport`: người xem là người được phân công và gửi (sửa) được báo cáo; `canEdit`: người quản lý còn sửa, hủy được (chưa báo cáo).
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `?version=` | `testing.manage` | Phân công của một đợt (bỏ trống là mọi đợt), mới tạo trước, tối đa 2.000: `{ items, versions }`; `versions`: các đợt đã có, đợt mới phân công trước |
+| GET | `/mine` | Đăng nhập | Việc kiểm thử của người đang đăng nhập: chưa báo cáo trước (hạn gần trước), rồi đã báo cáo, đã hủy |
+| GET | `/candidates` | `testing.manage` | Người có thể được phân công: tài khoản đang dùng có vai trò, trừ tài khoản kiosk: `[{ userId, fullName, title, departmentName }]`, theo tên |
+| POST | `` | `testing.manage` | `{ version, feature, instructions?, assignees: [{ userId, startDate, dueDate }] }`: phân công một tính năng cho nhiều người (1–50), mỗi người một thời gian. Trả các phân công vừa tạo. Lỗi `400`: thiếu hoặc quá dài `version` (≤ 100), `feature` (≤ 200), `instructions` (≤ 4.000); không có người hoặc quá 50 → `assignees`; người không phải tài khoản đang dùng có vai trò (hoặc là kiosk), hoặc lặp lại → `assignees[i].userId`; hạn trước ngày bắt đầu, hạn trước hôm nay, quá 366 ngày → `assignees[i].dueDate` |
+| PUT | `/{id}` | `testing.manage` | `{ version, feature, instructions?, startDate, dueDate }`: sửa phân công chưa báo cáo. Đã báo cáo → `422 testing.reported`; đã hủy → `422 testing.cancelled`; lỗi ngày → `400 dueDate` |
+| POST | `/{id}/cancel` | `testing.manage` | Hủy phân công chưa báo cáo (`422 testing.reported`, `422 testing.cancelled`) |
+| PUT | `/{id}/report` | Người được phân công | `{ result, findings?, suggestions? }`: gửi hoặc sửa báo cáo. Người khác → `404`; trước ngày bắt đầu → `422 testing.not_started`; đã có hướng xử lý → `422 testing.reviewed`; đã hủy → `422 testing.cancelled`; thiếu kết quả → `400 result`; chưa đạt mà không ghi lỗi → `400 findings`; `findings`, `suggestions` ≤ 4.000 ký tự. Gửi sau hạn vẫn nhận (`late: true`) |
+| POST | `/{id}/review` | `testing.manage` | `{ note }` (≤ 2.000 ký tự): ghi hoặc sửa hướng xử lý; người kiểm thử không sửa báo cáo được nữa. Chưa có báo cáo → `422 testing.not_reported` |
+| GET | `/xlsx?version=` | `testing.manage` | Excel phân công và báo cáo của một đợt (bỏ trống là mọi đợt): đợt, tính năng, nội dung, người kiểm thử, khoa/phòng, từ ngày, hạn, trạng thái, kết quả, lỗi, đề xuất, giờ gửi (giờ Việt Nam), trễ hạn, hướng xử lý, người ghi hướng xử lý; trang 2 ghi đợt, số phân công, người xuất, thời điểm xuất |
+
+Lỗi phát hiện và đề xuất lưu mã hóa (cột `FindingsEncrypted`, `SuggestionsEncrypted`), vì người kiểm thử tự ghi và có thể nhắc tới người bệnh khi kiểm thử trên dữ liệu thật. Mỗi lần tạo, sửa, hủy, báo cáo, ghi hướng xử lý ghi nhật ký hệ thống.
+
 ---
 
 ## 7. Nhật ký audit (`/api/v1/audit-logs`)

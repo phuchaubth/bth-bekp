@@ -45,6 +45,12 @@ public static class Permissions
 
     /// <summary>Xem dữ liệu của mọi khoa (không giới hạn theo khoa của người dùng).</summary>
     public const string ScopeAllDepartments = "scope.all_departments";
+
+    /// <summary>
+    /// Phân công kiểm thử tính năng mới cho từng người, có thời gian; xem, ghi hướng xử lý và xuất báo cáo kiểm thử (quyết định 49).
+    /// Người được phân công tự xem và báo cáo việc của mình, không cần quyền này.
+    /// </summary>
+    public const string TestingManage = "testing.manage";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -60,6 +66,7 @@ public static class PermissionCatalog
     private const string ReportGroup = "Báo cáo và xuất dữ liệu";
     private const string NursingGroup = "Báo cáo điều dưỡng";
     private const string ScopeGroup = "Phạm vi dữ liệu";
+    private const string TestingGroup = "Kiểm thử";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -85,6 +92,7 @@ public static class PermissionCatalog
         new(Permissions.NursingReportsRead, "Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp", NursingGroup),
         new(Permissions.NursingReportsManage, "Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo, số liệu HIS", NursingGroup),
         new(Permissions.ScopeAllDepartments, "Xem dữ liệu toàn viện", ScopeGroup),
+        new(Permissions.TestingManage, "Phân công kiểm thử, xem và xử lý báo cáo kiểm thử", TestingGroup),
     ];
 
     private static readonly HashSet<string> Codes = new(All.Select(p => p.Code), StringComparer.Ordinal);

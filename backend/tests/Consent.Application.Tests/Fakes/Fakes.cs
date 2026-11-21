@@ -7,6 +7,7 @@ using Consent.Application.Exports;
 using Consent.Application.Reports;
 using Consent.Domain.Exports;
 using Consent.Domain.Settings;
+using Consent.Domain.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
@@ -140,6 +141,8 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<NursingDepartmentStatistics> NursingDepartmentStatistics { get; } = [];
 
     public List<NursingReportDelegation> NursingDelegations { get; } = [];
+
+    public List<TestAssignment> TestAssignments { get; } = [];
 
     public int SaveCount { get; private set; }
 
@@ -698,4 +701,27 @@ internal sealed class RecordingPdfRenderer : IConsentPdfRenderer
         Last = document;
         return "%PDF-giả"u8.ToArray();
     }
+}
+
+internal sealed class InMemoryTestAssignmentRepository(InMemoryStore store) : ITestAssignmentRepository
+{
+    public void Add(TestAssignment assignment) => store.TestAssignments.Add(assignment);
+
+    public Task<TestAssignment?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.TestAssignments.Find(a => a.Id == id));
+
+    public Task<IReadOnlyList<TestAssignment>> ListAsync(string? version, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TestAssignment>>([.. store.TestAssignments
+            .Where(a => version is null || a.Version == version)
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .ThenBy(a => a.Feature, StringComparer.Ordinal)]);
+
+    public Task<IReadOnlyList<TestAssignment>> ListForAssigneeAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TestAssignment>>([.. store.TestAssignments.Where(a => a.AssigneeUserId == userId)]);
+
+    public Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>([.. store.TestAssignments
+            .GroupBy(a => a.Version)
+            .OrderByDescending(g => g.Max(a => a.CreatedAtUtc))
+            .Select(g => g.Key)]);
 }

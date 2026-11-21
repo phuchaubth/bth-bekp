@@ -26,6 +26,8 @@ export const Permissions = {
   /** Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo và số giường, số liệu HIS. */
   NursingReportsManage: 'nursingreports.manage',
   ScopeAllDepartments: 'scope.all_departments',
+  /** Phân công kiểm thử tính năng mới, xem và xử lý báo cáo kiểm thử (quyết định 49). */
+  TestingManage: 'testing.manage',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]

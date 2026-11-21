@@ -6,6 +6,7 @@ using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
 using Consent.Application.NursingReports;
+using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -48,6 +49,7 @@ public static class DependencyInjection
         services.AddScoped<NursingSummaryService>();
         services.AddScoped<NursingDashboardService>();
         services.AddScoped<NursingDelegationService>();
+        services.AddScoped<TestAssignmentService>();
 
         RegisterValidators(services);
         return services;

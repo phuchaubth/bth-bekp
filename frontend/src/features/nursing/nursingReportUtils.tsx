@@ -1,5 +1,4 @@
 import { Tag } from 'antd'
-import dayjs from 'dayjs'
 import {
   DELEGATION_CONTENT_LABELS,
   type NursingCheckValue,
@@ -11,6 +10,7 @@ import {
   type NursingReportState,
   type SaveNursingReportInput,
 } from '../../api/nursingReports'
+import { formatDateRange } from '../../utils/format'
 
 /** Giá trị của form nhập báo cáo khoa: số theo khóa dòng, phần tick theo khóa dòng, phần nhập thêm. */
 export interface NursingReportFormValues {
@@ -75,24 +75,12 @@ export function statusTag(status: NursingReportState) {
   }
 }
 
-/** Lưu file về máy (ví dụ Excel bảng tổng hợp). */
-export function saveBlob(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = fileName
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
+/** Lưu file về máy (ví dụ Excel bảng tổng hợp); dùng chung với các trang khác. */
+export { saveBlob } from '../../utils/download'
 
 /** Thời gian ủy quyền (quyết định 48): "20/11 – 22/11/2026"; một ngày thì "20/11/2026"; khác năm thì ghi đủ năm cả hai ngày. */
 export function delegationPeriod({ startDate, endDate }: { startDate: string; endDate: string }) {
-  const start = dayjs(startDate)
-  const end = dayjs(endDate)
-  if (startDate === endDate) {
-    return end.format('DD/MM/YYYY')
-  }
-  return `${start.format(start.year() === end.year() ? 'DD/MM' : 'DD/MM/YYYY')} – ${end.format('DD/MM/YYYY')}`
+  return formatDateRange(startDate, endDate)
 }
 
 /** Nội dung được ủy quyền, cách nhau dấu phẩy: "Báo cáo của khoa, Số liệu HIS khi HIS lỗi". */
