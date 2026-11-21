@@ -66,6 +66,9 @@ public sealed class NursingDailyReport : Entity, IAuditableEntity
 
     public DateTimeOffset? SubmittedAtUtc { get; private set; }
 
+    /// <summary>Ủy quyền mà người gửi dùng (quyết định 48); <c>null</c> khi người của khoa tự gửi.</summary>
+    public Guid? SubmittedDelegationId { get; private set; }
+
     /// <summary>Lần mở lại gần nhất (nếu có): người mở, lúc mở, lý do.</summary>
     public Guid? ReopenedByUserId { get; private set; }
 
@@ -97,13 +100,17 @@ public sealed class NursingDailyReport : Entity, IAuditableEntity
         UpdatedAtUtc = nowUtc;
     }
 
-    /// <summary>Gửi báo cáo: khóa lại, chỉ Phòng Điều dưỡng mở lại được.</summary>
-    public void Submit(Guid userId, DateTimeOffset nowUtc)
+    /// <summary>
+    /// Gửi báo cáo: khóa lại, chỉ Phòng Điều dưỡng mở lại được. <paramref name="delegationId"/>: ủy quyền người gửi dùng (quyết
+    /// định 48); gửi lại sau khi bị trả lại thì ghi theo lần gửi mới.
+    /// </summary>
+    public void Submit(Guid userId, DateTimeOffset nowUtc, Guid? delegationId = null)
     {
         EnsureDraft();
         Status = NursingReportStatus.Submitted;
         SubmittedByUserId = userId;
         SubmittedAtUtc = nowUtc;
+        SubmittedDelegationId = delegationId;
         UpdatedByUserId = userId;
         UpdatedAtUtc = nowUtc;
     }

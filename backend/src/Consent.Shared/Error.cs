@@ -23,6 +23,9 @@ public enum ErrorType
 
     /// <summary>Lỗi không lường trước (HTTP 500).</summary>
     Unexpected,
+
+    /// <summary>Hệ thống tạm ngưng phục vụ, ví dụ đang bảo trì (HTTP 503).</summary>
+    Unavailable,
 }
 
 /// <summary>
@@ -54,4 +57,6 @@ public sealed record Error(
     public static Error Conflict(string code, string message) => new(code, message, ErrorType.Conflict);
 
     public static Error BusinessRule(string code, string message) => new(code, message, ErrorType.BusinessRule);
+
+    public static Error Unavailable(string code, string message) => new(code, message, ErrorType.Unavailable);
 }

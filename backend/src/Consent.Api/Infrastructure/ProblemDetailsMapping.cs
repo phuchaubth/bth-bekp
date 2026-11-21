@@ -20,6 +20,7 @@ internal static class ProblemDetailsMapping
         [StatusCodes.Status415UnsupportedMediaType] = "Định dạng dữ liệu không được hỗ trợ.",
         [StatusCodes.Status429TooManyRequests] = "Bạn thao tác quá nhiều lần. Vui lòng thử lại sau ít phút.",
         [StatusCodes.Status500InternalServerError] = "Đã xảy ra lỗi hệ thống",
+        [StatusCodes.Status503ServiceUnavailable] = "Hệ thống tạm ngưng phục vụ. Vui lòng thử lại sau ít phút.",
     };
 
     public static int StatusCodeFor(ErrorType type) => type switch
@@ -30,6 +31,7 @@ internal static class ProblemDetailsMapping
         ErrorType.NotFound => StatusCodes.Status404NotFound,
         ErrorType.Conflict => StatusCodes.Status409Conflict,
         ErrorType.BusinessRule => StatusCodes.Status422UnprocessableEntity,
+        ErrorType.Unavailable => StatusCodes.Status503ServiceUnavailable,
         _ => StatusCodes.Status500InternalServerError,
     };
 

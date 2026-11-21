@@ -51,4 +51,54 @@ public sealed class DepartmentTests
     {
         Assert.Throws<DomainException>(() => Department.Create(code, name));
     }
+
+    [Fact]
+    public void ShortName_IsTrimmed_KeepsItsCase_AndBlankClearsIt()
+    {
+        var department = Department.Create("NOIA", "Khoa Nội A (giả lập)");
+        Assert.Null(department.ShortName);
+
+        department.SetShortName("  Nội A  ");
+        Assert.Equal("Nội A", department.ShortName);
+
+        department.SetShortName(new string('x', Department.ShortNameMaxLength));
+        Assert.Equal(Department.ShortNameMaxLength, department.ShortName!.Length);
+
+        // Gõ kiểu tổ hợp (một số bộ gõ tiếng Việt) thì lưu dạng dựng sẵn, như tên khoa lấy từ HIS.
+        department.SetShortName("No\u0302\u0323i A");
+        Assert.Equal("N\u1ED9i A", department.ShortName);
+
+        department.SetShortName("   ");
+        Assert.Null(department.ShortName);
+        department.SetShortName("HSTC");
+        department.SetShortName(null);
+        Assert.Null(department.ShortName);
+    }
+
+    [Fact]
+    public void ShortName_IsKept_WhenTheHisListUpdatesTheDepartment()
+    {
+        var department = Department.Create("NOIA", "Khoa Nội A (giả lập)");
+        department.SetShortName("Nội A");
+
+        department.SyncFromHis("NOIA", "Khoa Nội tổng hợp A (giả lập)");
+        department.Update("NOIA2", "Khoa Nội A (giả lập)", isActive: true);
+
+        Assert.Equal("Nội A", department.ShortName);
+    }
+
+    [Theory]
+    [InlineData("Tên viết tắt quá dài hơn 20")]
+    [InlineData("Nội\nA")]
+    [InlineData("Nội\tA")]
+    public void ShortName_TooLongOrWithControlCharacters_IsRejected_AndTheOldOneKept(string shortName)
+    {
+        var department = Department.Create("NOIA", "Khoa Nội A (giả lập)");
+        department.SetShortName("Nội A");
+
+        var error = Assert.Throws<DomainException>(() => department.SetShortName(shortName));
+
+        Assert.Contains($"tối đa {Department.ShortNameMaxLength} ký tự", error.Message, StringComparison.Ordinal);
+        Assert.Equal("Nội A", department.ShortName);
+    }
 }

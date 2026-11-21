@@ -41,11 +41,26 @@ export const ReportsPage = lazy(() => import('../features/reports/ReportsPage').
 export const NursingReportPage = lazy(() =>
   import('../features/nursing/NursingReportPage').then((m) => ({ default: m.NursingReportPage })),
 )
+export const NursingDashboardPage = lazy(() =>
+  import('../features/nursing/NursingDashboardPage').then((m) => ({ default: m.NursingDashboardPage })),
+)
 export const NursingSummaryPage = lazy(() =>
   import('../features/nursing/NursingSummaryPage').then((m) => ({ default: m.NursingSummaryPage })),
 )
+export const NursingDelegationsPage = lazy(() =>
+  import('../features/nursing/NursingDelegationsPage').then((m) => ({ default: m.NursingDelegationsPage })),
+)
+export const TestAssignmentsPage = lazy(() =>
+  import('../features/testing/TestAssignmentsPage').then((m) => ({ default: m.TestAssignmentsPage })),
+)
+export const MyTestAssignmentsPage = lazy(() =>
+  import('../features/testing/MyTestAssignmentsPage').then((m) => ({ default: m.MyTestAssignmentsPage })),
+)
 export const AuditLogsPage = lazy(() => import('../features/audit/AuditLogsPage').then((m) => ({ default: m.AuditLogsPage })))
 export const SettingsPage = lazy(() => import('../features/admin/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+export const MaintenanceSettingsPage = lazy(() =>
+  import('../features/admin/maintenance/MaintenanceSettingsPage').then((m) => ({ default: m.MaintenanceSettingsPage })),
+)
 export const UsersPage = lazy(() => import('../features/admin/users/UsersPage').then((m) => ({ default: m.UsersPage })))
 
 export function Lazy({ children }: { children: ReactNode }) {

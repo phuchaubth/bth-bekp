@@ -85,6 +85,33 @@ public sealed class NursingReportTests
     }
 
     [Fact]
+    public void ReportingDepartment_KeepsTheOfficeOrder_AndOnlyAChangeTouchesItsTimestamp()
+    {
+        Assert.Equal(0, NursingReportDepartment.Create(Department, 48, Now).SortOrder);
+        var department = NursingReportDepartment.Create(Department, 48, Now, sortOrder: 3);
+        Assert.Equal((3, Now), (department.SortOrder, department.UpdatedAtUtc));
+
+        department.SetSortOrder(3, Now.AddHours(1));
+        Assert.Equal((3, Now), (department.SortOrder, department.UpdatedAtUtc));
+
+        department.SetSortOrder(1, Now.AddHours(2));
+        Assert.Equal((1, Now.AddHours(2)), (department.SortOrder, department.UpdatedAtUtc));
+
+        department.SetSortOrder(0, Now.AddHours(3));
+        Assert.Equal(0, department.SortOrder);
+    }
+
+    [Fact]
+    public void ReportingDepartment_SortOrder_CannotBeNegative()
+    {
+        Assert.Throws<DomainException>(() => NursingReportDepartment.Create(Department, 48, Now, sortOrder: -1));
+        var department = NursingReportDepartment.Create(Department, 48, Now, sortOrder: 2);
+
+        Assert.Throws<DomainException>(() => department.SetSortOrder(-1, Now.AddHours(1)));
+        Assert.Equal((2, Now), (department.SortOrder, department.UpdatedAtUtc));
+    }
+
+    [Fact]
     public void Statistics_KeepTheirSourceAndWhoUpdatedThem()
     {
         var statistics = NursingDailyStatistics.Create(Day, """{"hospital":{"outpatientVisits":12}}""", NursingStatisticsSource.His, NursingOffice, Now);

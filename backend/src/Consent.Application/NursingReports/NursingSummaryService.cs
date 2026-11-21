@@ -3,6 +3,7 @@ using Consent.Application.Abstractions;
 using Consent.Application.Common;
 using Consent.Application.ConsentForms;
 using Consent.Application.Settings;
+using Consent.Domain.Departments;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Settings;
 using Consent.Shared;
@@ -41,16 +42,22 @@ public sealed class NursingSummaryService(
         var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
         var merged = NursingHisEntry.Merge(NursingStatisticsValues.Parse(statistics?.ValuesJson), entries);
 
+        // Ủy quyền (quyết định 48): của báo cáo đã gửi và số liệu HIS khoa nhập theo ủy quyền (kể cả ủy quyền đã hủy sau đó), và các
+        // ủy quyền có hiệu lực trong ngày.
+        var used = await reports.GetDelegationsAsync(
+            [.. dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedDelegationId).Concat(entries.Select(e => e.DelegationId)).OfType<Guid>().Distinct()],
+            cancellationToken).ConfigureAwait(false);
+        var covering = await reports.ListDelegationsCoveringAsync(reportDate, cancellationToken).ConfigureAwait(false);
+
         var names = await NamesAsync(
             dayReports.Where(r => r.IsSubmitted).Select(r => r.SubmittedByUserId)
                 .Append(statistics?.UpdatedByUserId)
-                .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId)),
+                .Concat(entries.Select(e => (Guid?)e.UpdatedByUserId))
+                .Concat(used.Concat(covering).SelectMany(d => new Guid?[] { d.DelegatorUserId, d.DelegateUserId })),
             cancellationToken).ConfigureAwait(false);
+        var delegators = used.ToDictionary(d => d.Id, d => names.GetValueOrDefault(d.DelegatorUserId, "Không rõ"));
         var departmentNames = allDepartments.ToDictionary(d => d.Id, d => d.Name);
-        var summaryDepartments = allDepartments
-            .Select(d => new NursingSummaryDepartment(
-                d.Id, d.Name, d.IsActive && configured.ContainsKey(d.Id), configured.TryGetValue(d.Id, out var c) ? c.BedCount : null))
-            .ToList();
+        var summaryDepartments = NursingSummaryDepartment.From(allDepartments, configured);
 
         // Khoa phải nhập tay khi HIS lỗi: khoa phải báo cáo (NB PK chờ nhập viện) và khoa được giao chỉ số toàn viện.
         var expected = summaryDepartments.Where(d => d.IsReporting).Select(d => d.Id)
@@ -66,7 +73,8 @@ public sealed class NursingSummaryService(
                     departmentNames[d.Id],
                     [.. d.Keys.Select(k => k.Key)],
                     entry?.UpdatedAtUtc,
-                    entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId));
+                    entry is null ? null : names.GetValueOrDefault(entry.UpdatedByUserId),
+                    entry?.DelegationId is { } delegationId ? delegators.GetValueOrDefault(delegationId) : null);
             })
             .OrderBy(d => d.DepartmentName, VietnameseComparer.Instance)
             .ToList();
@@ -78,6 +86,19 @@ public sealed class NursingSummaryService(
             statistics is null ? null : names.GetValueOrDefault(statistics.UpdatedByUserId),
             expected,
             merged.UsesDepartmentEntries);
+        var codes = summaryDepartments.ToDictionary(d => d.Id, d => d.Code);
+        IReadOnlyList<NursingSummaryDelegationDto> active = [.. covering
+            .Select(d => new NursingSummaryDelegationDto(
+                d.DepartmentId,
+                codes.GetValueOrDefault(d.DepartmentId, string.Empty),
+                departmentNames.GetValueOrDefault(d.DepartmentId, string.Empty),
+                names.GetValueOrDefault(d.DelegateUserId, "Không rõ"),
+                names.GetValueOrDefault(d.DelegatorUserId, "Không rõ"),
+                d.StartDate,
+                d.EndDate,
+                NursingDelegationText.Contents(d.Scope)))
+            .OrderBy(d => d.DepartmentCode, VietnameseComparer.Instance)
+            .ThenBy(d => d.StartDate)];
         return NursingSummaryBuilder.Build(
             reportDate,
             summaryDepartments,
@@ -85,7 +106,9 @@ public sealed class NursingSummaryService(
             names,
             merged.Values,
             info,
-            merged.HospitalEnteredBy.ToDictionary(p => p.Key, p => departmentNames.GetValueOrDefault(p.Value) ?? string.Empty, StringComparer.Ordinal));
+            merged.HospitalEnteredBy,
+            delegators,
+            active);
     }
 
     public async Task<NursingReportFile> RenderPdfAsync(DateOnly reportDate, CancellationToken cancellationToken)
@@ -168,21 +191,28 @@ public sealed class NursingSummaryService(
     }
 
     /// <summary>
-    /// Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo hoặc còn được giao chỉ số), kèm phải báo cáo không, số
-    /// giường và các chỉ số toàn viện khoa nhập tay khi HIS lỗi.
+    /// Mọi khoa đang dùng (và khoa ngừng dùng còn trong danh sách báo cáo hoặc còn được giao chỉ số), kèm tên viết tắt, phải báo
+    /// cáo không, số giường và các chỉ số toàn viện khoa nhập tay khi HIS lỗi. Khoa phải báo cáo đứng trước theo thứ tự trên bảng
+    /// tổng hợp (quyết định 45), rồi các khoa khác theo tên.
     /// </summary>
     public async Task<IReadOnlyList<NursingReportDepartmentDto>> ListDepartmentsAsync(CancellationToken cancellationToken)
     {
         var configured = (await reports.ListDepartmentsAsync(cancellationToken).ConfigureAwait(false))
             .ToDictionary(d => d.DepartmentId);
         var assignments = await AssignmentsAsync(cancellationToken).ConfigureAwait(false);
+        bool Reporting(Department d) => d.IsActive && configured.ContainsKey(d.Id);
         return [.. (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
             .Where(d => d.IsActive || configured.ContainsKey(d.Id) || assignments.Values.Contains(d.Id))
-            .OrderBy(d => d.Name, VietnameseComparer.Instance)
+            .OrderBy(d => Reporting(d) ? 0 : 1)
+            .ThenBy(d => Reporting(d) ? configured[d.Id].SortOrder : 0)
+            .ThenBy(d => Reporting(d) ? d.ShortName ?? d.Code : string.Empty, VietnameseComparer.Instance)
+            .ThenBy(d => d.Name, VietnameseComparer.Instance)
             .Select(d => new NursingReportDepartmentDto(
                 d.Id,
                 d.Code,
                 d.Name,
+                d.ShortName,
+                d.IsActive,
                 configured.ContainsKey(d.Id),
                 configured.TryGetValue(d.Id, out var c) ? c.BedCount : null,
                 [.. NursingHisEntry.HospitalLines.Where(l => assignments.TryGetValue(l.Key, out var assigned) && assigned == d.Id).Select(l => l.Key)]))];
@@ -197,15 +227,21 @@ public sealed class NursingSummaryService(
     {
         ArgumentNullException.ThrowIfNull(request);
         var items = request.Items ?? [];
-        var active = (await departments.ListAsync(includeInactive: false, cancellationToken).ConfigureAwait(false))
-            .Select(d => d.Id)
-            .ToHashSet();
+        var known = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false)).ToDictionary(d => d.Id);
+
+        // Khoa không dùng được: không có, hoặc đã ngừng sử dụng (khoa nhập tay trước đây không còn trong danh mục khoa lấy từ HIS,
+        // quyết định 42). Thông báo ghi tên khoa để Phòng Điều dưỡng biết sửa dòng nào.
+        string? Unusable(Guid departmentId, string fix) =>
+            !known.TryGetValue(departmentId, out var department) ? "Khoa không tồn tại."
+            : department.IsActive ? null
+            : $"{department.Name} ({department.Code}) đã ngừng sử dụng (không còn trong danh mục khoa/phòng), {fix}.";
+
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
         for (var i = 0; i < items.Count; i++)
         {
-            if (!active.Contains(items[i].DepartmentId))
+            if (Unusable(items[i].DepartmentId, "bỏ chọn khoa này") is { } problem)
             {
-                errors[$"items[{i}].departmentId"] = ["Khoa không tồn tại hoặc đã ngừng sử dụng."];
+                errors[$"items[{i}].departmentId"] = [problem];
             }
             else if (items.Take(i).Any(other => other.DepartmentId == items[i].DepartmentId))
             {
@@ -227,9 +263,9 @@ public sealed class NursingSummaryService(
             }
             else if (departmentId is { } id)
             {
-                if (!active.Contains(id))
+                if (Unusable(id, "chọn khoa khác") is { } problem)
                 {
-                    errors[$"hisEntry.{key}"] = ["Khoa không tồn tại hoặc đã ngừng sử dụng."];
+                    errors[$"hisEntry.{key}"] = [problem];
                 }
                 else
                 {
@@ -238,9 +274,48 @@ public sealed class NursingSummaryService(
             }
         }
 
+        // Tên viết tắt (quyết định 45): chỉ khoa đang dùng; tối đa 20 ký tự; không trùng tên viết tắt (hoặc mã, khi chưa có tên viết
+        // tắt) của khoa đang dùng khác, để mục A, E, F không lẫn khoa.
+        var shortNames = new Dictionary<Guid, string?>();
+        foreach (var (departmentId, value) in request.ShortNames ?? new Dictionary<Guid, string?>())
+        {
+            var key = $"shortNames.{departmentId}";
+            var normalized = Department.NormalizeShortName(value);
+            if (Unusable(departmentId, "không đặt tên viết tắt được") is { } problem)
+            {
+                errors[key] = [problem];
+            }
+            else if (normalized is { Length: > Department.ShortNameMaxLength } || (normalized?.Any(char.IsControl) ?? false))
+            {
+                errors[key] = [$"Tên viết tắt tối đa {Department.ShortNameMaxLength} ký tự."];
+            }
+            else
+            {
+                shortNames[departmentId] = normalized;
+            }
+        }
+
+        var labels = known.Values
+            .Where(d => d.IsActive)
+            .Select(d => (Department: d, Label: shortNames.TryGetValue(d.Id, out var name) ? name ?? d.Code : d.ShortName ?? d.Code))
+            .ToList();
+        foreach (var same in labels.GroupBy(l => l.Label, StringComparer.OrdinalIgnoreCase).Where(g => g.Count() > 1))
+        {
+            foreach (var (department, label) in same.Where(l => shortNames.ContainsKey(l.Department.Id)))
+            {
+                var other = same.First(l => l.Department.Id != department.Id).Department;
+                errors[$"shortNames.{department.Id}"] = [$"Tên viết tắt \"{label}\" trùng với {other.Name} ({other.Code})."];
+            }
+        }
+
         if (errors.Count > 0)
         {
             return Error.Validation("validation", "Dữ liệu không hợp lệ.", errors);
+        }
+
+        foreach (var (departmentId, name) in shortNames)
+        {
+            known[departmentId].SetShortName(name);
         }
 
         if (request.HisEntry is not null)
@@ -248,14 +323,16 @@ public sealed class NursingSummaryService(
             await StoreAssignmentsAsync(hisEntry, cancellationToken).ConfigureAwait(false);
         }
 
+        // Thứ tự trên bảng tổng hợp là thứ tự trong danh sách gửi lên, đánh số từ 1 (quyết định 45).
         var now = clock.UtcNow;
         var existing = await reports.ListDepartmentsAsync(cancellationToken).ConfigureAwait(false);
-        var wanted = items.ToDictionary(i => i.DepartmentId, i => i.BedCount);
+        var wanted = items.Select((item, index) => (item, index)).ToDictionary(p => p.item.DepartmentId, p => (p.item.BedCount, Order: p.index + 1));
         foreach (var department in existing)
         {
-            if (wanted.TryGetValue(department.DepartmentId, out var beds))
+            if (wanted.TryGetValue(department.DepartmentId, out var want))
             {
-                department.SetBedCount(beds, now);
+                department.SetBedCount(want.BedCount, now);
+                department.SetSortOrder(want.Order, now);
             }
             else
             {
@@ -265,7 +342,7 @@ public sealed class NursingSummaryService(
 
         foreach (var item in items.Where(i => existing.All(e => e.DepartmentId != i.DepartmentId)))
         {
-            reports.AddDepartment(NursingReportDepartment.Create(item.DepartmentId, item.BedCount, now));
+            reports.AddDepartment(NursingReportDepartment.Create(item.DepartmentId, item.BedCount, now, wanted[item.DepartmentId].Order));
         }
 
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);

@@ -89,6 +89,25 @@ public sealed class AuthServiceTests
     }
 
     [Fact]
+    public async Task DeletedUser_CannotLogIn_AndIsTreatedAsAnUnknownAccount()
+    {
+        var ctx = new AppTestContext();
+        var admin = ctx.AddUser("admin1", role: SystemRoles.Administrator);
+        var deleted = ctx.AddUser("nghiviec", active: false);
+        deleted.Delete(admin.Id, DateTimeOffset.UtcNow);
+        var service = ctx.CreateAuthService();
+
+        var result = await service.LoginAsync(new LoginRequest("nghiviec", Password), CancellationToken.None);
+
+        // Không báo "ngưng sử dụng" (như tài khoản không tồn tại), không tạo phiên.
+        Assert.Equal(AuthErrors.InvalidCredentials, result.Error);
+        Assert.Empty(ctx.Store.RefreshTokens);
+        var audit = Assert.Single(ctx.Store.AuditLogs, a => a.Action == AuditActions.LoginFailed);
+        Assert.Contains("deleted_user", audit.Details, StringComparison.Ordinal);
+        Assert.Equal(deleted.Id.ToString(), audit.EntityId);
+    }
+
+    [Fact]
     public async Task InactiveUser_IsOnlyToldAboutLock_WhenPasswordIsCorrect()
     {
         var ctx = new AppTestContext();

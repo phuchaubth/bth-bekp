@@ -26,9 +26,18 @@ export const Permissions = {
   /** Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo và số giường, số liệu HIS. */
   NursingReportsManage: 'nursingreports.manage',
   ScopeAllDepartments: 'scope.all_departments',
+  /** Phân công kiểm thử tính năng mới, xem và xử lý báo cáo kiểm thử (quyết định 49). */
+  TestingManage: 'testing.manage',
+  /** Bật/tắt chế độ bảo trì, vẫn vào hệ thống khi đang bảo trì (quyết định 53). */
+  SystemMaintenance: 'system.maintenance',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]
 
 /** Mã vai trò Kiosk: tài khoản máy kiosk chỉ dùng màn hình kiosk. */
 export const KIOSK_ROLE_CODE = 'KIOSK'
+
+/** Có quyền, hoặc có một trong các quyền khi truyền danh sách (mục menu mở cho nhiều nhóm người dùng). */
+export function hasAnyPermission(permission: string | readonly string[], hasPermission: (permission: string) => boolean): boolean {
+  return typeof permission === 'string' ? hasPermission(permission) : permission.some((p) => hasPermission(p))
+}

@@ -9,7 +9,7 @@ public static class AuthErrors
         Error.Unauthorized("auth.invalid_credentials", "Tên đăng nhập hoặc mật khẩu không đúng.");
 
     public static Error Inactive { get; } =
-        Error.Unauthorized("auth.inactive", "Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.");
+        Error.Unauthorized("auth.inactive", "Tài khoản đã ngưng sử dụng. Vui lòng liên hệ quản trị viên.");
 
     public static Error RefreshInvalid { get; } =
         Error.Unauthorized("auth.refresh_invalid", "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");

@@ -122,7 +122,9 @@ Gói migration áp dụng lần lượt các migration còn thiếu (idempotent;
 | `ConsentWeb\` | `D:\Apps\ConsentWeb` | Đã gồm `web.config` mẫu (`deploy/iis/web.frontend.config`) |
 | `PatientInfoApi\` | `C:\Apps\PatientInfoApi` | Tùy chọn: API thông tin người bệnh (mục 5.5); đã gồm `web.config` mẫu (`deploy/iis/web.patientinfo.config`) |
 | `efbundle.exe` | Thư mục tạm trên máy chủ | Cập nhật lược đồ CSDL (mục 4.2) |
-| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql` |
+| `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql`, `05-uat-create-login.sql`; `06-xoa-du-lieu-chay-thu.sql` (dùng qua script bên dưới, mục 5.11) |
+| `cap-nhat-moi-truong.ps1` | Chạy tại thư mục gói | Cài gói lên UAT rồi Prod (mục 5.10) |
+| `xoa-du-lieu-chay-thu.ps1` | Chạy tại thư mục gói | Xóa phiếu, báo cáo điều dưỡng chạy thử trước khi dùng thật (mục 5.11) |
 | `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Mã commit và ngày đóng gói |
 
 **Cách 2: tự build** trên một máy có .NET SDK 10 và Node.js 24.15 trở lên (kết quả giống cách 1):
@@ -364,6 +366,16 @@ Khoa lập "Báo cáo công tác điều dưỡng" mỗi ngày, Phòng Điều d
 
 Từ quyết định 38, mục VI của báo cáo khoa nhập riêng **số ca nhập khoa từ PK** và **số ca nhập khoa do CK** ngày hôm trước, và bảng tổng hợp mục A có hai cột **Nhập khoa từ PK**, **Nhập khoa do CK** thay cột "Số ca nhập viện ngày hôm trước" (màn hình, PDF, Excel). Không có migration. Báo cáo đã gửi trước khi cài gói chỉ có số tổng: hai cột mới của khoa đó để trống; cần đủ số thì Phòng Điều dưỡng **Trả lại khoa** để khoa nhập lại.
 
+Từ quyết định 44, mục VI của báo cáo khoa có thêm **Số NB người nước ngoài** và **Số ca chuyển khoa ngày hôm trước**. Bảng tổng hợp mục A có thêm cột **Người nước ngoài**, **Chuyển khoa** và cột cuối **Người báo cáo**; cột khoa phòng ghi **mã khoa** (mã khoa/phòng lấy từ HIS, mục 5.9); dưới mỗi mục B–F có dòng người báo cáo; cuối PDF và Excel có chỗ **Phòng Điều dưỡng** ký. Không có migration. Báo cáo đã gửi trước khi cài gói chưa có hai dòng mới: hai cột mới của khoa đó để trống (không ghi 0); cần đủ số thì Phòng Điều dưỡng **Trả lại khoa** để khoa nhập thêm rồi gửi lại.
+
+Từ quyết định 45, Phòng Điều dưỡng xếp **thứ tự** các khoa ở mục A và đặt **tên viết tắt** in thay mã khoa trên bảng tổng hợp (hộp **Khoa báo cáo và số giường**). Bản này kèm migration `AddNursingDepartmentOrderAndShortName` (thêm cột `SortOrder` vào bảng `NursingReportDepartments`, cột `ShortName` vào bảng `Departments`; không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Sau khi cài, bảng tổng hợp vẫn xếp theo mã khoa và in mã khoa như trước cho tới khi Phòng Điều dưỡng đặt thứ tự, tên viết tắt rồi bấm **Lưu**. Lấy lại danh mục khoa/phòng từ HIS (mục 5.9) không xóa tên viết tắt.
+
+Từ quyết định 46, mục VI của báo cáo khoa có thêm **Số NB ngày hôm trước** (điền sẵn bằng Số NB hiện tại của báo cáo đã gửi hôm trước) và **Số NB hiện tại** do phần mềm tính: Số NB ngày hôm trước + nhập khoa từ PK + nhập khoa do CK − xuất viện − chuyển khoa. Bảng tổng hợp mục A có thêm cột **Số NB ngày hôm trước**. Không có migration. Báo cáo lưu trước khi cài gói giữ Số NB hiện tại khoa đã nhập, cột mới để trống. Ngày đầu sau khi cài, báo cáo mới của khoa được điền sẵn Số NB ngày hôm trước từ báo cáo đã gửi hôm trước (số khoa đã nhập tay); khoa kiểm tra lại trước khi gửi.
+
+Từ quyết định 47, Phòng Điều dưỡng có thêm trang **Dashboard** (menu **Điều dưỡng**): xem số liệu 7, 30 hoặc 90 ngày từ báo cáo các khoa đã gửi. Trang chỉ đọc, dùng quyền `nursingreports.read` có sẵn của vai trò Phòng Điều dưỡng. Không có migration, không cần cấu hình thêm.
+
+Từ quyết định 48, người lập báo cáo của khoa **ủy quyền** cho người khác làm báo cáo của khoa và/hoặc nhập số liệu HIS khi vắng (menu **Điều dưỡng → Ủy quyền báo cáo**). Bản này kèm migration `AddNursingReportDelegations` (bảng mới `NursingReportDelegations`; thêm cột `SubmittedDelegationId` vào bảng `NursingDailyReports`, cột `DelegationId` vào bảng `NursingDepartmentStatistics`; chỉ thêm, không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Không thêm quyền mới: người được ủy quyền phải có vai trò được quyền `nursingreports.submit` (vai trò **Điều dưỡng** có sẵn) và thuộc một khoa. Phòng Điều dưỡng xem mọi ủy quyền bằng quyền `nursingreports.read` có sẵn; hủy ủy quyền của người khác cần `nursingreports.manage`.
+
 1. **Tài khoản Phòng Điều dưỡng:** quản trị vào *Quản trị → Người dùng*, gán vai trò **Phòng Điều dưỡng** cho nhân viên Phòng Điều dưỡng (nên đặt khoa là Phòng Điều dưỡng). Vai trò này xem mọi khoa và bảng tổng hợp, trả lại báo cáo cho khoa sửa (nút **Trả lại khoa**), cài khoa báo cáo, số giường, khoa nhập số liệu HIS và bấm lấy số liệu HIS. Phòng Điều dưỡng không nhập số liệu thay khoa. Ban giám đốc chỉ cần xem: tạo vai trò riêng (ví dụ *Ban giám đốc*) ở *Quản trị → Vai trò và quyền → Thêm vai trò*, chỉ đánh dấu quyền *Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp* (và các quyền xem khác nếu cần), rồi gán cho tài khoản ban giám đốc (quyết định 40).
 2. **Điều dưỡng các khoa:** vai trò **Điều dưỡng** đã có quyền *Lập và gửi báo cáo điều dưỡng của khoa*. Người lập báo cáo phải được đặt **đúng khoa** ở hồ sơ người dùng (báo cáo lập cho khoa chính của người dùng; điều dưỡng làm ở nhiều khoa thì thêm các khoa đó ở ô *Khoa/phòng khác* và chọn khoa ở đầu trang báo cáo, mục 5.8). Vai trò khác cần lập (ví dụ trưởng khoa) thì thêm quyền này ở *Vai trò và quyền*.
 3. **Khoa báo cáo và số giường:** Phòng Điều dưỡng vào *Báo cáo điều dưỡng → Tổng hợp hằng ngày*, bấm **Khoa báo cáo và số giường**, chọn các khoa phải gửi báo cáo và nhập số giường thực kê (không tính băng ca). Khoa chưa được chọn thì chưa lập được báo cáo.
@@ -465,10 +477,162 @@ Khi phần mềm phiếu đã kết nối API thông tin người bệnh (mục 
    - khoa/phòng có **mã trùng** mã trên HIS: cập nhật tên theo HIS (đang ngừng sử dụng thì dùng lại);
    - khoa/phòng nhập tay trước đây có **tên trùng** tên trên HIS (không phân biệt hoa thường, khoảng trắng thừa): nhận mã HIS, giữ nguyên người dùng, phiếu, báo cáo đã gắn;
    - khoa/phòng chỉ có trên HIS: thêm mới;
-   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*).
+   - khoa/phòng không còn trên HIS: chuyển sang *ngừng sử dụng*, không xóa. Màn hình liệt kê tên các khoa này; tài khoản thuộc khoa đó cần chuyển sang khoa mới (*Quản trị → Người dùng*). Phòng Điều dưỡng mở *Báo cáo điều dưỡng → Tổng hợp hằng ngày → Khoa báo cáo và số giường*: khoa ngừng sử dụng có nhãn **Ngừng sử dụng**, chọn khoa thay thế trên HIS (khoa báo cáo, số giường, khoa nhập số liệu HIS) rồi **Lưu**; khoa ngừng sử dụng được bỏ khỏi danh sách khi lưu. Bản trước 20/11/2026 báo "Dữ liệu không hợp lệ" ở bước này nếu còn khoa ngừng sử dụng trong danh sách: xem khoa nào ghi *Ngừng sử dụng* ở *Quản trị → Khoa/phòng*, bỏ chọn khoa đó và chọn lại khoa nhập số liệu HIS đang giao cho khoa đó rồi lưu.
 
    HIS lỗi, API chưa có câu truy vấn hoặc HIS trả về rỗng thì danh mục giữ nguyên. Mỗi thay đổi ghi nhật ký hệ thống. Khi HIS thêm, đổi tên hoặc ngừng dùng khoa/phòng, bấm lại nút này.
 5. **Mã khoa là mã HIS:** sau khi lấy danh mục, cột `DepartmentCode` của câu truy vấn số liệu trong ngày (mục 5.7, `PatientInfo__DailyStatisticsQuery`) trả thẳng mã khoa trên HIS. Nếu câu truy vấn đó đang đổi mã HIS sang mã khoa nhập tay cũ thì bỏ phần đổi mã.
+
+
+### 5.10. Môi trường UAT (kiểm thử) và Production (chạy thật) (quyết định 50)
+
+Bệnh viện chạy **hai môi trường tách biệt** trên cùng máy chủ IIS (hoặc hai máy): **UAT** để kiểm thử bản mới, **Prod** để chạy thật. Mỗi bản mới đi theo một đường: **cài lên UAT → phân công kiểm thử (mục 10 hướng dẫn sử dụng, quyết định 49) → đạt thì cài đúng gói đó (cùng mã SHA256) lên Prod**. Không build lại gói cho Prod: gói đã kiểm thử trên UAT chính là gói chạy thật.
+
+| | UAT (kiểm thử) | Prod (chạy thật) |
+|---|---|---|
+| Địa chỉ | `https://phieudongthuan-uat.bth.org.vn` (tên ví dụ; bản ghi DNS nội bộ và **chứng chỉ riêng**) | `https://phieudongthuan.bth.org.vn` |
+| Thư mục | `C:\Apps\UAT\ConsentApi`, `C:\Apps\UAT\ConsentWeb` | `C:\Apps\ConsentApi`, `C:\Apps\ConsentWeb` |
+| Application Pool, site | `ConsentApi-UAT` (http `127.0.0.1:5090`), `ConsentWeb-UAT` (https 443, tên miền UAT) | `ConsentApi` (http `127.0.0.1:5080`), `ConsentWeb` |
+| CSDL, tài khoản SQL | `ConsentManagement_UAT`; `consent_app_uat`, `consent_migrator_uat` ([`05-uat-create-login.sql`](../deploy/sql/05-uat-create-login.sql)) | `ConsentManagement`; `consent_app`, `consent_migrator` |
+| `ASPNETCORE_ENVIRONMENT` | `Staging` (chạy như Production, nhưng cho dữ liệu giả lập); đặt ở Application Pool **và** `web.config` của API, vì giá trị trong `web.config` được ưu tiên | `Production` |
+| `App__EnvironmentLabel` | `UAT`: mọi trang (kể cả đăng nhập, kiosk, màn hình ký) có **dải vàng "UAT: môi trường kiểm thử"**, tab trình duyệt ghi `[UAT]` | **Không đặt** |
+| Khóa `Jwt__SigningKey`, `DataProtection__*` | **Tạo mới, khác Prod** | Khóa đang dùng |
+| `Storage__DocumentsPath` | `D:\ConsentDocuments-UAT` | `D:\ConsentDocuments` |
+| Dữ liệu | **Chỉ dữ liệu giả lập** (`Seed__DemoData=true` tạo khoa, tài khoản demo); tài khoản riêng cho người kiểm thử | Dữ liệu thật |
+| HIS | `His__Provider=None` (hoặc `Fake`: HIS giả lập sinh dữ liệu không có thật, chỉ chạy được ở UAT); không nối API thông tin người bệnh với CSDL HIS thật, trừ khi HIS có CSDL thử nghiệm | Theo mục 5.5 |
+
+> **Không chép CSDL, thư mục PDF hay khóa của Prod sang UAT.** UAT có thể bị nhiều người thử, phiếu lập trên UAT không có giá trị. Muốn thử với dữ liệu giống thật thì nhập dữ liệu giả lập.
+
+**Tạo môi trường UAT (làm một lần)**
+
+1. **DNS và chứng chỉ:** trỏ `phieudongthuan-uat.bth.org.vn` về IP máy chủ, cấp chứng chỉ cho tên này như mục 2a. Dùng **tên miền riêng**, không dùng cổng khác trên tên miền chạy thật: trình duyệt dùng chung cookie đăng nhập giữa các cổng của cùng tên miền.
+2. **CSDL:** đổi hai mật khẩu mẫu trong `sql\05-uat-create-login.sql` (khác mật khẩu Prod) rồi chạy bằng tài khoản quản trị SQL Server.
+3. **Thư mục PDF:** tạo `D:\ConsentDocuments-UAT`.
+4. **Site API UAT:** làm như mục 5.2 với tên `ConsentApi-UAT`, thư mục `C:\Apps\UAT\ConsentApi` (tạo thư mục trống), binding **http `127.0.0.1` cổng 5090**. Biến môi trường của Application Pool `ConsentApi-UAT` (lệnh PowerShell ở mục 5.2 bước 3, đổi `$pool` và các giá trị):
+
+   ```powershell
+   $pool = 'ConsentApi-UAT'
+   $vars = @{
+     'ASPNETCORE_ENVIRONMENT'            = 'Staging'
+     'App__EnvironmentLabel'             = 'UAT'
+     'ConnectionStrings__Default'        = 'Server=tcp:SQL01,1433;Database=ConsentManagement_UAT;User Id=consent_app_uat;Password=…;Encrypt=True;TrustServerCertificate=True'
+     'Jwt__SigningKey'                   = '…'   # tạo mới (mục 3), khác Prod
+     'DataProtection__FieldEncryptionKey'= '…'   # tạo mới, khác Prod
+     'DataProtection__BlindIndexKey'     = '…'   # tạo mới, khác Prod và khác khóa trên
+     'Storage__DocumentsPath'            = 'D:\ConsentDocuments-UAT'
+     'AllowedHosts'                      = 'phieudongthuan-uat.bth.org.vn;localhost;127.0.0.1'
+     'ReverseProxy__TrustAllProxies'     = 'true'
+     'Seed__Enabled'                     = 'true'
+     'Seed__AdminPassword'               = '…'   # xóa sau khi đăng nhập lần đầu
+     'Seed__DemoData'                    = 'true'
+     'Seed__DemoPassword'                = '…'   # mật khẩu chung của các tài khoản demo trên UAT
+   }
+   ```
+
+   Cấp quyền *Modify* cho `IIS AppPool\ConsentApi-UAT` trên `D:\ConsentDocuments-UAT`.
+5. **Site Web UAT:** làm như mục 5.3 với tên `ConsentWeb-UAT`, thư mục `C:\Apps\UAT\ConsentWeb` (tạo thư mục trống), binding https 443, hostname `phieudongthuan-uat.bth.org.vn`, bật *Require Server Name Indication*, chọn chứng chỉ UAT. Phần cấu hình ARR ở mục 5.3 bước 1 làm một lần cho cả máy chủ, không làm lại.
+6. **Cài gói đầu tiên** bằng script ở mục dưới (`-MoiTruong UAT`). Lần đầu, script chép `web.config` mẫu vào hai thư mục, tự đổi địa chỉ chuyển tiếp `/api` của giao diện sang cổng 5090 và ghi `ASPNETCORE_ENVIRONMENT` = `Staging` trong `web.config` của API. `web.config` mẫu trong gói ghi `Production`, và giá trị trong `web.config` **ghi đè** biến của Application Pool: nếu chép `web.config` bằng tay vào `C:\Apps\UAT\ConsentApi` thì sửa `Production` thành `Staging`, nếu không API UAT chạy như Production và không khởi động được khi bật `Seed__DemoData`. Script kiểm tra và không cài khi `web.config` của API ghi môi trường khác.
+7. Mở `https://phieudongthuan-uat.bth.org.vn`: phải thấy dải vàng **UAT**. Đăng nhập `admin`, đổi mật khẩu, xóa biến `Seed__AdminPassword`, tạo tài khoản cho từng người kiểm thử (*Quản trị → Người dùng*), giao vai trò như thật để thử đúng quyền.
+
+**Ngưng sử dụng, xóa tài khoản (quyết định 51):** bản có tính năng này kèm migration `AddUserDeletion` (thêm cột `DeletedAtUtc`, `DeletedByUserId` vào bảng `Users`, chỉ thêm; tài khoản cũ không bị ảnh hưởng). Tài khoản trước đây "khóa" nay nằm ở thẻ **Ngưng sử dụng**.
+
+**Phân công kiểm thử (quyết định 49):** trang *Quản trị → Phân công kiểm thử* dùng quyền mới `testing.manage`; vai trò **Quản trị hệ thống** tự có khi API khởi động, muốn giao cho người khác (ví dụ trưởng nhóm kiểm thử) thì thêm quyền này vào vai trò ở *Vai trò và quyền*. Bản có tính năng này kèm migration `AddTestAssignments` (bảng mới `TestAssignments`, chỉ thêm); script dưới đây tự chạy migration.
+
+**Đưa bản mới lên: UAT trước, Prod sau**
+
+Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có trong gói (cùng thư mục với `efbundle.exe`). Mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS:
+
+1. **Lấy gói và mã SHA256** như mục 5.1: tải file `goi-trien-khai-iis-<mã commit>.zip` vào `C:\Setup`, chép mã ở dòng *SHA256 digest of uploaded artifact zip is …* trong log bước *upload-artifact* của GitHub Actions. **So mã trước khi giải nén** (script nằm trong gói, nên phải chắc gói đúng rồi mới chạy), rồi giải nén để lấy script:
+
+   ```powershell
+   (Get-FileHash C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Algorithm SHA256).Hash   # phải trùng mã trên GitHub Actions
+   Expand-Archive C:\Setup\goi-trien-khai-iis-<mã commit>.zip C:\Setup\tam-<mã commit>
+   cd C:\Setup\tam-<mã commit>
+   ```
+
+2. **Cài lên UAT:**
+
+   ```powershell
+   .\cap-nhat-moi-truong.ps1 -MoiTruong UAT -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
+   ```
+
+   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF; `web.config` của API không ghi môi trường khác); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool **API** (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" thay vì trang lỗi của IIS, quyết định 53); chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`; giao diện chỉ dừng vài giây trong lúc chép file giao diện); chạy lại API; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`. Máy đang mở phần mềm tự tải lại trang khi API chạy lại.
+3. **Kiểm thử trên UAT:** người quản lý kiểm thử (vai trò Quản trị, hoặc vai trò được thêm quyền `testing.manage`) vào *Quản trị → Phân công kiểm thử*, phân công từng tính năng mới cho từng người, mỗi người một thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo (bắt buộc); trang *Tổng quan* nhắc việc chưa báo cáo.
+4. **Xem kết quả:** khi mọi phân công đã có báo cáo và đạt (hoặc lỗi còn lại được chấp nhận, ghi hướng xử lý), quyết định đưa lên Prod. Bản không đạt: gửi báo cáo (xuất Excel) cho nhóm phát triển, chờ gói sửa, quay lại bước 1 với gói mới.
+5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy màn hình "Hệ thống đang bảo trì" vài phút) **cùng file gói, cùng mã SHA256**. Muốn kiểm tra bản mới trước khi cho mọi người vào: bật **chế độ bảo trì** trước khi chạy script, kiểm tra xong bằng tài khoản quản trị rồi tắt (mục 5.12):
+
+   ```powershell
+   .\cap-nhat-moi-truong.ps1 -MoiTruong Prod -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
+   ```
+
+   Script **từ chối** gói chưa cài thành công lên UAT (theo `lich-su-cai-dat.csv`). Chỉ khi sửa lỗi khẩn cấp mà không kịp qua UAT mới thêm `-BoQuaKiemTraUAT`, ghi lý do vào biên bản, rồi cài gói đó lên UAT ngay sau.
+6. **Kiểm tra Prod:** không có dải vàng; đăng nhập, mở một phiếu, một báo cáo. `lich-su-cai-dat.csv` ghi lại mọi lần cài (thời điểm, môi trường, mã SHA256, mã commit, người cài, kết quả) làm biên bản.
+
+Script đọc máy chủ SQL và tên CSDL từ chuỗi kết nối của chính Application Pool API nên không cập nhật nhầm CSDL của môi trường kia. Thư mục, tên Application Pool, cổng của mỗi môi trường khai ở đầu script (bảng `$CauHinh`); bệnh viện đặt khác thì sửa ở đó. Gói có `PatientInfoApi` và máy chủ có thư mục `PatientInfoApi` của môi trường đó thì script cập nhật luôn.
+
+**Khôi phục khi bản mới lỗi**
+
+1. Dừng Application Pool của môi trường đó (`Stop-WebAppPool ConsentApi`, `ConsentWeb`).
+2. Chép lại thư mục ứng dụng từ bản sao lưu script vừa tạo (dòng *Thư mục:* ở bước 4 của script): `robocopy C:\Backup\Consent\Prod\truoc-<mã>-<thời điểm>\ConsentApi C:\Apps\ConsentApi /MIR`, làm tương tự với `ConsentWeb`.
+3. CSDL: phần lớn bản nâng cấp chỉ **thêm** bảng, cột (ghi rõ ở từng quyết định), bản cũ chạy được trên CSDL mới nên **không cần** khôi phục CSDL. Chỉ khi bản mới làm sai dữ liệu mới khôi phục bản sao lưu `<tên CSDL>_truoc-cap-nhat_<thời điểm>.bak` (mục 7, `03-restore.sql`); dữ liệu nhập sau thời điểm đó sẽ mất.
+4. Khởi động lại Application Pool, kiểm tra `/health/ready`, báo nhóm phát triển kèm `lich-su-cai-dat.csv` và log lỗi.
+
+### 5.11. Xóa dữ liệu chạy thử trước khi dùng thật (quyết định 52)
+
+Sau thời gian chạy thử, bệnh viện xóa hết phiếu, báo cáo điều dưỡng đã làm thử để bắt đầu dùng thật với dữ liệu sạch. Script [`xoa-du-lieu-chay-thu.ps1`](../deploy/iis/xoa-du-lieu-chay-thu.ps1) có trong gói (cạnh `cap-nhat-moi-truong.ps1`), dùng file [`sql\06-xoa-du-lieu-chay-thu.sql`](../deploy/sql/06-xoa-du-lieu-chay-thu.sql) của gói. **Chạy trước ngày dùng thật**: sau khi đã dùng thật, script xóa cả phiếu, báo cáo thật.
+
+| Xóa | Giữ nguyên |
+|---|---|
+| Phiếu đồng thuận ở mọi trạng thái (nháp, chờ ký, hoàn tất, đã hủy, đã thu hồi), chữ ký trên phiếu, liên kết ký qua mã QR | Người dùng, vai trò và quyền, khoa/phòng, mẫu phiếu và các phiên bản |
+| File PDF đã ký của các phiếu đó: **chuyển** sang thư mục sao lưu, không xóa hẳn | Cấu hình hệ thống: tên đơn vị, logo, khung chữ ký (file nằm cùng thư mục PDF, không bị đụng tới), kiosk, lượt tiếp nhận |
+| Hồ sơ người bệnh và người đại diện (giữ lại nếu thêm `-GiuNguoiBenh`) | Khoa báo cáo và số giường, thứ tự, tên viết tắt, khoa được giao nhập số liệu HIS |
+| Báo cáo điều dưỡng của khoa (mọi ngày, mọi trạng thái) | Ủy quyền báo cáo, phân công kiểm thử |
+| Số liệu HIS của báo cáo điều dưỡng (toàn viện, các khoa nhập khi HIS lỗi) | Lịch sử xuất dữ liệu; **nhật ký hệ thống** (CSDL chặn sửa, xóa nhật ký; script ghi thêm một dòng **Xóa dữ liệu chạy thử**) |
+
+**Số phiếu** mặc định chạy tiếp, để số phiếu thật không trùng số phiếu chạy thử còn ghi trong nhật ký. Muốn phiếu thật bắt đầu lại từ `PDT-<năm>-000001` thì thêm `-DanhSoLaiTu1`.
+
+Cách chạy: mở **Windows PowerShell bằng Run as Administrator** trên máy chủ IIS, ngoài giờ làm việc (người dùng thấy màn hình "Hệ thống đang bảo trì" khoảng một phút).
+
+1. Giải nén gói (đã so mã SHA256, mục 5.1) và `cd` vào thư mục gói. File tải từ Internet có thể bị Windows chặn chạy script: gói đã so đúng mã thì chạy `Unblock-File .\xoa-du-lieu-chay-thu.ps1`. Máy đặt chính sách chỉ chạy script đã ký thì gọi `powershell -ExecutionPolicy Bypass -File .\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod` (chỉ áp dụng cho lần chạy này).
+2. Chạy `.\xoa-du-lieu-chay-thu.ps1 -MoiTruong Prod`, thêm `-DanhSoLaiTu1`, `-GiuNguoiBenh` nếu cần. Môi trường UAT dùng `-MoiTruong UAT`.
+3. Script đọc CSDL và thư mục PDF từ cấu hình của Application Pool `ConsentApi` (không gõ tay, không nhầm môi trường), hỏi mật khẩu `consent_migrator` (không hiện, không ghi ra file), rồi **đếm và in số dòng sẽ xóa** từng loại dữ liệu (kèm ngày sớm nhất, muộn nhất) và số file PDF. **Bước này chưa thay đổi gì.**
+4. Đọc kỹ bảng đếm. Thấy có dữ liệu thật (ví dụ một khoa đã dùng thật từ một ngày) thì gõ khác để hủy. Đúng thì gõ `XOA <tên CSDL>`, ví dụ `XOA ConsentManagement` (đúng chữ hoa, chữ thường).
+5. Script làm tiếp, không cần thao tác:
+   - sao lưu CSDL vào file `<tên CSDL>_truoc-xoa-du-lieu-chay-thu_<thời điểm>.bak` (`COPY_ONLY`, thư mục sao lưu mặc định của SQL Server);
+   - dừng `ConsentApi` (giao diện `ConsentWeb` vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì", quyết định 53);
+   - xóa trong **một giao dịch**: lỗi ở đâu thì CSDL giữ nguyên như trước, file PDF chưa bị đụng tới;
+   - chuyển file PDF của các phiếu vừa xóa sang `C:\Backup\Consent\Prod\xoa-du-lieu-chay-thu-<thời điểm>\pdf`, ghi `ket-qua.txt` cùng thư mục;
+   - chạy lại `ConsentApi` (cả khi có lỗi), chờ `/health/ready`; máy đang mở phần mềm tự tải lại trang.
+6. Đăng nhập kiểm tra: danh sách phiếu, người bệnh, báo cáo điều dưỡng trống; người dùng, mẫu phiếu, cấu hình, khoa báo cáo còn nguyên; *Nhật ký hệ thống* có dòng **Xóa dữ liệu chạy thử** ghi tài khoản Windows đã chạy và số dòng đã xóa. Nhấn **Ctrl+F5** trên các máy đang mở phần mềm.
+
+Chạy lại khi không còn gì để xóa thì script báo *Không có dữ liệu chạy thử để xóa* và dừng: không hỏi xác nhận, không dừng ứng dụng.
+
+**Khôi phục khi lỡ xóa nhầm** (làm ngay, vì dữ liệu nhập sau lúc xóa sẽ mất): dừng hai Application Pool; khôi phục file `.bak` ở bước 5 (mục 7, `03-restore.sql`); chép thư mục `pdf` trong thư mục sao lưu trở lại thư mục PDF (`robocopy C:\Backup\Consent\Prod\xoa-du-lieu-chay-thu-<thời điểm>\pdf <Storage__DocumentsPath> /E`); khởi động lại.
+
+Bản sao lưu (file `.bak`, thư mục `pdf`) vẫn chứa dữ liệu chạy thử: giữ hoặc xóa theo quy định lưu trữ của bệnh viện. Nếu khi chạy thử có dùng thông tin người bệnh thật (lấy từ HIS), nên xóa bản sao lưu khi không cần nữa.
+
+Script chỉ chạy được trên CSDL của phần mềm (file SQL kiểm tra các bảng trước khi làm). Chạy thẳng file SQL mà không qua script thì SQL Server báo thiếu tham số, không xóa gì.
+
+### 5.12. Chế độ bảo trì (quyết định 53)
+
+Khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà không để người khác thao tác cùng lúc, quản trị bật chế độ bảo trì tại **Quản trị → Bảo trì hệ thống** (hướng dẫn sử dụng, mục 8.7): ghi **lý do** (hiện cho người dùng) và **giờ dự kiến xong** (để trống nếu chưa rõ; chỉ để thông báo, hết giờ không tự tắt). Có hiệu lực ngay, không cần khởi động lại.
+
+- **Người không có quyền "Bảo trì hệ thống"** (kể cả tài khoản kiosk, người bệnh ký trên máy tính bảng hoặc qua mã QR) thấy màn hình **"Hệ thống đang bảo trì"** kèm lý do, giờ dự kiến xong; không đăng nhập, không thao tác được (API trả `503`). Màn hình tự kiểm tra lại mỗi 30 giây.
+- **Phiên đăng nhập không bị thu hồi**; trang đang mở và dữ liệu đang nhập vẫn giữ dưới màn hình bảo trì. Tắt bảo trì thì màn hình tự đóng, người dùng làm tiếp (thao tác lúc đang bảo trì chưa được lưu thì bấm lưu lại); kiosk không cần đăng nhập lại.
+- **Tài khoản có quyền `system.maintenance`** (vai trò Quản trị hệ thống có sẵn; thêm cho vai trò khác ở *Vai trò và quyền*, nhóm Hệ thống) vẫn đăng nhập, thao tác như thường, thấy dải vàng "Đang bật chế độ bảo trì". Đang bảo trì mà chưa đăng nhập: ở màn hình bảo trì chọn **Đăng nhập bằng tài khoản quản trị**. Tài khoản còn phải đổi mật khẩu (mới tạo, vừa đặt lại mật khẩu) không vào được khi đang bảo trì: đổi mật khẩu trước khi bật.
+- `/health`, `/health/ready` vẫn trả lời như thường: công cụ giám sát không báo động, script cài đặt vẫn kiểm tra được.
+- Mọi lần bật, sửa, tắt ghi **Nhật ký hệ thống** (*Bật chế độ bảo trì*, *Sửa thông báo bảo trì*, *Tắt chế độ bảo trì*); đăng nhập bị từ chối vì bảo trì ghi *Đăng nhập thất bại* (lý do `maintenance`).
+
+**Khi chạy script cài gói (mục 5.10) hoặc xóa dữ liệu chạy thử (mục 5.11)**, script chỉ dừng Application Pool API; giao diện vẫn chạy nên người dùng thấy cùng màn hình bảo trì (ghi "Máy chủ đang tạm dừng để cập nhật phần mềm hoặc bảo trì"), không thấy trang lỗi `503` trắng của IIS. API chạy lại thì các máy đang mở phần mềm **tự tải lại trang** (có thể đã lên phiên bản mới). Script cài gói chỉ dừng giao diện vài giây trong lúc chép file giao diện. Không cần bật chế độ bảo trì cho các script; bật khi muốn quản trị kiểm tra trước rồi mới cho mọi người vào.
+
+**Tắt khẩn cấp bằng SQL** (không còn tài khoản quản trị nào đăng nhập được, ví dụ quên mật khẩu): trên máy chủ SQL chạy
+
+```sql
+-- UAT: USE ConsentManagement_UAT;
+USE ConsentManagement;
+DELETE FROM dbo.SystemSettings WHERE [Key] LIKE N'Maintenance.%';
+```
+
+(ví dụ `sqlcmd -S localhost -E` với tài khoản Windows quản trị SQL Server). API thấy thay đổi sau tối đa 5 giây, không cần khởi động lại. Cách này không ghi nhật ký *Tắt chế độ bảo trì*: ghi vào biên bản vận hành.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
@@ -534,7 +698,7 @@ Khuyến nghị: bảo vệ hai khóa `DataProtection__*` như bảo vệ CSDL (
 - **Giám sát:** `GET /health` (tiến trình) và `GET /health/ready` (SQL Server) cho công cụ giám sát (Zabbix, PRTG, Uptime Kuma…); theo dõi dung lượng ổ `Storage__DocumentsPath` và ổ CSDL.
 - **Log ứng dụng:** ghi ra stdout/Event Log (IIS: bật `stdoutLogEnabled` tạm thời khi chẩn đoán; Docker: `docker compose logs api`). Log không chứa dữ liệu cá nhân; mỗi dòng có mã truy vết (`CorrelationId`) trùng với mã hiển thị cho người dùng khi lỗi và với nhật ký audit.
 - **Nhật ký audit** nằm trong CSDL (bảng `AuditLogs`, chỉ ghi thêm): xem tại **Nhật ký hệ thống**; lưu theo thời hạn hồ sơ bệnh án, không xóa.
-- **Tài khoản:** quản trị tạo tài khoản cho nhân viên tại **Quản trị → Người dùng** (mật khẩu tạm, bắt buộc đổi), gán vai trò và khoa. Khóa tài khoản khi nhân viên nghỉ việc (không xóa, để giữ nhật ký).
+- **Tài khoản:** quản trị tạo tài khoản cho nhân viên tại **Quản trị → Người dùng** (mật khẩu tạm, bắt buộc đổi), gán vai trò và khoa. Nhân viên nghỉ việc, chuyển công tác thì **Ngưng sử dụng** tài khoản (thẻ **Ngưng sử dụng**, sử dụng lại được); tài khoản tạo nhầm, không còn cần thì **Xóa** ở thẻ đó (quyết định 51: chỉ ẩn và gỡ vai trò, khoa; phiếu, báo cáo, nhật ký vẫn giữ tên; tên đăng nhập không dùng lại được).
 - **Điện thoại ký phiếu:** xem mục 9a.
 - **Dữ liệu demo:** không bao giờ bật `Seed__DemoData` ở môi trường chính thức (API từ chối khởi động). Dữ liệu người bệnh thật không được nhập vào môi trường thử nghiệm.
 
@@ -633,6 +797,8 @@ Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm
 12. Lưu 3 khóa vào kho mật khẩu và bản niêm phong; ghi lại người giữ.
 13. Thiết lập giám sát `/health/ready` và cảnh báo dung lượng đĩa.
 14. Lưu lại phiên bản đã triển khai (mã commit/`APP_VERSION`) vào biên bản bàn giao.
+15. Trước ngày dùng thật: xóa phiếu, báo cáo điều dưỡng chạy thử (kể cả phiếu thử ở các bước trên) bằng `xoa-du-lieu-chay-thu.ps1` (mục 5.11).
+16. Chế độ bảo trì (mục 5.12): bật thử ở **Quản trị → Bảo trì hệ thống**; một máy đăng nhập tài khoản thường và một kiosk thấy màn hình "Hệ thống đang bảo trì" kèm lý do; tài khoản quản trị vẫn mở được Cấu hình hệ thống, thấy dải vàng; tắt bảo trì: máy kia làm tiếp được, không phải đăng nhập lại.
 
 ## 11. Sự cố thường gặp
 

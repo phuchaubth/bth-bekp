@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Consent.Application.Abstractions;
 using Consent.Application.Common;
+using Consent.Application.Maintenance;
 using Consent.Domain.Auditing;
 using Consent.Domain.Identity;
 using Consent.Shared;
@@ -26,8 +27,16 @@ public sealed class AuthService(
     IRequestContext requestContext,
     IOptions<AuthOptions> options,
     IValidator<LoginRequest> loginValidator,
-    IValidator<ChangePasswordRequest> changePasswordValidator)
+    IValidator<ChangePasswordRequest> changePasswordValidator,
+    MaintenanceService maintenance)
 {
+    /// <summary>Đang bảo trì (quyết định 53): đúng mật khẩu nhưng tài khoản không có quyền bảo trì.</summary>
+    public const string MaintenanceLoginMessage =
+        "Hệ thống đang bảo trì. Trong lúc bảo trì chỉ tài khoản có quyền bảo trì hệ thống đăng nhập được.";
+
+    /// <summary>Đang bảo trì: làm mới phiên của tài khoản không có quyền bảo trì.</summary>
+    public const string MaintenanceStateMessage = "Hệ thống đang bảo trì. Vui lòng quay lại sau.";
+
     /// <summary>Giới hạn độ dài refresh token nhận từ client (token thật dài 43 ký tự).</summary>
     private const int MaxRefreshTokenLength = 200;
 
@@ -47,11 +56,12 @@ public sealed class AuthService(
         var userName = User.NormalizeUserName(request.UserName);
         var user = await users.GetByUserNameAsync(userName, cancellationToken).ConfigureAwait(false);
 
-        if (user is null)
+        // Tài khoản đã xóa (quyết định 51) đăng nhập như tài khoản không tồn tại.
+        if (user is null || user.IsDeleted)
         {
             // Vẫn băm mật khẩu để thời gian phản hồi không tiết lộ tài khoản có tồn tại hay không.
             passwordHasher.Verify(GetDummyPasswordHash(), request.Password);
-            AddAudit(AuditActions.LoginFailed, null, userName, new { reason = "unknown_user" });
+            AddAudit(AuditActions.LoginFailed, user?.Id, userName, new { reason = user is null ? "unknown_user" : "deleted_user" });
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return Result<AuthSession>.Failure(AuthErrors.InvalidCredentials);
         }
@@ -83,6 +93,14 @@ public sealed class AuthService(
             AddAudit(AuditActions.LoginFailed, user.Id, user.UserName, new { reason = "inactive" });
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return Result<AuthSession>.Failure(AuthErrors.Inactive);
+        }
+
+        // Như tài khoản ngưng sử dụng: chỉ báo đang bảo trì khi đã đúng mật khẩu.
+        if (await BlockedByMaintenanceAsync(user, MaintenanceLoginMessage, cancellationToken).ConfigureAwait(false) is { } blocked)
+        {
+            AddAudit(AuditActions.LoginFailed, user.Id, user.UserName, new { reason = "maintenance" });
+            await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            return Result<AuthSession>.Failure(blocked);
         }
 
         if (verification == PasswordVerification.SuccessRehashNeeded)
@@ -130,6 +148,12 @@ public sealed class AuthService(
                 .ConfigureAwait(false);
             await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             return Result<AuthSession>.Failure(user is { IsActive: false } ? AuthErrors.Inactive : AuthErrors.RefreshInvalid);
+        }
+
+        // Đang bảo trì: không cấp phiên mới nhưng cũng không thu hồi, không xoay vòng refresh token (tắt bảo trì là làm tiếp).
+        if (await BlockedByMaintenanceAsync(user, MaintenanceStateMessage, cancellationToken).ConfigureAwait(false) is { } blocked)
+        {
+            return Result<AuthSession>.Failure(blocked);
         }
 
         var (session, newToken) = await CreateSessionAsync(user, stored.FamilyId, now, cancellationToken).ConfigureAwait(false);
@@ -239,6 +263,23 @@ public sealed class AuthService(
         AddAudit(AuditActions.RefreshTokenReuseDetected, stored.UserId, owner?.UserName, new { familyId = stored.FamilyId });
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result<AuthSession>.Failure(AuthErrors.RefreshInvalid);
+    }
+
+    /// <summary>
+    /// Đang bảo trì mà tài khoản không có quyền bảo trì (người còn phải đổi mật khẩu chưa có quyền nào): lỗi 503 kèm lý do và giờ
+    /// dự kiến xong; ngược lại <c>null</c>.
+    /// </summary>
+    private async Task<Error?> BlockedByMaintenanceAsync(User user, string message, CancellationToken cancellationToken)
+    {
+        var state = await maintenance.GetStateAsync(cancellationToken).ConfigureAwait(false);
+        if (!state.Enabled)
+        {
+            return null;
+        }
+
+        var userRoles = await roles.GetByIdsAsync(user.RoleIds, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string> permissions = user.MustChangePassword ? [] : PermissionResolver.Resolve(userRoles);
+        return MaintenanceService.CanEnterDuringMaintenance(permissions) ? null : MaintenanceService.Blocked(state, message);
     }
 
     private async Task<(AuthSession Session, RefreshToken Token)> CreateSessionAsync(

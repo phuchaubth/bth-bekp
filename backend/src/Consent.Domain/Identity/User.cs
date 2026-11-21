@@ -68,8 +68,16 @@ public sealed class User : Entity, IAuditableEntity
     /// <summary>Bắt buộc đổi mật khẩu ở lần đăng nhập tiếp theo.</summary>
     public bool MustChangePassword { get; private set; }
 
-    /// <summary>Tài khoản được phép đăng nhập. Quản trị viên khóa/mở khóa bằng cờ này.</summary>
+    /// <summary>Tài khoản đang sử dụng (được phép đăng nhập). Quản trị viên ngưng sử dụng / sử dụng lại bằng cờ này.</summary>
     public bool IsActive { get; private set; }
+
+    /// <summary>Thời điểm xóa tài khoản (quyết định 51); <c>null</c> là chưa xóa.</summary>
+    public DateTimeOffset? DeletedAtUtc { get; private set; }
+
+    public Guid? DeletedByUserId { get; private set; }
+
+    /// <summary>Tài khoản đã xóa (xem <see cref="Delete"/>).</summary>
+    public bool IsDeleted => DeletedAtUtc is not null;
 
     public int FailedLoginCount { get; private set; }
 
@@ -249,15 +257,53 @@ public sealed class User : Entity, IAuditableEntity
         KioskLookupLockedUntilUtc = null;
     }
 
+    /// <summary>Ngưng sử dụng (quyết định 51): không đăng nhập được, tài khoản chuyển sang thẻ Ngưng sử dụng.</summary>
     public void Deactivate() => IsActive = false;
 
-    /// <summary>Mở khóa: cho phép đăng nhập lại và xóa trạng thái khóa tạm thời (cả khóa tra cứu trên kiosk).</summary>
+    /// <summary>
+    /// Sử dụng lại tài khoản đã ngưng, hoặc mở khóa tạm thời: cho phép đăng nhập lại và xóa trạng thái khóa tạm thời (cả khóa
+    /// tra cứu trên kiosk). Tài khoản đã xóa thì không sử dụng lại được.
+    /// </summary>
     public void Activate()
     {
+        if (IsDeleted)
+        {
+            throw new DomainException("Tài khoản đã xóa, không sử dụng lại được.");
+        }
+
         IsActive = true;
         FailedLoginCount = 0;
         LockoutEndUtc = null;
         ResetKioskLookupFailures();
+    }
+
+    /// <summary>
+    /// Xóa tài khoản đã ngưng sử dụng (quyết định 51). Không xóa khỏi CSDL: phiếu đã ký, báo cáo, nhật ký vẫn giữ tên người
+    /// làm. Tài khoản đã xóa không còn trong danh sách quản trị, không đăng nhập, không sử dụng lại được; tên đăng nhập không dùng
+    /// lại được (nhật ký không nhầm người). Gỡ vai trò và khoa/phòng: tài khoản đã xóa không còn quyền, không thuộc khoa nào.
+    /// </summary>
+    public void Delete(Guid deletedByUserId, DateTimeOffset nowUtc)
+    {
+        if (deletedByUserId == Guid.Empty)
+        {
+            throw new DomainException("Thiếu người xóa tài khoản.");
+        }
+
+        if (IsDeleted)
+        {
+            throw new DomainException("Tài khoản đã xóa.");
+        }
+
+        if (IsActive)
+        {
+            throw new DomainException("Chỉ xóa được tài khoản đã ngưng sử dụng.");
+        }
+
+        _roles.Clear();
+        _additionalDepartments.Clear();
+        DepartmentId = null;
+        DeletedAtUtc = nowUtc;
+        DeletedByUserId = deletedByUserId;
     }
 
     private static string RequireFullName(string fullName)

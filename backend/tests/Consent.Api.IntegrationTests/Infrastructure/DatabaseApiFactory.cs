@@ -1,3 +1,4 @@
+using Consent.Application.Maintenance;
 using Consent.Domain.ConsentTemplates;
 using Consent.Persistence;
 using Consent.Tests.Samples;
@@ -5,6 +6,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace Consent.Api.IntegrationTests.Infrastructure;
@@ -61,6 +63,8 @@ public sealed class DatabaseApiFactory(
         builder.ConfigureTestServices(services =>
         {
             services.AddHostedService<SampleTemplateSeeder>();
+            // Có CSDL: trạng thái bảo trì đọc từ CSDL như ứng dụng thật.
+            services.Replace(ServiceDescriptor.Singleton(new MaintenanceStateCache(MaintenanceStateCache.DefaultLifetime)));
             testServices?.Invoke(services);
         });
     }

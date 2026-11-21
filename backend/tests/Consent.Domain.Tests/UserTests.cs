@@ -182,4 +182,36 @@ public sealed class UserTests
         Assert.Null(user.SignatureSpecimenPng);
         Assert.Null(user.SignatureSpecimenUpdatedAtUtc);
     }
+
+    [Fact]
+    public void Delete_OnlyAStoppedAccount_KeepsTheName_DropsRolesAndDepartments_AndCannotBeUsedAgain()
+    {
+        var user = User.Create("dieuduong.nghi", "Điều dưỡng Nghỉ việc", Now);
+        user.SetRoles([Guid.NewGuid()]);
+        user.SetDepartments(Guid.NewGuid(), [Guid.NewGuid()]);
+        var admin = Guid.NewGuid();
+        var later = Now.AddDays(30);
+
+        // Đang sử dụng thì chưa xóa được (phải ngưng sử dụng trước).
+        Assert.Throws<DomainException>(() => user.Delete(admin, later));
+        Assert.False(user.IsDeleted);
+
+        user.Deactivate();
+        Assert.Throws<DomainException>(() => user.Delete(Guid.Empty, later));
+        user.Delete(admin, later);
+
+        Assert.True(user.IsDeleted);
+        Assert.Equal(later, user.DeletedAtUtc);
+        Assert.Equal(admin, user.DeletedByUserId);
+        Assert.Equal("Điều dưỡng Nghỉ việc", user.FullName);
+        Assert.Equal("dieuduong.nghi", user.UserName);
+        Assert.Empty(user.RoleIds);
+        Assert.Null(user.DepartmentId);
+        Assert.Empty(user.AdditionalDepartmentIds);
+        Assert.Empty(user.DepartmentIds);
+        Assert.False(user.IsActive);
+        Assert.Throws<DomainException>(() => user.Activate());
+        Assert.False(user.IsActive);
+        Assert.Throws<DomainException>(() => user.Delete(admin, later));
+    }
 }

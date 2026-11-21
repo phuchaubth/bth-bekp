@@ -13,9 +13,10 @@
 5. [Quản lý mẫu phiếu](#quan-ly-mau-phieu): phiên bản, định nghĩa (JSON), cấu hình ký, phát hành
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
-8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
-9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel
-10. [Câu hỏi thường gặp](#hoi-dap)
+8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu, bảo trì hệ thống
+9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
+10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
+11. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
 
@@ -58,6 +59,11 @@ Lưu ý:
 - Nhập sai mật khẩu 5 lần thì tài khoản bị tạm khóa (mặc định 15 phút). Chờ hết thời gian, hoặc nhờ quản trị hệ thống mở khóa.
 - Quên mật khẩu: liên hệ bộ phận CNTT để được đặt lại mật khẩu tạm.
 - Khi phiên đăng nhập hết hạn, phần mềm đưa bạn về trang đăng nhập. Đăng nhập lại, phần mềm mở lại đúng trang bạn đang làm.
+- Đầu trang có **dải vàng "UAT: môi trường kiểm thử"** (tab trình duyệt ghi `[UAT]`): bạn đang ở **môi trường kiểm thử**, dùng để thử bản mới trước khi đưa vào chạy thật (quyết định 50). Phiếu, báo cáo lập ở đây không có giá trị; không dùng cho người bệnh thật. Môi trường chạy thật không có dải này. Tài khoản và mật khẩu trên hai môi trường là riêng.
+
+  ![Trang đăng nhập trên môi trường kiểm thử UAT: dải vàng UAT ở đầu trang](huong-dan-su-dung/uat-dang-nhap.png)
+
+  *Hình 1.1a. Môi trường kiểm thử UAT: dải vàng ở đầu mọi trang, kể cả trang đăng nhập.*
 
 ### 1.2. Đổi mật khẩu lần đầu
 
@@ -976,11 +982,11 @@ Quản trị hệ thống có toàn quyền: mọi chức năng ở các phần 
 
 ### 8.1. Người dùng
 
-Bấm **Quản trị** → **Người dùng**. Tìm theo họ tên, tên đăng nhập, chức danh. Lọc theo **Khoa/phòng**, **Trạng thái**. Cột **Trạng thái**: **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Đã khóa**.
+Bấm **Quản trị** → **Người dùng**. Danh sách chia hai thẻ: **Đang sử dụng** và **Ngưng sử dụng** (số trong ngoặc là số tài khoản của thẻ, quyết định 51). Tìm theo họ tên, tên đăng nhập, chức danh; lọc theo **Khoa/phòng**. Cột **Trạng thái** (thẻ Đang sử dụng): **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Tạm khóa tra cứu** (tài khoản kiosk).
 
 ![Danh sách người dùng](huong-dan-su-dung/90-nguoi-dung.png)
 
-*Hình 8.1. Danh sách người dùng: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
+*Hình 8.1. Thẻ **Đang sử dụng**: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
 
 Thêm người dùng:
 
@@ -995,17 +1001,34 @@ Thêm người dùng:
 
 *Hình 8.2. Hộp **Thêm người dùng**: điều dưỡng khoa chính Khoa Khám bệnh, làm thêm ở Khoa Nội tổng hợp.*
 
-Sửa, khóa, mở khóa, đặt lại mật khẩu:
+Sửa, ngưng sử dụng, mở khóa, đặt lại mật khẩu (thẻ **Đang sử dụng**):
 
 - Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng chính, khoa/phòng khác, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
 - Bấm nút **⋯** ở cột **Thao tác** để chọn:
-  - **Khóa tài khoản**: người dùng bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho đến khi mở khóa. Khi nhân viên nghỉ việc, hãy khóa tài khoản thay vì xóa, để giữ nhật ký;
-  - **Mở khóa**: chỉ có khi tài khoản đang bị khóa, tạm khóa (nhập sai mật khẩu), hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
+  - **Ngưng sử dụng**: khi nhân viên nghỉ việc, chuyển công tác, nghỉ dài ngày. Người dùng bị đăng xuất khỏi mọi thiết bị, không đăng nhập được; tài khoản chuyển sang thẻ **Ngưng sử dụng**. Phiếu, báo cáo, nhật ký đã có vẫn giữ nguyên;
+  - **Mở khóa**: chỉ có khi tài khoản đang **Tạm khóa** (nhập sai mật khẩu) hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
   - **Đặt lại mật khẩu**: đặt mật khẩu tạm. Mọi phiên đăng nhập của người dùng bị đăng xuất. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.
 
 <img src="huong-dan-su-dung/92-thao-tac-nguoi-dung.png" alt="Menu thao tác khác của một người dùng" width="600">
 
-*Hình 8.3. Menu **⋯**: **Khóa tài khoản**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang khóa).*
+*Hình 8.3. Menu **⋯**: **Ngưng sử dụng**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang tạm khóa).*
+
+Thẻ **Ngưng sử dụng** (quyết định 51): các tài khoản đã ngưng sử dụng, mỗi dòng có **Sửa**, **Sử dụng lại**, **Xóa**.
+
+- **Sử dụng lại**: khi nhân viên quay lại làm việc. Người dùng đăng nhập lại được ngay với mật khẩu hiện tại (quên mật khẩu thì **Đặt lại mật khẩu** ở thẻ **Đang sử dụng**). Nên kiểm tra lại khoa, vai trò bằng nút **Sửa** trước khi sử dụng lại.
+- **Xóa**: khi tài khoản tạo nhầm, trùng, hoặc không còn cần giữ trong danh sách. Chỉ xóa được tài khoản đã ngưng sử dụng (ngưng sử dụng trước, rồi xóa ở thẻ này). Bấm **Xóa**, đọc hộp xác nhận rồi bấm **Xóa**:
+  - tài khoản biến khỏi cả hai thẻ, không đăng nhập và không sử dụng lại được; vai trò, khoa của tài khoản được gỡ;
+  - **tên đăng nhập đó không tạo lại được** (để nhật ký không nhầm người); cần tài khoản mới thì đặt tên đăng nhập khác;
+  - phiếu đã ký, báo cáo, nhật ký vẫn giữ tên người này; nhật ký hệ thống ghi người xóa, lúc xóa;
+  - **không hoàn tác được**.
+
+![Thẻ Ngưng sử dụng: các tài khoản đã ngưng, nút Sửa, Sử dụng lại, Xóa](huong-dan-su-dung/92a-ngung-su-dung.png)
+
+*Hình 8.3a. Thẻ **Ngưng sử dụng**: tài khoản nghỉ việc, chuyển công tác và một tài khoản tạo nhầm (dữ liệu giả lập).*
+
+![Hộp xác nhận xóa tài khoản](huong-dan-su-dung/92b-xoa-tai-khoan.png)
+
+*Hình 8.3b. Hộp xác nhận **Xóa tài khoản**: tài khoản tạo nhầm được xóa; tên đăng nhập không tạo lại được.*
 
 Dữ liệu theo khoa:
 
@@ -1135,6 +1158,37 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 Mỗi nhân viên tự ký chữ ký mẫu của mình ở **Tài khoản của tôi** (mục 1.5). Quản trị không ký thay được. Khi xác nhận phiếu, tài khoản đã có chữ ký mẫu thì ký bằng chữ ký mẫu, không phải vẽ lại. Vẫn chọn **Ký tay lần này** được. Tài khoản chưa có chữ ký mẫu thì vẽ vào khung ký mỗi lần xác nhận. Hãy nhắc nhân viên xác nhận phiếu (tiếp đón, điều dưỡng, bác sĩ) ký chữ ký mẫu trước khi dùng.
 
+<a id="bao-tri"></a>
+
+### 8.7. Bảo trì hệ thống
+
+Dùng khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà không để người khác thao tác cùng lúc. Trong lúc bảo trì, người dùng khác **không đăng nhập, không thao tác được**, kể cả kiosk và người bệnh đang ký qua mã QR. Tài khoản quản trị vẫn làm việc như thường.
+
+**Bật chế độ bảo trì.** Bấm **Quản trị** → **Bảo trì hệ thống**. Nhập **Lý do** (hiện cho người dùng, ví dụ "Nâng cấp phần mềm, cập nhật mẫu phiếu") và **Dự kiến xong lúc** (để trống nếu chưa rõ), bấm **Bật chế độ bảo trì**, đọc thông báo rồi bấm **Bật bảo trì**. Có hiệu lực ngay.
+
+![Trang Bảo trì hệ thống](huong-dan-su-dung/bt-01-trang-bao-tri.png)
+
+*Hình 8.11. Đang bảo trì: ghi lúc bật, người bật; sửa được lý do, giờ dự kiến xong.*
+
+**Người dùng thấy gì.** Mọi máy đang mở phần mềm (máy tính, máy tính bảng, kiosk, điện thoại người bệnh) hiện màn hình **"Hệ thống đang bảo trì"** kèm lý do và giờ dự kiến xong, ngay khi họ thao tác (mở trang, bấm lưu…). Người chưa đăng nhập thấy màn hình này thay cho trang đăng nhập.
+
+- Trang họ đang mở và **dữ liệu đang nhập vẫn giữ** dưới màn hình bảo trì. Màn hình tự kiểm tra lại mỗi 30 giây (hoặc bấm **Kiểm tra lại**). Bảo trì xong, màn hình tự đóng, làm tiếp được, không phải đăng nhập lại. Thao tác bấm lúc đang bảo trì chưa được lưu: bấm lưu lại.
+- Kiosk và điện thoại người bệnh có lời mời chờ hoặc liên hệ nhân viên, không có nút của nhân viên.
+
+![Màn hình Hệ thống đang bảo trì](huong-dan-su-dung/bt-02-man-hinh-bao-tri.png)
+
+*Hình 8.12. Màn hình bảo trì trên máy của một điều dưỡng: trang đang mở (ô tìm người bệnh vừa gõ) vẫn giữ bên dưới.*
+
+**Quản trị trong lúc bảo trì.** Tài khoản có quyền **Bảo trì hệ thống** (vai trò Quản trị hệ thống; thêm cho vai trò khác ở mục 8.3) vẫn đăng nhập, thao tác như thường, và thấy dải vàng **"Đang bật chế độ bảo trì"** ở đầu mọi trang. Máy đang hiện màn hình bảo trì mà quản trị cần đăng nhập: bấm **Đăng nhập bằng tài khoản quản trị** (máy đang giữ phiên của tài khoản khác thì bấm **Đăng xuất** trước). Tài khoản khác đăng nhập ở đây bị báo *Trong lúc bảo trì chỉ tài khoản có quyền bảo trì hệ thống đăng nhập được*.
+
+![Dải báo đang bảo trì cho quản trị](huong-dan-su-dung/bt-03-dai-bao-quan-tri.png)
+
+*Hình 8.13. Quản trị vẫn làm việc khi đang bảo trì, có dải vàng nhắc.*
+
+**Tắt chế độ bảo trì.** Vào lại **Bảo trì hệ thống**, bấm **Tắt chế độ bảo trì**. Mọi người làm việc lại được ngay. Giờ dự kiến xong chỉ để thông báo: **hết giờ hệ thống không tự tắt**. Bảo trì lâu hơn dự kiến thì sửa giờ, bấm **Lưu lý do, giờ dự kiến** để người dùng thấy giờ mới.
+
+Mọi lần bật, sửa, tắt đều ghi **Nhật ký hệ thống**. Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì theo hướng dẫn triển khai (mục 5.12). Khi phòng CNTT cài bản mới hoặc chạy script xóa dữ liệu chạy thử, người dùng cũng thấy màn hình bảo trì vài phút; xong thì trang tự tải lại.
+
 ---
 
 <a id="bao-cao-dieu-duong"></a>
@@ -1145,9 +1199,9 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 
 | Ai | Làm gì | Menu |
 |---|---|---|
-| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
+| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5). Khi vắng: ủy quyền cho người khác làm thay; được ủy quyền thì làm báo cáo của khoa khác trong thời gian được ủy quyền (mục 9.7) | **Điều dưỡng** → **Báo cáo của khoa**, **Ủy quyền báo cáo** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard**, **Ủy quyền báo cáo** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1158,11 +1212,17 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
    *Hình 9.1. Menu **Điều dưỡng** chỉ hiện với tài khoản được lập hoặc xem báo cáo điều dưỡng.*
 
 2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Tài khoản làm ở nhiều khoa có thêm ô chọn khoa cạnh ô ngày: mặc định khoa chính, chọn khoa khác để lập báo cáo của khoa đó. Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
-3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**, số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
+3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**:
+   - **Số NB ngày hôm trước** được điền sẵn bằng **Số NB hiện tại** của báo cáo khoa đã gửi hôm trước. Hôm trước khoa chưa gửi báo cáo, hoặc số chưa đúng, thì nhập tay.
+   - **Số NB hiện tại** không nhập: phần mềm tự tính = Số NB ngày hôm trước + Số ca nhập khoa từ PK + Số ca nhập khoa do CK − Số ca xuất viện − Số ca chuyển khoa (các số ca đều của ngày hôm trước). Số tự đổi khi nhập các ô này. Số âm có viền đỏ: có ô nhập nhầm. Gửi báo cáo thì phải có Số NB ngày hôm trước.
+   - Số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
+   - **Số NB người nước ngoài**: trong số NB hiện tại, số người bệnh là người nước ngoài. **Số ca chuyển khoa ngày hôm trước**: số người bệnh khoa chuyển sang khoa khác.
 
    ![Báo cáo mới của khoa, có số điền sẵn](huong-dan-su-dung/dd-01-bao-cao-khoa.png)
 
-   *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn.*
+   ![Mục VI: số NB ngày hôm trước điền sẵn, số NB hiện tại tự tính](huong-dan-su-dung/dd-01b-so-luong-nb.png)
+
+   *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn, gồm số NB ngày hôm trước. Ở mục VI, **Số NB hiện tại** tự tính theo công thức ghi dưới tên dòng, không nhập được.*
 
 4. Ở **Phần tick**, mỗi dòng chọn **Có sự cố/ Không ổn** hoặc **Không có sự cố/ Ổn**. Phải chọn đủ mọi dòng mới gửi được.
 5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được.
@@ -1203,29 +1263,39 @@ Lưu ý:
    - **Khoa đã gửi**: số khoa đã gửi trên số khoa phải báo cáo.
    - Số liệu HIS lấy lúc nào, bởi ai.
    - Khi HIS lỗi: dòng **Khoa nhập tay khi HIS lỗi** cho biết khoa nào đã nhập số liệu HIS, khoa nào chưa nhập (mục 9.5).
-3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa. Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
+3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **tên viết tắt** của khoa (khoa chưa đặt tên viết tắt thì ghi mã khoa), theo **thứ tự Phòng Điều dưỡng xếp**. Phòng Điều dưỡng đặt thứ tự và tên viết tắt ở mục 9.4. Rê chuột vào tên viết tắt để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+   - Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
+   - Cột **Người nước ngoài** và cột **Chuyển khoa** lấy từ hai dòng cùng tên ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có hai dòng này thì hai cột để trống.
+   - Cột **Số NB ngày hôm trước** đứng trước **Số NB hiện tại**. Số NB hiện tại = Số NB ngày hôm trước + Nhập khoa từ PK + Nhập khoa do CK − Xuất viện − Chuyển khoa; khoa không nhập, phần mềm tính khi khoa lưu báo cáo (mục 9.1). Báo cáo gửi trước khi có cách tính này để trống cột Số NB ngày hôm trước và giữ Số NB hiện tại khoa đã nhập.
+   - Cột cuối **Người báo cáo** là người gửi báo cáo của khoa.
 4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
+5. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm tên viết tắt của khoa:
+   - Mục B, D: người của khoa đã nhập tay số liệu HIS, hoặc người đã bấm **Lấy số liệu HIS** (ghi *lấy từ HIS*).
+   - Mục C, E, F: người gửi báo cáo của các khoa có số thủ thuật (mục C), báo **Không ổn** (mục E), có phần nhập thêm (mục F). Không khoa nào có thì ghi *Các khoa đã gửi báo cáo (cột Người báo cáo, mục A)*.
+   - Mục chưa có số liệu thì ghi *chưa có*.
 
    ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)
 
-   *Hình 9.7. Bảng tổng hợp, mục A–D, ngày HIS lỗi. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
+   *Hình 9.7. Bảng tổng hợp ngày HIS lỗi. Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Số NB ngày hôm trước**, **Người nước ngoài**, **Chuyển khoa** và **Người báo cáo**. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
 
-5. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
-6. **Mục F** là phần báo cáo nhập thêm của các khoa, giữ nguyên xuống dòng như khoa đã ghi.
+6. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
+7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi.
 
    ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
 
-   *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa.*
+   *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa. Dưới mỗi mục là người báo cáo.*
 
-7. Bấm **In PDF** để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel.
+8. Bấm **In PDF** để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel. Cuối PDF và file Excel có chỗ **Phòng Điều dưỡng** ký, ghi rõ họ tên.
 
    <img src="huong-dan-su-dung/dd-12-pdf-tong-hop.png" alt="PDF bảng tổng hợp, trang 1" width="560">
 
-   *Hình 9.9. PDF bảng tổng hợp (trang 1). Chân trang ghi giờ in, số khoa đã gửi và nguồn số liệu HIS: lấy từ HIS lúc nào, hoặc do khoa nhập tay.*
+   <img src="huong-dan-su-dung/dd-12b-pdf-tong-hop-ky.png" alt="PDF bảng tổng hợp, đầu trang 2: mục E, F, người báo cáo và chỗ Phòng Điều dưỡng ký" width="560">
+
+   *Hình 9.9. PDF bảng tổng hợp: trang 1 và đầu trang 2. Dưới mỗi mục B–F là người báo cáo; cuối bảng có chỗ Phòng Điều dưỡng ký. Chân trang ghi giờ in, số khoa đã gửi và nguồn số liệu HIS: lấy từ HIS lúc nào, hoặc do khoa nhập tay.*
 
 ### 9.3. Xem và trả lại báo cáo cho khoa (Phòng Điều dưỡng)
 
-1. Trong mục A, bấm **tên khoa**. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
+1. Trong mục A, bấm **tên viết tắt** của khoa. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
 
    ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
 
@@ -1237,23 +1307,31 @@ Lưu ý:
 
    *Hình 9.11. Bắt buộc ghi lý do. Lý do được ghi vào nhật ký và hiện cho khoa.*
 
-### 9.4. Cài khoa báo cáo, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
+### 9.4. Cài khoa báo cáo, thứ tự, tên viết tắt, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
 
 1. Trên trang **Tổng hợp hằng ngày**, bấm **Khoa báo cáo và số giường**.
 2. Tick các khoa phải gửi báo cáo, nhập **số giường thực kê** (không tính băng ca).
+3. Xếp **thứ tự** các khoa ở mục A của bảng tổng hợp. Các khoa được tick đứng đầu danh sách; cột **Thứ tự** ghi số thứ tự của khoa trên bảng tổng hợp.
+   - Gõ số thứ tự mới rồi bấm **Enter** (hoặc bấm ra ngoài ô): khoa chuyển tới vị trí đó, các khoa khác dịch xuống. Gõ số lớn hơn số khoa thì khoa xuống cuối.
+   - Bấm mũi tên **↑**, **↓** để đổi chỗ với khoa liền trên, liền dưới.
+   - Khoa mới tick xếp cuối. Bỏ tick thì khoa ra khỏi thứ tự.
+4. Đặt **tên viết tắt** của khoa ở cột **Tên viết tắt**, ví dụ *Nội TH*, tối đa 20 ký tự. Tên viết tắt in ở cột khoa phòng của mục A, ở mục E, mục F và dòng người báo cáo. Để trống thì in mã khoa (chữ mờ trong ô).
+   - Hai khoa không được trùng tên viết tắt, kể cả trùng mã của khoa khác; chữ hoa, chữ thường coi như nhau. Ô bị trùng có viền đỏ và dòng **Trùng với** tên khoa kia. Bấm **Lưu** khi còn trùng thì phần mềm báo lỗi, không lưu gì.
+   - Tên viết tắt không đổi khi quản trị lấy lại danh mục khoa/phòng từ HIS (mục 8.2). Phần mềm vẫn dùng mã khoa HIS để ghép số liệu.
 
    ![Hộp khoa báo cáo và số giường](huong-dan-su-dung/dd-09-khoa-bao-cao.png)
 
-   *Hình 9.12. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
+   *Hình 9.12. Các khoa được tick đứng đầu, theo thứ tự in ở mục A. Khoa HSTC để trống tên viết tắt nên bảng tổng hợp in mã khoa. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
 
-3. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
-4. Bấm **Lưu**.
+5. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
+6. Bấm **Lưu**.
 
    ![Phần giao khoa nhập số liệu HIS](huong-dan-su-dung/dd-09b-giao-khoa-nhap-his.png)
 
    *Hình 9.13. Giao khoa nhập từng chỉ số mục B, D khi HIS lỗi. Không cần giao **NB PK chờ nhập viện**: mỗi khoa phải báo cáo tự nhập số của khoa mình.*
 
-5. Khi khoa đổi số giường, có khoa mới phải báo cáo, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+7. Khi khoa đổi số giường, có khoa mới phải báo cáo, cần đổi thứ tự, tên viết tắt, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+8. Sau khi quản trị **lấy danh mục khoa/phòng từ HIS** (mục 8.2), khoa cũ không còn trên HIS chuyển sang ngừng sử dụng. Trong hộp này, khoa đó có nhãn **Ngừng sử dụng**, nằm cuối danh sách và không chọn được; đầu hộp có khung vàng ghi tên các khoa này. Bấm **Lưu** thì khoa ngừng sử dụng được bỏ khỏi danh sách khoa báo cáo. Chỉ số mục B, D đang giao cho khoa ngừng sử dụng để trống, có dòng nhắc; chọn khoa thay thế (thường là khoa cùng tên trên HIS) rồi lưu.
 
 Người nhập số liệu HIS cho một khoa cần tài khoản thuộc đúng khoa đó, có vai trò **Điều dưỡng** (quyền **Lập và gửi báo cáo điều dưỡng của khoa**). Khoa được giao nhập không cần được tick báo cáo. Quản trị tạo hoặc sửa tài khoản ở mục 8.1.
 
@@ -1285,24 +1363,178 @@ Ngày đã có số liệu HIS (lấy được một phần) thì thẻ ghi rõ,
 Bảng tổng hợp dùng số như sau:
 
 - Số lấy từ HIS được dùng trước. Ô HIS không có số mới dùng số khoa nhập. Khi HIS chạy lại, bấm **Lấy số liệu HIS**: ô nào HIS có số thì dùng số HIS.
-- Số do khoa nhập có dòng chữ nhỏ ghi tên khoa đã nhập, ví dụ *Khoa Khám bệnh nhập tay*.
+- Số do khoa nhập có dòng chữ nhỏ ghi tên viết tắt (hoặc mã) của khoa đã nhập, ví dụ *KKB nhập tay*. Dòng **Người báo cáo** dưới mục ghi người đã nhập.
 - Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô trên cùng (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
 
 ![Mục B, C, D với số khoa nhập tay](huong-dan-su-dung/dd-05b-tong-hop-b-d.png)
 
-*Hình 9.16. Mục B và mục D ghi khoa đã nhập từng số. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+*Hình 9.16. Mục B và mục D ghi tên viết tắt (hoặc mã) của khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+
+### 9.6. Dashboard điều dưỡng (Phòng Điều dưỡng)
+
+Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ số và biểu đồ. Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang chỉ để xem; muốn sửa số liệu thì trả lại báo cáo cho khoa (mục 9.3).
+
+1. Bấm **Điều dưỡng** → **Dashboard**.
+2. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày**, và ngày cuối ở ô ngày (mặc định hôm nay). Đổi lựa chọn thì số cũ mờ đi trong lúc tải số mới.
+3. Phần trên là **tám ô chỉ số của ngày cuối**:
+   - **Khoa đã gửi báo cáo**, kèm tên viết tắt các khoa chưa gửi để nhắc.
+   - **Số NB hiện tại**, tăng hay giảm bao nhiêu so với ngày hôm trước (tính trên các báo cáo có Số NB ngày hôm trước).
+   - **Công suất giường**: Số NB hiện tại chia số giường của các khoa đã gửi. Vượt 100% có biểu tượng cảnh báo và chữ **Vượt số giường**.
+   - **NB chăm sóc cấp 1**, kèm số NB thở máy, theo dõi monitor, thở oxy.
+   - **Nhập khoa**, **Xuất viện**, **Chuyển khoa**: số ca của ngày hôm trước.
+   - **Khoa báo "Không ổn"**, kèm số ca ADR và số báo cáo có nội dung bất thường (phần nhập thêm).
+
+   ![Dashboard điều dưỡng: ô chỉ số và biểu đồ theo ngày](huong-dan-su-dung/dd-14-dashboard.png)
+
+   *Hình 9.17. Dashboard 30 ngày. Rê chuột vào biểu đồ để xem số của từng ngày: khung gợi ý ghi cả số khoa đã gửi và công suất giường của ngày đó.*
+
+4. Bốn **biểu đồ theo ngày**: Số NB hiện tại; nhập khoa, xuất viện, chuyển khoa; NB chăm sóc cấp 1, thở máy, monitor; số khoa đã gửi báo cáo (đường đứt nét là số khoa phải báo cáo). Rê chuột, hoặc bấm vào biểu đồ rồi dùng phím mũi tên trái, phải, để xem số từng ngày. Bấm **Xem bảng** để đọc số dạng bảng (ngày mới nhất ở trên).
+5. Phần dưới:
+   - **Công suất giường theo khoa** của ngày cuối, khoa cao nhất ở trên.
+   - **"Không ổn" theo nội dung**: số lượt khoa báo "Không ổn" trong cả kỳ theo từng dòng của phần tick (mỗi khoa, mỗi ngày, mỗi dòng tính một lượt), kèm khoa báo trong ngày cuối. Có tính cả dòng **ĐD thực hiện thuốc** (bảng tổng hợp giấy không có dòng này).
+   - **Theo khoa**: số liệu từng khoa ngày cuối, và số ngày khoa đã gửi báo cáo trong kỳ.
+
+   ![Dashboard điều dưỡng: công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa](huong-dan-su-dung/dd-14b-dashboard-khoa.png)
+
+   *Hình 9.18. Phần dưới dashboard. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**.*
+
+Lưu ý khi đọc:
+
+- Ngày ít khoa gửi báo cáo thì tổng Số NB hiện tại thấp hơn thực tế. Xem biểu đồ **Khoa đã gửi báo cáo** cùng ngày đó.
+- Công suất giường dùng số giường đang cài trong hộp **Khoa báo cáo và số giường** (mục 9.4), kể cả khi xem ngày cũ.
+
+### 9.7. Ủy quyền báo cáo khi vắng
+
+Khi vắng (nghỉ phép, đi học, đi công tác…), người lập báo cáo của khoa **ủy quyền** cho người khác làm thay trong một khoảng ngày. Người được ủy quyền chỉ làm được **trong đúng thời gian đó** và **đúng nội dung được ủy quyền**. Bảng tổng hợp ghi rõ báo cáo nào do người được ủy quyền làm, được ai ủy quyền.
+
+**Người ủy quyền (người lập báo cáo của khoa):**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**, rồi bấm **Ủy quyền mới**.
+2. Điền hộp **Ủy quyền báo cáo điều dưỡng**:
+   - **Khoa**: khoa của mình (tài khoản thuộc nhiều khoa chọn khoa cần ủy quyền).
+   - **Người được ủy quyền**: gõ tên để tìm. Danh sách chỉ có tài khoản đang dùng, thuộc một khoa, được quyền lập báo cáo điều dưỡng (điều dưỡng cùng khoa hoặc khoa khác).
+   - **Thời gian ủy quyền**: từ ngày, đến ngày, tính cả hai ngày; bắt đầu từ hôm nay trở đi, tối đa 366 ngày.
+   - **Nội dung ủy quyền**: **Báo cáo của khoa** (lập, lưu nháp, gửi báo cáo hằng ngày), **Số liệu HIS khi HIS lỗi** (nhập số liệu HIS của khoa, mục 9.5), hoặc cả hai.
+   - **Lý do** (không bắt buộc), ví dụ "Nghỉ phép".
+3. Bấm **Ủy quyền**.
+
+   ![Hộp Ủy quyền mới: khoa, người được ủy quyền, thời gian, nội dung, lý do](huong-dan-su-dung/dd-15-uy-quyen-moi.png)
+
+   *Hình 9.19. Điều dưỡng Khoa Nhi ủy quyền cho điều dưỡng Khoa Ngoại tổng hợp làm báo cáo và nhập số liệu HIS của Khoa Nhi trong hai ngày.*
+
+4. Ủy quyền hiện ở bảng **Tôi đã ủy quyền**, có trạng thái **Sắp tới** (chưa tới ngày bắt đầu), **Đang hiệu lực**, **Đã hết hạn** hoặc **Đã hủy**. Đi làm lại sớm hoặc ủy quyền nhầm thì bấm **Hủy ủy quyền**: người được ủy quyền không làm được nữa; báo cáo đã gửi theo ủy quyền vẫn giữ nguyên và vẫn ghi là được ủy quyền.
+
+**Người được ủy quyền:**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**. Bảng **Tôi được ủy quyền** liệt kê các ủy quyền giao cho mình; ủy quyền đang hiệu lực có nút **Mở báo cáo của khoa**.
+
+   ![Trang Ủy quyền của người được ủy quyền: ủy quyền đang hiệu lực có nút Mở báo cáo của khoa](huong-dan-su-dung/dd-15b-duoc-uy-quyen.png)
+
+   *Hình 9.20. Điều dưỡng Khoa Nội được Khoa Nhi ủy quyền (đang hiệu lực); một ủy quyền khác đã bị hủy.*
+
+2. Bấm **Mở báo cáo của khoa**, hoặc vào **Báo cáo của khoa** rồi chọn khoa có chữ **(được ủy quyền)** ở ô khoa đầu trang. Dòng xanh trên cùng ghi đang làm thay ai, thời gian và nội dung được ủy quyền. Ô ngày chỉ chọn được các ngày trong thời gian ủy quyền.
+
+   ![Báo cáo của khoa khi làm thay theo ủy quyền](huong-dan-su-dung/dd-15c-bao-cao-thay.png)
+
+   *Hình 9.21. Điều dưỡng Khoa Nội làm báo cáo của Khoa Nhi theo ủy quyền.*
+
+3. Lập, lưu nháp và gửi báo cáo như mục 9.1; khi HIS lỗi, nhập số liệu HIS của khoa như mục 9.5. Người chỉ được ủy quyền số liệu HIS thì chỉ thấy thẻ số liệu HIS, không xem được báo cáo của khoa.
+4. Hết thời gian ủy quyền hoặc ủy quyền bị hủy thì khoa đó không còn trong ô khoa, và phần mềm không cho xem, sửa báo cáo của khoa đó nữa, kể cả báo cáo của các ngày trong thời gian ủy quyền. Báo cáo đã gửi cần sửa thì Phòng Điều dưỡng **Trả lại khoa** (mục 9.3) để người của khoa sửa.
+
+**Phòng Điều dưỡng:**
+
+- Bảng tổng hợp (mục 9.2) có ô **Ủy quyền báo cáo trong ngày**: khoa nào, ai làm thay, được ai ủy quyền, thời gian và nội dung. Báo cáo gửi theo ủy quyền ghi "Họ tên (được … ủy quyền)" ở cột **Người báo cáo**; dòng **Người báo cáo** dưới các mục B–F cũng ghi như vậy. PDF và Excel ghi giống màn hình.
+
+   ![Bảng tổng hợp: ô Ủy quyền báo cáo trong ngày và cột Người báo cáo ghi được ủy quyền](huong-dan-su-dung/dd-15d-tong-hop-uy-quyen.png)
+
+   *Hình 9.22. Báo cáo Khoa Nhi do Điều dưỡng Demo gửi theo ủy quyền của Điều dưỡng Nhi Demo.*
+
+- Trang **Ủy quyền báo cáo** của Phòng Điều dưỡng có bảng **Mọi ủy quyền** của các khoa. Tài khoản có quyền quản lý báo cáo điều dưỡng (vai trò Phòng Điều dưỡng) hủy được ủy quyền chưa hết hạn.
+
+   ![Mọi ủy quyền của các khoa](huong-dan-su-dung/dd-15e-moi-uy-quyen.png)
+
+   *Hình 9.23. Phòng Điều dưỡng xem mọi ủy quyền: đang hiệu lực, sắp tới, đã hủy.*
+
+---
+
+<a id="kiem-thu"></a>
+
+## 10. Kiểm thử tính năng mới
+
+Mỗi bản cài mới được kiểm thử trên **môi trường kiểm thử UAT** (đầu trang có dải vàng **UAT**) trước khi đưa vào chạy thật (quyết định 50). Người quản lý kiểm thử **phân công từng tính năng mới cho từng người, mỗi người một khoảng thời gian**; người được phân công kiểm thử rồi **bắt buộc gửi báo cáo**. Báo cáo là căn cứ để sửa, nâng cấp phần mềm và quyết định đưa bản mới lên chạy thật (quyết định 49).
+
+| Ai | Làm gì | Ở đâu |
+|---|---|---|
+| Người quản lý kiểm thử: vai trò **Quản trị hệ thống**, hoặc vai trò được thêm quyền *Phân công kiểm thử, xem và xử lý báo cáo kiểm thử* (mục 8.3) | Phân công, theo dõi, xem báo cáo, ghi hướng xử lý, xuất Excel | **Quản trị** → **Phân công kiểm thử** |
+| Người được phân công (tài khoản bất kỳ) | Xem việc, kiểm thử, gửi báo cáo | Dòng nhắc trên trang **Tổng quan**, hoặc menu tài khoản (góc phải) → **Việc kiểm thử của tôi** |
+
+### 10.1. Phân công kiểm thử (người quản lý)
+
+1. Bấm **Quản trị** → **Phân công kiểm thử** → **Phân công mới**.
+2. Điền:
+   - **Đợt kiểm thử**: tên bản cài hoặc gói, ví dụ "Gói 72 – 25/11/2026". Gõ vài chữ để chọn lại đợt đã có.
+   - **Tính năng cần kiểm thử**.
+   - **Nội dung, cách kiểm thử**: các bước làm, dữ liệu dùng thử (giả lập), kết quả mong đợi.
+   - **Người kiểm thử và thời gian của từng người**: chọn người (gõ tên để tìm), chọn **từ ngày** và **hạn báo cáo**. Bấm **Thêm người kiểm thử** để thêm người; mỗi người một thời gian riêng.
+3. Bấm **Phân công**. Mỗi người có một việc riêng.
+
+   ![Hộp Phân công kiểm thử: đợt, tính năng, cách kiểm thử, người kiểm thử và thời gian của từng người](huong-dan-su-dung/kt-01-phan-cong.png)
+
+   *Hình 10.1. Phân công kiểm thử tính năng **Kiosk: quét CCCD bằng camera** cho hai người, mỗi người một thời gian.*
+
+4. Trang **Phân công kiểm thử** có:
+   - **Tổng hợp theo tính năng**: số người, số **Đạt**, **Đạt một phần**, **Không đạt**, **Chưa báo cáo** (kèm số quá hạn).
+   - **Phân công**: từng người, thời gian, trạng thái (**Chưa tới ngày**, **Đang kiểm thử**, **Quá hạn**, **Đã báo cáo**, **Trễ hạn** khi gửi sau hạn, **Đã hủy**) và kết quả.
+
+   Chọn đợt ở ô đầu trang để chỉ xem một đợt.
+
+   ![Trang Phân công kiểm thử: tổng hợp theo tính năng và bảng phân công](huong-dan-su-dung/kt-02-tong-hop.png)
+
+   *Hình 10.2. Tổng hợp một đợt kiểm thử: tính năng nào đã đạt, tính năng nào còn lỗi, ai chưa báo cáo.*
+
+5. **Sửa** hoặc **Hủy** phân công được khi người kiểm thử chưa gửi báo cáo.
+
+### 10.2. Kiểm thử và gửi báo cáo (người được phân công)
+
+1. Trang **Tổng quan** nhắc *"Bạn có … việc kiểm thử chưa báo cáo (… quá hạn)"*. Bấm **Xem và báo cáo**, hoặc menu tài khoản → **Việc kiểm thử của tôi**.
+
+   ![Trang Tổng quan nhắc việc kiểm thử chưa báo cáo](huong-dan-su-dung/kt-03-nhac-viec.png)
+
+   *Hình 10.3. Dòng nhắc trên trang **Tổng quan**: bấm **Xem và báo cáo** để mở việc kiểm thử của mình.*
+
+2. Mỗi việc ghi tính năng, đợt kiểm thử, thời gian và cách kiểm thử. Làm theo cách kiểm thử trên môi trường UAT.
+3. Bấm **Gửi báo cáo**:
+   - **Kết quả**: **Đạt**, **Đạt một phần** hoặc **Không đạt**.
+   - **Lỗi, vấn đề phát hiện**: bắt buộc khi chưa đạt. Ghi cách làm để gặp lỗi, màn hình, thông báo hiện ra. Không ghi thông tin người bệnh thật.
+   - **Đề xuất nâng cấp** (không bắt buộc).
+
+   ![Hộp Báo cáo kiểm thử: kết quả, lỗi phát hiện, đề xuất nâng cấp](huong-dan-su-dung/kt-04-bao-cao.png)
+
+   *Hình 10.4. Báo cáo kiểm thử "Không đạt" phải ghi lỗi phát hiện.*
+
+4. Chỉ gửi được báo cáo từ ngày bắt đầu kiểm thử. Gửi sau hạn vẫn được nhưng ghi **Trễ hạn**. Sửa được báo cáo (nút **Sửa báo cáo**) cho tới khi người quản lý ghi hướng xử lý; sau đó việc đó hiện hướng xử lý.
+
+### 10.3. Xem báo cáo, ghi hướng xử lý, xuất Excel (người quản lý)
+
+1. Ở dòng đã báo cáo, bấm **Xem báo cáo**: kết quả, lỗi phát hiện, đề xuất.
+2. Ghi **Hướng xử lý** (ví dụ "Sửa trong gói 73", "Giữ nguyên: đúng quy trình") rồi bấm **Lưu hướng xử lý**. Người kiểm thử thấy hướng xử lý và không sửa báo cáo được nữa.
+3. Bấm **Xuất Excel** ở đầu trang: mọi phân công và báo cáo của đợt đang chọn (người, thời gian, trạng thái, kết quả, lỗi, đề xuất, giờ gửi, trễ hạn, hướng xử lý), gửi nhóm phát triển để sửa và nâng cấp.
+4. Khi mọi tính năng của đợt đã **Đạt** (hoặc lỗi còn lại đã có hướng xử lý được chấp nhận), phòng CNTT cài **đúng gói đó** lên môi trường chạy thật ([hướng dẫn triển khai, mục 5.10](trien-khai.md)).
 
 ---
 
 <a id="hoi-dap"></a>
 
-## 10. Câu hỏi thường gặp
+## 11. Câu hỏi thường gặp
 
 **Tôi quên mật khẩu thì làm sao?**
 Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục 8.1). Bạn đăng nhập bằng mật khẩu tạm rồi đổi mật khẩu mới.
 
 **Tài khoản báo bị tạm khóa?**
 Do nhập sai mật khẩu 5 lần. Chờ hết thời gian khóa (mặc định 15 phút), hoặc nhờ quản trị **Mở khóa**.
+
+**Màn hình báo "Hệ thống đang bảo trì"?**
+Quản trị đang bảo trì hoặc phòng CNTT đang cài bản mới. Không cần tải lại trang hay đăng nhập lại: chờ đến giờ dự kiến xong, màn hình tự đóng (hoặc tự tải lại trang) khi xong. Dữ liệu đang nhập vẫn giữ trên màn hình. Xem mục 8.7.
 
 **Vì sao tôi không thấy nút "Lấy thông tin"?**
 Nút này chỉ có khi bệnh viện đã kết nối hệ thống thông tin người bệnh. Nếu chưa có, hãy quét CCCD hoặc nhập trực tiếp.

@@ -8,5 +8,5 @@ import { appRoutes } from '../app/routes'
 export function renderApp(path = '/') {
   const router = createMemoryRouter(appRoutes, { initialEntries: [path] })
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return { router, ...render(<App router={router} queryClient={queryClient} />) }
+  return { router, queryClient, ...render(<App router={router} queryClient={queryClient} />) }
 }

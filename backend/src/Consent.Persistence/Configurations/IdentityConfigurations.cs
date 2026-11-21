@@ -23,6 +23,7 @@ internal sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.Title).HasMaxLength(User.TitleMaxLength);
         builder.Property(u => u.SmartCaUserId).HasMaxLength(User.SmartCaUserIdMaxLength);
         builder.Property(u => u.PasswordHash).HasMaxLength(User.PasswordHashMaxLength).IsRequired();
+        builder.Ignore(u => u.IsDeleted);
 
         builder.HasOne<Department>().WithMany().HasForeignKey(u => u.DepartmentId).OnDelete(DeleteBehavior.Restrict);
 

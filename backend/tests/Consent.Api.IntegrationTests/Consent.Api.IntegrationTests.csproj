@@ -26,6 +26,8 @@
   <ItemGroup>
     <!-- Mẫu phiếu minh họa dùng chung cho các project test (không có trong ứng dụng). -->
     <EmbeddedResource Include="..\SampleTemplates\*.json" LogicalName="SampleTemplates.%(Filename)%(Extension)" />
+    <!-- Script xóa dữ liệu chạy thử (quyết định 52): test chạy đúng file trong gói triển khai. -->
+    <EmbeddedResource Include="..\..\..\deploy\sql\06-xoa-du-lieu-chay-thu.sql" LogicalName="Deploy.06-xoa-du-lieu-chay-thu.sql" />
     <Compile Include="..\SampleTemplates\SampleConsentTemplates.cs" Link="SampleTemplates\SampleConsentTemplates.cs" />
   </ItemGroup>
 </Project>

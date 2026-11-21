@@ -104,6 +104,19 @@ const auditEntries: AuditLogEntry[] = [
     correlationId: null,
     details: null,
   },
+  {
+    // Script xóa dữ liệu chạy thử chạy trên máy chủ (quyết định 52): tài khoản Windows, không gắn đối tượng.
+    id: 'a-3',
+    occurredAtUtc: '2026-11-12T00:30:00Z',
+    action: 'Maintenance.TrialDataPurged',
+    entityType: null,
+    entityId: null,
+    userId: null,
+    userName: 'BV\\quantri',
+    ipAddress: null,
+    correlationId: null,
+    details: '{"keepPatients":false,"restartFormNumbers":false,"deleted":[{"table":"ConsentForms","rows":12}]}',
+  },
 ]
 
 const reporterSession = () =>
@@ -333,15 +346,17 @@ describe('Nhật ký hệ thống (màn hình 15)', () => {
   it('liệt kê bản ghi với tên hành động tiếng Việt, lọc theo hành động và xem chi tiết', { timeout: 15_000 }, async () => {
     const { calls } = mockApi({
       ...baseRoutes(adminSession()),
-      'GET /api/v1/audit-logs': { items: auditEntries, page: 1, pageSize: 50, totalCount: 2, totalPages: 1 },
+      'GET /api/v1/audit-logs': { items: auditEntries, page: 1, pageSize: 50, totalCount: 3, totalPages: 1 },
     })
     renderApp('/nhat-ky')
     const user = userEvent.setup()
 
     expect(await screen.findByText('Xuất dữ liệu phiếu')).toBeInTheDocument()
     expect(screen.getByText('Xem phiếu')).toBeInTheDocument()
+    expect(screen.getByText('Xóa dữ liệu chạy thử')).toBeInTheDocument()
+    expect(screen.getByText('BV\\quantri')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'f-1' })).toHaveAttribute('href', '/phieu-dong-thuan/f-1')
-    expect(screen.getByText('Tổng 2 bản ghi')).toBeInTheDocument()
+    expect(screen.getByText('Tổng 3 bản ghi')).toBeInTheDocument()
 
     await user.click(screen.getAllByRole('button', { name: 'Mở rộng dòng' })[0])
     expect(await screen.findByText(/"rows": 42/)).toBeInTheDocument()

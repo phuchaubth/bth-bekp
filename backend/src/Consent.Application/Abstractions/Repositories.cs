@@ -1,6 +1,7 @@
 using Consent.Application.Auditing;
 using Consent.Application.ConsentForms;
 using Consent.Application.Exports;
+using Consent.Application.NursingReports;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Users;
@@ -13,6 +14,7 @@ using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
 using Consent.Domain.Settings;
+using Consent.Domain.Testing;
 using Consent.Shared;
 
 namespace Consent.Application.Abstractions;
@@ -22,8 +24,6 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
 
     Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken);
-
-    Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken);
 
     Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken);
 
@@ -36,6 +36,9 @@ public interface IUserRepository
     Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken);
 
     Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken);
+
+    /// <summary>Người dùng đang hoạt động có ít nhất một vai trò trong <paramref name="roleIds"/>, kèm khoa của từng người.</summary>
+    Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken);
 
     void Add(User user);
 }
@@ -219,6 +222,12 @@ public interface INursingReportRepository
     /// <summary>Mọi báo cáo (nháp và đã gửi) của một ngày.</summary>
     Task<IReadOnlyList<NursingDailyReport>> ListByDateAsync(DateOnly reportDate, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Báo cáo đã gửi từ ngày <paramref name="from"/> đến ngày <paramref name="to"/> (dashboard, quyết định 47): chỉ số liệu và có
+    /// phần nhập thêm không, không đọc (giải mã) nội dung phần nhập thêm.
+    /// </summary>
+    Task<IReadOnlyList<NursingSubmittedFigures>> ListSubmittedFiguresAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
+
     void Add(NursingDailyReport report);
 
     Task<IReadOnlyList<NursingReportDepartment>> ListDepartmentsAsync(CancellationToken cancellationToken);
@@ -235,6 +244,22 @@ public interface INursingReportRepository
     Task<IReadOnlyList<NursingDepartmentStatistics>> ListDepartmentStatisticsAsync(DateOnly reportDate, CancellationToken cancellationToken);
 
     void AddDepartmentStatistics(NursingDepartmentStatistics statistics);
+
+    void AddDelegation(NursingReportDelegation delegation);
+
+    Task<NursingReportDelegation?> GetDelegationAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Ủy quyền báo cáo điều dưỡng (quyết định 48) mà <paramref name="userId"/> là người ủy quyền hoặc người được ủy quyền;
+    /// <c>null</c> là mọi ủy quyền (Phòng Điều dưỡng). Mới tạo trước.
+    /// </summary>
+    Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsAsync(Guid? userId, CancellationToken cancellationToken);
+
+    /// <summary>Ủy quyền chưa hủy có ngày <paramref name="date"/> (bảng tổng hợp ghi người được ủy quyền trong ngày).</summary>
+    Task<IReadOnlyList<NursingReportDelegation>> ListDelegationsCoveringAsync(DateOnly date, CancellationToken cancellationToken);
+
+    /// <summary>Các ủy quyền theo mã (kể cả đã hủy), để ghi người ủy quyền của báo cáo đã gửi theo ủy quyền.</summary>
+    Task<IReadOnlyList<NursingReportDelegation>> GetDelegationsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken);
 }
 
 public interface ISystemSettingRepository
@@ -251,6 +276,23 @@ public interface IExportJobRepository
     void Add(ExportJob job);
 
     Task<PagedResult<ExportJobRecord>> SearchAsync(ExportJobSearch query, CancellationToken cancellationToken);
+}
+
+/// <summary>Phân công kiểm thử tính năng mới (quyết định 49).</summary>
+public interface ITestAssignmentRepository
+{
+    void Add(TestAssignment assignment);
+
+    Task<TestAssignment?> GetAsync(Guid id, CancellationToken cancellationToken);
+
+    /// <summary>Phân công của một đợt kiểm thử (<c>null</c> là mọi đợt), mới tạo trước; tối đa 2.000 phân công.</summary>
+    Task<IReadOnlyList<TestAssignment>> ListAsync(string? version, CancellationToken cancellationToken);
+
+    /// <summary>Mọi phân công của một người (kể cả đã hủy).</summary>
+    Task<IReadOnlyList<TestAssignment>> ListForAssigneeAsync(Guid userId, CancellationToken cancellationToken);
+
+    /// <summary>Các đợt kiểm thử đã có, đợt mới phân công trước.</summary>
+    Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Cấp số phiếu tăng dần, không trùng (dùng sequence của CSDL).</summary>

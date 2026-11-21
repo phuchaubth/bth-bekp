@@ -45,6 +45,18 @@ public static class Permissions
 
     /// <summary>Xem dữ liệu của mọi khoa (không giới hạn theo khoa của người dùng).</summary>
     public const string ScopeAllDepartments = "scope.all_departments";
+
+    /// <summary>
+    /// Phân công kiểm thử tính năng mới cho từng người, có thời gian; xem, ghi hướng xử lý và xuất báo cáo kiểm thử (quyết định 49).
+    /// Người được phân công tự xem và báo cáo việc của mình, không cần quyền này.
+    /// </summary>
+    public const string TestingManage = "testing.manage";
+
+    /// <summary>
+    /// Bật/tắt chế độ bảo trì (quyết định 53) và vẫn đăng nhập, thao tác được khi đang bảo trì để điều chỉnh cấu hình, mẫu phiếu,
+    /// dữ liệu. Người không có quyền này (kể cả kiosk, người bệnh ký qua mã QR) không đăng nhập, không thao tác được khi đang bảo trì.
+    /// </summary>
+    public const string SystemMaintenance = "system.maintenance";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -60,6 +72,7 @@ public static class PermissionCatalog
     private const string ReportGroup = "Báo cáo và xuất dữ liệu";
     private const string NursingGroup = "Báo cáo điều dưỡng";
     private const string ScopeGroup = "Phạm vi dữ liệu";
+    private const string TestingGroup = "Kiểm thử";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -69,6 +82,7 @@ public static class PermissionCatalog
         new(Permissions.DepartmentsManage, "Quản lý khoa/phòng", SystemGroup),
         new(Permissions.AuditRead, "Xem nhật ký hệ thống", SystemGroup),
         new(Permissions.SettingsManage, "Cấu hình hệ thống", SystemGroup),
+        new(Permissions.SystemMaintenance, "Bảo trì hệ thống: bật/tắt, vào hệ thống khi đang bảo trì", SystemGroup),
         new(Permissions.PatientsRead, "Xem người bệnh", PatientGroup),
         new(Permissions.PatientsManage, "Thêm/sửa người bệnh", PatientGroup),
         new(Permissions.TemplatesRead, "Xem mẫu phiếu", TemplateGroup),
@@ -85,6 +99,7 @@ public static class PermissionCatalog
         new(Permissions.NursingReportsRead, "Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp", NursingGroup),
         new(Permissions.NursingReportsManage, "Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo, số liệu HIS", NursingGroup),
         new(Permissions.ScopeAllDepartments, "Xem dữ liệu toàn viện", ScopeGroup),
+        new(Permissions.TestingManage, "Phân công kiểm thử, xem và xử lý báo cáo kiểm thử", TestingGroup),
     ];
 
     private static readonly HashSet<string> Codes = new(All.Select(p => p.Code), StringComparer.Ordinal);

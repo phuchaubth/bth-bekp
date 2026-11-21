@@ -503,6 +503,10 @@ namespace Consent.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
 
+                    b.Property<string>("ShortName")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
@@ -688,6 +692,12 @@ namespace Consent.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -849,6 +859,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid?>("SubmittedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("SubmittedDelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -858,6 +871,8 @@ namespace Consent.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ReportDate");
+
+                    b.HasIndex("SubmittedDelegationId");
 
                     b.HasIndex("DepartmentId", "ReportDate")
                         .IsUnique();
@@ -906,6 +921,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("DelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -930,10 +948,66 @@ namespace Consent.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DelegationId");
+
                     b.HasIndex("ReportDate", "DepartmentId")
                         .IsUnique();
 
                     b.ToTable("NursingDepartmentStatistics", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DelegateUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DelegatorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DelegateUserId");
+
+                    b.HasIndex("DelegatorUserId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("StartDate", "EndDate");
+
+                    b.ToTable("NursingReportDelegations", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDepartment", b =>
@@ -951,6 +1025,9 @@ namespace Consent.Persistence.Migrations
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -1163,6 +1240,90 @@ namespace Consent.Persistence.Migrations
                     b.ToTable("SystemSettings", (string)null);
                 });
 
+            modelBuilder.Entity("Consent.Domain.Testing.TestAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssigneeUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Findings")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("FindingsEncrypted");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("ReportedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly?>("ReportedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Suggestions")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("SuggestionsEncrypted");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssigneeUserId");
+
+                    b.HasIndex("Version", "CreatedAtUtc");
+
+                    b.ToTable("TestAssignments", (string)null);
+                });
+
             modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentForm", b =>
                 {
                     b.HasOne("Consent.Domain.Identity.User", null)
@@ -1318,6 +1479,28 @@ namespace Consent.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingDailyReport", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedDelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingDepartmentStatistics", b =>
+                {
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("DelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
                 {
                     b.HasOne("Consent.Domain.Departments.Department", null)
                         .WithMany()

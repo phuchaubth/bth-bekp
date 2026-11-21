@@ -53,6 +53,7 @@ public static class DependencyInjection
         services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
         services.AddScoped<INursingReportRepository, NursingReportRepository>();
+        services.AddScoped<ITestAssignmentRepository, TestAssignmentRepository>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

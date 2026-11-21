@@ -41,6 +41,7 @@ public sealed class UserAdminServiceTests
         var result = await service.CreateAsync(NewUser(ctx.RoleByCode(SystemRoles.Nurse).Id), CancellationToken.None);
 
         Assert.Equal(ErrorType.Conflict, result.Error!.Type);
+        Assert.Contains("đã tồn tại", result.Error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -240,6 +241,99 @@ public sealed class UserAdminServiceTests
 
         Assert.Contains("chỉ thuộc một khoa", Assert.Single(result.Error!.FieldErrors!["additionalDepartmentIds"]), StringComparison.Ordinal);
         Assert.Empty(ctx.Store.Users);
+    }
+
+    [Fact]
+    public async Task Delete_OnlyAStoppedAccount_HidesItFromBothTabs_KeepsItForHistory_AndBlocksEveryAction()
+    {
+        var ctx = new AppTestContext();
+        var admin = ctx.AddUser("admin1", role: SystemRoles.Administrator);
+        var doctor = ctx.AddUser("bacsi.nghiviec");
+        ctx.CurrentUser.UserId = admin.Id;
+        var service = ctx.CreateUserAdminService();
+        async Task<IReadOnlyList<Guid>> TabAsync(bool? active) =>
+            [.. (await service.SearchAsync(new UserQuery(IsActive: active), CancellationToken.None)).Items.Select(u => u.Id)];
+
+        // Đang sử dụng: chưa xóa được.
+        var whileActive = await service.DeleteAsync(doctor.Id, CancellationToken.None);
+        Assert.Equal("users.delete_active", whileActive.Error!.Code);
+        Assert.False(doctor.IsDeleted);
+
+        // Ngưng sử dụng: sang thẻ Ngưng sử dụng.
+        Assert.True((await service.LockAsync(doctor.Id, CancellationToken.None)).IsSuccess);
+        Assert.Contains(doctor.Id, await TabAsync(false));
+        Assert.DoesNotContain(doctor.Id, await TabAsync(true));
+
+        var deleted = await service.DeleteAsync(doctor.Id, CancellationToken.None);
+
+        Assert.True(deleted.IsSuccess);
+        Assert.True(doctor.IsDeleted);
+        Assert.Equal(admin.Id, doctor.DeletedByUserId);
+        Assert.Contains(doctor, ctx.Store.Users);
+        foreach (var active in new bool?[] { null, true, false })
+        {
+            Assert.DoesNotContain(doctor.Id, await TabAsync(active));
+        }
+
+        var update = new UpdateUserRequest("Bác sĩ", null, null, null, null, null, [ctx.RoleByCode(SystemRoles.Doctor).Id]);
+        Assert.Equal(ErrorType.NotFound, (await service.GetAsync(doctor.Id, CancellationToken.None)).Error!.Type);
+        Assert.Equal(ErrorType.NotFound, (await service.UpdateAsync(doctor.Id, update, CancellationToken.None)).Error!.Type);
+        Assert.Equal(ErrorType.NotFound, (await service.UnlockAsync(doctor.Id, CancellationToken.None)).Error!.Type);
+        Assert.Equal(ErrorType.NotFound, (await service.LockAsync(doctor.Id, CancellationToken.None)).Error!.Type);
+        Assert.Equal(
+            ErrorType.NotFound,
+            (await service.ResetPasswordAsync(doctor.Id, new ResetPasswordRequest("Mat-Khau-Moi-2026!"), CancellationToken.None)).Error!.Type);
+        Assert.Equal(ErrorType.NotFound, (await service.DeleteAsync(doctor.Id, CancellationToken.None)).Error!.Type);
+        Assert.False(doctor.IsActive);
+        Assert.Equal("bacsi.nghiviec Demo", doctor.FullName);
+    }
+
+    [Fact]
+    public async Task Delete_Self_IsNotAllowed()
+    {
+        var ctx = new AppTestContext();
+        var admin = ctx.AddUser("admin1", role: SystemRoles.Administrator, active: false);
+        ctx.CurrentUser.UserId = admin.Id;
+
+        var result = await ctx.CreateUserAdminService().DeleteAsync(admin.Id, CancellationToken.None);
+
+        Assert.Equal("users.cannot_delete_self", result.Error!.Code);
+        Assert.False(admin.IsDeleted);
+    }
+
+    [Fact]
+    public async Task Create_WithTheUserNameOfADeletedAccount_IsRejected_SayingItCannotBeReused()
+    {
+        var ctx = new AppTestContext();
+        var admin = ctx.AddUser("admin1", role: SystemRoles.Administrator);
+        var old = ctx.AddUser("dieuduong.moi", active: false);
+        old.Delete(admin.Id, DateTimeOffset.UtcNow);
+        var service = ctx.CreateUserAdminService();
+
+        var result = await service.CreateAsync(NewUser(ctx.RoleByCode(SystemRoles.Nurse).Id), CancellationToken.None);
+
+        Assert.Equal(ErrorType.Conflict, result.Error!.Type);
+        Assert.Contains("tài khoản đã xóa", result.Error.Message, StringComparison.Ordinal);
+        Assert.Single(ctx.Store.Users, u => u.UserName == "dieuduong.moi");
+    }
+
+    [Fact]
+    public async Task DeletingTheLastAccountOfARoleAndDepartment_LetsThemBeDeleted()
+    {
+        var ctx = new AppTestContext();
+        var admin = ctx.AddUser("admin1", role: SystemRoles.Administrator);
+        ctx.CurrentUser.UserId = admin.Id;
+        var department = ctx.AddDepartment("THU", "Khoa thử");
+        var role = (await ctx.CreateRoleService().CreateAsync(new CreateRoleRequest("Dược sĩ", null, null), CancellationToken.None)).Value;
+        var pharmacist = ctx.AddUser("duocsi.nghiviec", role: role.Code, active: false, departmentId: department.Id);
+
+        Assert.Equal("roles.in_use", (await ctx.CreateRoleService().DeleteAsync(role.Id, CancellationToken.None)).Error!.Code);
+        Assert.Equal("departments.in_use", (await ctx.CreateDepartmentService().DeleteAsync(department.Id, CancellationToken.None)).Error!.Code);
+
+        Assert.True((await ctx.CreateUserAdminService().DeleteAsync(pharmacist.Id, CancellationToken.None)).IsSuccess);
+
+        Assert.True((await ctx.CreateRoleService().DeleteAsync(role.Id, CancellationToken.None)).IsSuccess);
+        Assert.True((await ctx.CreateDepartmentService().DeleteAsync(department.Id, CancellationToken.None)).IsSuccess);
     }
 
     [Fact]

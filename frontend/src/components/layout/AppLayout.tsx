@@ -1,4 +1,4 @@
-import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
+import { ExperimentOutlined, LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
@@ -7,6 +7,7 @@ import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../a
 import { BRAND } from '../../app/theme'
 import { useAuth } from '../../auth/authContext'
 import { BrandMark } from './BrandMark'
+import { MaintenanceBanner } from './MaintenanceBanner'
 
 const { Header, Content, Footer } = Layout
 
@@ -87,12 +88,15 @@ export function AppLayout() {
   const userMenu: MenuProps = {
     items: [
       { key: 'account', icon: <UserOutlined />, label: 'Tài khoản của tôi' },
+      { key: 'testing', icon: <ExperimentOutlined />, label: 'Việc kiểm thử của tôi' },
       { type: 'divider' },
       { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true },
     ],
     onClick: ({ key }) => {
       if (key === 'account') {
         navigate('/tai-khoan')
+      } else if (key === 'testing') {
+        navigate('/kiem-thu')
       } else if (key === 'logout') {
         void logout()
       }
@@ -161,6 +165,8 @@ export function AppLayout() {
           </nav>
         </Drawer>
       )}
+      {/* Quyết định 53: tài khoản có quyền bảo trì vẫn làm việc khi đang bảo trì, thấy dải báo này. */}
+      <MaintenanceBanner />
       <Content style={{ padding: isDesktop ? '28px 24px' : 16 }}>
         <main style={CONTAINER}>
           <Outlet />

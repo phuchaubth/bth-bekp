@@ -4,7 +4,7 @@ import { Navigate, useLocation } from 'react-router'
 import { SIGNING_PATH, signingSession } from '../features/signing/signingSession'
 import { ForbiddenPage } from '../pages/ForbiddenPage'
 import { useAuth } from './authContext'
-import { KIOSK_ROLE_CODE } from './permissions'
+import { KIOSK_ROLE_CODE, hasAnyPermission } from './permissions'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from './paths'
 
 export function FullPageSpinner({ tip = 'Đang tải…' }: { tip?: string }) {
@@ -45,9 +45,9 @@ export function RequireAuth({ children, allowPasswordChange = false }: { childre
 }
 
 /** Hiển thị trang 403 nếu người dùng không có quyền. */
-export function RequirePermission({ permission, children }: { permission?: string; children: ReactNode }) {
+export function RequirePermission({ permission, children }: { permission?: string | readonly string[]; children: ReactNode }) {
   const { hasPermission } = useAuth()
-  if (permission && !hasPermission(permission)) {
+  if (permission && !hasAnyPermission(permission, hasPermission)) {
     return <ForbiddenPage />
   }
   return children

@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { tokenStore } from '../auth/tokenStore'
 import { json, mockApi, problem } from '../test/mockApi'
-import { ApiError, apiRequest, getJson, setRefreshHandler } from './http'
+import { ApiError, apiBlob, apiRequest, getJson, setRefreshHandler } from './http'
+import { maintenanceStore } from './maintenanceStore'
 
 describe('apiRequest', () => {
   it('trả về JSON và gửi access token cùng header chống CSRF', async () => {
@@ -83,5 +84,74 @@ describe('apiRequest', () => {
     mockApi({ 'POST /api/v1/auth/logout': () => new Response(null, { status: 204 }) })
 
     await expect(apiRequest('/api/v1/auth/logout', { method: 'POST', auth: false })).resolves.toBeUndefined()
+  })
+})
+
+// Quyết định 53: mọi phản hồi 503 bật màn hình "Hệ thống đang bảo trì".
+describe('503: màn hình bảo trì', () => {
+  it('đang bảo trì (mã system.maintenance): ghi lý do, giờ dự kiến xong; hết bảo trì thì làm tiếp, không tải lại trang', async () => {
+    mockApi({
+      'GET /api/v1/patients': () =>
+        problem(503, 'Hệ thống đang bảo trì. Vui lòng quay lại sau.', {
+          code: 'system.maintenance',
+          reason: 'Nâng cấp phần mềm',
+          expectedEndAtUtc: '2026-11-21T04:30:00Z',
+        }),
+    })
+
+    const error = await apiRequest('/api/v1/patients').catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ status: 503, code: 'system.maintenance' })
+    expect(maintenanceStore.get().notice).toMatchObject({
+      kind: 'maintenance',
+      reason: 'Nâng cấp phần mềm',
+      expectedEndAtUtc: '2026-11-21T04:30:00Z',
+      reloadOnEnd: false,
+    })
+  })
+
+  it('503 không có mã (IIS khi ứng dụng đang dừng): giữ lý do đang hiện, hết thì tải lại trang', async () => {
+    mockApi({
+      'GET /api/v1/patients': () => problem(503, 'Đang bảo trì', { code: 'system.maintenance', reason: 'Nâng cấp phần mềm' }),
+      'GET /api/v1/consent-forms/f-1/pdf': () => new Response('Service Unavailable', { status: 503 }),
+    })
+    await apiRequest('/api/v1/patients').catch(() => undefined)
+    const since = maintenanceStore.get().notice?.since
+
+    await expect(apiBlob('/api/v1/consent-forms/f-1/pdf')).rejects.toMatchObject({ status: 503 })
+
+    expect(maintenanceStore.get().notice).toMatchObject({ kind: 'unavailable', reason: 'Nâng cấp phần mềm', reloadOnEnd: true, since })
+  })
+
+  it('lỗi khác 503 không bật màn hình bảo trì', async () => {
+    mockApi({ 'GET /api/v1/patients': () => problem(500, 'Đã xảy ra lỗi hệ thống') })
+
+    await apiRequest('/api/v1/patients').catch(() => undefined)
+
+    expect(maintenanceStore.get().notice).toBeNull()
+  })
+
+  it('đăng nhập được (kể cả khi đang bảo trì) thì đóng màn hình, trừ khi máy chủ vừa dừng hẳn (phải tải lại trang)', () => {
+    maintenanceStore.report({ kind: 'maintenance', reason: 'Nâng cấp phần mềm' })
+    maintenanceStore.startAdminLogin()
+    maintenanceStore.sessionStarted()
+    expect(maintenanceStore.get()).toEqual({ notice: null, adminLogin: false })
+
+    maintenanceStore.report({ kind: 'unavailable' })
+    maintenanceStore.startAdminLogin()
+    maintenanceStore.sessionStarted()
+    expect(maintenanceStore.get()).toMatchObject({ notice: { kind: 'unavailable', reloadOnEnd: true }, adminLogin: false })
+  })
+
+  it('báo lại cùng nội dung thì không vẽ lại', () => {
+    const listener = vi.fn()
+    const unsubscribe = maintenanceStore.subscribe(listener)
+
+    maintenanceStore.report({ kind: 'maintenance', reason: 'A' })
+    maintenanceStore.report({ kind: 'maintenance', reason: 'A' })
+    maintenanceStore.report({ kind: 'maintenance', reason: 'B' })
+    unsubscribe()
+
+    expect(listener).toHaveBeenCalledTimes(2)
   })
 })

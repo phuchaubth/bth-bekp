@@ -19,9 +19,19 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
     private const string RelNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private const string PackageRelNs = "http://schemas.openxmlformats.org/package/2006/relationships";
 
-    /// <summary>Số cột của trang: tên khoa và 11 cột số của bảng A.</summary>
-    /// <summary>Cột cuối (đánh số từ 0): cột khoa phòng rồi các cột số của bảng A.</summary>
-    private static readonly int LastColumn = NursingReportForm.SummaryColumns.Count;
+    /// <summary>
+    /// Cột cuối (đánh số từ 0): cột khoa phòng (mã khoa), các cột số của bảng A, rồi cột người báo cáo (quyết định 44).
+    /// </summary>
+    private static readonly int LastColumn = NursingReportForm.SummaryColumns.Count + 1;
+
+    /// <summary>Chỗ ký của Phòng Điều dưỡng: 7 cột cuối trang.</summary>
+    private static readonly int SignatureFrom = LastColumn - 6;
+
+    /// <summary>
+    /// Cột cuối của ô nhãn mục B–F (cột A–D): cột A nay chỉ ghi mã khoa nên hẹp, nhãn gộp thêm ba cột cho khỏi xuống dòng
+    /// (quyết định 44). Số liệu, phần báo cáo gộp từ cột kế tiếp đến cột cuối.
+    /// </summary>
+    internal const int LabelLastColumn = 3;
 
     private static readonly XmlWriterSettings XmlSettings = new()
     {
@@ -47,6 +57,12 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
 
         /// <summary>Số ở mục B–D: canh trái như bản giấy (cột "SỐ LIỆU" rộng).</summary>
         NumberLeft = 10,
+
+        /// <summary>Chữ đậm canh giữa, không viền: chỗ ký của Phòng Điều dưỡng.</summary>
+        CenterBold = 11,
+
+        /// <summary>Chữ thường xuống dòng, không viền: dòng người báo cáo dưới mỗi mục.</summary>
+        Note = 12,
     }
 
     internal sealed record Cell(int Column, object? Value, Style Style);
@@ -101,55 +117,93 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
         AddRow(new Cell(0, "A. Số liệu người bệnh nội trú", Style.Heading));
         var header = new List<Cell> { new(0, "KHOA PHÒNG", Style.Header) };
         header.AddRange(summary.Columns.Select((c, i) => new Cell(i + 1, c.Header, Style.Header)));
+        header.Add(new Cell(LastColumn, NursingReportForm.ReporterHeader, Style.Header));
         rows.Add(new Row(header, 66));
         foreach (var department in summary.Rows)
         {
-            var cells = new List<Cell> { new(0, department.DepartmentName, Style.Text) };
+            var cells = new List<Cell> { new(0, department.DepartmentCode, Style.Text) };
             cells.AddRange(summary.Columns.Select((c, i) => new Cell(i + 1, department.Cells[c.Key], Style.Number)));
+            cells.Add(new Cell(LastColumn, department.SubmittedBy, Style.Text));
             rows.Add(new Row(cells));
         }
 
         var total = new List<Cell> { new(0, "Tổng", Style.TotalText) };
         total.AddRange(summary.Columns.Select((c, i) => new Cell(i + 1, summary.Totals[c.Key], Style.TotalNumber)));
+        total.Add(new Cell(LastColumn, null, Style.TotalText));
         rows.Add(new Row(total));
 
-        void AddTable(string heading, string firstHeader, string secondHeader, IEnumerable<(string Label, object? Value)> lines, bool numbers)
+        void AddReporters(string? reporters)
+        {
+            var text = $"{NursingReportForm.ReporterHeader}: {reporters ?? "chưa có"}";
+            AddMergedRow(text, Style.Note, EstimateHeight(text));
+        }
+
+        void AddTable(string heading, string firstHeader, string secondHeader, IEnumerable<(string Label, object? Value)> lines, bool numbers, string? reporters)
         {
             AddRow();
             AddRow(new Cell(0, heading, Style.Heading));
-            rows.Add(new Row([new Cell(0, firstHeader, Style.Header), .. Spanned(1, secondHeader, Style.Header)]));
-            merges.Add(Range(1, LastColumn, rows.Count));
+            rows.Add(new Row([.. Span(0, LabelLastColumn, firstHeader, Style.Header), .. Spanned(LabelLastColumn + 1, secondHeader, Style.Header)]));
+            merges.Add(Range(0, LabelLastColumn, rows.Count));
+            merges.Add(Range(LabelLastColumn + 1, LastColumn, rows.Count));
             foreach (var (label, value) in lines)
             {
                 var text = value as string;
                 rows.Add(new Row(
-                    [new Cell(0, label, Style.Text), .. Spanned(1, value, numbers ? Style.NumberLeft : Style.Text)],
+                    [.. Span(0, LabelLastColumn, label, Style.Text), .. Spanned(LabelLastColumn + 1, value, numbers ? Style.NumberLeft : Style.Text)],
                     text is null ? null : EstimateHeight(text)));
-                merges.Add(Range(1, LastColumn, rows.Count));
+                merges.Add(Range(0, LabelLastColumn, rows.Count));
+                merges.Add(Range(LabelLastColumn + 1, LastColumn, rows.Count));
             }
+
+            AddReporters(reporters);
         }
 
-        AddTable("B. Số liệu khoa khám bệnh", "NỘI DUNG", "SỐ LIỆU", summary.Outpatient.Select(l => (l.Label, (object?)l.Value)), numbers: true);
-        AddTable("C. Số liệu PTTT", "NỘI DUNG", "SỐ LIỆU", summary.Procedures.Select(l => (l.Label, (object?)l.Value)), numbers: true);
-        AddTable("D. Số liệu CĐHA", "NỘI DUNG", "SỐ LIỆU", summary.Imaging.Select(l => (l.Label, (object?)l.Value)), numbers: true);
-        AddTable("E. Tình hình trong ngày", "NỘI DUNG", "PHẦN BÁO CÁO", summary.Situation.Select(c => (c.Label, (object?)(c.Text ?? string.Empty))), numbers: false);
+        AddTable(
+            "B. Số liệu khoa khám bệnh", "NỘI DUNG", "SỐ LIỆU", summary.Outpatient.Select(l => (l.Label, (object?)l.Value)), numbers: true,
+            summary.Reporters.Outpatient);
+        AddTable(
+            "C. Số liệu PTTT", "NỘI DUNG", "SỐ LIỆU", summary.Procedures.Select(l => (l.Label, (object?)l.Value)), numbers: true,
+            summary.Reporters.Procedures);
+        AddTable(
+            "D. Số liệu CĐHA", "NỘI DUNG", "SỐ LIỆU", summary.Imaging.Select(l => (l.Label, (object?)l.Value)), numbers: true,
+            summary.Reporters.Imaging);
+        AddTable(
+            "E. Tình hình trong ngày", "NỘI DUNG", "PHẦN BÁO CÁO", summary.Situation.Select(c => (c.Label, (object?)(c.Text ?? string.Empty))),
+            numbers: false, summary.Reporters.Situation);
         AddTable(
             "F. Báo cáo cụ thể sự cố (nếu có)",
             "KHOA",
             "NỘI DUNG BÁO CÁO SỰ CỐ",
             summary.Incidents.Count == 0
                 ? [(string.Empty, "Không có.")]
-                : summary.Incidents.Select(i => (i.DepartmentName, (object?)i.Text)),
-            numbers: false);
+                : summary.Incidents.Select(i => (i.DepartmentCode, (object?)i.Text)),
+            numbers: false,
+            summary.Reporters.Incidents);
 
+        // Chỗ Phòng Điều dưỡng ký (quyết định 44): tên phòng, ghi chú, rồi vài dòng trống để ký.
         AddRow();
+        rows.Add(new Row([new Cell(SignatureFrom, NursingReportForm.SignatureTitle, Style.CenterBold)]));
+        merges.Add(Range(SignatureFrom, LastColumn, rows.Count));
+        rows.Add(new Row([new Cell(SignatureFrom, NursingReportForm.SignatureHint, Style.Center)]));
+        merges.Add(Range(SignatureFrom, LastColumn, rows.Count));
+        for (var i = 0; i < SignatureBlankRows; i++)
+        {
+            AddRow();
+        }
+
         AddRow(new Cell(0, document.PrintedLine, Style.Normal));
         return (rows, merges);
     }
 
+    /// <summary>Số dòng trống để ký dưới chỗ ký của Phòng Điều dưỡng.</summary>
+    internal const int SignatureBlankRows = 4;
+
     /// <summary>Ô đầu vùng gộp có giá trị, các ô còn lại trống nhưng cùng kiểu (để kẻ đủ viền).</summary>
-    private static IEnumerable<Cell> Spanned(int from, object? value, Style style) =>
-        Enumerable.Range(from, LastColumn - from + 1).Select(c => new Cell(c, c == from ? value : null, style));
+    private static IEnumerable<Cell> Span(int from, int to, object? value, Style style) =>
+        Enumerable.Range(from, to - from + 1).Select(c => new Cell(c, c == from ? value : null, style));
+
+    /// <summary>Vùng gộp từ cột <paramref name="from"/> đến cột cuối.</summary>
+    private static IEnumerable<Cell> Spanned(int from, object? value, Style style) => Span(from, LastColumn, value, style);
 
     /// <summary>Ô gộp không tự giãn chiều cao: ước lượng theo số dòng (khoảng 110 ký tự mỗi dòng trên 11 cột gộp).</summary>
     private static double? EstimateHeight(string text)
@@ -177,8 +231,9 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
         w.WriteEndElement();
 
         w.WriteStartElement("cols");
-        WriteColumn(w, 1, 1, 36);
-        WriteColumn(w, 2, LastColumn + 1, 10.5);
+        WriteColumn(w, 1, 1, 12);
+        WriteColumn(w, 2, LastColumn, 10.5);
+        WriteColumn(w, LastColumn + 1, LastColumn + 1, 22);
         w.WriteEndElement();
 
         w.WriteStartElement("sheetData");
@@ -383,7 +438,7 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
         w.WriteEndElement();
 
         w.WriteStartElement("cellXfs");
-        w.WriteAttributeString("count", "11");
+        w.WriteAttributeString("count", "13");
         WriteXf(w, font: 0, fill: 0, border: 0, horizontal: null, vertical: null, wrap: false); // Normal
         WriteXf(w, font: 1, fill: 0, border: 0, horizontal: null, vertical: null, wrap: false); // Bold
         WriteXf(w, font: 2, fill: 0, border: 0, horizontal: "center", vertical: "center", wrap: false); // Title
@@ -395,6 +450,8 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
         WriteXf(w, font: 1, fill: 0, border: 1, horizontal: "right", vertical: "center", wrap: false); // TotalNumber
         WriteXf(w, font: 3, fill: 0, border: 0, horizontal: null, vertical: null, wrap: false); // Heading
         WriteXf(w, font: 0, fill: 0, border: 1, horizontal: "left", vertical: "center", wrap: false); // NumberLeft
+        WriteXf(w, font: 1, fill: 0, border: 0, horizontal: "center", vertical: null, wrap: false); // CenterBold
+        WriteXf(w, font: 0, fill: 0, border: 0, horizontal: "left", vertical: "top", wrap: true); // Note
         w.WriteEndElement();
 
         w.WriteStartElement("cellStyles");

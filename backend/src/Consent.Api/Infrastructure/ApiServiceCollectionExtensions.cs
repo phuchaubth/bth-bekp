@@ -120,6 +120,8 @@ internal static class ApiServiceCollectionExtensions
         app.UseRouting();
         app.UseCors(CorsPolicyName);
         app.UseAuthentication();
+        // Chế độ bảo trì (quyết định 53): sau xác thực (biết quyền trong token), trước phân quyền.
+        app.UseMiddleware<MaintenanceModeMiddleware>();
         app.UseAuthorization();
         app.UseRateLimiter();
 
@@ -135,14 +137,14 @@ internal static class ApiServiceCollectionExtensions
         {
             Predicate = _ => false,
             ResponseWriter = WriteHealthResponseAsync,
-        }).AllowAnonymous();
+        }).AllowAnonymous().WithMetadata(new AllowDuringMaintenanceAttribute());
 
         // Readiness: kiểm tra kết nối SQL Server.
         app.MapHealthChecks("/health/ready", new HealthCheckOptions
         {
             Predicate = check => check.Tags.Contains(ReadyTag),
             ResponseWriter = WriteHealthResponseAsync,
-        }).AllowAnonymous();
+        }).AllowAnonymous().WithMetadata(new AllowDuringMaintenanceAttribute());
 
         return app;
     }

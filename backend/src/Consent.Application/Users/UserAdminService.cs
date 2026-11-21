@@ -7,7 +7,10 @@ using FluentValidation;
 
 namespace Consent.Application.Users;
 
-/// <summary>Quản trị tài khoản người dùng: tạo, sửa, khóa/mở khóa, đặt lại mật khẩu.</summary>
+/// <summary>
+/// Quản trị tài khoản người dùng: tạo, sửa, ngưng sử dụng / sử dụng lại, mở khóa tạm thời, đặt lại mật khẩu, xóa tài khoản
+/// đã ngưng sử dụng (quyết định 51). Tài khoản đã xóa không còn trong danh sách và không thao tác được nữa.
+/// </summary>
 public sealed class UserAdminService(
     IUserRepository users,
     IRoleRepository roles,
@@ -35,7 +38,7 @@ public sealed class UserAdminService(
 
     public async Task<Result<UserDetailDto>> GetAsync(Guid id, CancellationToken cancellationToken)
     {
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         return user is null
             ? Result<UserDetailDto>.Failure(NotFound)
             : await ToDetailAsync(user, cancellationToken).ConfigureAwait(false);
@@ -50,10 +53,14 @@ public sealed class UserAdminService(
         }
 
         var userName = User.NormalizeUserName(request.UserName);
-        if (await users.UserNameExistsAsync(userName, cancellationToken).ConfigureAwait(false))
+        if (await users.GetByUserNameAsync(userName, cancellationToken).ConfigureAwait(false) is { } existing)
         {
-            return Result<UserDetailDto>.Failure(
-                Error.Conflict("users.username_exists", $"Tên đăng nhập \"{userName}\" đã tồn tại."));
+            // Tên đăng nhập của tài khoản đã xóa không dùng lại được: nhật ký, phiếu cũ không bị nhầm người (quyết định 51).
+            return Result<UserDetailDto>.Failure(Error.Conflict(
+                "users.username_exists",
+                existing.IsDeleted
+                    ? $"Tên đăng nhập \"{userName}\" thuộc một tài khoản đã xóa, không dùng lại được. Chọn tên đăng nhập khác."
+                    : $"Tên đăng nhập \"{userName}\" đã tồn tại."));
         }
 
         if (await ValidateReferencesAsync(request, cancellationToken).ConfigureAwait(false) is { } referenceError)
@@ -80,7 +87,7 @@ public sealed class UserAdminService(
             return Result<UserDetailDto>.Failure(invalid);
         }
 
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return Result<UserDetailDto>.Failure(NotFound);
@@ -107,7 +114,7 @@ public sealed class UserAdminService(
         return await ToDetailAsync(user, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Khóa tài khoản: không đăng nhập được và mọi phiên đang mở bị thu hồi.</summary>
+    /// <summary>Ngưng sử dụng tài khoản: không đăng nhập được và mọi phiên đang mở bị thu hồi.</summary>
     public async Task<Result> LockAsync(Guid id, CancellationToken cancellationToken)
     {
         if (currentUser.UserId == id)
@@ -115,7 +122,7 @@ public sealed class UserAdminService(
             return Result.Failure(Error.BusinessRule("users.cannot_lock_self", "Bạn không thể tự khóa tài khoản của mình."));
         }
 
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return Result.Failure(NotFound);
@@ -138,10 +145,10 @@ public sealed class UserAdminService(
         return Result.Success();
     }
 
-    /// <summary>Mở khóa: cho phép đăng nhập lại, xóa trạng thái khóa tạm thời do đăng nhập sai.</summary>
+    /// <summary>Sử dụng lại tài khoản đã ngưng, hoặc mở khóa tạm thời do đăng nhập sai (hay tra cứu sai trên kiosk).</summary>
     public async Task<Result> UnlockAsync(Guid id, CancellationToken cancellationToken)
     {
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return Result.Failure(NotFound);
@@ -161,7 +168,7 @@ public sealed class UserAdminService(
             return Result.Failure(invalid);
         }
 
-        var user = await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false);
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
         if (user is null)
         {
             return Result.Failure(NotFound);
@@ -179,6 +186,40 @@ public sealed class UserAdminService(
         await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         return Result.Success();
     }
+
+    /// <summary>
+    /// Xóa tài khoản đã ngưng sử dụng (quyết định 51). Không xóa khỏi CSDL: phiếu, báo cáo, nhật ký vẫn giữ tên người làm;
+    /// tài khoản không còn trong danh sách, không đăng nhập, không sử dụng lại được.
+    /// </summary>
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var byUserId = currentUser.UserId ?? throw new InvalidOperationException("Chưa xác định người dùng.");
+        if (byUserId == id)
+        {
+            return Result.Failure(Error.BusinessRule("users.cannot_delete_self", "Bạn không thể tự xóa tài khoản của mình."));
+        }
+
+        var user = await FindAsync(id, cancellationToken).ConfigureAwait(false);
+        if (user is null)
+        {
+            return Result.Failure(NotFound);
+        }
+
+        if (user.IsActive)
+        {
+            return Result.Failure(Error.BusinessRule(
+                "users.delete_active",
+                "Chỉ xóa được tài khoản đã ngưng sử dụng. Bấm Ngưng sử dụng trước, rồi xóa ở thẻ Ngưng sử dụng."));
+        }
+
+        user.Delete(byUserId, clock.UtcNow);
+        await unitOfWork.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <summary>Tài khoản còn quản lý được: tài khoản đã xóa coi như không tồn tại (quyết định 51).</summary>
+    private async Task<User?> FindAsync(Guid id, CancellationToken cancellationToken) =>
+        await users.GetByIdAsync(id, cancellationToken).ConfigureAwait(false) is { IsDeleted: false } user ? user : null;
 
     private async Task<Error?> ValidateReferencesAsync(IUserProfileRequest request, CancellationToken cancellationToken)
     {

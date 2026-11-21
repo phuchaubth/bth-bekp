@@ -5,7 +5,9 @@ using Consent.Application.ConsentTemplates;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
+using Consent.Application.Maintenance;
 using Consent.Application.NursingReports;
+using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -46,6 +48,11 @@ public static class DependencyInjection
         services.AddScoped<EncounterSettingsService>();
         services.AddScoped<NursingReportService>();
         services.AddScoped<NursingSummaryService>();
+        services.AddScoped<NursingDashboardService>();
+        services.AddScoped<NursingDelegationService>();
+        services.AddScoped<TestAssignmentService>();
+        services.AddScoped<MaintenanceService>();
+        services.AddSingleton(new MaintenanceStateCache(MaintenanceStateCache.DefaultLifetime));
 
         RegisterValidators(services);
         return services;

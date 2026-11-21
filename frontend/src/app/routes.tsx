@@ -3,6 +3,7 @@ import type { RouteObject } from 'react-router'
 import { RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from '../auth/paths'
 import { AppLayout } from '../components/layout/AppLayout'
+import { MaintenanceGate } from '../components/MaintenanceGate'
 import { PagePlaceholder } from '../components/PagePlaceholder'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ErrorPage } from '../pages/ErrorPage'
@@ -23,6 +24,10 @@ import {
   ExportsPage,
   KioskPage,
   Lazy,
+  MaintenanceSettingsPage,
+  MyTestAssignmentsPage,
+  NursingDashboardPage,
+  NursingDelegationsPage,
   NursingReportPage,
   NursingSummaryPage,
   PatientIntakePage,
@@ -33,6 +38,7 @@ import {
   RolesPage,
   SettingsPage,
   SigningKioskPage,
+  TestAssignmentsPage,
   UsersPage,
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
@@ -48,10 +54,14 @@ const implementedPages: Record<string, ReactNode> = {
   '/nhat-ky': <AuditLogsPage />,
   '/dieu-duong/bao-cao-khoa': <NursingReportPage />,
   '/dieu-duong/tong-hop': <NursingSummaryPage />,
+  '/dieu-duong/dashboard': <NursingDashboardPage />,
+  '/dieu-duong/uy-quyen': <NursingDelegationsPage />,
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
   '/quan-tri/cau-hinh': <SettingsPage />,
+  '/quan-tri/bao-tri': <MaintenanceSettingsPage />,
+  '/quan-tri/kiem-thu': <TestAssignmentsPage />,
 }
 
 const featureRoutes: RouteObject[] = flattenNavItems()
@@ -69,7 +79,8 @@ const featureRoutes: RouteObject[] = flattenNavItems()
     ),
   }))
 
-export const appRoutes: RouteObject[] = [
+/** Các trang (đều nằm dưới màn hình bảo trì). */
+const pageRoutes: RouteObject[] = [
   { path: LOGIN_PATH, element: <LoginPage />, errorElement: <ErrorPage /> },
   // Chế độ ký trên điện thoại: không dùng phiên đăng nhập (chỉ có token phiên ký), không có menu.
   {
@@ -134,6 +145,15 @@ export const appRoutes: RouteObject[] = [
           </Lazy>
         ),
       },
+      // Việc kiểm thử của tôi (quyết định 49): mọi tài khoản mở được, chỉ thấy việc được phân công cho mình.
+      {
+        path: 'kiem-thu',
+        element: (
+          <Lazy>
+            <MyTestAssignmentsPage />
+          </Lazy>
+        ),
+      },
       ...featureRoutes,
       {
         path: 'phieu-dong-thuan/tao-moi',
@@ -188,4 +208,9 @@ export const appRoutes: RouteObject[] = [
       { path: '*', element: <NotFoundPage /> },
     ],
   },
+]
+
+export const appRoutes: RouteObject[] = [
+  // Chế độ bảo trì (quyết định 53): máy chủ trả 503 thì màn hình "Hệ thống đang bảo trì" che trang đang mở (kể cả kiosk, ký QR).
+  { element: <MaintenanceGate />, errorElement: <ErrorPage />, children: pageRoutes },
 ]
