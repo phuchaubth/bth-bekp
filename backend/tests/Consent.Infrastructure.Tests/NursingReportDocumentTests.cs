@@ -224,11 +224,14 @@ public sealed class NursingReportDocumentTests
         using var measure = XGraphics.CreateMeasureContext(new XSize(2000, 2000), XGraphicsUnit.Point, XPageDirection.Downwards, new RenderEvents());
         var font = new XFont(EmbeddedFontResolver.FamilyName, MigraDocNursingReportPdfRenderer.NumberHeaderFontSize, XFontStyleEx.Bold);
 
+        // Khoảng cách chữ tới viền ô: của cột nếu cột có đặt, không thì của bảng (như khi in).
+        double Padding(Mdom.Unit column, Mdom.Unit table) => (column.IsEmpty ? table : column).Point;
+
         Assert.Equal(NursingReportForm.SummaryColumns.Count + 2, table.Columns.Count);
         for (var c = 1; c < table.Columns.Count - 1; c++)
         {
             var column = table.Columns[c];
-            var available = column.Width.Point - column.LeftPadding.Point - column.RightPadding.Point;
+            var available = column.Width.Point - Padding(column.LeftPadding, table.LeftPadding) - Padding(column.RightPadding, table.RightPadding);
             var header = (Mdom.Paragraph)table.Rows[0].Cells[c].Elements[0]!;
             Assert.Equal(MigraDocNursingReportPdfRenderer.NumberHeaderFontSize, header.Format.Font.Size.Point);
             Assert.All(
