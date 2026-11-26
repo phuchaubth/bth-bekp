@@ -127,12 +127,15 @@ public static class NursingReportForm
     /// <summary>Số ca chuyển khoa (chuyển sang khoa khác) ngày hôm trước (quyết định 44).</summary>
     public const string TransfersOutKey = "transfersOutYesterday";
 
+    /// <summary>Số người bệnh bao phòng (quyết định 54).</summary>
+    public const string PrivateRoomPatientsKey = "privateRoomPatients";
+
     /// <summary>
     /// Phiên bản mẫu báo cáo khoa, ghi kèm số liệu khi lưu (<see cref="NursingReportFigures.Version"/>). 1: mẫu ban đầu (quyết
     /// định 31, 38); 2: thêm số người bệnh người nước ngoài và số ca chuyển khoa (quyết định 44); 3: thêm số NB ngày hôm trước,
-    /// số NB hiện tại tính theo công thức (quyết định 46).
+    /// số NB hiện tại tính theo công thức (quyết định 46); 4: thêm số NB bao phòng (quyết định 54).
     /// </summary>
-    public const int FormVersion = 3;
+    public const int FormVersion = 4;
 
     /// <summary>Cột cuối bảng A: người gửi báo cáo của khoa (quyết định 44).</summary>
     public const string ReporterHeader = "Người báo cáo";
@@ -218,6 +221,7 @@ public static class NursingReportForm
                 "Số NB hiện tại",
                 Formula: new(PreviousDayPatientsKey, [AdmissionsFromClinicKey, AdmissionsByTransferKey], [DischargesKey, TransfersOutKey])),
             new(ForeignPatientsKey, "Số NB người nước ngoài", Since: 2),
+            new(PrivateRoomPatientsKey, "Số NB bao phòng", Since: 4),
             new("expectedDischarges", "Dự kiến xuất viện"),
             new("scheduledAdmissions", "Hẹn nhập viện"),
             new("newAdmissions", "Nhận mới"),
@@ -252,7 +256,8 @@ public static class NursingReportForm
     /// <summary>
     /// Cột số của bảng A, theo thứ tự bản giấy; cột "Số ca nhập viện ngày hôm trước" của bản giấy tách thành nhập khoa từ PK và
     /// do CK (quyết định 38); thêm "Người nước ngoài" sau "Số NB hiện tại" và "Chuyển khoa" sau cột xuất viện (quyết định 44);
-    /// thêm "Số NB ngày hôm trước" trước "Số NB hiện tại" (quyết định 46). Sau các cột số là cột <see cref="ReporterHeader"/>.
+    /// thêm "Số NB ngày hôm trước" trước "Số NB hiện tại" (quyết định 46); thêm "Bao phòng" sau "Người nước ngoài" (quyết định
+    /// 54). Sau các cột số là cột <see cref="ReporterHeader"/>.
     /// </summary>
     public static IReadOnlyList<NursingSummaryColumn> SummaryColumns { get; } =
     [
@@ -260,6 +265,7 @@ public static class NursingReportForm
         new(PreviousDayPatientsKey, "Số NB ngày hôm trước"),
         new(CurrentPatientsKey, "Số NB hiện tại"),
         new(ForeignPatientsKey, "Người nước ngoài"),
+        new(PrivateRoomPatientsKey, "Bao phòng"),
         new(AdmissionsFromClinicKey, "Nhập khoa từ PK"),
         new(AdmissionsByTransferKey, "Nhập khoa do CK"),
         new(DischargesKey, "Số ca Xuất viện ngày hôm trước"),

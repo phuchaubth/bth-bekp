@@ -79,7 +79,7 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         var values = new Dictionary<string, int?>
         {
             ["nurses"] = 18, ["previousDayPatients"] = 46, ["admissionsFromClinic"] = 2, ["dischargesYesterday"] = 1, ["currentPatients"] = 5,
-            ["boneMarrow"] = 2, ["outsideExams"] = 1,
+            ["boneMarrow"] = 2, ["outsideExams"] = 1, ["privateRoomPatients"] = 3,
         };
         var (draftStatus, draft) = await _client.SendJsonAsync(
             HttpMethod.Put, "/api/v1/nursing-reports/daily", nurse, new { reportDate = Today, values, notes = Notes });
@@ -106,6 +106,13 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
             command.Parameters.AddWithValue("@id", Guid.Parse(id));
             var stored = (string)(await command.ExecuteScalarAsync())!;
             Assert.DoesNotContain("Nguyễn Văn An", stored, StringComparison.Ordinal);
+
+            // Số liệu lưu kèm phiên bản mẫu 4 (quyết định 54: thêm "Số NB bao phòng").
+            await using var figures = new SqlCommand("SELECT FiguresJson FROM NursingDailyReports WHERE Id = @id", connection);
+            figures.Parameters.AddWithValue("@id", Guid.Parse(id));
+            using var json = JsonDocument.Parse((string)(await figures.ExecuteScalarAsync())!);
+            Assert.Equal(4, json.RootElement.GetProperty("form").GetInt32());
+            Assert.Equal(3, json.RootElement.GetProperty("values").GetProperty("privateRoomPatients").GetInt32());
         }
 
         var (_, audit) = await _client.SendJsonAsync(
@@ -131,6 +138,14 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal("NOI", summary.GetProperty("incidents")[0].GetProperty("departmentCode").GetString());
         Assert.Equal(0, row.GetProperty("cells").GetProperty("foreignPatients").GetInt32());
         Assert.Equal(0, row.GetProperty("cells").GetProperty("transfersOutYesterday").GetInt32());
+        // Quyết định 54: cột "Bao phòng" ngay sau "Người nước ngoài".
+        Assert.Equal(3, row.GetProperty("cells").GetProperty("privateRoomPatients").GetInt32());
+        var columns = summary.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("key").GetString()).ToList();
+        Assert.Equal("privateRoomPatients", columns[columns.IndexOf("foreignPatients") + 1]);
+        Assert.Equal(
+            "Bao phòng",
+            summary.GetProperty("columns").EnumerateArray().Single(c => c.GetProperty("key").GetString() == "privateRoomPatients")
+                .GetProperty("header").GetString());
         Assert.Equal("Điều dưỡng Demo", row.GetProperty("submittedBy").GetString());
         var reporters = summary.GetProperty("reporters");
         Assert.Equal(JsonValueKind.Null, reporters.GetProperty("outpatient").ValueKind);
@@ -477,6 +492,12 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.Equal(
             JsonValueKind.Null,
             items.Single(i => i.GetProperty("key").GetString() == "previousDayPatients").GetProperty("formula").ValueKind);
+        // Quyết định 54: dòng "Số NB bao phòng" ngay sau "Số NB người nước ngoài", thêm ở mẫu phiên bản 4.
+        var keys = items.Select(i => i.GetProperty("key").GetString()).ToList();
+        var privateRoom = items[keys.IndexOf("foreignPatients") + 1];
+        Assert.Equal("privateRoomPatients", privateRoom.GetProperty("key").GetString());
+        Assert.Equal("Số NB bao phòng", privateRoom.GetProperty("label").GetString());
+        Assert.Equal(4, privateRoom.GetProperty("since").GetInt32());
 
         using var anonymous = await _client.GetAsync("/api/v1/nursing-reports/form");
         Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);

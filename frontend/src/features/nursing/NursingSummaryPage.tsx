@@ -256,7 +256,8 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: 'Khoa phòng',
       dataIndex: 'departmentCode',
       fixed: 'left',
-      width: 110,
+      // Mã khoa (tên viết tắt) ngắn; tên dài thì xuống dòng.
+      width: 96,
       render: (code: string, row) => (
         <Flex vertical gap={2}>
           <Tooltip title={row.departmentName}>
@@ -277,9 +278,9 @@ export function SummaryView({ summary, onOpen }: { summary: NursingSummary; onOp
       title: c.header,
       key: c.key,
       align: 'right' as const,
-      // 15 cột số (thêm "Số NB ngày hôm trước", quyết định 46) và cột người báo cáo vẫn vừa màn hình rộng 1366 điểm ảnh, không
-      // phải cuộn ngang.
-      width: 66,
+      // 16 cột số (thêm "Số NB ngày hôm trước", quyết định 46; "Bao phòng", quyết định 54) và cột người báo cáo vẫn vừa màn hình
+      // rộng 1366 điểm ảnh, không phải cuộn ngang.
+      width: 63,
       render: (_: unknown, row: NursingSummaryRow) => number(row.cells[c.key]),
     })),
     { title: 'Người báo cáo', key: 'submittedBy', dataIndex: 'submittedBy', width: 150 },

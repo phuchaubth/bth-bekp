@@ -309,6 +309,14 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
     internal const double ReporterColumnMm = 24;
 
     /// <summary>
+    /// Cỡ chữ đầu các cột số của bảng A và khoảng cách chữ tới viền ô của các cột này (các bảng khác 1 mm): 16 cột số (quyết định
+    /// 54) mỗi cột còn 8,75 mm, chữ dài nhất ("Chuyển", "(Không") vẫn nằm gọn trong ô.
+    /// </summary>
+    internal const double NumberHeaderFontSize = 6.5;
+
+    internal const double NumberColumnPaddingMm = 0.4;
+
+    /// <summary>
     /// Bảng A: một dòng mỗi khoa (mã khoa), cột số theo bản giấy, cột người báo cáo cuối cùng (quyết định 44), dòng "Tổng" in
     /// đậm.
     /// </summary>
@@ -321,6 +329,11 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         widths.Add(ReporterColumnMm);
         var table = AddGrid(section, [.. widths]);
         table.Format.Font.Size = 8;
+        for (var i = 1; i <= numberColumns; i++)
+        {
+            table.Columns[i].LeftPadding = Unit.FromMillimeter(NumberColumnPaddingMm);
+            table.Columns[i].RightPadding = Unit.FromMillimeter(NumberColumnPaddingMm);
+        }
 
         var header = table.AddRow();
         header.HeadingFormat = true;
@@ -331,7 +344,7 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         for (var i = 0; i < numberColumns; i++)
         {
             var cell = header.Cells[i + 1].AddParagraph(summary.Columns[i].Header);
-            cell.Format.Font.Size = 7.5;
+            cell.Format.Font.Size = NumberHeaderFontSize;
         }
 
         header.Cells[numberColumns + 1].AddParagraph(NursingReportForm.ReporterHeader).Format.Font.Size = 7.5;
