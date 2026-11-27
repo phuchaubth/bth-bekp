@@ -11,6 +11,7 @@ import {
   Segmented,
   Spin,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -23,7 +24,8 @@ import { LineChart, SeriesTable, type LineChartProps } from '../../components/Li
 import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
-import { DepartmentCodeLink, DepartmentReportDrawer } from './DepartmentReportDrawer'
+import { DepartmentCodeLink, DepartmentReportDrawer, type OpenedDepartment } from './DepartmentReportDrawer'
+import { NursingSummaryPanel } from './NursingSummaryPanel'
 
 const DATE = 'YYYY-MM-DD'
 
@@ -45,93 +47,144 @@ const show = (value: number | null | undefined) => (value === null || value === 
 const occupancy = (patients: number | null | undefined, beds: number | null | undefined) =>
   patients === null || patients === undefined || !beds ? null : Math.round((patients / beds) * 100)
 
+/** Thẻ mở sẵn: bảng tổng hợp là việc hằng ngày của Phòng Điều dưỡng. */
+const SUMMARY_TAB = 'tong-hop'
+const TRENDS_TAB = 'bieu-do'
+
 /**
- * Dashboard điều dưỡng của Phòng Điều dưỡng (quyết định 47): số liệu các khoa đã gửi báo cáo trong 7, 30 hoặc 90 ngày đến
- * ngày đã chọn. Ô chỉ số và bảng theo khoa là của ngày cuối kỳ; biểu đồ theo từng ngày báo cáo. Khoa chưa gửi không được tính,
- * như bảng tổng hợp.
+ * Dashboard điều dưỡng của Phòng Điều dưỡng (quyết định 47), gồm cả bảng tổng hợp hằng ngày (quyết định 58: bỏ trang Tổng hợp
+ * hằng ngày riêng). Một ô ngày cho cả trang: trên cùng là tám ô chỉ số của ngày đó; thẻ **Bảng tổng hợp** (mở sẵn) là mục A–F như
+ * bản giấy kèm In PDF, Xuất Excel, lấy số liệu HIS, cài khoa báo cáo; thẻ **Biểu đồ** là số liệu 7, 30 hoặc 90 ngày đến ngày đó.
+ * Khoa chưa gửi không được tính, như bảng tổng hợp. Bấm mã khoa ở mục A hoặc ở bảng theo khoa mở báo cáo của khoa (quyết định 55).
  */
 export function NursingDashboardPage() {
-  const [to, setTo] = useState<Dayjs>(() => dayjs())
+  const [date, setDate] = useState<Dayjs>(() => dayjs())
   const [days, setDays] = useState(30)
-  const dashboard = useNursingDashboard(to.format(DATE), days)
+  const [tab, setTab] = useState(SUMMARY_TAB)
+  // Ngăn kéo nằm ngoài các bảng: trả lại báo cáo duy nhất của kỳ thì phần biểu đồ ẩn đi, ngăn kéo vẫn mở.
+  const [selected, setSelected] = useState<OpenedDepartment | null>(null)
+  const reportDate = date.format(DATE)
+  const dashboard = useNursingDashboard(reportDate, days)
+  const data = dashboard.data
+  const loading = dashboard.isError ? (
+    <Alert type="error" showIcon title={errorMessage(dashboard.error)} style={{ marginBottom: 16 }} />
+  ) : (
+    <Spin style={{ display: 'block', padding: 48 }} />
+  )
 
   return (
     <>
       <PageHeader
         title="Dashboard điều dưỡng"
         extra={
-          <Flex gap={8} wrap align="center">
-            <Segmented
-              value={days}
-              onChange={(value) => setDays(Number(value))}
-              options={PERIODS.map((period) => ({ value: period, label: `${period} ngày` }))}
-            />
-            <DatePicker
-              value={to}
-              format="DD/MM/YYYY"
-              allowClear={false}
-              aria-label="Đến ngày"
-              disabledDate={(d) => d.isAfter(dayjs(), 'day')}
-              onChange={(d) => d && setTo(d)}
-            />
-          </Flex>
+          <DatePicker
+            value={date}
+            format="DD/MM/YYYY"
+            allowClear={false}
+            aria-label="Ngày báo cáo"
+            disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+            onChange={(d) => d && setDate(d)}
+          />
         }
       />
-      {dashboard.isError ? (
-        <Alert type="error" showIcon title={errorMessage(dashboard.error)} />
-      ) : !dashboard.data ? (
-        <Spin style={{ display: 'block', padding: 48 }} />
+      {data && !dashboard.isError ? (
+        <Busy busy={dashboard.isPlaceholderData}>
+          <Typography.Title level={4} style={{ marginTop: 0 }}>
+            Ngày {dayjs(data.to).format('DD/MM/YYYY')}
+          </Typography.Title>
+          <Typography.Paragraph type="secondary">
+            Chỉ tính báo cáo khoa đã gửi (như bảng tổng hợp). Số ca nhập khoa, xuất viện, chuyển khoa là của ngày trước ngày báo cáo.
+          </Typography.Paragraph>
+          <KpiRow data={data} />
+        </Busy>
       ) : (
-        <DashboardBody data={dashboard.data} busy={dashboard.isPlaceholderData} />
+        loading
+      )}
+      <Tabs
+        activeKey={tab}
+        onChange={setTab}
+        style={{ marginTop: 8 }}
+        items={[
+          {
+            key: SUMMARY_TAB,
+            label: 'Bảng tổng hợp',
+            children: <NursingSummaryPanel reportDate={reportDate} onOpen={setSelected} />,
+          },
+          {
+            key: TRENDS_TAB,
+            label: 'Biểu đồ',
+            children: (
+              <>
+                <Flex justify="space-between" align="center" wrap gap={8} style={{ marginBottom: 16 }}>
+                  <Typography.Text type="secondary">
+                    {data && !dashboard.isError
+                      ? `Từ ${dayjs(data.from).format('DD/MM/YYYY')} đến ${dayjs(data.to).format('DD/MM/YYYY')}.`
+                      : ''}
+                  </Typography.Text>
+                  <Segmented
+                    value={days}
+                    onChange={(value) => setDays(Number(value))}
+                    options={PERIODS.map((period) => ({ value: period, label: `${period} ngày` }))}
+                  />
+                </Flex>
+                {data && !dashboard.isError ? (
+                  <Busy busy={dashboard.isPlaceholderData}>
+                    <Trends
+                      data={data}
+                      onOpen={(d) => setSelected({ departmentId: d.departmentId, departmentName: d.name, reportDate: data.to })}
+                    />
+                  </Busy>
+                ) : (
+                  loading
+                )}
+              </>
+            ),
+          },
+        ]}
+      />
+      {selected && (
+        <DepartmentReportDrawer
+          departmentId={selected.departmentId}
+          departmentName={selected.departmentName}
+          reportDate={selected.reportDate}
+          onClose={() => setSelected(null)}
+        />
       )}
     </>
   )
 }
 
-function DashboardBody({ data, busy }: { data: NursingDashboard; busy: boolean }) {
-  const lastDate = dayjs(data.to).format('DD/MM/YYYY')
-  const hasReports = data.days.some((d) => d.submitted > 0)
-  // Khoa đang xem báo cáo (quyết định 55). Ngăn kéo nằm ngoài bảng: trả lại báo cáo duy nhất của kỳ thì bảng ẩn đi, ngăn kéo vẫn mở.
-  const [selected, setSelected] = useState<NursingDashboardDepartment | null>(null)
+/** Đang tải ngày, khoảng ngày mới: giữ số cũ, mờ đi, không nháy trang. */
+function Busy({ busy, children }: { busy: boolean; children: ReactNode }) {
   return (
-    // Đang tải khoảng ngày mới: giữ số cũ, mờ đi, không nháy trang.
     <div aria-busy={busy} style={{ opacity: busy ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-      <Typography.Paragraph type="secondary">
-        Từ {dayjs(data.from).format('DD/MM/YYYY')} đến {lastDate}. Chỉ tính báo cáo khoa đã gửi (như bảng tổng hợp). Số ca nhập
-        khoa, xuất viện, chuyển khoa là của ngày trước ngày báo cáo.
-      </Typography.Paragraph>
-      <Typography.Title level={4} style={{ marginTop: 0 }}>
-        Ngày {lastDate}
-      </Typography.Title>
-      <KpiRow data={data} />
-      {!hasReports ? (
-        <Card style={{ marginTop: 16 }}>
-          <Empty description={`Chưa có khoa nào gửi báo cáo trong ${data.days.length} ngày này.`} />
-        </Card>
-      ) : (
-        <>
-          <Typography.Title level={4}>Theo ngày</Typography.Title>
-          <Charts data={data} />
-          <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
-            <Col xs={24} lg={12}>
-              <OccupancyCard data={data} />
-            </Col>
-            <Col xs={24} lg={12}>
-              <IssuesCard data={data} />
-            </Col>
-          </Row>
-          <DepartmentTable data={data} onOpen={setSelected} />
-        </>
-      )}
-      {selected && (
-        <DepartmentReportDrawer
-          departmentId={selected.departmentId}
-          departmentName={selected.name}
-          reportDate={data.to}
-          onClose={() => setSelected(null)}
-        />
-      )}
+      {children}
     </div>
+  )
+}
+
+/** Thẻ Biểu đồ: biểu đồ theo ngày, công suất giường và "Không ổn" theo khoa, bảng theo khoa ngày cuối kỳ. */
+function Trends({ data, onOpen }: { data: NursingDashboard; onOpen: (department: NursingDashboardDepartment) => void }) {
+  if (!data.days.some((d) => d.submitted > 0)) {
+    return (
+      <Card>
+        <Empty description={`Chưa có khoa nào gửi báo cáo trong ${data.days.length} ngày này.`} />
+      </Card>
+    )
+  }
+  return (
+    <>
+      <Charts data={data} />
+      <Row gutter={[16, 16]} style={{ marginTop: 16 }}>
+        <Col xs={24} lg={12}>
+          <OccupancyCard data={data} />
+        </Col>
+        <Col xs={24} lg={12}>
+          <IssuesCard data={data} />
+        </Col>
+      </Row>
+      <DepartmentTable data={data} onOpen={onOpen} />
+    </>
   )
 }
 

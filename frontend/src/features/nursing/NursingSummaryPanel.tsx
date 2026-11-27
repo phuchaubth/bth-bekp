@@ -14,7 +14,6 @@ import {
   Card,
   Checkbox,
   Col,
-  DatePicker,
   Flex,
   Input,
   InputNumber,
@@ -28,7 +27,7 @@ import {
   Typography,
   type TableColumnsType,
 } from 'antd'
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { useMemo, useState } from 'react'
 import {
   WAITING_ADMISSION,
@@ -44,30 +43,26 @@ import {
 } from '../../api/nursingReports'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
-import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { formatDateTime } from '../../utils/format'
-import { DepartmentCodeLink, DepartmentReportDrawer } from './DepartmentReportDrawer'
+import { DepartmentCodeLink, type OpenedDepartment } from './DepartmentReportDrawer'
 import { PdfModal } from './NursingReportFields'
 import { delegationContents, delegationPeriod, saveBlob, statusTag } from './nursingReportUtils'
-
-const DATE = 'YYYY-MM-DD'
 
 const number = (value: number | null | undefined) => (value === null || value === undefined ? '' : value)
 
 /**
- * Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (quyết định 31): mục A–F như bản giấy, lấy từ báo cáo các khoa đã gửi
- * và số liệu HIS. Phòng Điều dưỡng xem báo cáo từng khoa, trả lại khoa, cài khoa báo cáo, số giường và khoa nhập từng chỉ số, lấy
- * số liệu HIS. Khi HIS lỗi, các khoa nhập số liệu của khoa; Phòng Điều dưỡng chỉ tổng hợp (quyết định 35).
+ * Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" (quyết định 31) của ngày `reportDate`: mục A–F như bản giấy, lấy từ báo
+ * cáo các khoa đã gửi và số liệu HIS. Nằm ở thẻ "Bảng tổng hợp" của Dashboard điều dưỡng (quyết định 58; trước là trang Tổng hợp
+ * hằng ngày riêng), ngày chọn ở đầu Dashboard. Phòng Điều dưỡng in PDF, xuất Excel, xem báo cáo từng khoa (`onOpen`: ngăn kéo của
+ * Dashboard, trả lại khoa ở đó), cài khoa báo cáo, số giường và khoa nhập từng chỉ số, lấy số liệu HIS. Khi HIS lỗi, các khoa
+ * nhập số liệu của khoa; Phòng Điều dưỡng chỉ tổng hợp (quyết định 35). Số khoa đã gửi ở ô chỉ số đầu Dashboard.
  */
-export function NursingSummaryPage() {
+export function NursingSummaryPanel({ reportDate, onOpen }: { reportDate: string; onOpen: (department: OpenedDepartment) => void }) {
   const { hasPermission } = useAuth()
   const canManage = hasPermission(Permissions.NursingReportsManage)
-  const [date, setDate] = useState<Dayjs>(() => dayjs())
-  const reportDate = date.format(DATE)
   const summary = useNursingSummary(reportDate)
   const [pdfOpen, setPdfOpen] = useState(false)
-  const [selected, setSelected] = useState<NursingSummaryRow | null>(null)
   const [departmentsOpen, setDepartmentsOpen] = useState(false)
   const queryClient = useQueryClient()
   const { message } = App.useApp()
@@ -92,82 +87,57 @@ export function NursingSummaryPage() {
     onError: (e) => message.error(errorMessage(e)),
   })
 
+  if (summary.isError) {
+    return <Alert type="error" showIcon title={errorMessage(summary.error)} />
+  }
+  if (!summary.data) {
+    return <Spin style={{ display: 'block', padding: 48 }} />
+  }
+  const data = summary.data
+
   return (
     <>
-      <PageHeader
-        title="Tổng hợp báo cáo điều dưỡng"
-        extra={
+      <Card size="small" style={{ marginBottom: 16 }}>
+        <Flex justify="space-between" align="center" wrap gap={8}>
+          <Flex vertical gap={2}>
+            <Typography.Text type="secondary">{statisticsText(data)}</Typography.Text>
+            <HisEntryStatusLine summary={data} />
+          </Flex>
           <Flex gap={8} wrap>
-            <DatePicker
-              value={date}
-              format="DD/MM/YYYY"
-              allowClear={false}
-              aria-label="Ngày tổng hợp"
-              disabledDate={(d) => d.isAfter(dayjs(), 'day')}
-              onChange={(d) => d && setDate(d)}
-            />
             <Button icon={<FilePdfOutlined />} onClick={() => setPdfOpen(true)}>
               In PDF
             </Button>
             <Button icon={<FileExcelOutlined />} loading={workbook.isPending} onClick={() => workbook.mutate()}>
               Xuất Excel
             </Button>
+            {canManage && (
+              <>
+                <Button icon={<CloudDownloadOutlined />} loading={refresh.isPending} onClick={() => refresh.mutate()}>
+                  Lấy số liệu HIS
+                </Button>
+                <Button icon={<SettingOutlined />} onClick={() => setDepartmentsOpen(true)}>
+                  Khoa báo cáo và số giường
+                </Button>
+              </>
+            )}
           </Flex>
-        }
+        </Flex>
+      </Card>
+      {data.delegations && data.delegations.length > 0 && <DelegationsAlert delegations={data.delegations} />}
+      <SummaryView
+        summary={data}
+        onOpen={(row) => onOpen({ departmentId: row.departmentId, departmentName: row.departmentName, reportDate: data.reportDate })}
       />
-      {summary.isError ? (
-        <Alert type="error" showIcon title={errorMessage(summary.error)} />
-      ) : !summary.data ? (
-        <Spin style={{ display: 'block', padding: 48 }} />
-      ) : (
-        <>
-          <Card size="small" style={{ marginBottom: 16 }}>
-            <Flex justify="space-between" align="center" wrap gap={8}>
-              <Flex vertical gap={2}>
-                <Typography.Text>
-                  Khoa đã gửi: <b>{summary.data.submittedCount}</b>/{summary.data.reportingCount}
-                </Typography.Text>
-                <Typography.Text type="secondary">{statisticsText(summary.data)}</Typography.Text>
-                <HisEntryStatusLine summary={summary.data} />
-              </Flex>
-              {canManage && (
-                <Flex gap={8} wrap>
-                  <Button icon={<CloudDownloadOutlined />} loading={refresh.isPending} onClick={() => refresh.mutate()}>
-                    Lấy số liệu HIS
-                  </Button>
-                  <Button icon={<SettingOutlined />} onClick={() => setDepartmentsOpen(true)}>
-                    Khoa báo cáo và số giường
-                  </Button>
-                </Flex>
-              )}
-            </Flex>
-          </Card>
-          {summary.data.delegations && summary.data.delegations.length > 0 && (
-            <DelegationsAlert delegations={summary.data.delegations} />
-          )}
-          <SummaryView summary={summary.data} onOpen={setSelected} />
-        </>
-      )}
 
       <PdfModal
         open={pdfOpen}
-        title={`Tổng hợp báo cáo điều dưỡng ngày ${date.format('DD/MM/YYYY')}`}
+        title={`Tổng hợp báo cáo điều dưỡng ngày ${dayjs(reportDate).format('DD/MM/YYYY')}`}
         fileName={`tong-hop-dieu-duong-${reportDate}.pdf`}
         queryKey={[...nursingKeys.summary(reportDate), summary.dataUpdatedAt]}
         load={() => nursingReportsApi.summaryPdf(reportDate)}
         onClose={() => setPdfOpen(false)}
       />
-      {selected && (
-        <DepartmentReportDrawer
-          departmentId={selected.departmentId}
-          departmentName={selected.departmentName}
-          reportDate={reportDate}
-          onClose={() => setSelected(null)}
-        />
-      )}
-      {departmentsOpen && summary.data && (
-        <DepartmentsModal lines={[...summary.data.outpatient, ...summary.data.imaging]} onClose={() => setDepartmentsOpen(false)} />
-      )}
+      {departmentsOpen && <DepartmentsModal lines={[...data.outpatient, ...data.imaging]} onClose={() => setDepartmentsOpen(false)} />}
     </>
   )
 }

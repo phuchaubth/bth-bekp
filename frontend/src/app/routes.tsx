@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import type { RouteObject } from 'react-router'
+import { Navigate, type RouteObject } from 'react-router'
 import { RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from '../auth/paths'
 import { AppLayout } from '../components/layout/AppLayout'
@@ -29,7 +29,6 @@ import {
   NursingDashboardPage,
   NursingDelegationsPage,
   NursingReportPage,
-  NursingSummaryPage,
   PatientIntakePage,
   PatientProfilePage,
   PatientsPage,
@@ -56,7 +55,6 @@ const implementedPages: Record<string, ReactNode> = {
   '/bao-cao': <ReportsPage />,
   '/nhat-ky': <AuditLogsPage />,
   '/dieu-duong/bao-cao-khoa': <NursingReportPage />,
-  '/dieu-duong/tong-hop': <NursingSummaryPage />,
   '/dieu-duong/dashboard': <NursingDashboardPage />,
   '/dieu-duong/uy-quyen': <NursingDelegationsPage />,
   '/noi-kiem/so': <QcBooksPage />,
@@ -160,6 +158,9 @@ const pageRoutes: RouteObject[] = [
         ),
       },
       ...featureRoutes,
+      // Quyết định 58: trang Tổng hợp hằng ngày gộp vào Dashboard điều dưỡng (thẻ Bảng tổng hợp, mở sẵn). Đường dẫn cũ đã lưu
+      // trên trình duyệt, trong tài liệu chuyển sang Dashboard; trang Dashboard tự kiểm tra quyền.
+      { path: 'dieu-duong/tong-hop', element: <Navigate to="/dieu-duong/dashboard" replace /> },
       {
         path: 'phieu-dong-thuan/tao-moi',
         element: (

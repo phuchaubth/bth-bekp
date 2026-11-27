@@ -10,8 +10,18 @@ import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFiel
 import type { NursingReportFormValues } from './nursingReportUtils'
 
 /**
+ * Khoa đang xem báo cáo trên Dashboard (bấm mã khoa ở mục A của bảng tổng hợp hoặc ở bảng theo khoa), kèm ngày của bảng đã bấm:
+ * bảng đang hiện số cũ trong lúc tải ngày mới vẫn mở đúng báo cáo của ngày đang hiện.
+ */
+export interface OpenedDepartment {
+  departmentId: string
+  departmentName: string
+  reportDate: string
+}
+
+/**
  * Mã khoa (tên viết tắt) bấm được để mở báo cáo của khoa; rê chuột thấy tên khoa đầy đủ, trình đọc màn hình đọc cả mã và tên.
- * Dùng ở mục A của bảng tổng hợp và bảng theo khoa của Dashboard (quyết định 55).
+ * Dùng ở mục A của bảng tổng hợp và bảng theo khoa của Dashboard (quyết định 55, 58).
  */
 export function DepartmentCodeLink({ code, name, onClick }: { code: string; name: string; onClick: () => void }) {
   return (
@@ -30,7 +40,8 @@ export function DepartmentCodeLink({ code, name, onClick }: { code: string; name
 
 /**
  * Báo cáo của một khoa trong một ngày (chỉ đọc): in PDF, Phòng Điều dưỡng trả lại khoa để sửa khi cần. Mở từ bảng tổng hợp và
- * từ Dashboard (quyết định 55); nút "Trả lại khoa" chỉ có khi máy chủ cho phép (báo cáo đã gửi, người dùng có quyền quản lý).
+ * bảng theo khoa của Dashboard (quyết định 55, 58); nút "Trả lại khoa" chỉ có khi máy chủ cho phép (báo cáo đã gửi, người dùng có
+ * quyền quản lý).
  */
 export function DepartmentReportDrawer({
   departmentId,

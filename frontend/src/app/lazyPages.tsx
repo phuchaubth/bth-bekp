@@ -44,9 +44,6 @@ export const NursingReportPage = lazy(() =>
 export const NursingDashboardPage = lazy(() =>
   import('../features/nursing/NursingDashboardPage').then((m) => ({ default: m.NursingDashboardPage })),
 )
-export const NursingSummaryPage = lazy(() =>
-  import('../features/nursing/NursingSummaryPage').then((m) => ({ default: m.NursingSummaryPage })),
-)
 export const NursingDelegationsPage = lazy(() =>
   import('../features/nursing/NursingDelegationsPage').then((m) => ({ default: m.NursingDelegationsPage })),
 )

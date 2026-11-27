@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
+  NursingDashboard,
   NursingDelegation,
   NursingReport,
   NursingReportDepartment,
@@ -184,6 +185,26 @@ const hisEntry = (overrides: Partial<NonNullable<NursingReport['hisEntry']>> = {
 
 const lastCall = (calls: ApiCall[], method: string, path: string) =>
   calls.filter((c) => c.method === method && c.path === path).at(-1)
+
+/** Dashboard tối thiểu (giả lập) của ngày `to`: một ngày, một khoa đã gửi. */
+const dashboardOf = (to: string): NursingDashboard => ({
+  from: to,
+  to,
+  reportingCount: 2,
+  days: [{ date: to, submitted: 1, values: { currentPatients: 47 }, patientChange: null, beds: 40, bedPatients: 47, issueDepartments: 1, incidents: 1 }],
+  departments: [],
+  checks: [],
+})
+
+/**
+ * Phòng Điều dưỡng mở Dashboard điều dưỡng: bảng tổng hợp nằm ở thẻ "Bảng tổng hợp" (mở sẵn) của Dashboard (quyết định 58), nên
+ * trang tải cả dashboard của ngày đã chọn.
+ */
+const officeRoutes = (routes: Parameters<typeof mockApi>[0] = {}): Parameters<typeof mockApi>[0] => ({
+  ...baseRoutes(officeSession()),
+  'GET /api/v1/nursing-reports/dashboard': (call: ApiCall) => dashboardOf(new URLSearchParams(call.search).get('to') ?? TODAY),
+  ...routes,
+})
 
 const day = (offset: number) => dayjs().add(offset, 'day')
 
@@ -599,7 +620,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
   it('hiện mục A–F như bản giấy, xem báo cáo một khoa và trả lại khoa kèm lý do', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/form': definition,
       'GET /api/v1/nursing-reports/summary': summary,
       'GET /api/v1/nursing-reports/daily': report({
@@ -624,10 +645,14 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
         carriedOverKeys: [],
       }),
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     expect(await screen.findByText('A. Số liệu người bệnh nội trú')).toBeInTheDocument()
-    expect(screen.getByText(/Khoa đã gửi:/)).toHaveTextContent('Khoa đã gửi: 1/2')
+    // Quyết định 58: bảng tổng hợp là thẻ mở sẵn của Dashboard; số khoa đã gửi ghi ở ô chỉ số đầu trang, không nhắc lại ở ô HIS.
+    expect(screen.getByRole('heading', { name: 'Dashboard điều dưỡng' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Bảng tổng hợp' })).toHaveAttribute('aria-selected', 'true')
+    expect(within(await screen.findByRole('group', { name: 'Khoa đã gửi báo cáo' })).getByText('1/2')).toBeInTheDocument()
+    expect(screen.queryByText(/Khoa đã gửi:/)).not.toBeInTheDocument()
     expect(screen.getByText(/Số liệu HIS lấy lúc/)).toBeInTheDocument()
     const table = screen.getAllByRole('table')[0]
     // Quyết định 44: cột khoa phòng ghi mã khoa (tên đầy đủ khi rê chuột, đọc được qua nhãn nút); cột cuối là người báo cáo.
@@ -687,7 +712,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     const user = userEvent.setup()
     let refreshes = 0
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': summary,
       'GET /api/v1/nursing-reports/summary/xlsx': () => new Response(new Blob(['PK']), { status: 200 }),
       'POST /api/v1/nursing-reports/statistics/refresh': () =>
@@ -697,7 +722,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
               code: 'nursing_reports.his_unavailable',
             }),
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     await user.click(await screen.findByRole('button', { name: /Xuất Excel/ }))
     await waitFor(() => expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/summary/xlsx')).toBeDefined())
@@ -712,12 +737,12 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
   it('cài khoa báo cáo, số giường và khoa nhập từng chỉ số khi HIS lỗi; Phòng Điều dưỡng không nhập tay số liệu HIS', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': summary,
       'GET /api/v1/nursing-reports/departments': departments,
       'PUT /api/v1/nursing-reports/departments': departments,
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
     expect(screen.queryByRole('button', { name: /Nhập số liệu HIS/ })).not.toBeInTheDocument()
@@ -756,7 +781,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
     }
     let saves = 0
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': summary,
       'GET /api/v1/nursing-reports/departments': [hisIcu, stoppedIcu, ...departments.slice(1)],
       'PUT /api/v1/nursing-reports/departments': () =>
@@ -766,7 +791,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
             })
           : json([{ ...hisIcu, isReporting: true, bedCount: 22 }, ...departments.slice(1)]),
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
     const modal = await screen.findByRole('dialog', { name: 'Khoa báo cáo và số giường thực kê' })
@@ -820,13 +845,13 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
   it('Phòng Điều dưỡng xếp thứ tự các khoa ở mục A và đặt tên viết tắt in trên bảng tổng hợp (quyết định 45)', { timeout: 20_000 }, async () => {
     const user = userEvent.setup()
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': summary,
       // Máy chủ trả khoa phải báo cáo trước, theo thứ tự đã lưu, rồi các khoa khác.
       'GET /api/v1/nursing-reports/departments': [departments[1], { ...departments[2], shortName: 'Nội' }, departments[0]],
       'PUT /api/v1/nursing-reports/departments': departments,
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     await user.click(await screen.findByRole('button', { name: /Khoa báo cáo và số giường/ }))
     const modal = await screen.findByRole('dialog', { name: 'Khoa báo cáo và số giường thực kê' })
@@ -913,7 +938,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
 
   it('HIS lỗi: số do khoa nhập có ghi tên khoa, và cho biết khoa nào chưa nhập', async () => {
     mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': {
         ...summary,
         outpatient: [{ key: 'outpatientVisits', label: 'TSNB đến khám', value: 412, enteredBy: 'Khoa Khám bệnh' }],
@@ -933,7 +958,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
         },
       },
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     expect(await screen.findByText(/HIS lỗi thì các khoa nhập tay số liệu của khoa/)).toBeInTheDocument()
     expect(screen.getByText(/Khoa Khám bệnh \(TSNB đến khám, TS X-quang\): đã nhập lúc 16\/11\/2026 \d\d:\d\d \(Điều dưỡng KKB\)/)).toBeInTheDocument()
@@ -945,7 +970,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
   // Quyết định 48: bảng tổng hợp ghi người được ủy quyền làm và ghi rõ được ai ủy quyền.
   it('ủy quyền: liệt kê ủy quyền trong ngày, người báo cáo và người nhập số liệu HIS ghi "được … ủy quyền"', async () => {
     mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/summary': {
         ...summary,
         rows: summary.rows.map((r) =>
@@ -980,7 +1005,7 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
         ],
       },
     })
-    renderApp('/dieu-duong/tong-hop')
+    renderApp('/dieu-duong/dashboard')
 
     expect(await screen.findByText('Ủy quyền báo cáo trong ngày (1)')).toBeInTheDocument()
     const item = screen.getByText('NOI', { selector: 'b' }).closest('li')!
@@ -994,10 +1019,97 @@ describe('Tổng hợp báo cáo điều dưỡng', () => {
   })
 
   it('không có ủy quyền trong ngày thì không hiện mục ủy quyền', async () => {
-    mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/summary': { ...summary, delegations: [] } })
-    renderApp('/dieu-duong/tong-hop')
+    mockApi({ ...officeRoutes(), 'GET /api/v1/nursing-reports/summary': { ...summary, delegations: [] } })
+    renderApp('/dieu-duong/dashboard')
 
-    expect(await screen.findByText(/Khoa đã gửi:/)).toBeInTheDocument()
+    expect(await screen.findByText('A. Số liệu người bệnh nội trú')).toBeInTheDocument()
     expect(screen.queryByText(/Ủy quyền báo cáo trong ngày/)).not.toBeInTheDocument()
+  })
+
+  // Quyết định 58: bỏ trang Tổng hợp hằng ngày; đường dẫn cũ (đã lưu trên trình duyệt) mở Dashboard, vẫn kiểm tra quyền.
+  it('đường dẫn cũ của trang Tổng hợp hằng ngày mở Dashboard ở thẻ Bảng tổng hợp; không có quyền thì vẫn bị chặn', async () => {
+    mockApi(officeRoutes({ 'GET /api/v1/nursing-reports/summary': summary }))
+    const { router, unmount } = renderApp('/dieu-duong/tong-hop')
+
+    expect(await screen.findByText('A. Số liệu người bệnh nội trú')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/dieu-duong/dashboard')
+    expect(screen.getByRole('heading', { name: 'Dashboard điều dưỡng' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Bảng tổng hợp' })).toHaveAttribute('aria-selected', 'true')
+    unmount()
+
+    const { calls } = mockApi({ ...baseRoutes(nurseSession()) })
+    renderApp('/dieu-duong/tong-hop')
+    expect(await screen.findByText('Bạn không có quyền truy cập')).toBeInTheDocument()
+    expect(calls.some((c) => c.path.startsWith('/api/v1/nursing-reports/summary'))).toBe(false)
+  })
+
+  it(
+    'một ô ngày cho cả Dashboard: bảng tổng hợp, ô chỉ số, PDF, báo cáo khoa và thẻ Biểu đồ cùng ngày; đổi khoảng ngày không tải lại bảng tổng hợp',
+    { timeout: 30_000 },
+    async () => {
+      const user = userEvent.setup()
+      const { calls } = mockApi(
+        officeRoutes({
+          'GET /api/v1/nursing-reports/form': definition,
+          'GET /api/v1/nursing-reports/summary': (call: ApiCall) => ({ ...summary, reportDate: new URLSearchParams(call.search).get('date') }),
+          'GET /api/v1/nursing-reports/summary/pdf': () => new Response('%PDF-1.7', { headers: { 'Content-Type': 'application/pdf' } }),
+          'GET /api/v1/nursing-reports/daily': (call: ApiCall) =>
+            report({ reportDate: new URLSearchParams(call.search).get('date') ?? TODAY, canEdit: false, carriedOverKeys: [] }),
+        }),
+      )
+      renderApp('/dieu-duong/dashboard')
+
+      await screen.findByText('A. Số liệu người bệnh nội trú')
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/summary')!.search).toBe(`?date=${TODAY}`)
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/dashboard')!.search).toBe(`?to=${TODAY}&days=30`)
+
+      const earlier = dayjs().subtract(3, 'day')
+      const end = earlier.format('YYYY-MM-DD')
+      const picker = screen.getByLabelText('Ngày báo cáo')
+      await user.click(picker)
+      await user.clear(picker)
+      await user.type(picker, `${earlier.format('DD/MM/YYYY')}{Enter}`)
+      await waitFor(() => expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/summary')!.search).toBe(`?date=${end}`))
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/dashboard')!.search).toBe(`?to=${end}&days=30`)
+      expect(await screen.findByRole('heading', { name: `Ngày ${earlier.format('DD/MM/YYYY')}` })).toBeInTheDocument()
+
+      // In PDF và báo cáo của khoa theo ngày đã chọn.
+      await user.click(await screen.findByRole('button', { name: /In PDF/ }))
+      expect(await screen.findByTitle(`Tổng hợp báo cáo điều dưỡng ngày ${earlier.format('DD/MM/YYYY')}`)).toBeInTheDocument()
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/summary/pdf')!.search).toBe(`?date=${end}`)
+      const pdf = screen.getByTitle(`Tổng hợp báo cáo điều dưỡng ngày ${earlier.format('DD/MM/YYYY')}`).closest<HTMLElement>('[role="dialog"]')!
+      await user.click(within(pdf).getByRole('button', { name: 'Đóng' }))
+      await user.click(within(screen.getAllByRole('table')[0]).getByRole('button', { name: 'NOI – Khoa Nội tổng hợp' }))
+      expect(await screen.findByText(`Khoa Nội tổng hợp – ngày ${earlier.format('DD/MM/YYYY')}`)).toBeInTheDocument()
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')!.search).toBe(`?date=${end}&departmentId=d-noi`)
+      const drawer = (await screen.findByText(`Khoa Nội tổng hợp – ngày ${earlier.format('DD/MM/YYYY')}`)).closest<HTMLElement>('[role="dialog"]')!
+      await user.click(within(drawer).getByRole('button', { name: 'Đóng' }))
+      // Hộp PDF đã đóng vẫn nằm trong trang (ẩn); ngăn kéo thì được bỏ hẳn.
+      await waitFor(() => expect(screen.queryByText(`Khoa Nội tổng hợp – ngày ${earlier.format('DD/MM/YYYY')}`)).not.toBeInTheDocument())
+
+      // Thẻ Biểu đồ: cùng ngày cuối kỳ; đổi khoảng ngày chỉ tải lại dashboard.
+      const summaryCalls = calls.filter((c) => c.path === '/api/v1/nursing-reports/summary').length
+      await user.click(screen.getByRole('tab', { name: 'Biểu đồ' }))
+      expect(await screen.findByText(`Từ ${earlier.format('DD/MM/YYYY')} đến ${earlier.format('DD/MM/YYYY')}.`)).toBeInTheDocument()
+      await user.click(screen.getByText('7 ngày'))
+      await waitFor(() => expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/dashboard')!.search).toBe(`?to=${end}&days=7`))
+      await user.click(screen.getByRole('tab', { name: 'Bảng tổng hợp' }))
+      expect(screen.getByText('A. Số liệu người bệnh nội trú')).toBeVisible()
+      expect(calls.filter((c) => c.path === '/api/v1/nursing-reports/summary')).toHaveLength(summaryCalls)
+    },
+  )
+
+  it('tài khoản chỉ có quyền xem: có In PDF, Xuất Excel; không có Lấy số liệu HIS, Khoa báo cáo và số giường', async () => {
+    mockApi({
+      ...baseRoutes(session({ ...officeSession().user, permissions: [Permissions.NursingReportsRead] })),
+      'GET /api/v1/nursing-reports/dashboard': dashboardOf(TODAY),
+      'GET /api/v1/nursing-reports/summary': summary,
+    })
+    renderApp('/dieu-duong/dashboard')
+
+    expect(await screen.findByRole('button', { name: /Xuất Excel/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /In PDF/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Lấy số liệu HIS/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Khoa báo cáo và số giường/ })).not.toBeInTheDocument()
   })
 })

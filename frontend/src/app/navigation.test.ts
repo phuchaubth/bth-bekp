@@ -28,16 +28,14 @@ describe('navigation', () => {
     expect(filterNavItems(navItems, () => false).map((i) => i.label)).toEqual(['Tổng quan'])
   })
 
-  it('báo cáo điều dưỡng: điều dưỡng thấy báo cáo của khoa, Phòng Điều dưỡng thấy bảng tổng hợp và dashboard; cả hai thấy ủy quyền', () => {
+  it('báo cáo điều dưỡng: điều dưỡng thấy báo cáo của khoa, Phòng Điều dưỡng thấy dashboard (có bảng tổng hợp); cả hai thấy ủy quyền', () => {
     const nursing = (granted: string[]) =>
       filterNavItems(navItems, (p) => granted.includes(p)).find((i) => i.label === 'Báo cáo điều dưỡng')?.children?.map((c) => c.label)
 
     expect(nursing([Permissions.NursingReportsSubmit])).toEqual(['Báo cáo của khoa', 'Ủy quyền báo cáo'])
-    expect(nursing([Permissions.NursingReportsRead, Permissions.NursingReportsManage])).toEqual([
-      'Tổng hợp hằng ngày',
-      'Dashboard',
-      'Ủy quyền báo cáo',
-    ])
+    // Quyết định 58: không còn mục "Tổng hợp hằng ngày", bảng tổng hợp nằm trong Dashboard.
+    expect(nursing([Permissions.NursingReportsRead, Permissions.NursingReportsManage])).toEqual(['Dashboard', 'Ủy quyền báo cáo'])
+    expect(flattenNavItems().map((item) => item.path)).not.toContain('/dieu-duong/tong-hop')
     expect(nursing([Permissions.ConsentsRead])).toBeUndefined()
   })
 

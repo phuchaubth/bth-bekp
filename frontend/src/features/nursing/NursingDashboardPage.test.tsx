@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { describe, expect, it, vi } from 'vitest'
-import type { NursingDashboard, NursingReport, NursingReportFormDefinition } from '../../api/nursingReports'
+import type { NursingDashboard, NursingReport, NursingReportFormDefinition, NursingSummary } from '../../api/nursingReports'
 import { Permissions } from '../../auth/permissions'
 import { baseRoutes, doctorPermissions, session } from '../../test/fixtures'
 import { mockApi, problem, type ApiCall } from '../../test/mockApi'
@@ -141,6 +141,32 @@ const officeSession = () =>
 
 const tile = (name: string) => screen.getByRole('group', { name })
 
+/** Bảng tổng hợp tối thiểu (giả lập) của ngày `date`: thẻ Bảng tổng hợp mở sẵn của Dashboard tải bảng này (quyết định 58). */
+const summaryOf = (date: string): NursingSummary => ({
+  reportDate: date,
+  columns: [],
+  rows: [],
+  totals: {},
+  outpatient: [],
+  procedures: [],
+  imaging: [],
+  situation: [],
+  incidents: [],
+  reporters: { outpatient: null, procedures: null, imaging: null, situation: null, incidents: null },
+  statistics: { hisAvailable: false, hasValues: false, source: null, updatedAtUtc: null, updatedBy: null, entries: [], usesDepartmentEntries: false },
+  submittedCount: 2,
+  reportingCount: 3,
+})
+
+/** Phòng Điều dưỡng mở Dashboard: trang tải cả bảng tổng hợp của ngày đã chọn. */
+const officeRoutes = () => ({
+  ...baseRoutes(officeSession()),
+  'GET /api/v1/nursing-reports/summary': (call: ApiCall) => summaryOf(new URLSearchParams(call.search).get('date') ?? TODAY),
+})
+
+/** Biểu đồ, công suất giường, "Không ổn" và bảng theo khoa nằm ở thẻ Biểu đồ (quyết định 58). */
+const openTrends = async (user: ReturnType<typeof userEvent.setup>) => user.click(await screen.findByRole('tab', { name: 'Biểu đồ' }))
+
 /** Mẫu báo cáo khoa thu gọn (giả lập) để xem báo cáo của khoa trong ngăn kéo. */
 const definition: NursingReportFormDefinition = {
   title: 'BÁO CÁO CÔNG TÁC ĐIỀU DƯỠNG',
@@ -196,13 +222,18 @@ const dialogTitled = async (title: string) => (await screen.findByText(title)).c
 
 describe('Dashboard điều dưỡng', () => {
   it('ô chỉ số ngày cuối kỳ, công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa', { timeout: 20_000 }, async () => {
-    const { calls } = mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/dashboard': dashboard })
+    const user = userEvent.setup()
+    const { calls } = mockApi({ ...officeRoutes(), 'GET /api/v1/nursing-reports/dashboard': dashboard })
 
     renderApp('/dieu-duong/dashboard')
 
     expect(await screen.findByRole('heading', { name: 'Dashboard điều dưỡng' })).toBeInTheDocument()
     expect(calls.find((c) => c.path === '/api/v1/nursing-reports/dashboard')?.search).toBe(`?to=${TODAY}&days=30`)
     expect(await screen.findByRole('heading', { name: `Ngày ${dayjs().format('DD/MM/YYYY')}` })).toBeInTheDocument()
+    // Quyết định 58: ô chỉ số ở trên hai thẻ; thẻ Bảng tổng hợp mở sẵn, biểu đồ ở thẻ Biểu đồ (chưa vẽ khi chưa mở thẻ).
+    expect(screen.getByRole('tab', { name: 'Bảng tổng hợp' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText(/^Công suất giường theo khoa/)).not.toBeInTheDocument()
+    expect(calls.find((c) => c.path === '/api/v1/nursing-reports/summary')?.search).toBe(`?date=${TODAY}`)
 
     expect(within(tile('Khoa đã gửi báo cáo')).getByText('2/3')).toBeInTheDocument()
     expect(within(tile('Khoa đã gửi báo cáo')).getByText('Chưa gửi: HSTC')).toBeInTheDocument()
@@ -219,6 +250,8 @@ describe('Dashboard điều dưỡng', () => {
     expect(tile('Khoa báo "Không ổn"')).toHaveTextContent('2ADR 1 · 1 báo cáo có nội dung bất thường')
 
     // Công suất theo khoa: cao nhất trước, vượt số giường có biểu tượng cảnh báo; khoa chưa cài số giường không có.
+    await openTrends(user)
+    expect(screen.getByText(`Từ ${dayjs(daysAgo(2)).format('DD/MM/YYYY')} đến ${dayjs().format('DD/MM/YYYY')}.`)).toBeInTheDocument()
     const occupancy = screen.getByText(/^Công suất giường theo khoa/).closest('.ant-card') as HTMLElement
     const occupancyRows = within(occupancy).getAllByRole('listitem')
     expect(occupancyRows.map((row) => row.textContent)).toEqual(['NGOAI22/20 · 110%', 'NOI A30/40 · 75%'])
@@ -261,7 +294,7 @@ describe('Dashboard điều dưỡng', () => {
     const user = userEvent.setup()
     let release: () => void = () => {}
     const { calls } = mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/dashboard': (call) =>
         call.search.includes('days=30')
           ? dashboard
@@ -271,6 +304,7 @@ describe('Dashboard điều dưỡng', () => {
     })
 
     renderApp('/dieu-duong/dashboard')
+    await openTrends(user)
     await user.click(await screen.findByRole('button', { name: 'Xem bảng: Số NB hiện tại' }))
 
     const card = screen.getByRole('button', { name: 'Xem biểu đồ: Số NB hiện tại' }).closest('.ant-card') as HTMLElement
@@ -294,7 +328,7 @@ describe('Dashboard điều dưỡng', () => {
     await waitFor(() => expect(body).toHaveAttribute('aria-busy', 'false'))
 
     const earlier = dayjs().subtract(5, 'day')
-    const picker = screen.getByLabelText('Đến ngày')
+    const picker = screen.getByLabelText('Ngày báo cáo')
     await user.click(picker)
     await user.clear(picker)
     await user.type(picker, `${earlier.format('DD/MM/YYYY')}{Enter}`)
@@ -326,7 +360,7 @@ describe('Dashboard điều dưỡng', () => {
           submittedAtUtc: '2026-11-20T00:45:00Z',
         })
       const { calls } = mockApi({
-        ...baseRoutes(officeSession()),
+        ...officeRoutes(),
         // Ngày cuối kỳ theo ngày đã chọn; sau khi trả lại, báo cáo Khoa Ngoại về dạng nháp nên không còn được tính.
         'GET /api/v1/nursing-reports/dashboard': (call: ApiCall) => ({
           ...dashboard,
@@ -359,10 +393,11 @@ describe('Dashboard điều dưỡng', () => {
       })
 
       renderApp('/dieu-duong/dashboard')
-      const picker = await screen.findByLabelText('Đến ngày')
+      const picker = await screen.findByLabelText('Ngày báo cáo')
       await user.click(picker)
       await user.clear(picker)
       await user.type(picker, `${earlier.format('DD/MM/YYYY')}{Enter}`)
+      await openTrends(user)
       const table = (await screen.findByText(`Theo khoa – ngày ${earlier.format('DD/MM/YYYY')}`)).closest('.ant-card') as HTMLElement
       const dashboardCalls = () => calls.filter((c) => c.path === '/api/v1/nursing-reports/dashboard' && c.search === `?to=${end}&days=30`).length
       expect(dashboardCalls()).toBe(1)
@@ -418,8 +453,9 @@ describe('Dashboard điều dưỡng', () => {
   )
 
   it('chưa khoa nào gửi trong kỳ: ô chỉ số để trống, không vẽ biểu đồ', async () => {
+    const user = userEvent.setup()
     mockApi({
-      ...baseRoutes(officeSession()),
+      ...officeRoutes(),
       'GET /api/v1/nursing-reports/dashboard': {
         ...dashboard,
         days: dashboard.days.map((d) => ({ ...d, submitted: 0, values: values(), patientChange: null, beds: null, bedPatients: null, issueDepartments: 0, incidents: 0 })),
@@ -430,6 +466,7 @@ describe('Dashboard điều dưỡng', () => {
 
     renderApp('/dieu-duong/dashboard')
 
+    await openTrends(user)
     expect(await screen.findByText('Chưa có khoa nào gửi báo cáo trong 3 ngày này.')).toBeInTheDocument()
     expect(within(tile('Khoa đã gửi báo cáo')).getByText('0/3')).toBeInTheDocument()
     expect(tile('Khoa đã gửi báo cáo')).toHaveTextContent('Chưa gửi: NOI A, NGOAI, HSTC')
@@ -445,7 +482,7 @@ describe('Dashboard điều dưỡng', () => {
       days: dashboard.days.map((d) => (d.date === TODAY ? { ...d, beds: 40, bedPatients: 44, values: values({ currentPatients: 44 }) } : d)),
       departments: dashboard.departments.filter((d) => d.submitted),
     }
-    mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/dashboard': full })
+    mockApi({ ...officeRoutes(), 'GET /api/v1/nursing-reports/dashboard': full })
     const { unmount } = renderApp('/dieu-duong/dashboard')
 
     expect(await screen.findByText('Đủ các khoa')).toBeInTheDocument()
@@ -453,7 +490,7 @@ describe('Dashboard điều dưỡng', () => {
     expect(tile('Công suất giường')).toHaveTextContent('Vượt số giường')
     unmount()
 
-    mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/dashboard': () => problem(400, 'Chọn từ 1 đến 92 ngày.') })
+    mockApi({ ...officeRoutes(), 'GET /api/v1/nursing-reports/dashboard': () => problem(400, 'Chọn từ 1 đến 92 ngày.') })
     renderApp('/dieu-duong/dashboard')
     expect(await screen.findByText('Chọn từ 1 đến 92 ngày.')).toBeInTheDocument()
   })

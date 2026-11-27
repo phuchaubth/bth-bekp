@@ -43,8 +43,8 @@ export const navItems: NavItem[] = [
     icon: <MedicineBoxOutlined />,
     children: [
       { path: '/dieu-duong/bao-cao-khoa', label: 'Báo cáo của khoa', permission: Permissions.NursingReportsSubmit },
-      { path: '/dieu-duong/tong-hop', label: 'Tổng hợp hằng ngày', permission: Permissions.NursingReportsRead },
-      // Quyết định 47: số liệu nhiều ngày dạng biểu đồ cho Phòng Điều dưỡng.
+      // Quyết định 47: số liệu nhiều ngày dạng biểu đồ cho Phòng Điều dưỡng. Quyết định 58: bảng tổng hợp hằng ngày nằm trong
+      // Dashboard, bỏ mục "Tổng hợp hằng ngày" (đường dẫn cũ chuyển sang Dashboard, xem routes.tsx).
       { path: '/dieu-duong/dashboard', label: 'Dashboard', permission: Permissions.NursingReportsRead },
       // Quyết định 48: người lập báo cáo ủy quyền khi vắng; Phòng Điều dưỡng xem mọi ủy quyền.
       {

@@ -116,7 +116,7 @@ Mỗi người chỉ thấy các mục menu được phép dùng. Với phân qu
 | **Điều dưỡng** (Báo cáo điều dưỡng, mục 9) | chỉ Điều dưỡng: **Báo cáo của khoa** | không | không | không | không | có |
 | **Quản trị** | không | không | không | không | chỉ **Người dùng** (xem) | có |
 
-Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Tổng hợp hằng ngày**.
+Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Dashboard** (bảng tổng hợp hằng ngày nằm trong Dashboard, mục 9.2), **Ủy quyền báo cáo**.
 
 Quản trị hệ thống có thể đổi quyền của từng vai trò (mục 8.3), nên menu của bạn có thể khác bảng trên.
 
@@ -1202,7 +1202,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 |---|---|---|
 | Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5). Khi vắng: ủy quyền cho người khác làm thay; được ủy quyền thì làm báo cáo của khoa khác trong thời gian được ủy quyền (mục 9.7) | **Điều dưỡng** → **Báo cáo của khoa**, **Ủy quyền báo cáo** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày, xem và trả lại báo cáo của khoa ngay trên dashboard (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard**, **Ủy quyền báo cáo** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem biểu đồ nhiều ngày (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Mọi việc trên bảng tổng hợp và biểu đồ làm ở một trang **Dashboard**. Không nhập số liệu thay khoa | **Điều dưỡng** → **Dashboard**, **Ủy quyền báo cáo** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1260,35 +1260,38 @@ Lưu ý:
 
 ### 9.2. Bảng tổng hợp hằng ngày (Phòng Điều dưỡng)
 
-1. Bấm **Điều dưỡng** trên menu, chọn **Tổng hợp hằng ngày**. Chọn ngày ở góc trên bên phải.
-2. Ô trên cùng ghi:
-   - **Khoa đã gửi**: số khoa đã gửi trên số khoa phải báo cáo.
+Bảng tổng hợp nằm trong trang **Dashboard** điều dưỡng (không còn mục menu **Tổng hợp hằng ngày** riêng; đường dẫn cũ đã lưu trên trình duyệt tự mở Dashboard).
+
+1. Bấm **Điều dưỡng** trên menu, chọn **Dashboard**. Chọn ngày ở ô **Ngày báo cáo**, góc trên bên phải (mặc định hôm nay). Một ô ngày dùng cho cả trang: ô chỉ số, bảng tổng hợp, PDF, Excel và biểu đồ đều theo ngày này.
+2. Phần trên cùng là **tám ô chỉ số** của ngày đó (mục 9.6), trong đó ô **Khoa đã gửi báo cáo** ghi số khoa đã gửi trên số khoa phải báo cáo, kèm tên viết tắt các khoa chưa gửi để nhắc. Dưới các ô chỉ số có hai thẻ: **Bảng tổng hợp** (mở sẵn) và **Biểu đồ** (mục 9.6).
+3. Ở thẻ **Bảng tổng hợp**, ô đầu tiên ghi:
    - Số liệu HIS lấy lúc nào, bởi ai.
    - Khi HIS lỗi: dòng **Khoa nhập tay khi HIS lỗi** cho biết khoa nào đã nhập số liệu HIS, khoa nào chưa nhập (mục 9.5).
-3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **tên viết tắt** của khoa (khoa chưa đặt tên viết tắt thì ghi mã khoa), theo **thứ tự Phòng Điều dưỡng xếp**. Phòng Điều dưỡng đặt thứ tự và tên viết tắt ở mục 9.4. Rê chuột vào tên viết tắt để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+   - Các nút **In PDF**, **Xuất Excel** (bước 9), và với tài khoản Phòng Điều dưỡng: **Lấy số liệu HIS** (mục 9.5), **Khoa báo cáo và số giường** (mục 9.4).
+4. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **tên viết tắt** của khoa (khoa chưa đặt tên viết tắt thì ghi mã khoa), theo **thứ tự Phòng Điều dưỡng xếp**. Phòng Điều dưỡng đặt thứ tự và tên viết tắt ở mục 9.4. Rê chuột vào tên viết tắt để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
    - Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
    - Cột **Người nước ngoài** và cột **Chuyển khoa** lấy từ hai dòng cùng tên ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có hai dòng này thì hai cột để trống.
    - Cột **Bao phòng** (ngay sau cột Người nước ngoài) lấy từ dòng **Số NB bao phòng** ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có dòng này thì cột để trống (không ghi 0); cần đủ số thì trả lại khoa (mục 9.3) để khoa nhập thêm rồi gửi lại.
    - Cột **Số NB ngày hôm trước** đứng trước **Số NB hiện tại**. Số NB hiện tại = Số NB ngày hôm trước + Nhập khoa từ PK + Nhập khoa do CK − Xuất viện − Chuyển khoa; khoa không nhập, phần mềm tính khi khoa lưu báo cáo (mục 9.1). Báo cáo gửi trước khi có cách tính này để trống cột Số NB ngày hôm trước và giữ Số NB hiện tại khoa đã nhập.
    - Cột cuối **Người báo cáo** là người gửi báo cáo của khoa.
-4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
-5. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm tên viết tắt của khoa:
+5. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
+6. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm tên viết tắt của khoa:
    - Mục B, D: người của khoa đã nhập tay số liệu HIS, hoặc người đã bấm **Lấy số liệu HIS** (ghi *lấy từ HIS*).
    - Mục C, E, F: người gửi báo cáo của các khoa có số thủ thuật (mục C), báo **Không ổn** (mục E), có phần nhập thêm (mục F). Không khoa nào có thì ghi *Các khoa đã gửi báo cáo (cột Người báo cáo, mục A)*.
    - Mục chưa có số liệu thì ghi *chưa có*.
 
    ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)
 
-   *Hình 9.7. Bảng tổng hợp ngày HIS lỗi. Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Số NB ngày hôm trước**, **Người nước ngoài**, **Bao phòng**, **Chuyển khoa** và **Người báo cáo**. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
+   *Hình 9.7. Thẻ **Bảng tổng hợp** của Dashboard ngày HIS lỗi (kéo xuống dưới tám ô chỉ số). Ô đầu thẻ ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS, và có các nút **In PDF**, **Xuất Excel**, **Lấy số liệu HIS**, **Khoa báo cáo và số giường** (hai nút sau chỉ có với tài khoản Phòng Điều dưỡng). Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Số NB ngày hôm trước**, **Người nước ngoài**, **Bao phòng**, **Chuyển khoa** và **Người báo cáo**.*
 
-6. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
-7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi. Trong PDF và file Excel, phần nhập thêm dài được chia thành nhiều dòng (mỗi dòng khoảng 1.000 ký tự, chia ở chỗ xuống dòng hoặc giữa hai từ), các dòng sau ghi tên viết tắt kèm **(tiếp)** và tự sang trang, nên in đủ cả phần nhập thêm dài nhất.
+7. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
+8. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi. Trong PDF và file Excel, phần nhập thêm dài được chia thành nhiều dòng (mỗi dòng khoảng 1.000 ký tự, chia ở chỗ xuống dòng hoặc giữa hai từ), các dòng sau ghi tên viết tắt kèm **(tiếp)** và tự sang trang, nên in đủ cả phần nhập thêm dài nhất.
 
    ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
 
    *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa. Dưới mỗi mục là người báo cáo.*
 
-8. Bấm **In PDF** để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel. Cuối PDF và file Excel có chỗ **Phòng Điều dưỡng** ký, ghi rõ họ tên.
+9. Bấm **In PDF** (ô đầu thẻ **Bảng tổng hợp**) để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel. Cuối PDF và file Excel có chỗ **Phòng Điều dưỡng** ký, ghi rõ họ tên.
 
    <img src="huong-dan-su-dung/dd-12-pdf-tong-hop.png" alt="PDF bảng tổng hợp, trang 1" width="560">
 
@@ -1298,7 +1301,7 @@ Lưu ý:
 
 ### 9.3. Xem và trả lại báo cáo cho khoa (Phòng Điều dưỡng)
 
-1. Trong mục A, bấm **tên viết tắt** của khoa. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
+1. Trong mục A của bảng tổng hợp (Dashboard, thẻ **Bảng tổng hợp**), bấm **tên viết tắt** của khoa. Báo cáo của khoa ngày ở ô **Ngày báo cáo** mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
 
    ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
 
@@ -1312,7 +1315,7 @@ Lưu ý:
 
 ### 9.4. Cài khoa báo cáo, thứ tự, tên viết tắt, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
 
-1. Trên trang **Tổng hợp hằng ngày**, bấm **Khoa báo cáo và số giường**.
+1. Trên trang **Dashboard**, thẻ **Bảng tổng hợp**, bấm **Khoa báo cáo và số giường** (ô đầu thẻ).
 2. Tick các khoa phải gửi báo cáo, nhập **số giường thực kê** (không tính băng ca).
 3. Xếp **thứ tự** các khoa ở mục A của bảng tổng hợp. Các khoa được tick đứng đầu danh sách; cột **Thứ tự** ghi số thứ tự của khoa trên bảng tổng hợp.
    - Gõ số thứ tự mới rồi bấm **Enter** (hoặc bấm ra ngoài ô): khoa chuyển tới vị trí đó, các khoa khác dịch xuống. Gõ số lớn hơn số khoa thì khoa xuống cuối.
@@ -1340,7 +1343,7 @@ Người nhập số liệu HIS cho một khoa cần tài khoản thuộc đúng
 
 ### 9.5. Số liệu HIS (mục B, mục D, cột "NB PK chờ nhập viện")
 
-**Khi HIS chạy bình thường.** Phòng CNTT cài câu truy vấn số liệu. Phòng Điều dưỡng bấm **Lấy số liệu HIS**. Số liệu được lưu theo ngày. Số **NB PK chờ nhập viện** là số tại lúc bấm. Nếu có mã khoa trên HIS không khớp khoa nào, phần mềm báo để phòng CNTT kiểm tra.
+**Khi HIS chạy bình thường.** Phòng CNTT cài câu truy vấn số liệu. Phòng Điều dưỡng bấm **Lấy số liệu HIS** (Dashboard, thẻ **Bảng tổng hợp**). Số liệu được lưu theo ngày. Số **NB PK chờ nhập viện** là số tại lúc bấm. Nếu có mã khoa trên HIS không khớp khoa nào, phần mềm báo để phòng CNTT kiểm tra.
 
 **Khi HIS lỗi hoặc chưa cài câu truy vấn.** Nhiệm vụ khoa nào thì khoa đó nhập. Phòng Điều dưỡng không nhập thay, chỉ tổng hợp.
 
@@ -1367,45 +1370,45 @@ Bảng tổng hợp dùng số như sau:
 
 - Số lấy từ HIS được dùng trước. Ô HIS không có số mới dùng số khoa nhập. Khi HIS chạy lại, bấm **Lấy số liệu HIS**: ô nào HIS có số thì dùng số HIS.
 - Số do khoa nhập có dòng chữ nhỏ ghi tên viết tắt (hoặc mã) của khoa đã nhập, ví dụ *KKB nhập tay*. Dòng **Người báo cáo** dưới mục ghi người đã nhập.
-- Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô trên cùng (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
+- Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô đầu thẻ **Bảng tổng hợp** (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
 
 ![Mục B, C, D với số khoa nhập tay](huong-dan-su-dung/dd-05b-tong-hop-b-d.png)
 
 *Hình 9.16. Mục B và mục D ghi tên viết tắt (hoặc mã) của khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
 
-### 9.6. Dashboard điều dưỡng (Phòng Điều dưỡng)
+### 9.6. Dashboard điều dưỡng: ô chỉ số và biểu đồ (Phòng Điều dưỡng)
 
-Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ số và biểu đồ. Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang không sửa số liệu; số của khoa nào sai thì trả lại báo cáo cho khoa đó, ngay trên dashboard (bước 6) hoặc ở bảng tổng hợp (mục 9.3).
+Trang **Dashboard** là trang làm việc hằng ngày của Phòng Điều dưỡng: bảng tổng hợp của một ngày (thẻ **Bảng tổng hợp**, mục 9.2) và số liệu nhiều ngày bằng các ô chỉ số và biểu đồ (thẻ **Biểu đồ**). Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang không sửa số liệu; số của khoa nào sai thì trả lại báo cáo cho khoa đó (mục 9.3, hoặc bước 6 dưới đây).
 
-1. Bấm **Điều dưỡng** → **Dashboard**.
-2. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày**, và ngày cuối ở ô ngày (mặc định hôm nay). Đổi lựa chọn thì số cũ mờ đi trong lúc tải số mới.
-3. Phần trên là **tám ô chỉ số của ngày cuối**:
+1. Bấm **Điều dưỡng** → **Dashboard**. Chọn ngày ở ô **Ngày báo cáo** (mặc định hôm nay).
+2. Phần trên cùng là **tám ô chỉ số của ngày đã chọn**, luôn hiện ở cả hai thẻ:
    - **Khoa đã gửi báo cáo**, kèm tên viết tắt các khoa chưa gửi để nhắc.
    - **Số NB hiện tại**, tăng hay giảm bao nhiêu so với ngày hôm trước (tính trên các báo cáo có Số NB ngày hôm trước).
    - **Công suất giường**: Số NB hiện tại chia số giường của các khoa đã gửi. Vượt 100% có biểu tượng cảnh báo và chữ **Vượt số giường**.
    - **NB chăm sóc cấp 1**, kèm số NB thở máy, theo dõi monitor, thở oxy.
    - **Nhập khoa**, **Xuất viện**, **Chuyển khoa**: số ca của ngày hôm trước.
    - **Khoa báo "Không ổn"**, kèm số ca ADR và số báo cáo có nội dung bất thường (phần nhập thêm).
+3. Bấm thẻ **Biểu đồ**. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày** ở góc phải của thẻ; kỳ là các ngày đến hết ngày ở ô **Ngày báo cáo** (dòng *Từ … đến …* ghi rõ). Đổi ngày hoặc khoảng thời gian thì số cũ mờ đi trong lúc tải số mới. Đổi khoảng thời gian không tải lại bảng tổng hợp.
 
-   ![Dashboard điều dưỡng: ô chỉ số và biểu đồ theo ngày](huong-dan-su-dung/dd-14-dashboard.png)
+   ![Dashboard điều dưỡng: ô chỉ số và thẻ Biểu đồ](huong-dan-su-dung/dd-14-dashboard.png)
 
-   *Hình 9.17. Dashboard 30 ngày. Rê chuột vào biểu đồ để xem số của từng ngày: khung gợi ý ghi cả số khoa đã gửi và công suất giường của ngày đó.*
+   *Hình 9.17. Dashboard, thẻ **Biểu đồ**, 30 ngày. Tám ô chỉ số ở trên hai thẻ. Rê chuột vào biểu đồ để xem số của từng ngày: khung gợi ý ghi cả số khoa đã gửi và công suất giường của ngày đó.*
 
 4. Bốn **biểu đồ theo ngày**: Số NB hiện tại; nhập khoa, xuất viện, chuyển khoa; NB chăm sóc cấp 1, thở máy, monitor; số khoa đã gửi báo cáo (đường đứt nét là số khoa phải báo cáo). Rê chuột, hoặc bấm vào biểu đồ rồi dùng phím mũi tên trái, phải, để xem số từng ngày. Bấm **Xem bảng** để đọc số dạng bảng (ngày mới nhất ở trên).
-5. Phần dưới:
+5. Phần dưới của thẻ **Biểu đồ**:
    - **Công suất giường theo khoa** của ngày cuối, khoa cao nhất ở trên.
    - **"Không ổn" theo nội dung**: số lượt khoa báo "Không ổn" trong cả kỳ theo từng dòng của phần tick (mỗi khoa, mỗi ngày, mỗi dòng tính một lượt), kèm khoa báo trong ngày cuối. Có tính cả dòng **ĐD thực hiện thuốc** (bảng tổng hợp giấy không có dòng này).
    - **Theo khoa**: số liệu từng khoa ngày cuối, và số ngày khoa đã gửi báo cáo trong kỳ.
 
    ![Dashboard điều dưỡng: công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa](huong-dan-su-dung/dd-14b-dashboard-khoa.png)
 
-   *Hình 9.18. Phần dưới dashboard. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**. Tên viết tắt của khoa ở bảng **Theo khoa** (chữ xanh) bấm được.*
+   *Hình 9.18. Phần dưới thẻ **Biểu đồ**. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**. Tên viết tắt của khoa ở bảng **Theo khoa** (chữ xanh) bấm được.*
 
-6. Ở bảng **Theo khoa**, bấm **tên viết tắt** của khoa. Báo cáo của khoa **ngày cuối** (ngày ở ô ngày) mở ở bên phải, chỉ xem, giống khi mở từ bảng tổng hợp (Hình 9.10).
+6. Ở bảng **Theo khoa**, bấm **tên viết tắt** của khoa. Báo cáo của khoa **ngày cuối** (ngày ở ô **Ngày báo cáo**) mở ở bên phải, chỉ xem, giống khi bấm ở mục A của bảng tổng hợp (Hình 9.10).
    - Bấm **In PDF** để xem và in báo cáo của khoa.
-   - Khoa cần sửa: bấm **Trả lại khoa**, ghi lý do, bấm **Trả lại khoa** trong hộp (Hình 9.11). Nút này chỉ có khi khoa đã gửi, và chỉ với tài khoản được trả lại báo cáo (vai trò Phòng Điều dưỡng). Dashboard tính lại ngay: khoa đó thành **Chưa gửi** cho tới khi khoa sửa và gửi lại.
+   - Khoa cần sửa: bấm **Trả lại khoa**, ghi lý do, bấm **Trả lại khoa** trong hộp (Hình 9.11). Nút này chỉ có khi khoa đã gửi, và chỉ với tài khoản được trả lại báo cáo (vai trò Phòng Điều dưỡng). Dashboard tính lại ngay, cả ô chỉ số, biểu đồ và bảng tổng hợp: khoa đó thành **Chưa gửi** cho tới khi khoa sửa và gửi lại.
    - Khoa chưa lập báo cáo ngày đó thì ghi **Khoa chưa lập báo cáo ngày này.**; khoa đang làm dở thì thấy báo cáo nháp.
-   - Muốn xem báo cáo của ngày khác: đổi ngày ở ô ngày rồi bấm lại tên khoa.
+   - Muốn xem báo cáo của ngày khác: đổi ngày ở ô **Ngày báo cáo** rồi bấm lại tên khoa.
 
 Lưu ý khi đọc:
 
@@ -1452,7 +1455,7 @@ Khi vắng (nghỉ phép, đi học, đi công tác…), người lập báo cá
 
 **Phòng Điều dưỡng:**
 
-- Bảng tổng hợp (mục 9.2) có ô **Ủy quyền báo cáo trong ngày**: khoa nào, ai làm thay, được ai ủy quyền, thời gian và nội dung. Báo cáo gửi theo ủy quyền ghi "Họ tên (được … ủy quyền)" ở cột **Người báo cáo**; dòng **Người báo cáo** dưới các mục B–F cũng ghi như vậy. PDF và Excel ghi giống màn hình.
+- Bảng tổng hợp (Dashboard, thẻ **Bảng tổng hợp**, mục 9.2) có ô **Ủy quyền báo cáo trong ngày**: khoa nào, ai làm thay, được ai ủy quyền, thời gian và nội dung. Báo cáo gửi theo ủy quyền ghi "Họ tên (được … ủy quyền)" ở cột **Người báo cáo**; dòng **Người báo cáo** dưới các mục B–F cũng ghi như vậy. PDF và Excel ghi giống màn hình.
 
    ![Bảng tổng hợp: ô Ủy quyền báo cáo trong ngày và cột Người báo cáo ghi được ủy quyền](huong-dan-su-dung/dd-15d-tong-hop-uy-quyen.png)
 
