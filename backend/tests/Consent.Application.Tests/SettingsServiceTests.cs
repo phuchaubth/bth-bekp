@@ -52,17 +52,22 @@ public sealed class SettingsServiceTests
         var service = ctx.CreateSettingsService();
 
         var none = await service.GetAsync(CancellationToken.None);
+        var noInfo = await service.GetLogoInfoAsync(CancellationToken.None);
         var uploaded = await service.UploadLogoAsync(new(TestLogos.Png64), CancellationToken.None);
         var resolved = await service.ResolveLogoAsync(CancellationToken.None);
+        var info = await service.GetLogoInfoAsync(CancellationToken.None);
         var removed = await service.DeleteLogoAsync(CancellationToken.None);
 
         Assert.Null(none.Logo);
+        Assert.Null(noInfo);
         Assert.True(uploaded.IsSuccess, uploaded.Error?.Message);
         Assert.Equal(new LogoInfoDto("image/png", 64, 64, ctx.Clock.UtcNow), uploaded.Value.Logo);
+        Assert.Equal(uploaded.Value.Logo, info);
         Assert.Equal(Convert.FromBase64String(TestLogos.Png64), resolved!.Content);
         Assert.Single(ctx.Documents.Files);
         Assert.Null(removed.Logo);
         Assert.Null(await service.ResolveLogoAsync(CancellationToken.None));
+        Assert.Null(await service.GetLogoInfoAsync(CancellationToken.None));
         Assert.DoesNotContain(ctx.Store.SystemSettings, s => s.Key.StartsWith("Logo.", StringComparison.Ordinal));
     }
 

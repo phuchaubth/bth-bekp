@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { authApi, type AuthResponse, type CurrentUser } from '../api/auth'
+import { brandingKeys } from '../api/branding'
 import { environmentKeys } from '../api/environment'
 import { ApiError, setRefreshHandler } from '../api/http'
 import { maintenanceStore } from '../api/maintenanceStore'
@@ -44,8 +45,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setStatus('anonymous')
     // Xóa dữ liệu đã cache của phiên. Giữ nhãn môi trường: không thuộc phiên nào, và có thể còn đang tải khi khôi phục phiên
-    // thất bại (xóa sẽ hủy yêu cầu đó, trang đăng nhập UAT mất dải báo, quyết định 50).
-    queryClient.removeQueries({ predicate: (query) => query.queryKey[0] !== environmentKeys.info[0] })
+    // thất bại (xóa sẽ hủy yêu cầu đó, trang đăng nhập UAT mất dải báo, quyết định 50). Giữ ảnh nhận diện (logo, khung chữ
+    // ký): ai cũng xem được, trang đăng nhập dùng logo (quyết định 61).
+    queryClient.removeQueries({
+      predicate: (query) => query.queryKey[0] !== environmentKeys.info[0] && query.queryKey[0] !== brandingKeys.logo[0],
+    })
     queryClient.getMutationCache().clear()
   }, [queryClient])
 
