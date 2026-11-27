@@ -18,6 +18,9 @@ internal sealed class MigraDocCriticalLogbookPdfRenderer : ICriticalLogbookPdfRe
     internal const double ContentWidthMm = 273;
 
     private const double TableFontSize = 8;
+
+    /// <summary>Ô ☒/☐ phông DejaVu to hơn chữ Tinos cùng cỡ: nhỏ hơn một chút để ô cao gần bằng chữ hoa trong ô sổ.</summary>
+    private const double BoxFontSize = 7;
     private static readonly Color Muted = new(0x55, 0x5D, 0x6B);
     private static readonly Color Cancelled = new(0x80, 0x80, 0x80);
     private static readonly Color HeaderFill = new(0xEE, 0xF2, 0xF2);
@@ -220,7 +223,8 @@ internal sealed class MigraDocCriticalLogbookPdfRenderer : ICriticalLogbookPdfRe
             for (var i = 0; i < data.Cells.Count && i < document.Columns.Count; i++)
             {
                 var text = data.Cancelled ? MigraDocQcLogPdfRenderer.Struck(data.Cells[i]) : data.Cells[i];
-                var paragraph = row.Cells[i].AddParagraph(text);
+                var paragraph = row.Cells[i].AddParagraph();
+                AddCellText(paragraph, text);
                 if (data.Cancelled)
                 {
                     paragraph.Format.Font.Color = Cancelled;
@@ -239,6 +243,40 @@ internal sealed class MigraDocCriticalLogbookPdfRenderer : ICriticalLogbookPdfRe
                 paragraph.AddFormattedText(note, TextFormat.Italic);
                 row.KeepWith = 1;
             }
+        }
+    }
+
+    /// <summary>
+    /// Chữ một ô sổ. Ô đánh dấu ☒/☐ (cột xác nhận lại thông tin, cột khẩn) in bằng phông DejaVu Sans nhúng sẵn: Tinos không có
+    /// hai ký tự này nên in ra ô trống dù đã đánh dấu. Màu theo dòng (dòng đã hủy màu xám); dấu gạch của dòng đã hủy giữ ở
+    /// phông Tinos.
+    /// </summary>
+    internal static void AddCellText(Paragraph paragraph, string text)
+    {
+        var start = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (text[i] != MigraDocConsentPdfRenderer.Checked[0] && text[i] != MigraDocConsentPdfRenderer.Unchecked[0])
+            {
+                continue;
+            }
+
+            if (i > start)
+            {
+                paragraph.AddText(text[start..i]);
+            }
+
+            var box = paragraph.AddFormattedText(text[i..(i + 1)]);
+            box.FontName = EmbeddedFontResolver.BoxFamilyName;
+            box.Size = BoxFontSize;
+            box.Bold = false;
+            box.Italic = false;
+            start = i + 1;
+        }
+
+        if (start < text.Length)
+        {
+            paragraph.AddText(text[start..]);
         }
     }
 }

@@ -108,6 +108,49 @@ public sealed class CriticalLogbookPdfTests
     }
 
     [Fact]
+    public void CheckBoxes_UseTheEmbeddedBoxFont_RestOfTheCellStaysInTinos()
+    {
+        // Tinos không có ☒/☐: in bằng Tinos thì ô đã đánh dấu thành ô trống (lỗi thấy khi xem PDF sổ ST01 thật).
+        var count = CriticalLogbookService.ColumnsOf(CriticalLogbookForm.Laboratory).Count;
+        string[] cells = [.. Enumerable.Range(0, count).Select(i => i == 0 ? "1" : $"Ô {i + 1} (giả lập)")];
+        const string readBack = "☒ Chính xác (đọc lại lần 2)";
+        cells[count - 1] = readBack;
+        var table = Body(MigraDocCriticalLogbookPdfRenderer.Build(Document(rows: [new(cells, false, null), new(cells, true, "Đã hủy (giả lập)")])))
+            .OfType<Mdom.Tables.Table>()
+            .Last();
+
+        foreach (var (row, cancelled) in new[] { (2, false), (3, true) })
+        {
+            var parts = table.Rows[row].Cells[count - 1].Elements.Cast<Mdom.Paragraph>().Single().Elements.Cast<Mdom.DocumentObject>().ToList();
+            Assert.Equal(2, parts.Count);
+            var box = Assert.IsType<Mdom.FormattedText>(parts[0]);
+            Assert.Equal("☒", TextOf(box.Elements));
+            Assert.Equal(EmbeddedFontResolver.BoxFamilyName, box.FontName);
+            var expected = cancelled ? MigraDocQcLogPdfRenderer.Struck(readBack)[1..] : readBack[1..];
+            Assert.Equal(expected, Assert.IsType<Mdom.Text>(parts[1]).Content);
+        }
+
+        // Ô không có ký tự đánh dấu: một đoạn chữ Tinos như cũ.
+        Assert.IsType<Mdom.Text>(table.Rows[2].Cells[1].Elements.Cast<Mdom.Paragraph>().Single().Elements.Cast<Mdom.DocumentObject>().Single());
+    }
+
+    [Theory]
+    [InlineData("☐", 1)]
+    [InlineData("Khẩn ☒ / ☐ (giả lập)", 5)]
+    [InlineData("☒☒", 2)]
+    public void CheckBoxes_EveryBoxIsItsOwnRun(string text, int elements)
+    {
+        var paragraph = new Mdom.Paragraph();
+        MigraDocCriticalLogbookPdfRenderer.AddCellText(paragraph, text);
+
+        var parts = paragraph.Elements.Cast<Mdom.DocumentObject>().ToList();
+        Assert.Equal(elements, parts.Count);
+        Assert.Equal(text, TextOf(paragraph.Elements));
+        Assert.All(parts.OfType<Mdom.FormattedText>(), box => Assert.Equal(EmbeddedFontResolver.BoxFamilyName, box.FontName));
+        Assert.Equal(text.Count(c => c is '☒' or '☐'), parts.OfType<Mdom.FormattedText>().Count());
+    }
+
+    [Fact]
     public void EmptyLogbook_SaysThereIsNoRecord()
     {
         var table = Body(MigraDocCriticalLogbookPdfRenderer.Build(Document(CriticalLogbookForm.Clinical, rows: []))).OfType<Mdom.Tables.Table>().Last();
