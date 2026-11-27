@@ -88,6 +88,56 @@ function lastPoint(values: (number | null)[]) {
   return null
 }
 
+/** Bề ngang ước lượng mỗi ký tự cỡ chữ 11px: đủ để tránh chồng nhãn, không cần đo chữ thật. */
+const CHAR_WIDTH = 6
+
+interface Point {
+  x: number
+  y: number
+}
+
+/** Đường gấp khúc (tọa độ SVG) có đi qua hộp chữ không: lấy mẫu dọc từng đoạn, hai mẫu liền nhau cách nhau không quá 4px. */
+function crossesBox(lines: Point[][], box: { x0: number; x1: number; y0: number; y1: number }) {
+  return lines.some((line) =>
+    line.some((a, k) => {
+      const b = line[k + 1] ?? a
+      const steps = Math.max(1, Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / 4))
+      for (let t = 0; t <= steps; t++) {
+        const px = a.x + ((b.x - a.x) * t) / steps
+        const py = a.y + ((b.y - a.y) * t) / steps
+        if (px >= box.x0 && px <= box.x1 && py >= box.y0 && py <= box.y1) {
+          return true
+        }
+      }
+      return false
+    }),
+  )
+}
+
+/**
+ * Chỗ đặt nhãn đường mốc: trên đường ở cuối bên phải; đường số liệu đi qua chỗ đó (thường gặp khi tỷ lệ dao động quanh mục
+ * tiêu) thì thử đầu bên trái, rồi dưới đường mốc. Chỗ nào cũng chồng thì giữ chỗ mặc định.
+ */
+function referenceLabelPlace(label: string, refY: number, plot: { left: number; right: number; bottom: number }, lines: Point[][]) {
+  const width = label.length * CHAR_WIDTH
+  const candidates = [
+    { x: plot.right, y: refY - 5, anchor: 'end' as const },
+    { x: plot.left, y: refY - 5, anchor: 'start' as const },
+    ...(refY + 18 <= plot.bottom
+      ? [
+          { x: plot.right, y: refY + 14, anchor: 'end' as const },
+          { x: plot.left, y: refY + 14, anchor: 'start' as const },
+        ]
+      : []),
+  ]
+  // Chữ cỡ 11px chiếm từ 11px trên đường chân chữ tới 3px dưới; chừa thêm khoảng trống và nửa nét đường 2px.
+  const free = candidates.find((c) => {
+    const x0 = c.anchor === 'end' ? c.x - width : c.x
+    return !crossesBox(lines, { x0: x0 - 4, x1: x0 + width + 4, y0: c.y - 13, y1: c.y + 6 })
+  })
+  return free ?? candidates[0]
+}
+
 /**
  * Biểu đồ đường theo ngày bằng SVG (không cần thư viện), vẽ theo bề rộng thật của khung. Đường 2px, chỗ không có số thì ngắt;
  * điểm cuối mỗi đường có chấm và nhãn (một dãy: số cuối; nhiều dãy: tên dãy, bỏ khi các nhãn sát nhau). Rê chuột hoặc dùng
@@ -153,6 +203,14 @@ export function LineChart({
 
   const activeX = active === null ? 0 : x(active)
   const tooltipOnLeft = active !== null && activeX > width / 2
+  const referenceLabel =
+    reference &&
+    referenceLabelPlace(
+      reference.label,
+      y(reference.value),
+      { left: padding.left, right: padding.left + plotWidth, bottom: padding.top + plotHeight },
+      series.flatMap((s) => segments(s.values).map((segment) => segment.map((p) => ({ x: x(p.index), y: y(p.value) })))),
+    )
 
   return (
     <div
@@ -201,7 +259,7 @@ export function LineChart({
             </text>
           ) : null,
         )}
-        {reference && (
+        {reference && referenceLabel && (
           <g data-reference>
             <line
               x1={padding.left}
@@ -212,7 +270,7 @@ export function LineChart({
               strokeWidth={1}
               strokeDasharray="4 3"
             />
-            <text x={padding.left + plotWidth} y={y(reference.value) - 5} fontSize={11} textAnchor="end" fill={TEXT_SECONDARY}>
+            <text x={referenceLabel.x} y={referenceLabel.y} fontSize={11} textAnchor={referenceLabel.anchor} fill={TEXT_SECONDARY}>
               {reference.label}
             </text>
           </g>

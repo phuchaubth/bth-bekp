@@ -239,11 +239,13 @@ export function CriticalDetailPage() {
                 items={eventsOf(r).map((e) => ({
                   color: e.color,
                   title: (
-                    <Space wrap size={6}>
-                      <Typography.Text strong>{dateTimeOf(e.at)}</Typography.Text>
-                      <Typography.Text>{e.title}</Typography.Text>
-                      {e.badge}
-                    </Space>
+                    <>
+                      <div>
+                        <Typography.Text strong>{dateTimeOf(e.at)}</Typography.Text>
+                      </div>
+                      <div>{e.title}</div>
+                      {e.badge && <div>{e.badge}</div>}
+                    </>
                   ),
                   content: (
                     <>

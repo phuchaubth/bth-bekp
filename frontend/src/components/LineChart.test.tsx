@@ -108,9 +108,36 @@ describe('LineChart', () => {
       />,
     )
 
-    expect(within(container.querySelector('[data-reference]') as HTMLElement).getByText('Phải báo cáo: 15')).toBeInTheDocument()
+    const label = within(container.querySelector('[data-reference]') as HTMLElement).getByText('Phải báo cáo: 15')
+    // Số liệu nằm xa dưới đường mốc: nhãn ở chỗ mặc định, trên đường mốc, cuối bên phải.
+    expect(label.getAttribute('text-anchor')).toBe('end')
     const ticks = [...container.querySelectorAll('svg text')].map((t) => t.textContent)
     expect(ticks).toContain('15')
+  })
+
+  it('nhãn đường mốc tránh đường số liệu: cuối bên phải số liệu sát trên mục tiêu thì nhãn sang đầu bên trái', () => {
+    const chart = (values: number[]) =>
+      render(
+        <LineChart
+          title="Báo đúng hạn"
+          labels={labels}
+          series={[{ name: 'Báo đúng hạn', color: '#008f84', values }]}
+          reference={{ value: 95, label: 'Mục tiêu 95%' }}
+        />,
+      )
+    const place = (container: HTMLElement) => {
+      const text = container.querySelector('[data-reference] text') as SVGTextElement
+      return { anchor: text.getAttribute('text-anchor'), y: Number(text.getAttribute('y')) }
+    }
+    const line = (container: HTMLElement) => Number(container.querySelector('[data-reference] line')?.getAttribute('y1'))
+
+    const right = chart([60, 62, 70, 80, 97, 96]).container
+    expect(place(right).anchor).toBe('start')
+    expect(place(right).y).toBeLessThan(line(right))
+
+    // Cả hai đầu đều sát trên mục tiêu: nhãn xuống dưới đường mốc.
+    const both = chart([97, 96, 70, 80, 97, 96]).container
+    expect(place(both).y).toBeGreaterThan(line(both))
   })
 
   it('bảng số liệu: ngày mới nhất trước, ô không có số ghi "—", có cột ghi chú', () => {
