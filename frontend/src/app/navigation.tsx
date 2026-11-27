@@ -1,4 +1,5 @@
 import {
+  AlertOutlined,
   AuditOutlined,
   BarChartOutlined,
   DashboardOutlined,
@@ -69,6 +70,29 @@ export const navItems: NavItem[] = [
         permission: [Permissions.QcRecord, Permissions.QcReview, Permissions.QcMonitor],
       },
       { path: '/noi-kiem/danh-muc', label: 'Máy đo và lô vật tư', permission: Permissions.QcManage },
+    ],
+  },
+  {
+    // Quyết định 60: khoa cận lâm sàng báo kết quả nguy cấp, khoa điều trị nhận, bác sĩ xử trí, QLCL giám sát. Màn hình theo
+    // dõi tại khoa (TV) mở từ trang "Gửi đến khoa tôi", toàn màn hình (routes.tsx).
+    path: '/ket-qua-nguy-cap',
+    label: 'Kết quả nguy cấp',
+    shortLabel: 'KQ nguy cấp',
+    icon: <AlertOutlined />,
+    children: [
+      { path: '/ket-qua-nguy-cap/khoa-bao', label: 'Khoa tôi báo', permission: [Permissions.CriticalRecord, Permissions.CriticalMonitor] },
+      {
+        path: '/ket-qua-nguy-cap/khoa-nhan',
+        label: 'Gửi đến khoa tôi',
+        permission: [Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor],
+      },
+      {
+        path: '/ket-qua-nguy-cap/so',
+        label: 'Sổ kết quả nguy cấp',
+        permission: [Permissions.CriticalRecord, Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor],
+      },
+      { path: '/ket-qua-nguy-cap/dashboard', label: 'Dashboard', permission: Permissions.CriticalMonitor },
+      { path: '/ket-qua-nguy-cap/danh-muc', label: 'Danh mục và cấu hình', permission: Permissions.CriticalManage },
     ],
   },
   {

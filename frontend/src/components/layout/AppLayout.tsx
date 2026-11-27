@@ -5,6 +5,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router'
 import { accountDepartments } from '../../api/auth'
 import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
 import { BRAND } from '../../app/theme'
+import { CriticalAlertBanner } from '../../features/critical/CriticalAlertBanner'
 import { useAuth } from '../../auth/authContext'
 import { BrandMark } from './BrandMark'
 import { MaintenanceBanner } from './MaintenanceBanner'
@@ -167,6 +168,8 @@ export function AppLayout() {
       )}
       {/* Quyết định 53: tài khoản có quyền bảo trì vẫn làm việc khi đang bảo trì, thấy dải báo này. */}
       <MaintenanceBanner />
+      {/* Quyết định 60: kết quả nguy cấp gửi đến khoa (dải đỏ chớp tắt, chuông), hồ sơ quá hạn báo của khoa báo. */}
+      <CriticalAlertBanner />
       <Content style={{ padding: isDesktop ? '28px 24px' : 16 }}>
         <main style={CONTAINER}>
           <Outlet />

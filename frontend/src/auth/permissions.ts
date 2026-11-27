@@ -38,6 +38,18 @@ export const Permissions = {
   QcManage: 'qc.manage',
   /** Xem dashboard nội kiểm mọi khoa, chỉ xem (lãnh đạo, Phòng Điều dưỡng, QLCL; quyết định 59). */
   QcMonitor: 'qc.monitor',
+  /** Khoa cận lâm sàng: ghi kết quả nguy cấp và lần báo của khoa mình, hủy hồ sơ báo nhầm (quyết định 60). */
+  CriticalRecord: 'critical.record',
+  /** Khoa điều trị: xem kết quả nguy cấp gửi đến khoa, xác nhận đã nhận cuộc gọi. */
+  CriticalReceive: 'critical.receive',
+  /** Bác sĩ: ghi hướng xử trí kết quả nguy cấp gửi đến khoa bằng tài khoản của mình. */
+  CriticalTreat: 'critical.treat',
+  /** Màn hình theo dõi kết quả nguy cấp tại khoa (chỉ xem, tên viết tắt). */
+  CriticalDisplay: 'critical.display',
+  /** Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (QLCL, KHTH). */
+  CriticalMonitor: 'critical.monitor',
+  /** QLCL: danh mục kết quả nguy cấp và thông số vận hành. */
+  CriticalManage: 'critical.manage',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]

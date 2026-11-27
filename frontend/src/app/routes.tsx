@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Navigate, type RouteObject } from 'react-router'
-import { RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
+import { RedirectDisplayAccount, RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from '../auth/paths'
 import { AppLayout } from '../components/layout/AppLayout'
 import { MaintenanceGate } from '../components/MaintenanceGate'
@@ -20,6 +20,14 @@ import {
   ConsentFormsPage,
   ConsentTemplateDetailPage,
   ConsentTemplatesPage,
+  CriticalDashboardPage,
+  CriticalDetailPage,
+  CriticalLogbookPage,
+  CriticalReceivedPage,
+  CriticalRecordPage,
+  CriticalScreenPage,
+  CriticalSentPage,
+  CriticalSettingsPage,
   DepartmentsPage,
   ExportsPage,
   KioskPage,
@@ -46,6 +54,7 @@ import {
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
 import { REMOTE_SIGNING_PATH } from '../api/remoteSigning'
+import { SCREEN_PATH } from '../features/critical/criticalUtils'
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
@@ -61,6 +70,11 @@ const implementedPages: Record<string, ReactNode> = {
   '/noi-kiem/so': <QcBooksPage />,
   '/noi-kiem/dashboard': <QcDashboardPage />,
   '/noi-kiem/danh-muc': <QcCatalogPage />,
+  '/ket-qua-nguy-cap/khoa-bao': <CriticalSentPage />,
+  '/ket-qua-nguy-cap/khoa-nhan': <CriticalReceivedPage />,
+  '/ket-qua-nguy-cap/so': <CriticalLogbookPage />,
+  '/ket-qua-nguy-cap/dashboard': <CriticalDashboardPage />,
+  '/ket-qua-nguy-cap/danh-muc': <CriticalSettingsPage />,
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
@@ -121,6 +135,21 @@ const pageRoutes: RouteObject[] = [
     ),
     errorElement: <ErrorPage />,
   },
+  // Màn hình theo dõi kết quả nguy cấp tại khoa (quyết định 60): toàn màn hình, không có menu; tài khoản màn hình theo dõi
+  // mở trang nào cũng được chuyển về đây.
+  {
+    path: SCREEN_PATH,
+    element: (
+      <RequireAuth>
+        <RequirePermission permission={[Permissions.CriticalDisplay, Permissions.CriticalReceive, Permissions.CriticalTreat]}>
+          <Lazy>
+            <CriticalScreenPage />
+          </Lazy>
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <ErrorPage />,
+  },
   {
     path: FORCED_PASSWORD_CHANGE_PATH,
     element: (
@@ -135,7 +164,9 @@ const pageRoutes: RouteObject[] = [
     element: (
       <RequireAuth>
         <RedirectKioskAccount>
-          <AppLayout />
+          <RedirectDisplayAccount>
+            <AppLayout />
+          </RedirectDisplayAccount>
         </RedirectKioskAccount>
       </RequireAuth>
     ),
@@ -209,6 +240,28 @@ const pageRoutes: RouteObject[] = [
           <RequirePermission permission={[Permissions.QcRecord, Permissions.QcReview]}>
             <Lazy>
               <QcBookPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'ket-qua-nguy-cap/ghi',
+        element: (
+          <RequirePermission permission={Permissions.CriticalRecord}>
+            <Lazy>
+              <CriticalRecordPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'ket-qua-nguy-cap/ho-so/:id',
+        element: (
+          <RequirePermission
+            permission={[Permissions.CriticalRecord, Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor]}
+          >
+            <Lazy>
+              <CriticalDetailPage />
             </Lazy>
           </RequirePermission>
         ),

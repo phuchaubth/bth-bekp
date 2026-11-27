@@ -264,6 +264,8 @@ export const auditActionLabels: Record<string, string> = {
   'Maintenance.Enabled': 'Bật chế độ bảo trì',
   'Maintenance.Updated': 'Sửa thông báo bảo trì',
   'Maintenance.Disabled': 'Tắt chế độ bảo trì',
+  'CriticalResults.SettingsUpdated': 'Sửa thông số kết quả nguy cấp',
+  'CriticalResults.LogbookPrinted': 'In sổ kết quả nguy cấp',
 }
 
 export const auditEntityLabels: Record<string, string> = {
@@ -279,4 +281,7 @@ export const auditEntityLabels: Record<string, string> = {
   ConsentSignature: 'Chữ ký',
   ExportJob: 'Lần xuất dữ liệu',
   RefreshToken: 'Phiên đăng nhập',
+  CriticalResult: 'Hồ sơ kết quả nguy cấp',
+  CriticalNotification: 'Lần báo kết quả nguy cấp',
+  CriticalTest: 'Danh mục kết quả nguy cấp',
 }

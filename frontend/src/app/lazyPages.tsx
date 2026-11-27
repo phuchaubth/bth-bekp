@@ -51,6 +51,30 @@ export const QcBooksPage = lazy(() => import('../features/qc/QcBooksPage').then(
 export const QcBookPage = lazy(() => import('../features/qc/QcBookPage').then((m) => ({ default: m.QcBookPage })))
 export const QcCatalogPage = lazy(() => import('../features/qc/QcCatalogPage').then((m) => ({ default: m.QcCatalogPage })))
 export const QcDashboardPage = lazy(() => import('../features/qc/QcDashboardPage').then((m) => ({ default: m.QcDashboardPage })))
+export const CriticalSentPage = lazy(() =>
+  import('../features/critical/CriticalSentPage').then((m) => ({ default: m.CriticalSentPage })),
+)
+export const CriticalReceivedPage = lazy(() =>
+  import('../features/critical/CriticalReceivedPage').then((m) => ({ default: m.CriticalReceivedPage })),
+)
+export const CriticalRecordPage = lazy(() =>
+  import('../features/critical/CriticalRecordPage').then((m) => ({ default: m.CriticalRecordPage })),
+)
+export const CriticalDetailPage = lazy(() =>
+  import('../features/critical/CriticalDetailPage').then((m) => ({ default: m.CriticalDetailPage })),
+)
+export const CriticalDashboardPage = lazy(() =>
+  import('../features/critical/CriticalDashboardPage').then((m) => ({ default: m.CriticalDashboardPage })),
+)
+export const CriticalLogbookPage = lazy(() =>
+  import('../features/critical/CriticalLogbookPage').then((m) => ({ default: m.CriticalLogbookPage })),
+)
+export const CriticalSettingsPage = lazy(() =>
+  import('../features/critical/CriticalSettingsPage').then((m) => ({ default: m.CriticalSettingsPage })),
+)
+export const CriticalScreenPage = lazy(() =>
+  import('../features/critical/CriticalScreenPage').then((m) => ({ default: m.CriticalScreenPage })),
+)
 export const TestAssignmentsPage = lazy(() =>
   import('../features/testing/TestAssignmentsPage').then((m) => ({ default: m.TestAssignmentsPage })),
 )

@@ -1,6 +1,7 @@
 import { Flex, Spin } from 'antd'
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
+import { SCREEN_PATH, isDisplayOnly } from '../features/critical/criticalUtils'
 import { SIGNING_PATH, signingSession } from '../features/signing/signingSession'
 import { ForbiddenPage } from '../pages/ForbiddenPage'
 import { useAuth } from './authContext'
@@ -58,6 +59,15 @@ export function RedirectKioskAccount({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   if (user?.roles.some((role) => role.code === KIOSK_ROLE_CODE)) {
     return <Navigate to={KIOSK_PATH} replace />
+  }
+  return children
+}
+
+/** Tài khoản màn hình theo dõi kết quả nguy cấp tại khoa (quyết định 60) chỉ dùng màn hình theo dõi. */
+export function RedirectDisplayAccount({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (isDisplayOnly(user?.permissions)) {
+    return <Navigate to={SCREEN_PATH} replace />
   }
   return children
 }
