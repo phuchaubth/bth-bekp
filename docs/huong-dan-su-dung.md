@@ -17,7 +17,8 @@
 9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
 10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
 11. [Sổ nội kiểm đường huyết tại giường](#noi-kiem): khoa ghi kết quả từng ngày, Khoa HSH xem xét và xác nhận sổ tháng, in PDF theo mẫu; [dashboard giám sát](#dashboard-noi-kiem)
-12. [Câu hỏi thường gặp](#hoi-dap)
+12. [Kết quả nguy cấp](#ket-qua-nguy-cap): khoa cận lâm sàng ghi kết quả và lần báo, khoa điều trị xác nhận đã nhận, bác sĩ ghi hướng xử trí, cảnh báo đỏ chớp tắt và chuông, [màn hình theo dõi tại khoa](#man-hinh-kqnc), sổ ST01, ST02, sổ Vi sinh in PDF, dashboard QLCL
+13. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
 
@@ -1062,7 +1063,7 @@ Bấm **Quản trị** → **Vai trò và quyền**. Cột trái liệt kê các
 **Sửa quyền của vai trò:**
 
 1. Chọn vai trò ở cột trái.
-2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**, **Kiểm thử**, **Nội kiểm đường huyết** (mục 11).
+2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**, **Kiểm thử**, **Nội kiểm đường huyết** (mục 11), **Kết quả nguy cấp** (mục 12).
 3. Bấm **Lưu thay đổi** (hoặc **Hủy thay đổi** để bỏ).
 
 **Thêm vai trò** (ví dụ vai trò cho Ban giám đốc, Dược sĩ lâm sàng):
@@ -1120,7 +1121,16 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 **Tên đơn vị in trên phiếu.** Nhập **Cơ quan chủ quản**, **Tên bệnh viện**, **Địa danh** (in ở dòng ngày tháng, ví dụ "Hà Nội, ngày … tháng … năm …"), bấm **Lưu**. Phiếu in sau khi lưu dùng tên mới. PDF đã ký giữ nguyên. Khi chưa nhập, phiếu dùng giá trị mẫu như trong ảnh. Hãy nhập tên đơn vị thật trước khi đưa vào sử dụng.
 
-**Logo bệnh viện.** Bấm **Tải logo lên** (hoặc **Thay logo**), chọn ảnh PNG hoặc JPG, tối đa 1 MB, nên là ảnh vuông nền trắng hoặc trong suốt, rộng từ 300 điểm ảnh. Logo in ở góc trên bên trái mọi phiếu tạo sau khi lưu. Bấm **Bỏ logo** để bỏ.
+**Logo bệnh viện.** Bấm **Tải logo lên** (hoặc **Thay logo**), chọn ảnh PNG hoặc JPG, tối đa 1 MB, nên là ảnh vuông nền trắng hoặc trong suốt, rộng từ 300 điểm ảnh. Bấm **Bỏ logo** để bỏ. Logo dùng ở:
+
+- góc trên bên trái PDF phiếu đồng thuận, sổ nội kiểm, sổ kết quả nguy cấp tạo sau khi lưu;
+- **logo của phần mềm trên web** (quyết định 61): thanh trên cùng, trang đăng nhập, biểu tượng trên thẻ trình duyệt. Máy đang mở phần mềm thấy logo mới khi tải lại trang. Chưa có logo thì phần mềm dùng biểu tượng mặc định.
+
+![Thanh trên cùng có logo bệnh viện](huong-dan-su-dung/logo-01-thanh-tren.png)
+
+<img src="huong-dan-su-dung/logo-02-dang-nhap.png" alt="Trang đăng nhập có logo bệnh viện" width="320">
+
+*Hình 8.6a. Logo bệnh viện (logo giả lập) trên thanh trên cùng và trang đăng nhập.*
 
 ![Cấu hình tên đơn vị và logo](huong-dan-su-dung/96-cau-hinh-ten-don-vi-logo.png)
 
@@ -1711,9 +1721,271 @@ Người chỉ có quyền xem dashboard (lãnh đạo, Phòng Điều dưỡng,
 
 ---
 
+<a id="ket-qua-nguy-cap"></a>
+
+## 12. Kết quả nguy cấp
+
+Phần mềm thay các sổ giấy của quy trình thông báo kết quả nguy cấp (quyết định 60):
+
+- sổ của khoa cận lâm sàng (ST01);
+- sổ của khoa điều trị (ST02);
+- sổ thông báo qua điện thoại của Khoa Vi sinh.
+
+Khoa cận lâm sàng vẫn **gọi điện** báo khoa điều trị như hiện nay, rồi ghi **một lần** vào phần mềm. Sổ của khoa báo và sổ ST02 của khoa nhận cùng lấy từ hồ sơ đó. Người nghe máy ở khoa điều trị bấm xác nhận đã nhận. Bác sĩ tự ghi hướng xử trí bằng tài khoản của mình, thay chữ ký ở sổ ST02.
+
+**Hai mốc thời gian** (thông số mặc định, QLCL sửa được ở mục 12.10):
+
+- báo khoa điều trị trong **10 phút** kể từ giờ có kết quả;
+- bác sĩ ghi hướng xử trí ban đầu trong **10 phút** kể từ giờ khoa điều trị nhận cuộc gọi.
+
+Mỗi hồ sơ giữ thời hạn áp dụng lúc ghi: sửa thông số sau này không làm đổi hạn của hồ sơ đã có.
+
+| Ai | Làm gì | Ở đâu (menu **KQ nguy cấp**) |
+|---|---|---|
+| Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, hủy hồ sơ báo nhầm, in sổ của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp** |
+| Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi**, **Không phải khoa tôi**, in sổ ST02 | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp** |
+| Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa | **Gửi đến khoa tôi** |
+| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
+| Màn hình đặt tại khoa: tài khoản vai trò **Màn hình theo dõi KQNC** | Chỉ xem kết quả gửi đến khoa, không thao tác | Tự mở **màn hình theo dõi** (mục 12.7) |
+
+Quyền của điều dưỡng, bác sĩ do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**. Người dùng phải được đặt đúng khoa ở hồ sơ người dùng: mỗi khoa chỉ thấy hồ sơ của khoa mình.
+
+**Trạng thái hồ sơ:**
+
+- **Chờ gọi báo**: đã có kết quả, chưa báo khoa điều trị.
+- **Chờ khoa xác nhận**: đã gọi báo, người nghe máy chưa bấm **Đã nhận cuộc gọi**.
+- **Chờ bác sĩ xử trí**: khoa đã xác nhận, bác sĩ chưa ghi hướng xử trí.
+- **Hoàn tất**.
+- **Đã hủy**: báo nhầm. Hồ sơ không bị xóa (mục 12.6).
+
+Mọi thao tác đều ghi **Nhật ký hệ thống** (mục 7.1). Không có nút xóa. Giờ hệ thống ghi riêng với giờ anh chị nhập. Một bước ghi sau giờ sự việc quá **30 phút** (ví dụ ghi bù khi mất mạng) thì hồ sơ có nhãn **Ghi bù**.
+
+### 12.1. Khoa tôi báo (khoa cận lâm sàng)
+
+Bấm **KQ nguy cấp** → **Khoa tôi báo**. Đây là bàn làm việc của khoa:
+
+- Ba ô trên cùng:
+  - **Chờ gọi báo**, kèm số hồ sơ sắp quá hạn;
+  - **Đã báo, khoa điều trị chưa xong**, kèm số hồ sơ bác sĩ quá hạn xử trí;
+  - **Hôm nay đã báo**, kèm thời gian trung vị từ lúc có kết quả đến lúc báo.
+- Danh sách **Đang chờ**: mỗi hồ sơ có **đồng hồ đếm ngược** đến hạn báo hoặc hạn bác sĩ xử trí. Đồng hồ màu cam khi còn ít hơn 3 phút, màu đỏ khi đã quá hạn.
+- Bảng **Vừa xong**: hồ sơ hoàn tất hoặc đã hủy trong 24 giờ.
+
+Hồ sơ **Chờ gọi báo** có nút **Ghi lần báo**. Gọi được rồi thì bấm nút này, ghi như phần 3 ở mục 12.2. Hồ sơ bị khoa nhận trả lại cũng quay về đây để báo lại đúng khoa.
+
+Có hồ sơ quá hạn báo thì mọi trang của tài khoản khoa báo hiện **dải màu cam** "… kết quả nguy cấp quá hạn báo", kèm nút **Xem ngay**.
+
+![Khoa tôi báo: ba ô số, hồ sơ đang chờ có đồng hồ đếm ngược](huong-dan-su-dung/kq-01-khoa-toi-bao.png)
+
+*Hình 12.1. Khoa Huyết học – Sinh hóa: một hồ sơ chờ gọi báo, hai hồ sơ khoa điều trị chưa xong, trong đó một hồ sơ bác sĩ đã quá hạn xử trí (dữ liệu giả lập).*
+
+### 12.2. Ghi kết quả nguy cấp (khoa cận lâm sàng)
+
+Bấm **Ghi kết quả nguy cấp**. Bên phải trang có:
+
+- khung **Thời hạn báo**: đồng hồ đếm ngược, tính từ giờ có kết quả;
+- khung **Kịch bản gọi điện**: 5 bước, câu nói được điền sẵn theo hồ sơ đang ghi. Đọc theo kịch bản khi gọi.
+
+1. **Người bệnh**:
+   - Nhập **Mã người bệnh**. Bệnh viện đã kết nối API thông tin người bệnh thì bấm **Tra HIS** để điền sẵn họ tên, ngày sinh, giới tính, địa chỉ; hồ sơ có nhãn **Lấy từ HIS**.
+   - HIS lỗi, không tìm thấy, hoặc bệnh viện chưa kết nối HIS: nhập tay họ tên, ngày sinh, địa chỉ. Hồ sơ có nhãn **Nhập tay**.
+   - Địa chỉ là thông tin đối chiếu thứ ba khi gọi điện (cùng họ tên, ngày sinh), mặc định bắt buộc.
+2. **Kết quả nguy cấp**:
+   - Chọn **xét nghiệm, kỹ thuật** trong danh mục. Khung bên dưới hiện **khoảng nguy cấp theo danh mục**. Người ghi tự đối chiếu như quy trình hiện nay; phần mềm không tự đánh giá giá trị.
+   - Nhập **Giá trị**, **Ngày chỉ định**, **Giờ có kết quả**. Ô **Đơn vị** điền sẵn theo danh mục. Kết quả ghi bằng chữ (ví dụ cấy máu, siêu âm) thì không có đơn vị.
+   - Xét nghiệm của sổ Khoa Vi sinh có thêm ô **SID** (bắt buộc) và **Mẫu khẩn**.
+3. **Đã báo cho khoa điều trị**:
+   - Chọn **Cách báo**: **Gọi điện**, hoặc **Trực tiếp tại khoa** khi không liên lạc được qua điện thoại và phải cử người đến khoa.
+   - Chọn **Khoa nhận**, nhập **Người nghe máy** (họ tên, chức danh như người nghe máy tự giới thiệu), **Giờ báo** (nút **Bây giờ**).
+   - **Người nhận đọc lại tên kết quả, giá trị, đơn vị**: người nhận đọc lại sai thì bấm **Không chính xác**, đọc lại kết quả, nghe người nhận đọc lại lần nữa, đúng thì bấm **Chính xác**. Chỉ lưu được khi đã chọn **Chính xác**. Số lần đọc sai vẫn lưu trong lịch sử hồ sơ.
+   - Sổ Khoa Vi sinh: đánh dấu **đã nhắc lại 2 lần** (bắt buộc).
+   - **Người báo** là tài khoản đang đăng nhập.
+4. Bấm **Lưu, đã báo**. Chưa gọi được thì bấm **Lưu, gọi sau**: hồ sơ vào **Khoa tôi báo**, đồng hồ hạn báo vẫn chạy.
+
+![Ghi kết quả nguy cấp: người bệnh, kết quả, lần báo; bên phải là thời hạn báo và kịch bản gọi điện](huong-dan-su-dung/kq-02-ghi-ket-qua.png)
+
+*Hình 12.2. Ghi kết quả Kali 6,7 mmol/L và lần báo cho Khoa Nội tổng hợp; kịch bản gọi điện điền sẵn theo hồ sơ (dữ liệu giả lập).*
+
+### 12.3. Gửi đến khoa tôi (khoa điều trị)
+
+Bấm **KQ nguy cấp** → **Gửi đến khoa tôi**. Trang có ba cột:
+
+- **Chờ khoa xác nhận** (đỏ). Mỗi thẻ ghi người bệnh, kết quả, khoảng nguy cấp, khoa báo, người báo, giờ có kết quả, giờ báo, người nghe máy. Thẻ có đồng hồ **BS xử trí** đếm ngược.
+- **Chờ bác sĩ xử trí** (cam). Hồ sơ quá hạn có dòng nhắc: nhắc lại và báo trực tiếp bác sĩ.
+- **Vừa xong**: hồ sơ hoàn tất hoặc đã hủy trong 24 giờ.
+
+Người nghe máy làm như sau:
+
+1. Nghe máy, đọc lại kết quả cho người báo.
+2. Mở thẻ hồ sơ mới, kiểm tra đúng người bệnh của khoa, bấm **Đã nhận cuộc gọi** bằng **tài khoản của mình**.
+3. Báo ngay bác sĩ điều trị.
+
+Người bệnh không điều trị tại khoa, hoặc thông tin không khớp: bấm **Không phải khoa tôi**, chọn hoặc ghi lý do, bấm **Gửi trả khoa báo**. Hồ sơ trở về khoa báo để báo lại đúng khoa.
+
+![Gửi đến khoa tôi: chờ khoa xác nhận, chờ bác sĩ xử trí, vừa xong; dải đỏ trên cùng](huong-dan-su-dung/kq-03-khoa-nhan.png)
+
+*Hình 12.3. Khoa Nội tổng hợp: một hồ sơ mới chờ khoa xác nhận, một hồ sơ bác sĩ quá hạn xử trí, ba hồ sơ vừa xong (một hồ sơ đã hủy).*
+
+**Cảnh báo trên mọi trang** cho tài khoản điều dưỡng, bác sĩ của khoa nhận (tự cập nhật mỗi 15 giây):
+
+- Có hồ sơ chờ khoa xác nhận: **dải đỏ chớp tắt** "… kết quả nguy cấp chờ khoa xác nhận", ghi người bệnh, kết quả, khoa báo, thời gian bác sĩ còn lại. **Chuông** kêu khi có hồ sơ mới, nhắc lại mỗi 60 giây đến khi khoa xác nhận.
+- Có hồ sơ bác sĩ quá hạn xử trí: **dải màu cam**.
+- Bấm **Xem ngay** để mở trang **Gửi đến khoa tôi**.
+
+Về chuông:
+
+- Trình duyệt chỉ cho phát âm thanh sau khi người dùng bấm hoặc gõ phím trên trang. Sau khi đăng nhập, bấm một chỗ bất kỳ hoặc bấm nút **Bật chuông** trên dải đỏ.
+- **Tắt tiếng** chỉ tắt chuông trên máy đang dùng (máy nhớ lựa chọn này). Bấm **Bật tiếng** để nghe lại. Dải đỏ vẫn hiện.
+- Chuông, chớp tắt, nhịp nhắc lại do QLCL đặt (mục 12.10).
+
+### 12.4. Bác sĩ ghi hướng xử trí
+
+1. Mở hồ sơ: bấm **Bác sĩ ghi hướng xử trí** trên thẻ hồ sơ, hoặc **Xem ngay** trên dải cảnh báo. Dùng được trên điện thoại.
+2. Nhập **Hướng xử trí ban đầu**.
+3. **Giờ xử trí**: **Bây giờ**, hoặc **Đã xử trí lúc khác** rồi chọn giờ. Giờ xử trí phải sau giờ khoa nhận cuộc gọi.
+4. Đánh dấu **Đã ghi vào hồ sơ bệnh án** khi đã ghi.
+5. Bấm **Lưu hướng xử trí**. Bác sĩ là tài khoản đang đăng nhập (thay chữ ký cột 9 sổ ST02). Hồ sơ chuyển **Hoàn tất**. Phần mềm báo đã lưu lúc nào, sau bao nhiêu phút kể từ khi khoa nhận cuộc gọi.
+
+Bác sĩ ghi được ngay cả khi người nghe máy chưa bấm **Đã nhận cuộc gọi**: nút là **Xác nhận đã nhận và lưu**, hồ sơ tính là khoa đã nhận lúc bác sĩ lưu.
+
+<img src="huong-dan-su-dung/kq-04-bac-si-dien-thoai.png" alt="Bác sĩ ghi hướng xử trí trên điện thoại" width="360">
+
+*Hình 12.4. Bác sĩ ghi hướng xử trí trên điện thoại; dải đỏ trên cùng báo còn một hồ sơ chờ khoa xác nhận.*
+
+### 12.5. Chi tiết hồ sơ
+
+Bấm **Xem hồ sơ** ở các danh sách. Trang chi tiết có:
+
+- **Diễn biến**: có kết quả, từng lần báo (người báo, người nhận, đọc lại), trả lại, khoa xác nhận, bác sĩ xử trí, hủy. Mỗi mốc ghi giờ và người làm.
+- **Hai mốc 10 phút**: báo, xử trí, mỗi mốc ghi số phút và đúng hạn hay trễ.
+- **Ghi sổ**: sổ và tháng mà hồ sơ được ghi vào. Bấm để mở sổ.
+- **Thông số áp dụng cho hồ sơ này**: thời hạn lúc ghi.
+- Các nút làm tiếp theo bước của hồ sơ và quyền của người xem: **Ghi lần báo**, **Hủy hồ sơ báo nhầm** (khoa báo); **Đã nhận cuộc gọi**, **Không phải khoa tôi** (khoa nhận); khung **Bác sĩ ghi hướng xử trí** (bác sĩ).
+
+![Chi tiết hồ sơ hoàn tất: diễn biến, hai mốc 10 phút, ghi sổ](huong-dan-su-dung/kq-05-chi-tiet.png)
+
+*Hình 12.5. Hồ sơ hoàn tất: báo sau 4 phút, bác sĩ xử trí sau 7 phút, đều đúng hạn (dữ liệu giả lập).*
+
+### 12.6. Hủy hồ sơ báo nhầm (khoa báo)
+
+Ghi nhầm người bệnh, nhầm kết quả: khoa báo mở hồ sơ, bấm **Hủy hồ sơ báo nhầm**, ghi **Lý do hủy** (bắt buộc), bấm **Hủy hồ sơ**.
+
+- Hồ sơ đã báo khoa điều trị: **gọi ngay khoa nhận** để hủy thông tin đã báo, đánh dấu **Đã gọi báo … về việc hủy**, rồi mới hủy được.
+- Hồ sơ không bị xóa. Sổ in dòng này **gạch ngang** kèm lý do, người hủy, giờ hủy. Dashboard đếm hồ sơ hủy riêng, không tính vào tỷ lệ đúng hạn.
+- Ghi lại hồ sơ đúng như mục 12.2.
+
+<img src="huong-dan-su-dung/kq-06-huy.png" alt="Hộp Hủy hồ sơ báo nhầm" width="420">
+
+*Hình 12.6. Hủy hồ sơ báo nhầm: lý do và xác nhận đã gọi báo khoa nhận về việc hủy.*
+
+<a id="man-hinh-kqnc"></a>
+
+### 12.7. Màn hình theo dõi tại khoa (TV)
+
+Màn hình đặt ở khoa điều trị (TV hoặc màn hình lớn) hiện kết quả nguy cấp gửi đến khoa, **tự cập nhật** mỗi 15 giây:
+
+- **Chờ khoa xác nhận**, **Chờ bác sĩ xử trí**, mỗi hồ sơ có đồng hồ đếm ngược;
+- danh sách vừa xong, số hồ sơ hôm nay và số đã xong, đồng hồ;
+- **dải đỏ chớp tắt** "KẾT QUẢ NGUY CẤP MỚI" và chuông khi có hồ sơ chờ khoa xác nhận.
+
+Màn hình chỉ để xem, không có nút thao tác. Người nghe máy vẫn bấm **Đã nhận cuộc gọi** bằng tài khoản của mình trên máy tính hoặc điện thoại. Để giữ bí mật thông tin người bệnh, màn hình chỉ hiện **tên viết tắt** (ví dụ N.T.M), năm sinh và 4 số cuối mã người bệnh. QLCL bật được họ tên đầy đủ (mục 12.10).
+
+Cách mở:
+
+- Tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy đặt ở khoa theo tài liệu triển khai, mục 5.14.
+- Điều dưỡng, bác sĩ mở bằng nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**.
+- Sau khi mở, **bấm vào màn hình một lần** để bật chuông (dòng **Bấm để bật chuông**).
+
+![Màn hình theo dõi tại khoa: tên viết tắt, đồng hồ đếm ngược, dải đỏ chớp tắt](huong-dan-su-dung/kq-07-man-hinh-khoa.png)
+
+*Hình 12.7. Màn hình theo dõi của Khoa Nội tổng hợp (1920×1080): một hồ sơ mới chờ khoa xác nhận, một hồ sơ bác sĩ quá hạn (dữ liệu giả lập).*
+
+### 12.8. Sổ kết quả nguy cấp, in PDF
+
+Bấm **KQ nguy cấp** → **Sổ kết quả nguy cấp**:
+
+1. Chọn **Mẫu sổ**:
+   - **ST01**: sổ của khoa cận lâm sàng báo;
+   - **ST02**: sổ của khoa điều trị nhận;
+   - **Sổ Khoa Vi sinh**.
+
+   Mỗi xét nghiệm trong danh mục ghi vào sổ ST01 hoặc sổ Khoa Vi sinh của khoa báo (mục 12.10).
+2. Chọn **Khoa** và **Tháng**. Khoa chỉ xem sổ của khoa mình. QLCL xem mọi khoa.
+3. Trang hiện sổ đúng các cột của sổ giấy, mỗi hồ sơ một dòng, lấy từ hồ sơ điện tử (không nhập lại). Hồ sơ đã hủy in **gạch ngang** kèm dòng ghi chú lý do.
+4. Bấm **In PDF (A4 ngang)**. Tên đơn vị, logo lấy từ *Cấu hình hệ thống* (mục 8.5). Mã số sổ lấy từ thông số (mục 12.10).
+
+![Sổ ST02 của khoa điều trị: mỗi hồ sơ một dòng như sổ giấy](huong-dan-su-dung/kq-09-so-st02.png)
+
+*Hình 12.8. Sổ ST02 tháng 11 của Khoa Nội tổng hợp; dòng đã hủy in gạch ngang kèm lý do (dữ liệu giả lập).*
+
+![PDF sổ ST01 của khoa cận lâm sàng, A4 ngang](huong-dan-su-dung/kq-12-pdf-st01.png)
+
+*Hình 12.9. Trang 1 PDF sổ ST01 tháng 11 của Khoa Huyết học – Sinh hóa (tên đơn vị đang là giá trị mẫu, logo giả lập).*
+
+### 12.9. Dashboard (QLCL)
+
+Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. Các phần của trang:
+
+- Năm ô chỉ số, so với mục tiêu (ô có dấu cảnh báo khi chưa đạt):
+  - **Kết quả nguy cấp**: số hồ sơ, kèm số hồ sơ đã hủy (đếm riêng, không tính vào tỷ lệ);
+  - **Báo trong 10 phút**: số hồ sơ báo đúng hạn trên số hồ sơ đã báo hoặc đã quá hạn báo;
+  - **BS xử trí trong 10 phút**: số hồ sơ bác sĩ xử trí đúng hạn trên số hồ sơ đã xử trí hoặc đã quá hạn xử trí;
+  - **Đọc lại chính xác lần đầu**: lần báo mà người nhận đọc lại đúng ngay lần đầu;
+  - **Hồ sơ đủ các bước**: số hồ sơ hoàn tất trên số hồ sơ đã hoàn tất hoặc đã quá hạn.
+- **Thời gian trung vị**: từ lúc có kết quả đến lúc báo, từ lúc khoa nhận đến lúc bác sĩ xử trí, kèm khoảng Q1–Q3.
+- Hai biểu đồ 12 tháng (tỷ lệ báo đúng hạn, tỷ lệ bác sĩ xử trí đúng hạn), có đường nét đứt là mục tiêu. Rê chuột vào điểm để xem số; bấm **Xem bảng** để đọc số.
+- Bảng **Theo khoa báo** (sổ ST01, sổ Vi sinh) và **Theo khoa nhận** (sổ ST02): số hồ sơ, tỷ lệ đúng hạn, trung vị, số hồ sơ đang chờ.
+- **Trường hợp quá hạn trong kỳ**: tối đa 50 trường hợp gần nhất, tên người bệnh viết tắt, mốc quá hạn. Bấm **Xem hồ sơ** để mở. Dùng cho phân tích nguyên nhân hằng quý.
+
+![Dashboard kết quả nguy cấp tháng 11](huong-dan-su-dung/kq-08-dashboard.png)
+
+*Hình 12.10. Dashboard tháng 11: 17 hồ sơ, báo đúng hạn 93,8% (chưa đạt mục tiêu 95%), bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
+
+### 12.10. Danh mục và cấu hình (QLCL)
+
+Bấm **KQ nguy cấp** → **Danh mục và cấu hình**. Sửa khi vận hành, không cần cài bản mới. Mỗi lần lưu đều ghi nhật ký hệ thống (giá trị cũ và mới).
+
+**Tab Thông số vận hành.** Sửa rồi bấm **Lưu thay đổi**, hoặc bấm **Hoàn tác** để bỏ.
+
+| Thông số | Mặc định | Ý nghĩa |
+|---|---|---|
+| Thời hạn báo kết quả | 10 phút | Tính từ giờ có kết quả |
+| Thời hạn bác sĩ xử trí ban đầu | 10 phút | Tính từ giờ khoa nhận cuộc gọi |
+| Ngưỡng ghi bù | 30 phút | Ghi sau giờ sự việc quá số phút này thì hồ sơ có nhãn **Ghi bù** |
+| Báo sắp quá hạn khi còn | 3 phút | Đồng hồ chuyển màu cam; phải ít hơn cả hai thời hạn |
+| Chu kỳ tự kiểm tra hồ sơ mới | 15 giây | Dải cảnh báo, bàn làm việc, màn hình theo dõi tự cập nhật theo chu kỳ này |
+| Chuông báo; Nhắc lại chuông | Bật; 60 giây | Chuông khi có hồ sơ mới; nhắc lại khi còn hồ sơ chờ khoa xác nhận (0 là không nhắc lại) |
+| Chớp tắt dải cảnh báo; Nhịp chớp tắt | Bật; 1200 ms | Từ 1000 ms trở lên (không quá một lần mỗi giây), an toàn cho người nhạy cảm với ánh sáng nhấp nháy. Máy đặt chế độ giảm chuyển động thì dải không chớp |
+| Giữ hồ sơ hoàn tất trên bàn làm việc | 24 giờ | Sau thời gian này xem hồ sơ trong sổ |
+| Màn hình theo dõi hiện họ tên đầy đủ | Tắt (tên viết tắt) | |
+| Bắt buộc địa chỉ người bệnh | Bắt buộc | Thông tin đối chiếu thứ ba khi gọi điện |
+| Mục tiêu dashboard | 95%, 90%, 98%, 98% | Báo đúng hạn, bác sĩ xử trí đúng hạn, đọc lại chính xác lần đầu, hồ sơ đủ các bước |
+| Mã số sổ (in trên PDF) | QT-KQNC/ST01, QT-KQNC/ST02, QT-VS-21/ST02 | Theo mã số sổ giấy bệnh viện đang dùng |
+
+![Thông số vận hành](huong-dan-su-dung/kq-10-cau-hinh.png)
+
+*Hình 12.11. Tab Thông số vận hành với giá trị mặc định.*
+
+**Tab Danh mục kết quả nguy cấp.** Bấm **Thêm mục**, hoặc **Sửa** ở từng dòng:
+
+- **Xét nghiệm, kỹ thuật**;
+- **Khoảng nguy cấp: người lớn**, **trẻ em (nếu khác)**;
+- **Kiểu kết quả**: số kèm **Đơn vị**, hoặc ghi bằng chữ;
+- **Khoa thực hiện**, **Thứ tự**;
+- **Ghi vào sổ của khoa báo**: sổ ST01 hoặc sổ Khoa Vi sinh;
+- **Trạng thái**.
+
+Khi cài mới, danh mục **trống**: QLCL nhập danh mục theo phụ lục danh mục kết quả nguy cấp của quy trình đang hiệu lực trước khi các khoa dùng (khoa cận lâm sàng chưa ghi được hồ sơ khi danh mục trống). Rà soát danh mục định kỳ theo quy trình. Mục cũ thì sửa hoặc tắt **Trạng thái** (ngưng dùng), không xóa, để giữ hồ sơ đã ghi.
+
+![Danh mục kết quả nguy cấp](huong-dan-su-dung/kq-11-danh-muc.png)
+
+*Hình 12.12. Danh mục kết quả nguy cấp trên máy thử (các mục ví dụ, giả lập).*
+
+---
+
 <a id="hoi-dap"></a>
 
-## 12. Câu hỏi thường gặp
+## 13. Câu hỏi thường gặp
 
 **Tôi quên mật khẩu thì làm sao?**
 Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục 8.1). Bạn đăng nhập bằng mật khẩu tạm rồi đổi mật khẩu mới.
@@ -1809,3 +2081,19 @@ Tài khoản cần quyền *Ghi kết quả nội kiểm đường huyết của
 
 **Ghi nhầm kết quả nội kiểm mà không còn nút Ghi điều chỉnh?**
 Ngày đó Khoa HSH đã xem xét, hoặc khoa đã gửi sổ tháng. Báo Khoa HSH **trả lại ngày** (hoặc trả lại sổ), rồi ghi điều chỉnh có lý do (mục 11.4). Sổ đã được Khoa HSH xác nhận thì không thay đổi được nữa.
+
+**Có kết quả nguy cấp gửi đến khoa mà máy không kêu chuông?**
+Kiểm tra lần lượt:
+
+- Đã bấm vào trang ít nhất một lần sau khi mở chưa (trình duyệt chặn âm thanh trước lần bấm đầu), hoặc bấm **Bật chuông** trên dải đỏ.
+- Nút trên dải đỏ có đang ghi **Bật tiếng** không (máy này đã tắt tiếng): bấm để nghe lại.
+- Loa máy tính đã bật chưa, âm lượng của trình duyệt có bị tắt không.
+- QLCL có tắt **Chuông báo** ở thông số vận hành không (mục 12.10).
+
+Dải đỏ chớp tắt vẫn hiện dù không có chuông.
+
+**Màn hình theo dõi tại khoa không đổi, hoặc báo mất kết nối?**
+Màn hình tự cập nhật mỗi 15 giây và ghi giờ cập nhật gần nhất. Giờ đó đứng yên thì kiểm tra mạng của máy, rồi bấm F5. Trang đăng nhập hiện ra thì đăng nhập lại bằng tài khoản màn hình của khoa.
+
+**Không thấy menu KQ nguy cấp, hoặc không thấy hồ sơ gửi đến khoa?**
+Tài khoản cần quyền trong nhóm **Kết quả nguy cấp** (quản trị thêm cho vai trò ở mục 8.3) và phải được đặt đúng khoa (mục 8.1). Khoa báo chọn nhầm khoa nhận thì hồ sơ nằm ở khoa khác: khoa đó bấm **Không phải khoa tôi** để trả lại.

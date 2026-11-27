@@ -659,6 +659,61 @@ Sau khi cài, quản trị làm một lần:
 
 Lưu ý: không có lệnh xóa sổ, kết quả hay lần xem xét (ghi sai thì ghi điều chỉnh có lý do; kết quả cũ vẫn giữ). Script xóa dữ liệu chạy thử (mục 5.11) **không xóa** dữ liệu nội kiểm: chạy thử nội kiểm trên môi trường UAT (mục 5.10).
 
+### 5.14. Kết quả nguy cấp (quyết định 60) và logo phần mềm trên web (quyết định 61)
+
+Quản lý thông báo kết quả nguy cấp, thay các sổ giấy ST01, ST02 và sổ Khoa Vi sinh (menu **KQ nguy cấp**; hướng dẫn sử dụng, mục 12).
+
+Bản này kèm migration `AddCriticalResults`: 3 bảng mới `CriticalTests`, `CriticalResults`, `CriticalNotifications` và sequence `CriticalResultNumbers`. Migration chỉ thêm, không đổi dữ liệu cũ. Chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`.
+
+Khi khởi động, phần mềm tự tạo 3 vai trò mới:
+
+- **Khoa cận lâm sàng (KQNC)**: mã `CRITICAL_LAB`, quyền `critical.record`;
+- **QLCL (kết quả nguy cấp)**: mã `CRITICAL_QA`, quyền `critical.monitor`, `critical.manage`;
+- **Màn hình theo dõi KQNC**: mã `CRITICAL_DISPLAY`, quyền `critical.display`.
+
+Quản trị hệ thống tự có mọi quyền mới.
+
+Sau khi cài, quản trị làm một lần:
+
+1. **Quyền cho khoa điều trị.** Vai trò có sẵn **không tự thêm quyền mới**, vì quản trị có thể đã sửa quyền (CSDL cài mới thì đã có sẵn). Vào *Quản trị → Vai trò và quyền*, nhóm **Kết quả nguy cấp**:
+   - vai trò **Điều dưỡng**: đánh dấu *Khoa điều trị: xem kết quả nguy cấp gửi đến khoa, xác nhận đã nhận* (`critical.receive`);
+   - vai trò **Bác sĩ**: đánh dấu `critical.receive` và *Bác sĩ: ghi hướng xử trí kết quả nguy cấp gửi đến khoa* (`critical.treat`);
+   - bấm **Lưu**.
+
+   Quyền mới có hiệu lực khi người dùng đăng nhập lại (hoặc tối đa 15 phút). Người dùng phải được đặt **đúng khoa** (khoa chính hoặc *Khoa/phòng khác*, mục 5.8): mỗi khoa chỉ thấy hồ sơ gửi đến khoa mình.
+2. **Tài khoản khoa cận lâm sàng, QLCL.** *Quản trị → Người dùng*:
+   - gán vai trò **Khoa cận lâm sàng (KQNC)** cho người báo kết quả ở các khoa xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh (đặt đúng khoa);
+   - gán vai trò **QLCL (kết quả nguy cấp)** cho Phòng Quản lý chất lượng;
+   - lãnh đạo, Phòng KHTH chỉ cần xem: thêm quyền *Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)* (`critical.monitor`) cho vai trò của họ.
+3. **Danh mục và thông số** (QLCL, trước khi các khoa dùng): *KQ nguy cấp → Danh mục và cấu hình*.
+   - Danh mục **trống** khi cài: nhập theo phụ lục danh mục kết quả nguy cấp của quy trình đang hiệu lực (xét nghiệm, kỹ thuật; khoảng nguy cấp người lớn, trẻ em; đơn vị; ghi vào sổ ST01 hay sổ Khoa Vi sinh). Danh mục trống thì khoa cận lâm sàng chưa ghi được hồ sơ.
+   - Kiểm tra thông số vận hành (mặc định: báo trong 10 phút, bác sĩ xử trí trong 10 phút, chuông và chớp tắt bật, mục tiêu 95/90/98/98%) và **mã số sổ** in trên PDF (mặc định `QT-KQNC/ST01`, `QT-KQNC/ST02`, `QT-VS-21/ST02`).
+4. **Máy tính của khoa điều trị.** Dải cảnh báo đỏ có chuông. Máy ở phòng hành chính, phòng điều dưỡng cần bật loa. Trình duyệt chỉ cho phát âm thanh sau khi người dùng bấm hoặc gõ phím trên trang: sau khi đăng nhập, bấm một chỗ bất kỳ (hoặc nút **Bật chuông** trên dải đỏ).
+5. **Màn hình theo dõi tại khoa (TV)**, cho khoa muốn đặt màn hình:
+   - **Thiết bị:** màn hình hoặc TV Full HD (1920×1080) có loa, máy tính nhỏ chạy Windows với Chrome hoặc Edge bản mới, nối mạng nội bộ. Tắt chế độ ngủ của Windows (*Settings → System → Power*: *Screen* và *Sleep* = *Never*).
+   - **Tài khoản:** *Quản trị → Người dùng → Thêm*, ví dụ `manhinh.noi`. **Khoa** là khoa đặt màn hình. Chọn **chỉ vai trò Màn hình theo dõi KQNC** và đặt mật khẩu mạnh. Tài khoản này chỉ xem, không thao tác. Đăng nhập trang nào cũng tự mở màn hình theo dõi. Người bệnh hiện tên viết tắt.
+   - **Mở trình duyệt toàn màn hình khi bật máy:** tạo lối tắt trong thư mục khởi động (`Win + R` → `shell:startup`), đích:
+
+     ```text
+     "C:\Program Files\Google\Chrome\Application\chrome.exe" --kiosk "https://<địa chỉ phần mềm>/man-hinh-kqnc" --autoplay-policy=no-user-gesture-required --no-first-run --disable-features=TranslateUI
+     ```
+
+     Edge dùng tương tự: `msedge.exe --kiosk "https://<địa chỉ phần mềm>/man-hinh-kqnc" --edge-kiosk-type=fullscreen --autoplay-policy=no-user-gesture-required`.
+   - **Về cờ `--autoplay-policy=no-user-gesture-required`:**
+     - Cờ này cho trình duyệt tự phát âm thanh, nên chuông bật ngay mỗi lần máy khởi động lại, không cần ai bấm. Nút trên màn hình ghi **Chuông bật · thử chuông**.
+     - Chỉ đặt cờ cho lối tắt của máy màn hình theo dõi, không đặt cho máy làm việc.
+     - Không đặt cờ thì sau mỗi lần mở phải bấm vào màn hình một lần (nút ghi **Bấm để bật chuông**). Trước khi chạy lối tắt mới, đóng hết cửa sổ trình duyệt đang mở để cờ có hiệu lực.
+   - **Lần đầu:** đăng nhập bằng tài khoản màn hình. Phiên đăng nhập tự gia hạn khi máy chạy. Máy tắt quá 12 giờ thì mở lại sẽ hiện trang đăng nhập: đăng nhập lại.
+   - **Thử trên UAT** (dữ liệu giả lập): tài khoản khoa cận lâm sàng ghi một hồ sơ gửi đến khoa. Màn hình phải hiện dải đỏ chớp tắt, chuông kêu và nhắc lại mỗi 60 giây đến khi khoa bấm **Đã nhận cuộc gọi**.
+
+**Logo phần mềm trên web (quyết định 61):** logo bệnh viện tải lên ở *Quản trị → Cấu hình hệ thống* (mục 8.5 hướng dẫn sử dụng) nay cũng là logo trên thanh trên cùng, trang đăng nhập và biểu tượng thẻ trình duyệt. Không cần cấu hình thêm. Ảnh logo đọc được không cần đăng nhập (`/api/v1/branding/logo`), vì trang đăng nhập phải hiện logo; logo không có dữ liệu cá nhân.
+
+Lưu ý:
+
+- Không có lệnh xóa hồ sơ kết quả nguy cấp. Báo nhầm thì hủy hồ sơ có lý do; hồ sơ vẫn giữ và sổ in gạch ngang.
+- Script xóa dữ liệu chạy thử (mục 5.11) **không xóa** dữ liệu kết quả nguy cấp: chạy thử trên môi trường UAT (mục 5.10).
+- Không có xuất Excel cho sổ và dashboard kết quả nguy cấp: sổ in PDF theo mẫu giấy; dashboard có bảng số liệu (**Xem bảng**).
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).

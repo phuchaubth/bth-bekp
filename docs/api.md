@@ -543,6 +543,8 @@ Mọi phản hồi của API có `Cache-Control: no-store` (trừ ảnh khung ch
 |---|---|---|---|
 | GET | `/api/v1/branding/signature-frame` | Không cần đăng nhập | Khung chữ ký đang dùng `{ contentType, width, height, updatedAtUtc }` (`Cache-Control: no-cache`); chưa có → `404`, khung ký hiện như mặc định |
 | GET | `/api/v1/branding/signature-frame/image` | Không cần đăng nhập | Ảnh khung (`image/png`; khung JPG tải lên từ bản trước trả `image/jpeg`). Giao diện gọi kèm `?v=<updatedAtUtc>` nên ảnh được lưu đệm một ngày (`Cache-Control: public, max-age=86400`); chưa có → `404` |
+| GET | `/api/v1/branding/logo` | Không cần đăng nhập | Logo bệnh viện dùng làm logo phần mềm trên web (quyết định 61): `{ contentType, width, height, updatedAtUtc }` (`Cache-Control: no-cache`); chưa có logo → `404` (`no-store`), giao diện dùng biểu tượng mặc định |
+| GET | `/api/v1/branding/logo/image` | Không cần đăng nhập | Ảnh logo (`image/png` hoặc `image/jpeg`) cho thanh trên cùng, trang đăng nhập, biểu tượng thẻ trình duyệt. Giao diện gọi kèm `?v=<updatedAtUtc>` nên ảnh được lưu đệm một ngày (`Cache-Control: public, max-age=86400`); chưa có → `404` (`no-store`). Logo là ảnh công khai trên trang đăng nhập, không có dữ liệu cá nhân |
 
 ---
 
@@ -671,6 +673,69 @@ Sổ theo dõi kết quả nội kiểm theo mẫu giấy CT-ĐHTG/BM01 (lần b
   - `controlLevels`: các mức dung dịch chứng đang dùng còn hạn; `stripLots`: số lô que thử đang dùng còn hạn.
   - `metersWithoutBook`: máy đang dùng mà khoa đang giữ máy chưa mở sổ tháng này.
   - `pendingBooks`: sổ của 5 tháng trước chưa xác nhận, `{ bookId, month, departmentId, departmentName, meterLabel, status, returned, canOpen }`.
+
+## 6k. Kết quả nguy cấp (`/api/v1/critical-results`, quyết định 60)
+
+Thay sổ giấy của quy trình thông báo kết quả nguy cấp: sổ khoa cận lâm sàng (ST01), sổ khoa điều trị (ST02), sổ Khoa Vi sinh. Khoa cận lâm sàng gọi điện báo khoa điều trị rồi ghi **một lần**; sổ của khoa báo và sổ ST02 của khoa nhận cùng lấy từ hồ sơ. Quyền:
+
+- `critical.record`: khoa cận lâm sàng ghi kết quả, lần báo, hủy hồ sơ báo nhầm của khoa mình;
+- `critical.receive`: khoa điều trị xem kết quả gửi đến khoa mình, xác nhận đã nhận, trả lại lần báo;
+- `critical.treat`: bác sĩ ghi hướng xử trí cho hồ sơ gửi đến khoa mình;
+- `critical.display`: màn hình theo dõi tại khoa, chỉ đọc cảnh báo;
+- `critical.monitor`: xem hồ sơ, sổ, dashboard mọi khoa;
+- `critical.manage`: danh mục và thông số vận hành.
+
+"Khoa mình" là khoa chính hoặc khoa khác của tài khoản; có `scope.all_departments` thì mọi khoa. Giờ gửi lên là UTC (ISO 8601), ngày là ngày của bệnh viện (`yyyy-MM-dd`), tháng dạng `yyyy-MM`. Không có lệnh xóa. Mọi thay đổi ghi nhật ký hệ thống (`CriticalResults.CriticalResult`, `CriticalResults.CriticalNotification`, `CriticalResults.CriticalTest`, `CriticalResults.SettingsUpdated` kèm giá trị cũ và mới, `CriticalResults.LogbookPrinted`).
+
+Lỗi:
+
+- vi phạm quy tắc của quy trình (sai bước, giờ không hợp lệ, hủy khi chưa báo khoa nhận về việc hủy…) → `422 critical.rule` kèm lời nhắn;
+- hai người cùng lúc thay đổi một hồ sơ → người sau nhận `409` (tải lại rồi làm lại);
+- không có quyền với khoa của hồ sơ → `403 critical.forbidden`; không tìm thấy → `404 critical.not_found`.
+
+**Hồ sơ** `{ id, number, status, sendingDepartmentId/Name, receivingDepartmentId/Name, patientCode, patientName, patientInitials, patientDateOfBirth, patientGender, patientAddress, patientSource, testId, testName, testAdultRange, testChildRange, logbook, textResult, value, unit, orderDate, resultAtUtc, sampleId, urgent, notifyDeadlineMinutes, actionDeadlineMinutes, notifyDueAtUtc, notifiedAtUtc, actionDueAtUtc, recordedByName, recordedAtUtc, acknowledgedByName/AtUtc, actionByName, actionAtUtc, actionSummary, recordedInMedicalRecord, actionRecordedAtUtc, cancelledByName/AtUtc, cancelReason, receivingDepartmentInformed, notifiedOnTime, actedOnTime, lateEntry, notifications, can }`:
+
+- `number` dạng `KQNC-yyyy-000001` (sequence `CriticalResultNumbers`).
+- `status`: `AwaitingNotification` (chưa báo hoặc bị trả lại), `AwaitingAcknowledgement`, `AwaitingAction`, `Completed`, `Cancelled`.
+- Hạn: `notifyDueAtUtc` = giờ có kết quả + `notifyDeadlineMinutes`; `actionDueAtUtc` = giờ khoa nhận cuộc gọi + `actionDeadlineMinutes`. Hai thời hạn và ngưỡng ghi bù chép từ thông số lúc ghi; sửa thông số sau này không đổi hồ sơ đã có.
+- `lateEntry`: có bước ghi sau giờ sự việc quá ngưỡng ghi bù.
+- `notifications`: các lần báo `{ id, attemptNo, receivingDepartmentId/Name, method (Phone|InPerson), notifiedAtUtc, receiverName, incorrectReadBacks, repeatedTwice, notifiedByName, recordedAtUtc, rejectedAtUtc, rejectedByName, rejectReason }`.
+- `can` `{ notify, acknowledge, reject, act, cancel }`: người xem làm được gì (giao diện ẩn nút; máy chủ vẫn kiểm tra).
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/settings` | Một quyền `critical.*` bất kỳ | Thông số vận hành `{ notifyMinutes, actionMinutes, warnMinutes, pollSeconds, soundEnabled, soundRepeatSeconds, flashEnabled, flashPeriodMs, keepHours, lateEntryMinutes, requireAddress, displayFullName, targetNotifyPercent, targetActionPercent, targetReadBackPercent, targetCompletePercent, codeLaboratory, codeClinical, codeMicrobiology }` kèm lần sửa cuối |
+| PUT | `/settings` | `critical.manage` | Lưu cả bộ thông số (khóa `Critical.*` trong `SystemSettings`). Lỗi `400` theo từng trường: ngoài khoảng (ví dụ thời hạn 1–120 phút, nhịp chớp tắt 1000–3000 ms, mục tiêu 50–100%); `warnMinutes` phải nhỏ hơn cả hai thời hạn; mã sổ bắt buộc, ≤ 50 ký tự |
+| GET | `/tests` | Một quyền `critical.*` bất kỳ | Danh mục `{ id, name, adultRange, childRange, unit, section, logbook (Laboratory\|Microbiology), textResult, sortOrder, isActive }`; người có `critical.manage` thấy cả mục ngưng dùng |
+| POST | `/tests` | `critical.manage` | `{ name, adultRange, childRange?, unit?, section?, logbook, textResult, sortOrder, isActive }`; kết quả chữ (`textResult`) bỏ qua `unit`. Thiếu tên, khoảng nguy cấp, quá dài → `422 critical.rule` |
+| PUT | `/tests/{id}` | `critical.manage` | Như thêm; ngưng dùng bằng `isActive: false` (không xóa để giữ hồ sơ đã ghi) |
+| GET | `/patient?code=` | `critical.record` | Tra người bệnh trên HIS qua API thông tin người bệnh để điền sẵn: `{ status (Found\|NotFound\|Unavailable…), code, fullName, dateOfBirth, gender, address }`; HIS lỗi hoặc chưa cấu hình thì giao diện cho nhập tay |
+| GET | `/sent?departmentId=` | `critical.record` (khoa mình) hoặc `critical.monitor` | Bàn làm việc khoa báo: hồ sơ đang mở và vừa xong (trong `keepHours`), `{ serverTimeUtc, items }` |
+| GET | `/received?departmentId=` | `critical.receive`, `critical.treat` (khoa mình) hoặc `critical.monitor` | Bàn làm việc khoa nhận, cùng dạng |
+| GET | `/alerts` | Một quyền `critical.*` bất kỳ | Cảnh báo của tài khoản (dải cảnh báo, màn hình theo dõi), giao diện hỏi lại mỗi `pollSeconds`: `{ serverTimeUtc, settings { warnMinutes, pollSeconds, soundEnabled, soundRepeatSeconds, flashEnabled, flashPeriodMs }, receivingDepartmentNames, awaitingAcknowledgement, awaitingAction, recentlyCompleted, todayReceived, todayActedOnTime, todayActed, awaitingNotification, overdueNotification }`. Mỗi hồ sơ chỉ có thông tin cần theo dõi; tài khoản chỉ có `critical.display` nhận **tên viết tắt** (trừ khi `displayFullName`), năm sinh, 4 số cuối mã người bệnh |
+| GET | `/{id}` | Khoa báo, khoa nhận của hồ sơ hoặc `critical.monitor` | Hồ sơ đầy đủ |
+| POST | `/` | `critical.record` (khoa báo là khoa mình) | `{ sendingDepartmentId, testId, patient { code, fullName, dateOfBirth, gender?, address?, source (His\|Manual) }, value, unit?, orderDate, resultAtUtc, sampleId?, urgent, notification? }`. Có `notification` (gọi điện xong mới ghi) thì ghi luôn lần báo, không có thì hồ sơ `AwaitingNotification`. Sổ Vi sinh bắt buộc `sampleId`. Khoa báo, mục danh mục, khoa nhận không tồn tại hoặc ngưng dùng → `400` ở trường đó; thiếu thông tin, quá dài, mục danh mục ngưng dùng, giờ có kết quả chưa tới hoặc quá 31 ngày, ngày chỉ định sau ngày có kết quả, khoa nhận trùng khoa báo… → `422 critical.rule` |
+| POST | `/{id}/notifications` | `critical.record` (khoa báo) | Lần báo `{ receivingDepartmentId, method (Phone\|InPerson), notifiedAtUtc, receiverName, readBackCorrect, incorrectReadBacks, repeatedTwice }` cho hồ sơ chưa báo hoặc bị trả lại. Chỉ lưu khi `readBackCorrect` (người nhận đọc lại đúng); sổ Vi sinh bắt buộc `repeatedTwice`; giờ báo sau giờ có kết quả, không sau giờ hiện tại (cho phép lệch 2 phút); khoa nhận khác khoa báo |
+| POST | `/{id}/acknowledge` | `critical.receive` (khoa nhận) | Người nghe máy xác nhận đã nhận bằng tài khoản của mình; hồ sơ sang `AwaitingAction` |
+| POST | `/{id}/reject` | `critical.receive` (khoa nhận) | `{ reason }` (bắt buộc): không phải khoa của người bệnh, thông tin không khớp; hồ sơ trở về `AwaitingNotification` để khoa báo báo lại. Khoa đã xác nhận thì không trả lại được |
+| POST | `/{id}/action` | `critical.treat` (khoa nhận) | `{ summary, actionAtUtc, recordedInMedicalRecord }`: bác sĩ ghi hướng xử trí ban đầu (≤ 1000 ký tự), hồ sơ `Completed`. Giờ xử trí không trước giờ khoa nhận cuộc gọi, không sau giờ hiện tại. Hồ sơ còn `AwaitingAcknowledgement` thì tính là khoa đã nhận lúc bác sĩ lưu |
+| POST | `/{id}/cancel` | `critical.record` (khoa báo) | `{ reason, receivingDepartmentInformed }`: hủy hồ sơ báo nhầm (bắt buộc lý do). Hồ sơ đã báo khoa nhận thì phải `receivingDepartmentInformed: true`. Hồ sơ không bị xóa: sổ in gạch ngang kèm lý do, dashboard đếm riêng |
+| GET | `/logbook?form=&departmentId=&month=` | `form=Clinical`: `critical.receive`/`critical.treat` (khoa mình); `Laboratory`, `Microbiology`: `critical.record` (khoa mình); mọi sổ: `critical.monitor` | Sổ một khoa một tháng (mặc định tháng này) `{ form, code, departmentId, departmentName, month, columns, rows: [{ cells, cancelled, note }] }`, đúng cột của sổ giấy |
+| GET | `/logbook/pdf?form=&departmentId=&month=` | Như trên | PDF A4 ngang theo mẫu sổ: logo, tên đơn vị (Cấu hình hệ thống), mã số sổ (thông số), dòng đã hủy chữ xám gạch ngang kèm ghi chú. Tên file `ket-qua-nguy-cap-so-<ST01\|ST02\|vi-sinh>-<yyyy>-<MM>.pdf`; ghi nhật ký `CriticalResults.LogbookPrinted` |
+| GET | `/dashboard?month=&period=` | `critical.monitor` | Dashboard tháng (mặc định) hoặc quý (`period=quarter`, quý chứa `month`), xem bên dưới |
+
+**Dashboard** `{ period, month, label, from, to, serverTimeUtc, targets, kpis, trend, senders, receivers, late }`:
+
+- `kpis` `{ total, cancelled, notifyOnTime, actionOnTime, readBackFirstTime, complete, medianNotifyMinutes, notifyQ1Minutes, notifyQ3Minutes, medianActionMinutes, actionQ1Minutes, actionQ3Minutes }`. Tỷ lệ là `{ numerator, denominator, percent }` (`percent` làm tròn một chữ số thập phân, 0,05 làm tròn lên; mẫu số 0 thì `null`). Hồ sơ đã hủy không tính vào tỷ lệ.
+  - `notifyOnTime`: báo đúng hạn trên hồ sơ đã báo hoặc đã quá hạn báo;
+  - `actionOnTime`: bác sĩ xử trí đúng hạn trên hồ sơ đã xử trí hoặc đã quá hạn xử trí;
+  - `readBackFirstTime`: lần báo hiện hành có người nhận đọc lại đúng ngay lần đầu;
+  - `complete`: hồ sơ hoàn tất trên hồ sơ đã hoàn tất hoặc đã quá hạn.
+- Trung vị, Q1, Q3 tính theo nội suy tuyến tính.
+- `trend`: 12 tháng đến tháng đang xem `{ month, total, notifyOnTimePercent, actionOnTimePercent }`.
+- `senders` (khoa báo), `receivers` (khoa nhận) `{ departmentId, name, total, onTime, medianMinutes, open }`.
+- `late`: tối đa 50 trường hợp quá hạn gần nhất (báo chậm, bác sĩ xử trí chậm, đang quá hạn) `{ id, number, resultAtUtc, patientInitials, patientCode, testName, value, unit, sendingDepartmentName, receivingDepartmentName, miss }`.
+- `targets` `{ notifyPercent, actionPercent, readBackPercent, completePercent, notifyMinutes, actionMinutes }` từ thông số vận hành.
 
 ---
 
