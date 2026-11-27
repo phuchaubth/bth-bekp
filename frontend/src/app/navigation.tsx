@@ -2,6 +2,7 @@ import {
   AuditOutlined,
   BarChartOutlined,
   DashboardOutlined,
+  ExperimentOutlined,
   ExportOutlined,
   FileProtectOutlined,
   FileTextOutlined,
@@ -51,6 +52,17 @@ export const navItems: NavItem[] = [
         label: 'Ủy quyền báo cáo',
         permission: [Permissions.NursingReportsSubmit, Permissions.NursingReportsRead],
       },
+    ],
+  },
+  {
+    // Quyết định 57: khoa ghi kết quả nội kiểm đường huyết tại giường, Khoa HSH xem xét và xác nhận sổ tháng.
+    path: '/noi-kiem',
+    label: 'Nội kiểm đường huyết',
+    shortLabel: 'Nội kiểm',
+    icon: <ExperimentOutlined />,
+    children: [
+      { path: '/noi-kiem/so', label: 'Sổ nội kiểm', permission: [Permissions.QcRecord, Permissions.QcReview] },
+      { path: '/noi-kiem/danh-muc', label: 'Máy đo và lô vật tư', permission: Permissions.QcManage },
     ],
   },
   {

@@ -30,6 +30,12 @@ export const Permissions = {
   TestingManage: 'testing.manage',
   /** Bật/tắt chế độ bảo trì, vẫn vào hệ thống khi đang bảo trì (quyết định 53). */
   SystemMaintenance: 'system.maintenance',
+  /** Khoa ghi kết quả nội kiểm đường huyết của khoa mình, gửi sổ tháng (quyết định 57). */
+  QcRecord: 'qc.record',
+  /** Khoa HSH: xem xét kết quả nội kiểm các khoa, xác nhận sổ tháng. */
+  QcReview: 'qc.review',
+  /** Khoa HSH: khai báo máy đo, lô que thử, lô dung dịch chứng. */
+  QcManage: 'qc.manage',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]

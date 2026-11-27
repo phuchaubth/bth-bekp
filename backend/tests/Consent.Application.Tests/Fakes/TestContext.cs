@@ -6,6 +6,7 @@ using Consent.Application.Exports;
 using Consent.Application.Kiosk;
 using Consent.Application.Maintenance;
 using Consent.Application.NursingReports;
+using Consent.Application.QualityControl;
 using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
@@ -260,6 +261,21 @@ internal sealed class AppTestContext
     public StubDailyStatisticsSource DailyStatistics { get; } = new();
 
     public CapturingNursingDocuments NursingDocuments { get; } = new();
+
+    public CapturingQcLogPdf QcPdf { get; } = new();
+
+    public QcCatalogService CreateQcCatalogService() => new(
+        new InMemoryQualityControlRepository(Store), new InMemoryDepartmentRepository(Store), Store, CurrentUser, Clock);
+
+    public QcBookService CreateQcBookService() => new(
+        new InMemoryQualityControlRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        CreateSettingsService(),
+        QcPdf);
 
     public NursingReportService CreateNursingReportService() => new(
         new InMemoryNursingReportRepository(Store),

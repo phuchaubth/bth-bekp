@@ -1494,7 +1494,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     /// Logo chỉ được kiểm tra phần đầu file lúc tải lên; thử giải mã trước khi in để một file hỏng không làm hỏng việc in
     /// mọi phiếu (khi đó phiếu in không có logo).
     /// </summary>
-    private static bool CanDecode(LogoImage logo)
+    internal static bool CanDecode(LogoImage logo)
     {
         try
         {
@@ -1520,7 +1520,7 @@ internal sealed class MigraDocConsentPdfRenderer : IConsentPdfRenderer
     /// Logo bệnh viện, thu vừa ô, giữ đúng tỉ lệ. Đẩy xuống một khoảng bằng từ đỉnh dòng đến đỉnh chữ hoa của chữ cỡ
     /// <paramref name="alignWithTextOfSize"/> bên cạnh, để cạnh trên logo thẳng cạnh trên chữ quốc hiệu.
     /// </summary>
-    private static void AddLogo(
+    internal static void AddLogo(
         Cell cell, LogoImage logo, double maxWidthMm, double maxHeightMm, double alignWithTextOfSize, bool center = false)
     {
         var scale = Math.Min(maxWidthMm / logo.Width, maxHeightMm / logo.Height);

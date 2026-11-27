@@ -16,7 +16,8 @@
 8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu, bảo trì hệ thống
 9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
 10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
-11. [Câu hỏi thường gặp](#hoi-dap)
+11. [Sổ nội kiểm đường huyết tại giường](#noi-kiem): khoa ghi kết quả từng ngày, Khoa HSH xem xét và xác nhận sổ tháng, in PDF theo mẫu
+12. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
 
@@ -1061,7 +1062,7 @@ Bấm **Quản trị** → **Vai trò và quyền**. Cột trái liệt kê các
 **Sửa quyền của vai trò:**
 
 1. Chọn vai trò ở cột trái.
-2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**.
+2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**, **Kiểm thử**, **Nội kiểm đường huyết** (mục 11).
 3. Bấm **Lưu thay đổi** (hoặc **Hủy thay đổi** để bỏ).
 
 **Thêm vai trò** (ví dụ vai trò cho Ban giám đốc, Dược sĩ lâm sàng):
@@ -1531,9 +1532,133 @@ Mỗi bản cài mới được kiểm thử trên **môi trường kiểm thử
 
 ---
 
+<a id="noi-kiem"></a>
+
+## 11. Sổ nội kiểm đường huyết tại giường
+
+Phần mềm thay **"Sổ theo dõi kết quả nội kiểm đường huyết tại giường"** giấy (mẫu CT-ĐHTG/BM01, lần ban hành 03) (quyết định 57). Mỗi máy đo của một khoa có **một sổ mỗi tháng**, mỗi ngày một dòng như sổ giấy. Khoa ghi kết quả; **Khoa Huyết học – Sinh hóa (Khoa HSH)** xem xét từng ngày và xác nhận sổ cuối tháng.
+
+| Ai | Làm gì | Ở đâu |
+|---|---|---|
+| Khoa HSH: vai trò **Khoa HSH (nội kiểm)** | Khai báo máy đo, lô que thử, lô dung dịch chứng; xem xét từng ngày; trả lại ngày hoặc sổ; xác nhận sổ tháng; in PDF | **Nội kiểm** → **Máy đo và lô vật tư**, **Sổ nội kiểm** |
+| Điều dưỡng khoa (vai trò có quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng*, mục 8.3) | Mở sổ tháng, ghi kết quả từng ngày, ghi nguyên nhân và kết quả chạy lại, ghi điều chỉnh, gửi sổ tháng, in PDF | **Nội kiểm** → **Sổ nội kiểm** |
+
+**Dữ liệu không bị sửa, có xác nhận giữa hai khoa:**
+
+- Phần mềm **tự đánh giá** Đạt/Không đạt theo ngưỡng chấp nhận của lô dung dịch chứng (tính cả hai đầu ngưỡng).
+- Kết quả đã ghi **không sửa được**. Ghi sai thì **ghi điều chỉnh** (bắt buộc lý do): kết quả cũ vẫn giữ, hiện và in **gạch ngang** kèm lý do, người điều chỉnh.
+- Khoa HSH đã xem xét ngày nào thì khoa **không ghi, không điều chỉnh** ngày đó nữa. Cần sửa thì Khoa HSH **trả lại ngày** (bắt buộc lý do), khoa điều chỉnh, Khoa HSH xem xét lại. Lần xem xét cũ vẫn giữ (gạch ngang).
+- Khoa **gửi sổ tháng** thì không ghi thêm được. Khoa HSH **xác nhận sổ tháng** thì sổ khóa hẳn.
+- Người ghi kết quả của một ngày **không tự xem xét** ngày đó; người gửi sổ **không tự xác nhận** sổ.
+- Mọi lần ghi, điều chỉnh, xem xét, trả lại, gửi, xác nhận được ghi **Nhật ký hệ thống** (mục 7.1). Không có nút xóa.
+
+### 11.1. Khai báo máy đo và lô vật tư (Khoa HSH, làm trước)
+
+1. Bấm **Nội kiểm** → **Máy đo và lô vật tư**.
+2. Tab **Máy đo** → **Thêm máy đo**: chọn **khoa dùng máy**, nhập **loại máy** (hãng, đời máy) và **số seri** (không trùng máy khác). Máy hỏng, thu hồi: bấm **Sửa**, tắt **Đang dùng**. Chuyển máy sang khoa khác: **Sửa**, chọn khoa mới; sổ tháng này của khoa cũ giữ nguyên, khoa mới mở sổ mới.
+3. Tab **Lô que thử, dung dịch chứng** → **Thêm lô**:
+   - **Que thử**: tên vật tư, số lô, hạn dùng.
+   - **Dung dịch chứng**: thêm **mức** (Level 1, 2 hoặc 3) và **ngưỡng chấp nhận** (từ – đến, đơn vị mg/dL hoặc mmol/L), lấy theo tờ hướng dẫn của lô. Cùng số lô nhưng khác mức thì khai báo hai lần.
+
+   ![Danh mục lô que thử, dung dịch chứng](huong-dan-su-dung/nk-01-danh-muc.png)
+
+   *Hình 11.1. Danh mục lô: que thử, dung dịch chứng Level 1 và Level 2 kèm ngưỡng chấp nhận (dữ liệu giả lập).*
+
+   ![Hộp Thêm lô dung dịch chứng: mức, hạn dùng, ngưỡng chấp nhận, đơn vị](huong-dan-su-dung/nk-02-them-lo.png)
+
+   *Hình 11.2. Thêm lô dung dịch chứng Level 3.*
+
+4. Lô hết dùng: **Sửa**, tắt **Đang dùng**; khoa không chọn được lô đó nữa. Sửa lô (ví dụ ngưỡng) chỉ áp dụng cho kết quả ghi **sau** khi sửa; kết quả đã ghi giữ ngưỡng lúc ghi. Lô **hết hạn** trước ngày thực hiện thì khoa không ghi được kết quả với lô đó.
+
+### 11.2. Mở sổ tháng (khoa)
+
+1. Bấm **Nội kiểm** → **Sổ nội kiểm**. Chọn **tháng** ở đầu trang (mặc định tháng này). Danh sách có máy của khoa mình, trạng thái sổ, số ngày đã ghi, không đạt, Khoa HSH đã xem xét, còn chờ xem xét.
+2. Máy chưa có sổ tháng này: bấm **Mở sổ**. Sổ đã có: bấm **Xem sổ**. Mở được sổ của 12 tháng gần đây (ghi bù từ sổ giấy).
+
+   ![Danh sách sổ nội kiểm tháng của khoa](huong-dan-su-dung/nk-03-danh-sach-so.png)
+
+   *Hình 11.3. Danh sách sổ tháng 11 của khoa Nội: 21 ngày đã ghi, 1 ngày không đạt, Khoa HSH đã xem xét 15 ngày.*
+
+### 11.3. Ghi kết quả hằng ngày (khoa)
+
+1. Ở dòng ngày thực hiện, bấm **Ghi kết quả**.
+2. **Lô que thử, ngày mở hộp, lô dung dịch chứng hai mức, ngày mở lọ** được điền sẵn theo lần ghi trước của máy. Mở hộp que, lọ dung dịch chứng mới thì chọn lô mới và ngày mở mới. Mức thấp hơn ở dòng đầu (như hai cột kết quả của sổ giấy).
+3. Nhập **kết quả** hai mức. Đánh giá **Đạt/ Pass** hoặc **Không đạt/ Fail** hiện ngay bên cạnh.
+4. Bấm **Lưu kết quả**. Nhân viên thực hiện là người đăng nhập. Ghi sau ngày thực hiện (ghi bù) thì dòng đó có nhãn **Ghi muộn** (PDF có dấu `*`).
+
+   ![Hộp Ghi kết quả nội kiểm: lô điền sẵn, đánh giá hiện ngay](huong-dan-su-dung/nk-04-ghi-ket-qua.png)
+
+   *Hình 11.4. Mức 2 ngoài ngưỡng 100–140 mg/dL: phần mềm đánh giá **Không đạt**.*
+
+5. Kết quả **không đạt**: bấm **Ghi nguyên nhân, chạy lại**, ghi **nguyên nhân không đạt** (bắt buộc), nhập **kết quả chạy lại** hai mức (đánh giá lại hiện ngay). Không chạy lại được thì bỏ chọn **Đã chạy lại QC** và ghi nguyên nhân. Mỗi kết quả ghi nguyên nhân và chạy lại một lần.
+
+   ![Hộp ghi nguyên nhân không đạt và kết quả chạy lại](huong-dan-su-dung/nk-05-chay-lai.png)
+
+   *Hình 11.5. Ghi nguyên nhân, kết quả chạy lại đạt.*
+
+### 11.4. Ghi sai: ghi điều chỉnh (khoa)
+
+1. Ở dòng kết quả ghi sai, bấm **Ghi điều chỉnh** (chỉ có khi Khoa HSH **chưa xem xét** ngày đó và sổ chưa gửi).
+2. Ghi **lý do điều chỉnh** (bắt buộc). Kết quả cũ được điền sẵn: sửa chỗ sai (kết quả, lô, ngày mở, cả ngày thực hiện nếu ghi nhầm ngày) rồi bấm **Lưu điều chỉnh**. Ghi nhầm máy (không phải của máy này): đánh dấu **Chỉ hủy kết quả này**.
+
+   ![Hộp Ghi điều chỉnh: lý do bắt buộc, kết quả cũ được giữ lại](huong-dan-su-dung/nk-06-dieu-chinh.png)
+
+   *Hình 11.6. Ghi điều chỉnh kết quả mức 1 do đọc nhầm số trên máy.*
+
+3. Kết quả cũ vẫn hiện trên sổ: chữ xám **gạch ngang**, kèm *Đã hủy: lý do (người điều chỉnh)*; kết quả mới ngay dưới.
+
+   ![Sổ tháng của khoa: kết quả đã hủy gạch ngang, kết quả không đạt có nguyên nhân và chạy lại](huong-dan-su-dung/nk-07-so-thang.png)
+
+   *Hình 11.7. Ngày 20 và 25: kết quả ghi sai gạch ngang, kèm lý do; ngày 26 không đạt, đã ghi nguyên nhân và chạy lại đạt.*
+
+4. Ngày Khoa HSH đã xem xét thì không còn nút **Ghi điều chỉnh**: báo Khoa HSH **trả lại ngày** (mục 11.5).
+
+### 11.5. Xem xét từng ngày (Khoa HSH)
+
+1. Bấm **Nội kiểm** → **Sổ nội kiểm**, chọn tháng (chọn khoa ở ô **Khoa** nếu cần), bấm **Xem sổ** ở dòng có số ngày **Chờ xem xét**.
+2. Xem xét một ngày: bấm **Xem xét** ở dòng ngày đó. Xem xét nhiều ngày: đánh dấu các ngày (hoặc bấm **Chọn mọi ngày chờ xem xét**: chọn các ngày đã qua và các ngày đã có kết quả, không chọn hôm nay khi khoa chưa ghi), bấm **Xem xét … ngày đã chọn**.
+3. Mỗi ngày chọn kết quả xem xét, như cột cuối của sổ giấy (điền sẵn theo gợi ý của phần mềm, chỉ có các lựa chọn khớp với kết quả khoa đã ghi):
+   - **Đã kiểm - ĐẠT**: kết quả đạt, hoặc không đạt nhưng chạy lại đạt.
+   - **Đã kiểm - Không có QC ngày này**: ngày khoa không ghi kết quả.
+   - **Đã kiểm - KHÔNG ĐẠT, KHÔNG CHẠY LẠI QC**: không đạt, không chạy lại (hoặc chạy lại vẫn không đạt).
+   - **Đã kiểm - KHÔNG ĐẠT, đã chạy lại QC sau nhắc nhở**: không đạt, khoa đã chạy lại sau khi Khoa HSH nhắc.
+
+   Ghi chú (không bắt buộc) rồi bấm **Lưu xem xét**.
+
+   ![Hộp xem xét nhiều ngày: kết quả khoa ghi và kết quả xem xét điền sẵn theo gợi ý](huong-dan-su-dung/nk-08-xem-xet.png)
+
+   *Hình 11.8. Xem xét 11 ngày một lần (hôm nay khoa chưa ghi nên không được chọn sẵn); ngày 18 không đạt, không chạy lại.*
+
+4. Người ghi kết quả (hoặc ghi chạy lại) của một ngày không tự xem xét ngày đó, kể cả khi có cả hai quyền.
+5. **Trả lại ngày**: ở ngày đã xem xét, bấm **Trả lại ngày**, ghi lý do. Khoa ghi điều chỉnh ngày đó, rồi Khoa HSH xem xét lại. Sổ đã gửi thì sổ cũng được trả lại khoa.
+
+### 11.6. Gửi sổ tháng, xác nhận sổ tháng
+
+1. **Khoa**: từ **ngày cuối tháng**, bấm **Gửi sổ tháng** ở đầu trang sổ. Gửi rồi khoa không ghi thêm, không điều chỉnh được.
+2. **Khoa HSH**: xem xét đủ **mọi ngày** trong tháng, rồi bấm **Xác nhận sổ tháng**. Sổ **khóa hẳn**, không ai thay đổi được nữa. Người gửi sổ không tự xác nhận được.
+3. Sổ cần sửa: Khoa HSH bấm **Trả lại sổ** (ghi lý do). Khoa thấy lý do ở đầu trang sổ, ghi thêm hoặc điều chỉnh (với ngày đã xem xét thì Khoa HSH trả lại ngày đó), rồi gửi lại.
+
+   ![Sổ tháng 10 đã được Khoa HSH xác nhận](huong-dan-su-dung/nk-09-xac-nhan.png)
+
+   *Hình 11.9. Sổ đã xác nhận: ghi người xác nhận, thời điểm; không còn nút thao tác.*
+
+### 11.7. In sổ theo mẫu giấy
+
+Bấm **In PDF** ở đầu trang sổ (khoa và Khoa HSH đều in được). PDF khổ A4 ngang theo mẫu CT-ĐHTG/BM01: tên đơn vị, logo (lấy ở *Cấu hình hệ thống*), mã số mẫu; khoa, tháng, máy; que thử và dung dịch chứng đã dùng trong tháng (số lô, hạn dùng, ngày mở, ngưỡng chấp nhận; nhiều lô thì nối bằng " - " như sổ giấy); mỗi ngày một dòng. Kết quả đã hủy và lần xem xét đã trả lại in chữ xám **gạch ngang** kèm lý do. Cuối trang ghi trạng thái sổ (đang ghi, đã gửi, đã xác nhận: người, thời điểm).
+
+![PDF sổ nội kiểm tháng 10 theo mẫu giấy](huong-dan-su-dung/nk-10-pdf.png)
+
+*Hình 11.10. Trang đầu PDF sổ tháng 10 (đã xác nhận); ngày 9 không đạt, đã chạy lại.*
+
+![PDF sổ tháng 11, trang 2: kết quả đã hủy in gạch ngang kèm lý do](huong-dan-su-dung/nk-11-pdf-dieu-chinh.png)
+
+*Hình 11.11. Trang 2 PDF sổ tháng 11: ngày 20 và 25 có kết quả đã hủy (gạch ngang, kèm lý do), ngày 26 không đạt, đã chạy lại.*
+
+---
+
 <a id="hoi-dap"></a>
 
-## 11. Câu hỏi thường gặp
+## 12. Câu hỏi thường gặp
 
 **Tôi quên mật khẩu thì làm sao?**
 Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục 8.1). Bạn đăng nhập bằng mật khẩu tạm rồi đổi mật khẩu mới.
@@ -1623,3 +1748,9 @@ Thẻ chỉ có khi khoa phải gửi báo cáo, hoặc được Phòng Điều 
 
 **Phiếu mới được điền sẵn câu trả lời cũ, có cần kiểm tra không?**
 Có. Đây là chức năng kế thừa phiếu lần trước (mục 2.7). Kiểm tra lại từng câu trước khi trình ký. Ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký không được điền sẵn.
+
+**Không thấy menu Nội kiểm, hoặc không mở được sổ của khoa?**
+Tài khoản cần quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng* (quản trị thêm cho vai trò ở mục 8.3, ví dụ vai trò Điều dưỡng) và đúng khoa (mục 8.1); đăng xuất rồi đăng nhập lại. Khoa chưa có máy trong danh sách sổ: nhờ Khoa HSH khai báo máy đo của khoa (mục 11.1).
+
+**Ghi nhầm kết quả nội kiểm mà không còn nút Ghi điều chỉnh?**
+Ngày đó Khoa HSH đã xem xét, hoặc khoa đã gửi sổ tháng. Báo Khoa HSH **trả lại ngày** (hoặc trả lại sổ), rồi ghi điều chỉnh có lý do (mục 11.4). Sổ đã được Khoa HSH xác nhận thì không thay đổi được nữa.

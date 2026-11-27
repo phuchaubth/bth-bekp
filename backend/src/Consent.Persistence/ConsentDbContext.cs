@@ -7,6 +7,7 @@ using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Consent.Domain.Settings;
 using Consent.Domain.Testing;
 using Consent.Persistence.Configurations;
@@ -54,6 +55,12 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
     public DbSet<NursingReportDelegation> NursingReportDelegations => Set<NursingReportDelegation>();
 
     public DbSet<TestAssignment> TestAssignments => Set<TestAssignment>();
+
+    public DbSet<QcMeter> QcMeters => Set<QcMeter>();
+
+    public DbSet<QcLot> QcLots => Set<QcLot>();
+
+    public DbSet<QcBook> QcBooks => Set<QcBook>();
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {

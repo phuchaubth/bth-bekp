@@ -7,6 +7,7 @@ using Consent.Application.Exports;
 using Consent.Application.Kiosk;
 using Consent.Application.Maintenance;
 using Consent.Application.NursingReports;
+using Consent.Application.QualityControl;
 using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
@@ -51,6 +52,8 @@ public static class DependencyInjection
         services.AddScoped<NursingDashboardService>();
         services.AddScoped<NursingDelegationService>();
         services.AddScoped<TestAssignmentService>();
+        services.AddScoped<QcCatalogService>();
+        services.AddScoped<QcBookService>();
         services.AddScoped<MaintenanceService>();
         services.AddSingleton(new MaintenanceStateCache(MaintenanceStateCache.DefaultLifetime));
 

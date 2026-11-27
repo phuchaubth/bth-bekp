@@ -13,6 +13,7 @@ using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Consent.Domain.Settings;
 using Consent.Domain.Testing;
 using Consent.Shared;
@@ -293,6 +294,41 @@ public interface ITestAssignmentRepository
 
     /// <summary>Các đợt kiểm thử đã có, đợt mới phân công trước.</summary>
     Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken);
+}
+
+/// <summary>Sổ theo dõi kết quả nội kiểm đường huyết tại giường (quyết định 57): danh mục máy đo, lô vật tư và sổ tháng.</summary>
+public interface IQualityControlRepository
+{
+    void Add(QcMeter meter);
+
+    void Add(QcLot lot);
+
+    void Add(QcBook book);
+
+    /// <summary>Mọi máy đo (kể cả máy ngưng sử dụng).</summary>
+    Task<IReadOnlyList<QcMeter>> ListMetersAsync(CancellationToken cancellationToken);
+
+    Task<QcMeter?> GetMeterAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<bool> SerialExistsAsync(string serialNumber, Guid? excludeId, CancellationToken cancellationToken);
+
+    /// <summary>Mọi lô que thử, dung dịch chứng (kể cả lô ngưng sử dụng).</summary>
+    Task<IReadOnlyList<QcLot>> ListLotsAsync(CancellationToken cancellationToken);
+
+    Task<QcLot?> GetLotAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<bool> LotExistsAsync(QcLotKind kind, string lotNumber, int? level, Guid? excludeId, CancellationToken cancellationToken);
+
+    /// <summary>Sổ kèm mọi kết quả và lần xem xét.</summary>
+    Task<QcBook?> GetBookAsync(Guid id, CancellationToken cancellationToken);
+
+    Task<QcBook?> FindBookAsync(Guid meterId, Guid departmentId, int year, int month, CancellationToken cancellationToken);
+
+    /// <summary>Các sổ của một tháng, kèm kết quả và lần xem xét (để đếm ngày đã ghi, đã xem xét).</summary>
+    Task<IReadOnlyList<QcBook>> ListBooksAsync(int year, int month, CancellationToken cancellationToken);
+
+    /// <summary>Kết quả còn hiệu lực ghi gần nhất của một máy (ở mọi sổ): gợi ý lô đang dùng khi ghi kết quả mới.</summary>
+    Task<QcRun?> FindLatestRunAsync(Guid meterId, CancellationToken cancellationToken);
 }
 
 /// <summary>Cấp số phiếu tăng dần, không trùng (dùng sequence của CSDL).</summary>

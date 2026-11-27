@@ -33,6 +33,9 @@ import {
   PatientIntakePage,
   PatientProfilePage,
   PatientsPage,
+  QcBookPage,
+  QcBooksPage,
+  QcCatalogPage,
   RemoteSigningPage,
   ReportsPage,
   RolesPage,
@@ -56,6 +59,8 @@ const implementedPages: Record<string, ReactNode> = {
   '/dieu-duong/tong-hop': <NursingSummaryPage />,
   '/dieu-duong/dashboard': <NursingDashboardPage />,
   '/dieu-duong/uy-quyen': <NursingDelegationsPage />,
+  '/noi-kiem/so': <QcBooksPage />,
+  '/noi-kiem/danh-muc': <QcCatalogPage />,
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
@@ -191,6 +196,16 @@ const pageRoutes: RouteObject[] = [
           <RequirePermission permission={Permissions.PatientsManage}>
             <Lazy>
               <PatientIntakePage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'noi-kiem/so/:id',
+        element: (
+          <RequirePermission permission={[Permissions.QcRecord, Permissions.QcReview]}>
+            <Lazy>
+              <QcBookPage />
             </Lazy>
           </RequirePermission>
         ),

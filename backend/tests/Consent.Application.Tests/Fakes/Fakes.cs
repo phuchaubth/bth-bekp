@@ -15,6 +15,7 @@ using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Consent.Shared;
 using Consent.Application.ConsentForms;
 using Consent.Domain.ConsentForms;
@@ -143,6 +144,12 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<NursingReportDelegation> NursingDelegations { get; } = [];
 
     public List<TestAssignment> TestAssignments { get; } = [];
+
+    public List<QcMeter> QcMeters { get; } = [];
+
+    public List<QcLot> QcLots { get; } = [];
+
+    public List<QcBook> QcBooks { get; } = [];
 
     public int SaveCount { get; private set; }
 

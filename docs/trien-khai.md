@@ -640,6 +640,19 @@ DELETE FROM dbo.SystemSettings WHERE [Key] LIKE N'Maintenance.%';
 
 (ví dụ `sqlcmd -S localhost -E` với tài khoản Windows quản trị SQL Server). API thấy thay đổi sau tối đa 5 giây, không cần khởi động lại. Cách này không ghi nhật ký *Tắt chế độ bảo trì*: ghi vào biên bản vận hành.
 
+### 5.13. Sổ theo dõi kết quả nội kiểm đường huyết (quyết định 57)
+
+Sổ theo dõi kết quả nội kiểm đường huyết tại giường theo mẫu giấy CT-ĐHTG/BM01 (menu **Nội kiểm**; hướng dẫn sử dụng, mục 11). Bản này kèm migration `AddQualityControlLogs` (5 bảng mới: `QcMeters`, `QcLots`, `QcBooks`, `QcRuns`, `QcDayReviews`; chỉ thêm, không đổi dữ liệu cũ): chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`. Khi khởi động, phần mềm tự tạo vai trò mới **Khoa HSH (nội kiểm)** (mã `LAB_QC`, quyền `qc.review`, `qc.manage`).
+
+Sau khi cài, quản trị làm một lần:
+
+1. **Quyền ghi kết quả cho khoa lâm sàng.** Vai trò có sẵn **không tự thêm quyền mới** (quản trị có thể đã sửa quyền). Vào *Quản trị → Vai trò và quyền*, chọn vai trò **Điều dưỡng** (và vai trò khác của người chạy nội kiểm ở khoa, nếu có), nhóm **Nội kiểm đường huyết**, đánh dấu *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng* (`qc.record`), bấm **Lưu**. Người ghi phải được đặt **đúng khoa** ở hồ sơ người dùng (khoa chính hoặc *Khoa/phòng khác*, mục 5.8). Quyền mới có hiệu lực khi người dùng đăng nhập lại (hoặc tối đa 15 phút).
+2. **Tài khoản Khoa HSH.** *Quản trị → Người dùng*: gán vai trò **Khoa HSH (nội kiểm)** cho nhân viên Khoa Huyết học – Sinh hóa xem xét nội kiểm (nên đặt khoa là Khoa Huyết học – Sinh hóa). Vai trò này xem sổ của mọi khoa, xem xét từng ngày, trả lại ngày hoặc sổ, xác nhận sổ tháng, khai báo máy đo và lô. Muốn tách người khai báo danh mục với người xem xét thì tạo vai trò riêng (mục 8.3 hướng dẫn sử dụng) chỉ có `qc.manage` hoặc chỉ có `qc.review`.
+3. **Khai báo danh mục** (Khoa HSH, trước khi các khoa ghi): *Nội kiểm → Máy đo và lô vật tư*: máy đo của từng khoa (khoa, loại máy, số seri), lô que thử, lô dung dịch chứng (mức, hạn dùng, ngưỡng chấp nhận, đơn vị). Khoa chưa có máy đã khai báo thì chưa mở được sổ.
+4. **Tên đơn vị, logo trên PDF** lấy ở *Cấu hình hệ thống* như phiếu đồng thuận. Mã số mẫu, lần ban hành, ngày hiệu lực (CT-ĐHTG/BM01, 03, 16-06-2026) cố định trong phần mềm: bệnh viện ban hành lại mẫu thì báo để sửa trong bản sau.
+
+Lưu ý: không có lệnh xóa sổ, kết quả hay lần xem xét (ghi sai thì ghi điều chỉnh có lý do; kết quả cũ vẫn giữ). Script xóa dữ liệu chạy thử (mục 5.11) **không xóa** dữ liệu nội kiểm: chạy thử nội kiểm trên môi trường UAT (mục 5.10).
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).

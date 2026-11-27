@@ -1,6 +1,7 @@
 using Consent.Application.Abstractions;
 using Consent.Application.ConsentForms;
 using Consent.Application.NursingReports;
+using Consent.Application.QualityControl;
 using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.His;
 using Consent.Infrastructure.Pdf;
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddSingleton<IConsentPdfRenderer, MigraDocConsentPdfRenderer>();
         services.AddSingleton<INursingReportPdfRenderer, MigraDocNursingReportPdfRenderer>();
         services.AddSingleton<INursingSummaryWorkbookWriter, XlsxNursingSummaryWriter>();
+        services.AddSingleton<IQcLogPdfRenderer, MigraDocQcLogPdfRenderer>();
         services.AddSingleton<IDocumentStore, EncryptedFileDocumentStore>();
         services.AddSingleton<ITabularFileWriter, XlsxTabularFileWriter>();
         services.AddSingleton<ITabularFileWriter, CsvTabularFileWriter>();

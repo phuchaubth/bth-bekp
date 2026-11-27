@@ -57,6 +57,18 @@ public static class Permissions
     /// dữ liệu. Người không có quyền này (kể cả kiosk, người bệnh ký qua mã QR) không đăng nhập, không thao tác được khi đang bảo trì.
     /// </summary>
     public const string SystemMaintenance = "system.maintenance";
+
+    /// <summary>
+    /// Khoa lâm sàng ghi kết quả nội kiểm đường huyết tại giường vào sổ của khoa mình, ghi điều chỉnh, gửi sổ tháng (quyết định 57);
+    /// có thêm <see cref="ScopeAllDepartments"/> thì ghi được cho mọi khoa.
+    /// </summary>
+    public const string QcRecord = "qc.record";
+
+    /// <summary>Khoa HSH: xem sổ nội kiểm của mọi khoa, xem xét từng ngày, trả lại ngày hoặc sổ, xác nhận sổ tháng, in PDF.</summary>
+    public const string QcReview = "qc.review";
+
+    /// <summary>Khoa HSH: khai báo máy đo đường huyết của các khoa, lô que thử, lô dung dịch chứng và ngưỡng chấp nhận.</summary>
+    public const string QcManage = "qc.manage";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -73,6 +85,7 @@ public static class PermissionCatalog
     private const string NursingGroup = "Báo cáo điều dưỡng";
     private const string ScopeGroup = "Phạm vi dữ liệu";
     private const string TestingGroup = "Kiểm thử";
+    private const string QcGroup = "Nội kiểm đường huyết";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -100,6 +113,9 @@ public static class PermissionCatalog
         new(Permissions.NursingReportsManage, "Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo, số liệu HIS", NursingGroup),
         new(Permissions.ScopeAllDepartments, "Xem dữ liệu toàn viện", ScopeGroup),
         new(Permissions.TestingManage, "Phân công kiểm thử, xem và xử lý báo cáo kiểm thử", TestingGroup),
+        new(Permissions.QcRecord, "Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng", QcGroup),
+        new(Permissions.QcReview, "Khoa HSH: xem xét kết quả nội kiểm các khoa, xác nhận sổ tháng", QcGroup),
+        new(Permissions.QcManage, "Khoa HSH: khai báo máy đo, lô que thử, lô dung dịch chứng", QcGroup),
     ];
 
     private static readonly HashSet<string> Codes = new(All.Select(p => p.Code), StringComparer.Ordinal);

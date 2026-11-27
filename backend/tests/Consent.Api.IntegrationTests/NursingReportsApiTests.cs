@@ -391,7 +391,7 @@ public sealed class NursingReportsApiTests(SqlServerFixture sql) : IAsyncLifetim
         var (savedStatus, saved) = await SaveAsync(["NOI", "KKB"], new() { ["NOI"] = " Nội ", ["KKB"] = "KB" });
         Assert.True(savedStatus == HttpStatusCode.OK, saved.ToString());
         Assert.Equal(
-            [("NOI", "Nội", true), ("KKB", "KB", true), ("PDD", null, false), ("KHTH", null, false)],
+            [("NOI", "Nội", true), ("KKB", "KB", true), ("HSH", null, false), ("PDD", null, false), ("KHTH", null, false)],
             saved.EnumerateArray().Select(d => (
                 d.GetProperty("code").GetString(), d.GetProperty("shortName").GetString(), d.GetProperty("isReporting").GetBoolean())));
         Assert.Equal(["Nội", "KB"], await SummaryLabelsAsync());

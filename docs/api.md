@@ -195,8 +195,9 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 | Phiếu đồng thuận | `consents.read`, `consents.create`, `consents.sign`, `consents.revoke`, `kiosk.use` (dùng màn hình kiosk, quyết định 24) |
 | Báo cáo và xuất dữ liệu | `reports.read`, `exports.run`, `exports.sensitive` |
 | Phạm vi dữ liệu | `scope.all_departments` (xem dữ liệu mọi khoa) |
+| Nội kiểm đường huyết (quyết định 57) | `qc.record` (khoa ghi kết quả, gửi sổ tháng), `qc.review` (Khoa HSH xem xét, xác nhận sổ), `qc.manage` (Khoa HSH khai báo máy đo, lô) |
 
-**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`, `KIOSK` (máy kiosk người bệnh: chỉ `kiosk.use`; tài khoản mang vai trò này không được có vai trò khác và phải thuộc một khoa — `400` ở `roleIds`/`departmentId`). Vai trò hệ thống còn thiếu được tự tạo khi khởi động (nâng cấp phiên bản không cần thao tác). Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
+**Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`, `LAB_QC` (Khoa HSH, quyết định 57: `qc.review`, `qc.manage`), `KIOSK` (máy kiosk người bệnh: chỉ `kiosk.use`; tài khoản mang vai trò này không được có vai trò khác và phải thuộc một khoa — `400` ở `roleIds`/`departmentId`). Vai trò hệ thống còn thiếu được tự tạo khi khởi động (nâng cấp phiên bản không cần thao tác). Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
 
 ---
 
@@ -616,6 +617,36 @@ Người quản lý kiểm thử (`testing.manage`) phân công từng tính nă
 | GET | `/xlsx?version=` | `testing.manage` | Excel phân công và báo cáo của một đợt (bỏ trống là mọi đợt): đợt, tính năng, nội dung, người kiểm thử, khoa/phòng, từ ngày, hạn, trạng thái, kết quả, lỗi, đề xuất, giờ gửi (giờ Việt Nam), trễ hạn, hướng xử lý, người ghi hướng xử lý; trang 2 ghi đợt, số phân công, người xuất, thời điểm xuất |
 
 Lỗi phát hiện và đề xuất lưu mã hóa (cột `FindingsEncrypted`, `SuggestionsEncrypted`), vì người kiểm thử tự ghi và có thể nhắc tới người bệnh khi kiểm thử trên dữ liệu thật. Mỗi lần tạo, sửa, hủy, báo cáo, ghi hướng xử lý ghi nhật ký hệ thống.
+
+## 6j. Sổ nội kiểm đường huyết tại giường (`/api/v1/qc`, quyết định 57)
+
+Sổ theo dõi kết quả nội kiểm theo mẫu giấy CT-ĐHTG/BM01 (lần ban hành 03): mỗi máy đo của một khoa có một **sổ tháng**. Khoa HSH khai báo danh mục (`qc.manage`); khoa lâm sàng ghi kết quả của khoa mình (`qc.record`; có thêm `scope.all_departments` thì mọi khoa); Khoa HSH xem xét từng ngày, trả lại ngày hoặc sổ, xác nhận sổ tháng (`qc.review`, mọi khoa). Ngày là ngày của bệnh viện (`yyyy-MM-dd`), tháng dạng `yyyy-MM`. Không có lệnh xóa. Mọi thay đổi ghi nhật ký hệ thống (`QcMeter`, `QcLot`, `QcBook`, `QcRun`, `QcDayReview`). Vi phạm quy tắc của sổ trả `422 qc.rule` kèm lời nhắn; hai người cùng lúc thay đổi một sổ thì người sau nhận `409` (tải lại rồi làm lại). Tài khoản không có `qc.record` lẫn `qc.review` → `403`; sổ của khoa khác (không có `qc.review`) → `404`.
+
+**Danh mục.** Máy `{ id, departmentId, departmentName, model, serialNumber, isActive, createdAtUtc }`: số seri không trùng. Lô `{ id, kind, productName, lotNumber, expiryDate, level, rangeLow, rangeHigh, unit, isActive, createdAtUtc }`: `kind` `TestStrip` (que thử: `level`, `rangeLow`, `rangeHigh`, `unit` là `null`) hoặc `ControlSolution` (dung dịch chứng: `level` 1–3, ngưỡng chấp nhận `rangeLow` < `rangeHigh`, số > 0, tối đa 9999.9, một chữ số thập phân; `unit` `MgPerDl` hoặc `MmolPerL`); số lô không trùng trong cùng loại và mức. Sửa lô chỉ áp dụng cho kết quả ghi sau; kết quả đã ghi giữ số lô, hạn dùng, ngưỡng lúc ghi.
+
+**Kết quả** (`run`): ngày thực hiện, que thử `{ lotId, lotNumber, expiryDate, openedOn }`, hai mức dung dịch chứng `control1`, `control2` `{ lotId, level, lotNumber, expiryDate, openedOn, low, high, unit, value, passed, repeatValue, repeatPassed }` (mức thấp hơn ở `control1`), `passed` (cả hai mức trong ngưỡng, tính cả hai đầu), `failureReason`, `hasRepeat`, `repeatPassed`, `performedBy`, `recordedAtUtc`, `late` (ghi sau ngày thực hiện), `replacesRunId`; kết quả đã hủy có `cancelReason`, `cancelledBy`, `cancelledAtUtc`. `canFollowUp`, `canCorrect`: người xem ghi được nguyên nhân và chạy lại, ghi điều chỉnh.
+
+**Sổ** `{ id, meterId, meterLabel, departmentId, departmentName, year, month, status, submittedBy, submittedAtUtc, confirmedBy, confirmedAtUtc, returnReason, returnedBy, returnedAtUtc, header, days, availableLots, defaults, actions }`: `status` `Open` (khoa đang ghi), `Submitted` (khoa đã gửi), `Confirmed` (Khoa HSH đã xác nhận, khóa hẳn); `header` `{ strips, controls1, controls2 }`: lô đã dùng trong tháng (theo kết quả còn hiệu lực) như phần đầu sổ giấy; `days`: mỗi ngày của tháng `{ date, run, cancelledRuns, review, returnedReviews, suggestedOutcome, allowedOutcomes, canRecord, canReview, canReturn }`; `review` `{ id, outcome, note, reviewedBy, reviewedAtUtc, returnReason, returnedBy, returnedAtUtc }` với `outcome` `Passed` ("Đã kiểm - ĐẠT"), `NoQc` ("Đã kiểm - Không có QC ngày này"), `FailedNotRepeated` ("Đã kiểm - KHÔNG ĐẠT, KHÔNG CHẠY LẠI QC"), `FailedRepeatedAfterReminder` ("Đã kiểm - KHÔNG ĐẠT, đã chạy lại QC sau nhắc nhở"); `availableLots`, `defaults` (lô và ngày mở theo kết quả ghi gần nhất của máy): chỉ có khi người xem ghi được kết quả; `actions` `{ record, submit, review, confirm, return }`.
+
+| Phương thức | Đường dẫn | Quyền | Mô tả |
+|---|---|---|---|
+| GET | `/catalog` | `qc.manage` | `{ meters, lots }`, kể cả ngưng sử dụng |
+| POST | `/meters` | `qc.manage` | `{ departmentId, model, serialNumber }`. Lỗi `400`: khoa không tồn tại hoặc ngưng hoạt động → `departmentId`; thiếu, quá dài `model` (≤ 100), `serialNumber` (≤ 50) hoặc seri trùng → `serialNumber` |
+| PUT | `/meters/{id}` | `qc.manage` | `{ departmentId, model, serialNumber, isActive }`: sửa, chuyển khoa, ngưng hoặc dùng lại máy. Chuyển khoa: sổ tháng này của khoa cũ giữ nguyên, khoa mới mở sổ mới |
+| POST | `/lots` | `qc.manage` | `{ kind, productName, lotNumber, expiryDate, level?, rangeLow?, rangeHigh?, unit? }`. Lỗi `400` theo từng trường; trùng → `lotNumber` |
+| PUT | `/lots/{id}` | `qc.manage` | Như thêm, kèm `isActive`; không đổi được `kind` (`400 kind`) |
+| GET | `/books?month=&departmentId=` | `qc.record` hoặc `qc.review` | Sổ của tháng (mặc định tháng này), theo khoa rồi theo máy: `{ month, items: [{ bookId, meterId, meterLabel, departmentId, departmentName, status, recordedDays, failedDays, reviewedDays, daysToReview, canOpen }] }`; máy đang dùng chưa mở sổ tháng này có `bookId: null`. Khoa chỉ thấy khoa của mình |
+| POST | `/books` | `qc.record` (khoa của máy) hoặc `qc.review` | `{ meterId, month }`: mở sổ tháng của máy cho khoa đang giữ máy; đã có thì trả sổ đó. Tháng sau hoặc quá 12 tháng trước → `400 month` |
+| GET | `/books/{id}` | Như trên | Sổ đầy đủ |
+| POST | `/books/{id}/runs` | `qc.record` (khoa của sổ) | `{ runDate, stripLotId, stripOpenedOn, control1LotId, control1OpenedOn, control1Value, control2LotId, control2OpenedOn, control2Value }`: ghi kết quả của một ngày chưa có kết quả. Thiếu trường → `400`; `422 qc.rule`: sổ đã gửi hoặc đã xác nhận, ngày ngoài tháng hoặc chưa tới, ngày đã được xem xét, ngày đã có kết quả, lô sai loại, ngưng sử dụng, hết hạn trước ngày thực hiện, ngày mở sau ngày thực hiện, hai mức trùng hoặc mức cao ở cột đầu, kết quả không hợp lệ, máy ngưng hoặc đã chuyển khoa |
+| POST | `/books/{id}/runs/{runId}/follow-up` | `qc.record` | `{ reason, control1RepeatValue?, control2RepeatValue? }`: kết quả không đạt, ghi nguyên nhân (bắt buộc, ≤ 500 ký tự) và kết quả chạy lại hai mức (bỏ trống cả hai nếu không chạy lại); một lần cho mỗi kết quả |
+| POST | `/books/{id}/runs/{runId}/correction` | `qc.record` | `{ reason, replacement? }`: ghi điều chỉnh. Kết quả cũ được hủy (giữ lại, `cancelReason`), `replacement` (cùng dạng như ghi kết quả; ngày có thể khác) là kết quả thay thế; không có `replacement` là chỉ hủy. Thiếu lý do → `400 reason`; ngày đã được xem xét → `422 qc.rule` |
+| POST | `/books/{id}/reviews` | `qc.review` | `{ days: [{ date, outcome, note? }] }` (1–31 ngày): xem xét các ngày đến hôm nay chưa xem xét. `outcome` phải khớp dữ liệu (`allowedOutcomes`); người ghi kết quả (hoặc ghi chạy lại) ngày đó không tự xem xét; sổ đã xác nhận → `422 qc.rule` |
+| POST | `/books/{id}/reviews/return` | `qc.review` | `{ date, reason }`: trả lại một ngày đã xem xét (lần xem xét cũ giữ lại); sổ đã gửi thì sổ cũng trở về `Open` với lý do này |
+| POST | `/books/{id}/submit` | `qc.record` | Khoa gửi sổ tháng, từ ngày cuối tháng |
+| POST | `/books/{id}/confirm` | `qc.review` | Xác nhận sổ đã gửi khi mọi ngày đã xem xét; người gửi sổ không tự xác nhận. Sổ khóa hẳn |
+| POST | `/books/{id}/return` | `qc.review` | `{ reason }`: trả lại sổ đã gửi |
+| GET | `/books/{id}/pdf` | Như xem sổ | PDF theo mẫu giấy (A4 ngang): đầu trang có logo, tên đơn vị (Cấu hình hệ thống), mã số mẫu; phần đầu sổ; bảng mỗi ngày một dòng; kết quả đã hủy và lần xem xét đã trả lại in chữ xám gạch ngang kèm lý do; kết quả ghi sau ngày thực hiện có dấu `*`. Tên file `so-noi-kiem-<mã khoa>-<yyyy>-<MM>-<seri>.pdf` |
 
 ---
 

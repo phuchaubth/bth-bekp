@@ -4,6 +4,7 @@ using Consent.Domain.ConsentTemplates;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -27,6 +28,7 @@ internal sealed partial class DatabaseSeeder(
         ("NOI", "Khoa Nội tổng hợp"),
         ("KHTH", "Phòng Kế hoạch tổng hợp"),
         ("PDD", "Phòng Điều dưỡng"),
+        ("HSH", "Khoa Huyết học – Sinh hóa"),
     ];
 
     /// <summary>Tài khoản demo: tên giả lập, không phải người thật.</summary>
@@ -40,6 +42,7 @@ internal sealed partial class DatabaseSeeder(
         ("baocao.demo", "Báo cáo Demo", "Chuyên viên", SystemRoles.Reporter, "KHTH"),
         ("kiemtra.demo", "Kiểm tra Demo", "Chuyên viên", SystemRoles.Auditor, "KHTH"),
         ("phongdieuduong.demo", "Phòng Điều dưỡng Demo", "Điều dưỡng trưởng", SystemRoles.NursingOffice, "PDD"),
+        ("hsh.demo", "Khoa HSH Demo", "Kỹ thuật viên", SystemRoles.LabQualityControl, "HSH"),
     ];
 
     /// <summary>Người bệnh demo: họ tên có "(giả lập)", số giấy tờ là số thử nghiệm, không phải người thật.</summary>
@@ -195,6 +198,27 @@ internal sealed partial class DatabaseSeeder(
             user.SetPassword(passwordHash, mustChangePassword: false);
             db.Users.Add(user);
         }
+
+        await SeedDemoQualityControlAsync(departments["NOI"].Id, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Danh mục nội kiểm demo (quyết định 57): một máy đo của khoa Nội tổng hợp, một lô que thử, hai lô dung dịch chứng. Tên, số
+    /// seri, số lô, ngưỡng đều giả lập. Chỉ tạo khi chưa có máy đo nào.
+    /// </summary>
+    private async Task SeedDemoQualityControlAsync(Guid departmentId, CancellationToken cancellationToken)
+    {
+        if (await db.QcMeters.AnyAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var now = clock.UtcNow;
+        var expiry = DateOnly.FromDateTime(now.UtcDateTime).AddYears(1);
+        db.QcMeters.Add(QcMeter.Create(departmentId, "Máy đo đường huyết Demo (giả lập)", "DEMO-0001", now));
+        db.QcLots.Add(QcLot.CreateTestStrip("Que thử Demo (giả lập)", "QT-DEMO-01", expiry, now));
+        db.QcLots.Add(QcLot.CreateControl("Dung dịch chứng Demo mức 1 (giả lập)", "DC1-DEMO-01", expiry, 1, 40, 70, QcUnit.MgPerDl, now));
+        db.QcLots.Add(QcLot.CreateControl("Dung dịch chứng Demo mức 2 (giả lập)", "DC2-DEMO-01", expiry, 2, 100, 140, QcUnit.MgPerDl, now));
     }
 
     [LoggerMessage(Level = LogLevel.Warning,
