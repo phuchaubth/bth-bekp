@@ -35,6 +35,10 @@ describe('đồng hồ thời hạn kết quả nguy cấp', () => {
     expect(formatCountdown(-130)).toBe('2:10')
     expect(formatCountdown(3 * 3600 + 5 * 60)).toBe('3 giờ 05 phút')
     expect(countdownText(59)).toBe('Còn 0:59')
+    expect(countdownText(0)).toBe('Còn 0:00')
+    // Vừa quá hạn (chưa tới một phút) đã phải ghi Quá hạn.
+    expect(countdownText(-1)).toBe('Quá hạn 0:01')
+    expect(countdownText(-30)).toBe('Quá hạn 0:30')
     expect(countdownText(-61)).toBe('Quá hạn 1:01')
   })
 

@@ -366,7 +366,7 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
 
   it('Ghi kết quả Vi sinh: kết quả bằng chữ, bắt buộc SID và người nhận nhắc lại 2 lần', { timeout: 30_000 }, async () => {
     const user = userEvent.setup()
-    mockApi(common(labSession()))
+    const { calls } = mockApi({ ...common(labSession()), [`POST ${base}`]: (c) => record({ ...(c.body as object) }) })
     renderApp('/ket-qua-nguy-cap/ghi')
 
     await pick(user, document.body, 'Xét nghiệm, kỹ thuật (danh mục kết quả nguy cấp)', 'Cấy máu (giả lập) · Vi sinh')
@@ -376,6 +376,30 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
     await user.click(screen.getByRole('button', { name: 'Lưu, đã báo' }))
     expect(await screen.findByText('Sổ Vi sinh: nhập SID.')).toBeInTheDocument()
     expect(screen.getByText('Sổ Vi sinh: người nhận phải nhắc lại 2 lần.')).toBeInTheDocument()
+
+    // Điền đủ rồi lưu: gửi SID, mẫu khẩn, người nhận đã nhắc lại 2 lần; kết quả bằng chữ không có đơn vị.
+    await user.type(screen.getByLabelText('Mã người bệnh'), 'NB-GL-0010')
+    await user.type(screen.getByLabelText('Họ tên'), 'Người Bệnh Vi Sinh')
+    await user.type(screen.getByLabelText('Ngày sinh'), '02/01/1960{Enter}')
+    await user.type(screen.getByLabelText('Địa chỉ'), 'Ấp Mẫu (giả lập)')
+    await user.type(screen.getByLabelText('Kết quả (ghi bằng chữ)'), 'Dương tính (giả lập)')
+    await user.type(screen.getByLabelText('SID (mã mẫu)'), 'VS-0010')
+    await user.click(screen.getByLabelText('Mẫu khẩn'))
+    await pick(user, document.body, 'Khoa nhận', 'Khoa Nội tổng hợp')
+    await user.type(screen.getByLabelText('Người nghe máy'), 'Điều dưỡng nghe máy (giả lập)')
+    await user.click(screen.getByRole('button', { name: /^(check )?Chính xác$/ }))
+    await user.click(screen.getByLabelText('Người nhận đã nhắc lại 2 lần (sổ Vi sinh)'))
+    await user.click(screen.getByRole('button', { name: 'Lưu, đã báo' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
+    expect(calls.find((c) => c.method === 'POST' && c.path === base)!.body).toMatchObject({
+      testId: 't-c',
+      value: 'Dương tính (giả lập)',
+      unit: null,
+      sampleId: 'VS-0010',
+      urgent: true,
+      notification: { method: 'Phone', receiverName: 'Điều dưỡng nghe máy (giả lập)', readBackCorrect: true, incorrectReadBacks: 0, repeatedTwice: true },
+    })
   })
 })
 
@@ -392,10 +416,12 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
       acknowledgedAtUtc: ago(11),
     })
     const cancelled = record({ id: 'kq-4', status: 'Cancelled', patientName: 'Người Bệnh Báo Nhầm', cancelReason: 'Nhập nhầm người bệnh', cancelledAtUtc: ago(1) })
+    // Hồ sơ chờ xác nhận mà người xem không được xác nhận, trả lại (máy chủ quyết định qua "can"): không có nút.
+    const viewOnly = record({ id: 'kq-6', patientName: 'Người Bệnh Chỉ Xem', can: none })
     const { calls } = mockApi({
       ...common(nurseSession()),
       [`GET ${base}/alerts`]: alerts({ awaitingAcknowledgement: [alertItem()] }),
-      [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [waiting, late, cancelled] },
+      [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [waiting, late, cancelled, viewOnly] },
       [`POST ${base}/kq-1/acknowledge`]: record({ status: 'AwaitingAction', acknowledgedByName: 'Điều dưỡng Demo', acknowledgedAtUtc: now.toISOString() }),
       [`POST ${base}/kq-1/reject`]: record({ status: 'AwaitingNotification', receivingDepartmentId: null }),
     })
@@ -419,6 +445,9 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
     expect(within(card).queryByRole('button', { name: 'Bác sĩ ghi hướng xử trí' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('article', { name: 'Người Bệnh Quá Hạn' })).getByText('Quá hạn: nhắc lại và báo trực tiếp bác sĩ.')).toBeInTheDocument()
     expect(screen.getByText('Nhập nhầm người bệnh')).toBeInTheDocument()
+    const viewOnlyCard = screen.getByRole('article', { name: 'Người Bệnh Chỉ Xem' })
+    expect(within(viewOnlyCard).queryByRole('button', { name: 'Đã nhận cuộc gọi' })).not.toBeInTheDocument()
+    expect(within(viewOnlyCard).queryByRole('button', { name: 'Không phải khoa tôi' })).not.toBeInTheDocument()
 
     await user.click(within(card).getByRole('button', { name: 'Đã nhận cuộc gọi' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === `${base}/kq-1/acknowledge`)).toBe(true))
@@ -430,6 +459,31 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
     await waitFor(() =>
       expect(calls.find((c) => c.path === `${base}/kq-1/reject`)?.body).toEqual({ reason: 'Người bệnh đã chuyển khoa' }),
     )
+  })
+
+  it('Máy đã tắt tiếng: bấm trên trang vẫn không kêu chuông, bật tiếng lại thì kêu; QLCL tắt chớp tắt thì dải không chớp', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    window.localStorage.setItem('critical.muted', '1')
+    mockApi({
+      ...common(nurseSession()),
+      [`GET ${base}/alerts`]: alerts({
+        awaitingAcknowledgement: [alertItem()],
+        settings: { warnMinutes: 3, pollSeconds: 15, soundEnabled: true, soundRepeatSeconds: 60, flashEnabled: false, flashPeriodMs: 1200 },
+      }),
+      [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] },
+    })
+    renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    const banner = await screen.findByRole('region', { name: 'Cảnh báo kết quả nguy cấp' })
+    expect(banner).not.toHaveClass('critical-flash')
+    // Bấm vào trang: trình duyệt cho phát âm thanh, nhưng máy này đã tắt tiếng nên chuông không kêu.
+    await user.click(document.body)
+    await waitFor(() => expect(FakeAudioContext.running).toBe(true))
+    expect(FakeAudioContext.chimes).toBe(0)
+
+    await user.click(within(banner).getByRole('button', { name: /Bật tiếng/ }))
+    await waitFor(() => expect(FakeAudioContext.chimes).toBeGreaterThan(0))
+    expect(window.localStorage.getItem('critical.muted')).toBeNull()
   })
 
   it('Bác sĩ nghe máy ghi hướng xử trí ngay trên hồ sơ: xác nhận đã nhận và lưu bằng tài khoản của mình', { timeout: 30_000 }, async () => {

@@ -211,6 +211,35 @@ public sealed class CriticalDashboardLogbookTests
     }
 
     [Fact]
+    public async Task Dashboard_DoctorOverdueWithoutAction_CountsAgainstActionRate_NotYetDueDoesNot()
+    {
+        // Báo 9:00, khoa đã nhận, hạn bác sĩ 9:10 đã qua lúc 10:30 mà chưa xử trí: tính vào mẫu số, không đúng hạn.
+        var overdue = Seed(_lab, _potassium, "Người Bệnh Bảy", At(8, 55));
+        Call(overdue, _wardA, At(9, 0));
+        overdue.Acknowledge(Actor(_nurseA), At(9, 1));
+        // Báo 10:25, hạn bác sĩ 10:35 chưa tới: chưa tính.
+        var pending = Seed(_lab, _potassium, "Người Bệnh Tám", At(10, 20));
+        Call(pending, _wardA, At(10, 25));
+        ActAs(_quality);
+
+        var month = Ok(await Dashboard.GetAsync(null, null, CancellationToken.None));
+
+        Assert.Equal(new CriticalRateDto(0, 1), month.Kpis.ActionOnTime);
+        Assert.Equal(0.0, month.Kpis.ActionOnTime.Percent);
+        Assert.Equal(new CriticalRateDto(0, 1), month.Receivers.Single().OnTime);
+        Assert.Equal(new CriticalRateDto(0, 1), month.Kpis.Complete);
+    }
+
+    [Theory]
+    [InlineData(1, 16, 6.3)] // 6,25: 0,05 làm tròn lên (không làm tròn kiểu ngân hàng thành 6,2)
+    [InlineData(3, 8, 37.5)]
+    [InlineData(2, 3, 66.7)]
+    [InlineData(5, 5, 100.0)]
+    [InlineData(0, 0, null)]
+    public void Rate_PercentRoundsHalfAwayFromZero(int numerator, int denominator, double? percent) =>
+        Assert.Equal(percent, new CriticalRateDto(numerator, denominator).Percent);
+
+    [Fact]
     public async Task Dashboard_QuarterCoversThreeMonthsUpToToday()
     {
         Scenario();
