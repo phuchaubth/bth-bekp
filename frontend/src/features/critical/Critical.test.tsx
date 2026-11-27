@@ -219,6 +219,25 @@ async function pick(user: ReturnType<typeof userEvent.setup>, scope: HTMLElement
   await user.click(options.find((o) => o.classList.contains('ant-select-item-option'))!)
 }
 
+/** Âm thanh trình duyệt giả (jsdom không có Web Audio): đếm số lần chuông kêu. */
+class FakeAudioContext {
+  static chimes = 0
+  state = 'suspended'
+  currentTime = 0
+  destination = {}
+  async resume() {
+    this.state = 'running'
+  }
+  createOscillator() {
+    FakeAudioContext.chimes++
+    return { type: 'sine', frequency: { value: 0 }, connect: (node: unknown) => node, start() {}, stop() {} }
+  }
+  createGain() {
+    return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect: (node: unknown) => node }
+  }
+}
+Object.defineProperty(window, 'AudioContext', { configurable: true, writable: true, value: FakeAudioContext })
+
 afterEach(() => {
   vi.restoreAllMocks()
   window.localStorage.clear()
@@ -371,7 +390,10 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
     expect(banner).toHaveTextContent(/bác sĩ còn [67]:\d\d để xử trí/)
     expect(banner).toHaveClass('critical-flash')
     expect(banner.style.animationDuration).toBe('1200ms')
-    await user.click(within(banner).getByRole('button', { name: /Tắt tiếng/ }))
+    // Chưa bấm gì trên trang: trình duyệt chưa cho phát âm thanh. Bấm "Bật chuông": chuông kêu cho hồ sơ đang chờ.
+    await user.click(within(banner).getByRole('button', { name: /Bật chuông/ }))
+    await waitFor(() => expect(FakeAudioContext.chimes).toBeGreaterThan(0))
+    await user.click(await within(banner).findByRole('button', { name: /Tắt tiếng/ }))
     expect(window.localStorage.getItem('critical.muted')).toBe('1')
     expect(within(banner).getByRole('button', { name: /Bật tiếng/ })).toBeInTheDocument()
 

@@ -55,28 +55,40 @@ export function CriticalAlertBanner() {
     data?.settings.soundRepeatSeconds ?? 0,
   )
 
-  // Trình duyệt chỉ cho phát âm thanh sau một thao tác: lần bấm, gõ phím đầu tiên trên trang mở khóa chuông.
+  // Trình duyệt chỉ cho phát âm thanh sau một thao tác: lần bấm, gõ phím đầu tiên trên trang mở khóa chuông. Mở khóa khi bấm
+  // xong (click), không phải lúc nhấn xuống: dải cảnh báo đổi chữ giữa lúc nhấn và lúc thả thì lần bấm đó bị mất.
   useEffect(() => {
     if (audioOn || !staff || !enabled) return
     const unlock = () => void unlockChime().then((ok) => ok && setAudioOn(true))
-    window.addEventListener('pointerdown', unlock, { once: true })
-    window.addEventListener('keydown', unlock, { once: true })
+    window.addEventListener('click', unlock, { once: true, capture: true })
+    window.addEventListener('keydown', unlock, { once: true, capture: true })
     return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
+      window.removeEventListener('click', unlock, { capture: true })
+      window.removeEventListener('keydown', unlock, { capture: true })
     }
   }, [audioOn, staff, enabled])
 
   if (!data) return null
 
-  const toggleMute = () => {
-    writeMuted(!muted)
-    setMuted(!muted)
+  /** Một nút cố định chỗ: chưa mở khóa chuông thì "Bật chuông", rồi "Tắt tiếng" / "Bật tiếng" (dải không đổi chiều cao). */
+  const soundButton = () => {
+    if (!audioOn && !muted) {
+      return { label: 'Bật chuông', icon: <SoundOutlined />, onClick: () => void unlockChime().then((ok) => ok && setAudioOn(true)) }
+    }
+    return {
+      label: muted ? 'Bật tiếng' : 'Tắt tiếng',
+      icon: muted ? <AudioMutedOutlined /> : <SoundOutlined />,
+      onClick: () => {
+        writeMuted(!muted)
+        setMuted(!muted)
+      },
+    }
   }
 
   if (pending.length > 0) {
     const first = pending[0]
     const left = secondsLeft(first.actionDueAtUtc, nowMs)
+    const sound = soundButton()
     return (
       <div
         role="region"
@@ -96,21 +108,14 @@ export function CriticalAlertBanner() {
           </span>
         </Space>
         <Space wrap>
-          {soundEnabled && !audioOn && !muted && <span style={{ opacity: 0.9 }}>Bấm vào trang để bật chuông</span>}
           {pathname !== '/ket-qua-nguy-cap/khoa-nhan' && (
             <Button size="small" onClick={() => navigate('/ket-qua-nguy-cap/khoa-nhan')}>
               Xem ngay
             </Button>
           )}
           {soundEnabled && (
-            <Button
-              size="small"
-              ghost
-              icon={muted ? <AudioMutedOutlined /> : <SoundOutlined />}
-              onClick={toggleMute}
-              aria-pressed={muted}
-            >
-              {muted ? 'Bật tiếng' : 'Tắt tiếng'}
+            <Button size="small" ghost icon={sound.icon} onClick={sound.onClick} aria-pressed={muted} style={{ minWidth: 112 }}>
+              {sound.label}
             </Button>
           )}
         </Space>

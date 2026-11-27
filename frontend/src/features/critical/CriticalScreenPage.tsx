@@ -154,7 +154,7 @@ export function CriticalScreenPage() {
   }
 
   return (
-    <main style={page} onPointerDown={() => !audioOn && soundEnabled && enableSound()}>
+    <main style={page} onClick={() => !audioOn && soundEnabled && enableSound()}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 34, fontWeight: 700 }}>{data?.receivingDepartmentNames.join(', ') || 'Kết quả nguy cấp'}</div>

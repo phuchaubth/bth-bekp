@@ -167,7 +167,11 @@ export function CriticalReceivedPage() {
                     const late = r.actionDueAtUtc !== null && secondsLeft(r.actionDueAtUtc, nowMs) < 0
                     return (
                       <Card key={r.id} size="small" role="article" aria-label={r.patientName}>
-                        {r.actionDueAtUtc && <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />}
+                        {r.actionDueAtUtc && (
+                          <div style={{ marginBottom: 4 }}>
+                            <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />
+                          </div>
+                        )}
                         <PatientLine record={r} />
                         <div style={{ margin: '6px 0' }}>
                           <ResultValue testName={r.testName} value={r.value} unit={r.unit} />
