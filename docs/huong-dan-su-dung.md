@@ -1559,17 +1559,17 @@ Phần mềm thay **"Sổ theo dõi kết quả nội kiểm đường huyết t
 
 1. Bấm **Nội kiểm** → **Máy đo và lô vật tư**.
 2. Tab **Máy đo** → **Thêm máy đo**: chọn **khoa dùng máy**, nhập **loại máy** (hãng, đời máy) và **số seri** (không trùng máy khác). Máy hỏng, thu hồi: bấm **Sửa**, tắt **Đang dùng**. Chuyển máy sang khoa khác: **Sửa**, chọn khoa mới; sổ tháng này của khoa cũ giữ nguyên, khoa mới mở sổ mới.
-3. Tab **Lô que thử, dung dịch chứng** → **Thêm lô**:
-   - **Que thử**: tên vật tư, số lô, hạn dùng.
-   - **Dung dịch chứng**: thêm **mức** (Level 1, 2 hoặc 3) và **ngưỡng chấp nhận** (từ – đến, đơn vị mg/dL hoặc mmol/L), lấy theo tờ hướng dẫn của lô. Cùng số lô nhưng khác mức thì khai báo hai lần.
+3. Tab **Lô que thử, dung dịch chứng** có hai nút:
+   - **Thêm lô que thử**: tên vật tư, số lô, hạn dùng. Que thử không có ngưỡng.
+   - **Thêm lô dung dịch chứng**: tên vật tư, số lô, hạn dùng, **mức** (Level 1, 2 hoặc 3) và **ngưỡng chấp nhận**: ô **Từ** (ngưỡng dưới), ô **Đến** (ngưỡng trên) và **đơn vị** mg/dL hoặc mmol/L, lấy theo tờ hướng dẫn của lô cho đúng mức đó (có hãng in ngưỡng trên nhãn lọ que thử). Nhập số lớn hơn 0, nhiều nhất một chữ số thập phân; ngưỡng trên phải lớn hơn ngưỡng dưới. Kết quả nằm trong khoảng, **tính cả hai đầu**, là Đạt. Cùng số lô nhưng khác mức thì khai báo hai lần (mỗi mức một dòng).
 
    ![Danh mục lô que thử, dung dịch chứng](huong-dan-su-dung/nk-01-danh-muc.png)
 
-   *Hình 11.1. Danh mục lô: que thử, dung dịch chứng Level 1 và Level 2 kèm ngưỡng chấp nhận (dữ liệu giả lập).*
+   *Hình 11.1. Danh mục lô: que thử, dung dịch chứng Level 1 và Level 2 kèm ngưỡng chấp nhận (dữ liệu giả lập). Hai nút **Thêm lô que thử**, **Thêm lô dung dịch chứng** ở đầu tab.*
 
    ![Hộp Thêm lô dung dịch chứng: mức, hạn dùng, ngưỡng chấp nhận, đơn vị](huong-dan-su-dung/nk-02-them-lo.png)
 
-   *Hình 11.2. Thêm lô dung dịch chứng Level 3.*
+   *Hình 11.2. Bấm **Thêm lô dung dịch chứng**: hộp có sẵn ô **Mức (Level)** và **Ngưỡng chấp nhận** (từ – đến, đơn vị). Ví dụ lô Level 3, ngưỡng 280–380 mg/dL (dữ liệu giả lập).*
 
 4. Lô hết dùng: **Sửa**, tắt **Đang dùng**; khoa không chọn được lô đó nữa. Sửa lô (ví dụ ngưỡng) chỉ áp dụng cho kết quả ghi **sau** khi sửa; kết quả đã ghi giữ ngưỡng lúc ghi. Lô **hết hạn** trước ngày thực hiện thì khoa không ghi được kết quả với lô đó.
 
@@ -1585,13 +1585,16 @@ Phần mềm thay **"Sổ theo dõi kết quả nội kiểm đường huyết t
 ### 11.3. Ghi kết quả hằng ngày (khoa)
 
 1. Ở dòng ngày thực hiện, bấm **Ghi kết quả**.
-2. **Lô que thử, ngày mở hộp, lô dung dịch chứng hai mức, ngày mở lọ** được điền sẵn theo lần ghi trước của máy. Mở hộp que, lọ dung dịch chứng mới thì chọn lô mới và ngày mở mới. Mức thấp hơn ở dòng đầu (như hai cột kết quả của sổ giấy).
+2. **Lô que thử, ngày mở hộp, lô dung dịch chứng hai mức, ngày mở lọ** được điền sẵn theo lần ghi trước của máy. Mở hộp que, lọ dung dịch chứng mới thì chọn lô mới và ngày mở mới. Hai mức như hai cột kết quả của sổ giấy:
+   - Ô **Mức thấp (cột đầu)**: lô mức thấp, thường là **Level 1**.
+   - Ô **Mức cao**: chỉ có các lô mức cao hơn ô mức thấp (thường là **Level 2**). Đổi ô mức thấp sang mức bằng hoặc cao hơn thì ô mức cao tự bỏ chọn để chọn lại.
+   - Mỗi lựa chọn ghi **Level**, số lô, tên, ngưỡng chấp nhận và hạn dùng. Danh mục chưa có đủ hai mức dung dịch chứng đang dùng thì hộp báo ngay: nhờ Khoa HSH khai báo mức còn thiếu (mục 11.1).
 3. Nhập **kết quả** hai mức. Đánh giá **Đạt/ Pass** hoặc **Không đạt/ Fail** hiện ngay bên cạnh.
 4. Bấm **Lưu kết quả**. Nhân viên thực hiện là người đăng nhập. Ghi sau ngày thực hiện (ghi bù) thì dòng đó có nhãn **Ghi muộn** (PDF có dấu `*`).
 
    ![Hộp Ghi kết quả nội kiểm: lô điền sẵn, đánh giá hiện ngay](huong-dan-su-dung/nk-04-ghi-ket-qua.png)
 
-   *Hình 11.4. Mức 2 ngoài ngưỡng 100–140 mg/dL: phần mềm đánh giá **Không đạt**.*
+   *Hình 11.4. Ô **Mức thấp (cột đầu)** là Level 1, ô **Mức cao** là Level 2. Mức cao ngoài ngưỡng 100–140 mg/dL: phần mềm đánh giá **Không đạt**.*
 
 5. Kết quả **không đạt**: bấm **Ghi nguyên nhân, chạy lại**, ghi **nguyên nhân không đạt** (bắt buộc), nhập **kết quả chạy lại** hai mức (đánh giá lại hiện ngay). Không chạy lại được thì bỏ chọn **Đã chạy lại QC** và ghi nguyên nhân. Mỗi kết quả ghi nguyên nhân và chạy lại một lần.
 

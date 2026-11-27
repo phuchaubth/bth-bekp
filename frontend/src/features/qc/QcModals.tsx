@@ -81,7 +81,11 @@ export function QcRunModal({
   const correcting = run !== undefined
   const lots = book.availableLots
   const strips = lots.filter((l) => l.kind === 'TestStrip')
-  const controls = lots.filter((l) => l.kind === 'ControlSolution')
+  // Hai mức như sổ giấy, mức thấp ở cột đầu: ô đầu chỉ có lô chưa phải mức cao nhất, ô sau chỉ có lô mức cao hơn ô đầu (trước đây
+  // hai ô có mọi lô, chọn trùng hoặc ngược mức thì bấm Lưu mới báo lỗi).
+  const controls = lots.filter((l) => l.kind === 'ControlSolution').sort((a, b) => (a.level ?? 0) - (b.level ?? 0))
+  const levelCount = new Set(controls.map((l) => l.level)).size
+  const topLevel = Math.max(0, ...controls.map((l) => l.level ?? 0))
   const known = (id: string | null | undefined) => (id && lots.some((l) => l.id === id) ? id : undefined)
   const asDate = (value: string | null | undefined) => (value ? dayjs(value) : undefined)
   const defaults = book.defaults
@@ -190,16 +194,64 @@ export function QcRunModal({
               </Form.Item>
               <div style={{ flex: '1 1 160px' }}>{opened('stripOpenedOn', 'Ngày mở hộp')}</div>
             </Flex>
-            <Typography.Title level={5}>Dung dịch chứng (mức thấp ở cột đầu)</Typography.Title>
+            <Typography.Title level={5}>Dung dịch chứng: hai mức, mức thấp ở cột đầu</Typography.Title>
+            {levelCount < 2 ? (
+              <Alert
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+                title="Danh mục chưa có đủ hai mức dung dịch chứng đang dùng (ví dụ Level 1 và Level 2)."
+                description="Khoa HSH khai báo thêm lô dung dịch chứng của mức còn thiếu ở Nội kiểm → Máy đo và lô vật tư (nút Thêm lô dung dịch chứng), rồi ghi kết quả."
+              />
+            ) : null}
             {(
               [
-                ['control1LotId', 'control1OpenedOn', 'control1Value', control1, value1, 'Mức thứ nhất'],
-                ['control2LotId', 'control2OpenedOn', 'control2Value', control2, value2, 'Mức thứ hai'],
+                ['control1LotId', 'control1OpenedOn', 'control1Value', control1, value1, 'Mức thấp (cột đầu)'],
+                ['control2LotId', 'control2OpenedOn', 'control2Value', control2, value2, 'Mức cao'],
               ] as const
             ).map(([lotField, openedField, valueField, lot, value, label]) => (
               <Flex key={lotField} gap={12} wrap align="flex-end">
-                <Form.Item name={lotField} label={label} style={{ flex: '2 1 320px' }} rules={[{ required: true, message: 'Chọn lô dung dịch chứng.' }]}>
-                  <Select options={controls.map((l) => ({ value: l.id, label: lotLabel(l) }))} placeholder="Chọn lô" />
+                <Form.Item
+                  name={lotField}
+                  label={label}
+                  style={{ flex: '2 1 320px' }}
+                  dependencies={lotField === 'control2LotId' ? ['control1LotId'] : []}
+                  rules={[
+                    { required: true, message: 'Chọn lô dung dịch chứng.' },
+                    ...(lotField === 'control2LotId'
+                      ? [
+                          {
+                            validator: async (_: unknown, id: string | undefined) => {
+                              const low = control1?.level
+                              const high = lots.find((l) => l.id === id)?.level
+                              if (low !== undefined && low !== null && high !== undefined && high !== null && high <= low) {
+                                throw new Error(`Chọn lô mức cao hơn Level ${low}.`)
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                >
+                  <Select
+                    options={controls
+                      .filter((l) =>
+                        lotField === 'control1LotId' ? (l.level ?? 0) < topLevel : control1 ? (l.level ?? 0) > (control1.level ?? 0) : true,
+                      )
+                      .map((l) => ({ value: l.id, label: lotLabel(l) }))}
+                    placeholder="Chọn lô"
+                    onChange={
+                      lotField === 'control1LotId'
+                        ? (id: string) => {
+                            // Đổi mức thấp: lô mức cao đang chọn không còn cao hơn thì bỏ chọn.
+                            const low = lots.find((l) => l.id === id)?.level ?? 0
+                            if ((control2?.level ?? Number.MAX_SAFE_INTEGER) <= low) {
+                              form.setFieldValue('control2LotId', undefined)
+                            }
+                          }
+                        : undefined
+                    }
+                  />
                 </Form.Item>
                 <div style={{ flex: '1 1 160px' }}>{opened(openedField, 'Ngày mở lọ')}</div>
                 <Form.Item

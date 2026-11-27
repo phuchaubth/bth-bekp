@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   DatePicker,
+  Flex,
   Form,
   Input,
   InputNumber,
@@ -16,6 +17,7 @@ import {
   Table,
   Tabs,
   Tag,
+  Typography,
   type TableColumnsType,
 } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -115,7 +117,6 @@ function MeterModal({ meter, onClose }: { meter: QcMeter | null; onClose: () => 
 }
 
 interface LotForm {
-  kind: QcLotKind
   productName: string
   lotNumber: string
   expiryDate: Dayjs
@@ -126,16 +127,27 @@ interface LotForm {
   isActive: boolean
 }
 
-function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) {
+/** Lô đang thêm (`lot` null, loại theo nút đã bấm) hoặc đang sửa (loại của lô, không đổi được). */
+interface LotEdit {
+  lot: QcLot | null
+  kind: QcLotKind
+}
+
+const KIND_NAMES: Record<QcLotKind, string> = { TestStrip: 'lô que thử', ControlSolution: 'lô dung dịch chứng' }
+
+/**
+ * Hộp thêm, sửa lô. Loại vật tư chọn bằng nút mở hộp (Thêm lô que thử, Thêm lô dung dịch chứng): hộp dung dịch chứng hiện ngay ô
+ * mức và ngưỡng chấp nhận. Trước đây hộp mở sẵn "Que thử", ô ngưỡng chỉ hiện sau khi đổi loại, bệnh viện không thấy chỗ nhập ngưỡng.
+ */
+function LotModal({ lot, kind, onClose }: LotEdit & { onClose: () => void }) {
   const [form] = Form.useForm<LotForm>()
-  const kind = Form.useWatch('kind', form) ?? lot?.kind ?? 'TestStrip'
+  const control = kind === 'ControlSolution'
   const queryClient = useQueryClient()
   const { message } = App.useApp()
   const save = useMutation({
     mutationFn: (values: LotForm) => {
-      const control = values.kind === 'ControlSolution'
       const input = {
-        kind: values.kind,
+        kind,
         productName: values.productName,
         lotNumber: values.lotNumber,
         expiryDate: values.expiryDate.format(DATE),
@@ -154,8 +166,9 @@ function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) 
     },
     onError: (error) => applyServerFieldErrors(form, error),
   })
+  const title = `${lot ? 'Sửa' : 'Thêm'} ${KIND_NAMES[kind]}`
   return (
-    <Modal open title={lot ? 'Sửa lô' : 'Thêm lô'} okText="Lưu" onOk={() => form.submit()} confirmLoading={save.isPending} onCancel={onClose} destroyOnHidden>
+    <Modal open title={title} okText="Lưu" onOk={() => form.submit()} confirmLoading={save.isPending} onCancel={onClose} destroyOnHidden>
       {save.isError && !(save.error instanceof ApiError && save.error.fieldErrors) ? (
         <Alert type="error" showIcon title={errorMessage(save.error)} style={{ marginBottom: 16 }} />
       ) : null}
@@ -174,7 +187,6 @@ function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) 
         initialValues={
           lot
             ? {
-                kind: lot.kind,
                 productName: lot.productName,
                 lotNumber: lot.lotNumber,
                 expiryDate: dayjs(lot.expiryDate),
@@ -184,19 +196,18 @@ function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) 
                 unit: lot.unit ?? undefined,
                 isActive: lot.isActive,
               }
-            : { kind: 'TestStrip', isActive: true, unit: 'MgPerDl' }
+            : { isActive: true, unit: 'MgPerDl' }
         }
-        onFinish={(values) => save.mutate({ ...values, kind: values.kind ?? kind })}
+        onFinish={(values) => save.mutate(values)}
       >
-        <Form.Item name="kind" label="Loại vật tư">
-          <Select
-            disabled={lot !== null}
-            options={[
-              { value: 'TestStrip', label: 'Que thử' },
-              { value: 'ControlSolution', label: 'Dung dịch chứng' },
-            ]}
+        {!control ? (
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+            title="Que thử không có ngưỡng chấp nhận. Ngưỡng nhập ở lô dung dịch chứng (nút Thêm lô dung dịch chứng), mỗi mức một lô."
           />
-        </Form.Item>
+        ) : null}
         <Form.Item name="productName" label="Tên vật tư" rules={[{ required: true, whitespace: true, message: 'Nhập tên vật tư.' }]}>
           <Input maxLength={100} />
         </Form.Item>
@@ -206,12 +217,16 @@ function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) 
         <Form.Item name="expiryDate" label="Hạn dùng" rules={[{ required: true, message: 'Nhập hạn dùng.' }]}>
           <DatePicker format={SHOW_DATE} placeholder="Chọn ngày" />
         </Form.Item>
-        {kind === 'ControlSolution' ? (
+        {control ? (
           <>
             <Form.Item name="level" label="Mức (Level)" rules={[{ required: true, message: 'Chọn mức.' }]}>
               <Select options={[1, 2, 3].map((l) => ({ value: l, label: `Level ${l}` }))} />
             </Form.Item>
-            <Form.Item label="Ngưỡng chấp nhận" required>
+            <Form.Item
+              label="Ngưỡng chấp nhận"
+              required
+              extra="Từ – đến của đúng mức này, theo tờ hướng dẫn của lô (có hãng in trên nhãn lọ que thử). Kết quả trong khoảng, tính cả hai đầu, là Đạt."
+            >
               <Space.Compact>
                 <Form.Item name="rangeLow" noStyle rules={[{ required: true, message: 'Nhập ngưỡng dưới.' }]}>
                   <InputNumber min={0.1} max={9999.9} step={0.1} precision={1} placeholder="Từ" aria-label="Ngưỡng dưới" />
@@ -247,7 +262,7 @@ function LotModal({ lot, onClose }: { lot: QcLot | null; onClose: () => void }) 
 export function QcCatalogPage() {
   const catalog = useQcCatalog()
   const [meter, setMeter] = useState<QcMeter | null | undefined>(undefined)
-  const [lot, setLot] = useState<QcLot | null | undefined>(undefined)
+  const [lot, setLot] = useState<LotEdit | null>(null)
 
   const meterColumns: TableColumnsType<QcMeter> = [
     { title: 'Khoa', dataIndex: 'departmentName' },
@@ -263,7 +278,7 @@ export function QcCatalogPage() {
     { title: 'Hạn dùng', render: (_, row) => dayjs(row.expiryDate).format(SHOW_DATE) },
     { title: 'Ngưỡng chấp nhận', render: (_, row) => formatQcRange(row.rangeLow, row.rangeHigh, row.unit) },
     { title: 'Trạng thái', render: (_, row) => <ActiveTag active={row.isActive} /> },
-    { title: '', render: (_, row) => <Button size="small" onClick={() => setLot(row)}>Sửa</Button> },
+    { title: '', render: (_, row) => <Button size="small" onClick={() => setLot({ lot: row, kind: row.kind })}>Sửa</Button> },
   ]
 
   return (
@@ -290,9 +305,17 @@ export function QcCatalogPage() {
               label: 'Lô que thử, dung dịch chứng',
               children: (
                 <>
-                  <Button type="primary" icon={<PlusOutlined />} style={{ marginBottom: 12 }} onClick={() => setLot(null)}>
-                    Thêm lô
-                  </Button>
+                  <Flex gap={8} wrap style={{ marginBottom: 8 }}>
+                    <Button icon={<PlusOutlined />} onClick={() => setLot({ lot: null, kind: 'TestStrip' })}>
+                      Thêm lô que thử
+                    </Button>
+                    <Button icon={<PlusOutlined />} onClick={() => setLot({ lot: null, kind: 'ControlSolution' })}>
+                      Thêm lô dung dịch chứng
+                    </Button>
+                  </Flex>
+                  <Typography.Paragraph type="secondary">
+                    Ngưỡng chấp nhận khai báo ở lô dung dịch chứng, mỗi mức một dòng: Level 1 và Level 2 của cùng số lô là hai dòng.
+                  </Typography.Paragraph>
                   <Table rowKey="id" columns={lotColumns} dataSource={catalog.data?.lots} loading={catalog.isPending} pagination={false} scroll={{ x: 'max-content' }} />
                 </>
               ),
@@ -301,7 +324,7 @@ export function QcCatalogPage() {
         />
       </Card>
       {meter !== undefined ? <MeterModal meter={meter} onClose={() => setMeter(undefined)} /> : null}
-      {lot !== undefined ? <LotModal lot={lot} onClose={() => setLot(undefined)} /> : null}
+      {lot ? <LotModal lot={lot.lot} kind={lot.kind} onClose={() => setLot(null)} /> : null}
     </>
   )
 }

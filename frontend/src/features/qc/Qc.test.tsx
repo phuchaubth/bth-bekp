@@ -208,6 +208,55 @@ describe('Sổ nội kiểm đường huyết (khoa ghi kết quả)', () => {
     expect(await screen.findByRole('button', { name: 'Ghi nguyên nhân, chạy lại' })).toBeInTheDocument()
   })
 
+  // Bệnh viện gặp lỗi "Chọn hai mức dung dịch chứng khác nhau, mức thấp hơn ở cột đầu." khi bấm Lưu: hai ô có mọi lô nên dễ chọn
+  // trùng hoặc ngược mức. Nay ô mức thấp không có lô mức cao nhất, ô mức cao chỉ có lô mức cao hơn ô mức thấp.
+  it('hai mức dung dịch chứng: ô mức cao chỉ có lô mức cao hơn, đổi mức thấp thì bỏ lô mức cao không hợp; thiếu mức thì báo ngay', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const level3 = lot({ id: 'c-3', kind: 'ControlSolution', productName: 'Dung dịch chứng A', lotNumber: 'DC-03', level: 3, rangeLow: 280, rangeHigh: 380, unit: 'MgPerDl' })
+    const open = async (overrides: Partial<QcBook>) => {
+      mockApi({ ...baseRoutes(nurseSession()), 'GET /api/v1/qc/books/b-1': book({ availableLots: [...lots, level3], ...overrides }) })
+      const rendered = renderApp('/noi-kiem/so/b-1')
+      await user.click(await screen.findByRole('button', { name: 'Ghi kết quả' }))
+      return { dialog: await dialogTitled('Ghi kết quả nội kiểm'), unmount: rendered.unmount }
+    }
+    const selectOf = (dialog: HTMLElement, name: string) => within(dialog).getByRole('combobox', { name }).closest('.ant-select') as HTMLElement
+    /** Danh sách lựa chọn của ô vừa mở (danh sách mở sau cùng). */
+    const dropdown = async () => within(await waitFor(() => [...document.querySelectorAll<HTMLElement>('.ant-select-dropdown')].at(-1)!))
+
+    // Mức thấp Level 1 (điền sẵn): ô mức cao có Level 2, Level 3, không có Level 1.
+    let page = await open({})
+    expect(within(page.dialog).queryByText(/chưa có đủ hai mức/)).not.toBeInTheDocument()
+    await user.click(within(page.dialog).getByRole('combobox', { name: 'Mức cao' }))
+    let options = await dropdown()
+    expect(options.getByTitle(/^Level 3: DC-03/)).toBeInTheDocument()
+    expect(options.getByTitle(/^Level 2: DC-02/)).toBeInTheDocument()
+    expect(options.queryByTitle(/^Level 1: DC-01/)).toBeNull()
+    page.unmount()
+
+    // Ô mức thấp không có lô mức cao nhất (Level 3).
+    page = await open({ defaults: null })
+    await user.click(within(page.dialog).getByRole('combobox', { name: 'Mức thấp (cột đầu)' }))
+    options = await dropdown()
+    expect(options.getByTitle(/^Level 1: DC-01/)).toBeInTheDocument()
+    expect(options.getByTitle(/^Level 2: DC-02/)).toBeInTheDocument()
+    expect(options.queryByTitle(/^Level 3: DC-03/)).toBeNull()
+    page.unmount()
+
+    // Điền sẵn Level 1 và Level 2; đổi mức thấp sang Level 2 thì ô mức cao (Level 2) bị bỏ chọn, chỉ còn chọn được Level 3.
+    page = await open({})
+    expect(selectOf(page.dialog, 'Mức cao')).toHaveTextContent('Level 2: DC-02')
+    await user.click(within(page.dialog).getByRole('combobox', { name: 'Mức thấp (cột đầu)' }))
+    await user.click((await screen.findAllByTitle(/^Level 2: DC-02/)).at(-1)!)
+    await waitFor(() => expect(selectOf(page.dialog, 'Mức cao')).not.toHaveTextContent('DC-02'))
+    expect(selectOf(page.dialog, 'Mức cao')).toHaveTextContent('Chọn lô')
+    page.unmount()
+
+    // Danh mục chỉ có một mức: báo ngay trong hộp, không đợi bấm Lưu.
+    page = await open({ availableLots: [lots[0], lots[1]] })
+    expect(within(page.dialog).getByText('Danh mục chưa có đủ hai mức dung dịch chứng đang dùng (ví dụ Level 1 và Level 2).')).toBeInTheDocument()
+    page.unmount()
+  })
+
   it('không đạt thì ghi nguyên nhân và chạy lại; ghi sai thì ghi điều chỉnh có lý do, kết quả cũ gạch ngang', { timeout: 30_000 }, async () => {
     const user = userEvent.setup()
     const failed = book({ days: [qcDay(1, { run: run() })] })
@@ -416,10 +465,14 @@ describe('Sổ nội kiểm đường huyết (Khoa HSH)', () => {
 
     await user.click(screen.getByRole('tab', { name: 'Lô que thử, dung dịch chứng' }))
     expect(await screen.findByText('40-70 mg/dL')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Thêm lô/ }))
-    const dialog = await dialogTitled('Thêm lô')
-    await user.click(within(dialog).getByRole('combobox', { name: 'Loại vật tư' }))
-    await user.click(await screen.findByTitle('Dung dịch chứng'))
+    // Ngưỡng chấp nhận nhập ở lô dung dịch chứng: nút riêng, hộp hiện ngay ô mức và ngưỡng (bệnh viện không thấy ô ngưỡng khi hộp
+    // thêm lô mở sẵn loại que thử, phải đổi loại mới hiện).
+    expect(screen.getByText(/^Ngưỡng chấp nhận khai báo ở lô dung dịch chứng, mỗi mức một dòng/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Thêm lô dung dịch chứng/ }))
+    const dialog = await dialogTitled('Thêm lô dung dịch chứng')
+    expect(within(dialog).queryByRole('combobox', { name: 'Loại vật tư' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('spinbutton', { name: 'Ngưỡng dưới' })).toBeInTheDocument()
+    expect(within(dialog).getByText(/Kết quả trong khoảng, tính cả hai đầu, là Đạt\./)).toBeInTheDocument()
     await user.type(within(dialog).getByRole('textbox', { name: 'Tên vật tư' }), 'Dung dịch chứng B (giả lập)')
     await user.type(within(dialog).getByRole('textbox', { name: 'Số lô' }), 'DC-B-02')
     await user.type(within(dialog).getByPlaceholderText('Chọn ngày'), '30/06/2027{Enter}')
@@ -440,6 +493,63 @@ describe('Sổ nội kiểm đường huyết (Khoa HSH)', () => {
         rangeLow: 13.1,
         rangeHigh: 19.7,
         unit: 'MmolPerL',
+      }),
+    )
+  })
+
+  it('lô que thử không có ô ngưỡng, ghi rõ ngưỡng nhập ở lô dung dịch chứng; sửa lô dung dịch chứng hiện sẵn ngưỡng', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...baseRoutes(labSession()),
+      'GET /api/v1/qc/catalog': { meters: [], lots } satisfies QcCatalog,
+      'POST /api/v1/qc/lots': lots[0],
+      'PUT /api/v1/qc/lots/c-2': lots[2],
+    })
+    renderApp('/noi-kiem/danh-muc')
+
+    await user.click(await screen.findByRole('tab', { name: 'Lô que thử, dung dịch chứng' }))
+    await user.click(await screen.findByRole('button', { name: /Thêm lô que thử/ }))
+    const strip = await dialogTitled('Thêm lô que thử')
+    expect(within(strip).queryByRole('spinbutton', { name: 'Ngưỡng dưới' })).not.toBeInTheDocument()
+    expect(within(strip).queryByRole('combobox', { name: 'Mức (Level)' })).not.toBeInTheDocument()
+    expect(within(strip).getByText(/^Que thử không có ngưỡng chấp nhận\. Ngưỡng nhập ở lô dung dịch chứng/)).toBeInTheDocument()
+    await user.type(within(strip).getByRole('textbox', { name: 'Tên vật tư' }), 'Que thử B (giả lập)')
+    await user.type(within(strip).getByRole('textbox', { name: 'Số lô' }), 'QT-B-01')
+    await user.type(within(strip).getByPlaceholderText('Chọn ngày'), '31/12/2027{Enter}')
+    await user.click(within(strip).getByRole('button', { name: 'Lưu' }))
+    await waitFor(() =>
+      expect(lastCall(calls, 'POST', '/api/v1/qc/lots')?.body).toEqual({
+        kind: 'TestStrip',
+        productName: 'Que thử B (giả lập)',
+        lotNumber: 'QT-B-01',
+        expiryDate: '2027-12-31',
+        level: null,
+        rangeLow: null,
+        rangeHigh: null,
+        unit: null,
+      }),
+    )
+    await waitFor(() => expect(screen.queryByText('Thêm lô que thử', { selector: '.ant-modal-title' })).not.toBeInTheDocument())
+
+    const row = screen.getByText('DC-02').closest('tr')!
+    await user.click(within(row).getByRole('button', { name: 'Sửa' }))
+    const control = await dialogTitled('Sửa lô dung dịch chứng')
+    expect(within(control).getByRole('spinbutton', { name: 'Ngưỡng dưới' })).toHaveValue('100.0')
+    expect(within(control).getByRole('spinbutton', { name: 'Ngưỡng trên' })).toHaveValue('140.0')
+    await user.clear(within(control).getByRole('spinbutton', { name: 'Ngưỡng trên' }))
+    await user.type(within(control).getByRole('spinbutton', { name: 'Ngưỡng trên' }), '150')
+    await user.click(within(control).getByRole('button', { name: 'Lưu' }))
+    await waitFor(() =>
+      expect(lastCall(calls, 'PUT', '/api/v1/qc/lots/c-2')?.body).toEqual({
+        kind: 'ControlSolution',
+        productName: 'Dung dịch chứng A',
+        lotNumber: 'DC-02',
+        expiryDate: lots[2].expiryDate,
+        level: 2,
+        rangeLow: 100,
+        rangeHigh: 150,
+        unit: 'MgPerDl',
+        isActive: true,
       }),
     )
   })
