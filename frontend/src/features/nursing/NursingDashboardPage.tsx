@@ -23,6 +23,7 @@ import { LineChart, SeriesTable, type LineChartProps } from '../../components/Li
 import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
+import { DepartmentCodeLink, DepartmentReportDrawer } from './DepartmentReportDrawer'
 
 const DATE = 'YYYY-MM-DD'
 
@@ -90,6 +91,8 @@ export function NursingDashboardPage() {
 function DashboardBody({ data, busy }: { data: NursingDashboard; busy: boolean }) {
   const lastDate = dayjs(data.to).format('DD/MM/YYYY')
   const hasReports = data.days.some((d) => d.submitted > 0)
+  // Khoa đang xem báo cáo (quyết định 55). Ngăn kéo nằm ngoài bảng: trả lại báo cáo duy nhất của kỳ thì bảng ẩn đi, ngăn kéo vẫn mở.
+  const [selected, setSelected] = useState<NursingDashboardDepartment | null>(null)
   return (
     // Đang tải khoảng ngày mới: giữ số cũ, mờ đi, không nháy trang.
     <div aria-busy={busy} style={{ opacity: busy ? 0.6 : 1, transition: 'opacity 0.2s' }}>
@@ -117,8 +120,16 @@ function DashboardBody({ data, busy }: { data: NursingDashboard; busy: boolean }
               <IssuesCard data={data} />
             </Col>
           </Row>
-          <DepartmentTable data={data} />
+          <DepartmentTable data={data} onOpen={setSelected} />
         </>
+      )}
+      {selected && (
+        <DepartmentReportDrawer
+          departmentId={selected.departmentId}
+          departmentName={selected.name}
+          reportDate={data.to}
+          onClose={() => setSelected(null)}
+        />
       )}
     </div>
   )
@@ -417,8 +428,11 @@ function IssuesCard({ data }: { data: NursingDashboard }) {
   )
 }
 
-/** Bảng theo khoa (thứ tự bảng tổng hợp), số liệu ngày cuối kỳ và số ngày đã gửi báo cáo trong kỳ. */
-function DepartmentTable({ data }: { data: NursingDashboard }) {
+/**
+ * Bảng theo khoa (thứ tự bảng tổng hợp), số liệu ngày cuối kỳ và số ngày đã gửi báo cáo trong kỳ. Bấm mã khoa mở báo cáo của khoa
+ * ngày cuối kỳ như ở bảng tổng hợp: in PDF, Phòng Điều dưỡng trả lại khoa (quyết định 55).
+ */
+function DepartmentTable({ data, onOpen }: { data: NursingDashboard; onOpen: (department: NursingDashboardDepartment) => void }) {
   const checkLabels = Object.fromEntries(data.checks.map((c) => [c.key, c.label]))
   const value = (d: NursingDashboardDepartment, key: string) => (d.submitted ? show(d.values[key]) : '')
   const percentOf = (d: NursingDashboardDepartment) => (d.submitted ? occupancy(d.values.currentPatients, d.bedCount) : null)
@@ -437,9 +451,7 @@ function DepartmentTable({ data }: { data: NursingDashboard }) {
       width: 120,
       render: (_, d) => (
         <Flex vertical gap={2} align="start">
-          <Tooltip title={d.name}>
-            <span style={{ fontWeight: 500 }}>{d.code}</span>
-          </Tooltip>
+          <DepartmentCodeLink code={d.code} name={d.name} onClick={() => onOpen(d)} />
           {!d.submitted && <Tag style={{ marginInlineEnd: 0 }}>Chưa gửi</Tag>}
           {!d.isReporting && <Tag style={{ marginInlineEnd: 0 }}>Không trong danh sách</Tag>}
         </Flex>

@@ -1,11 +1,11 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
-import { describe, expect, it } from 'vitest'
-import type { NursingDashboard } from '../../api/nursingReports'
+import { describe, expect, it, vi } from 'vitest'
+import type { NursingDashboard, NursingReport, NursingReportFormDefinition } from '../../api/nursingReports'
 import { Permissions } from '../../auth/permissions'
 import { baseRoutes, doctorPermissions, session } from '../../test/fixtures'
-import { mockApi, problem } from '../../test/mockApi'
+import { mockApi, problem, type ApiCall } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
 // Dữ liệu giả lập cho test (không phải dữ liệu thật). Ngày tính từ hôm nay để không phụ thuộc ngày chạy test.
@@ -141,6 +141,59 @@ const officeSession = () =>
 
 const tile = (name: string) => screen.getByRole('group', { name })
 
+/** Mẫu báo cáo khoa thu gọn (giả lập) để xem báo cáo của khoa trong ngăn kéo. */
+const definition: NursingReportFormDefinition = {
+  title: 'BÁO CÁO CÔNG TÁC ĐIỀU DƯỠNG',
+  category: 'Khoa Lâm sàng',
+  sections: [
+    {
+      title: 'VI. SỐ LƯỢNG NB',
+      valueKey: null,
+      items: [{ key: 'currentPatients', label: 'Số NB hiện tại', carryOver: false }],
+    },
+  ],
+  checks: [{ key: 'professional', label: 'Vấn đề chuyên môn', inSummary: true }],
+  issueLabel: 'Có sự cố/ Không ổn',
+  okLabel: 'Không có sự cố/ Ổn',
+  notesLabel: 'Báo cáo các vấn đề bất thường (nếu có):',
+  maxValue: 99999,
+  notesMaxLength: 20000,
+}
+
+const report = (overrides: Partial<NursingReport> = {}): NursingReport => ({
+  id: null,
+  departmentId: 'd-ngoai',
+  departmentName: 'Khoa Ngoại (giả lập)',
+  reportDate: TODAY,
+  status: 'New',
+  values: {},
+  checks: {},
+  notes: null,
+  canEdit: false,
+  canReopen: false,
+  updatedBy: null,
+  updatedAtUtc: null,
+  submittedBy: null,
+  submittedAtUtc: null,
+  reopenedBy: null,
+  reopenedAtUtc: null,
+  reopenReason: null,
+  carriedOverKeys: [],
+  isReportingDepartment: true,
+  hisEntry: null,
+  reportVisible: true,
+  ...overrides,
+})
+
+const lastCall = (calls: ApiCall[], method: string, path: string) =>
+  calls.filter((c) => c.method === method && c.path === path).at(-1)
+
+/**
+ * Ngăn kéo (hoặc hộp thoại) theo chữ tiêu đề. AntD trong môi trường test đặt cùng id cho chú thích của mã khoa và tiêu đề ngăn
+ * kéo, nên mở ngăn kéo thứ hai thì tên đọc được của nó lấy nhầm chú thích cũ: tìm theo chữ thay vì theo tên.
+ */
+const dialogTitled = async (title: string) => (await screen.findByText(title)).closest<HTMLElement>('[role="dialog"]')!
+
 describe('Dashboard điều dưỡng', () => {
   it('ô chỉ số ngày cuối kỳ, công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa', { timeout: 20_000 }, async () => {
     const { calls } = mockApi({ ...baseRoutes(officeSession()), 'GET /api/v1/nursing-reports/dashboard': dashboard })
@@ -247,6 +300,122 @@ describe('Dashboard điều dưỡng', () => {
     await user.type(picker, `${earlier.format('DD/MM/YYYY')}{Enter}`)
     await waitFor(() => expect(calls.some((c) => c.search === `?to=${earlier.format('YYYY-MM-DD')}&days=7`)).toBe(true))
   })
+
+  it(
+    'bấm mã khoa mở báo cáo của khoa ngày cuối kỳ (như bảng tổng hợp): in PDF, trả lại khoa thì dashboard tải lại',
+    { timeout: 30_000 },
+    async () => {
+      const user = userEvent.setup()
+      URL.createObjectURL = vi.fn(() => 'blob:test/bao-cao')
+      URL.revokeObjectURL = vi.fn()
+      const earlier = dayjs().subtract(3, 'day')
+      const end = earlier.format('YYYY-MM-DD')
+      let reopened = false
+      const submitted = (id: string, departmentId: string, departmentName: string, currentPatients: number, canReopen: boolean) =>
+        report({
+          id,
+          departmentId,
+          departmentName,
+          reportDate: end,
+          status: 'Submitted',
+          values: { currentPatients },
+          checks: { professional: 'ok' },
+          canReopen,
+          updatedAtUtc: '2026-11-20T00:40:00Z',
+          submittedBy: 'Điều dưỡng Demo',
+          submittedAtUtc: '2026-11-20T00:45:00Z',
+        })
+      const { calls } = mockApi({
+        ...baseRoutes(officeSession()),
+        // Ngày cuối kỳ theo ngày đã chọn; sau khi trả lại, báo cáo Khoa Ngoại về dạng nháp nên không còn được tính.
+        'GET /api/v1/nursing-reports/dashboard': (call: ApiCall) => ({
+          ...dashboard,
+          to: new URLSearchParams(call.search).get('to'),
+          departments: dashboard.departments.map((d) => (reopened && d.departmentId === 'd-ngoai' ? { ...d, submitted: false, values: {} } : d)),
+        }),
+        'GET /api/v1/nursing-reports/form': definition,
+        'GET /api/v1/nursing-reports/daily': (call: ApiCall) => {
+          const departmentId = new URLSearchParams(call.search).get('departmentId')
+          return departmentId === 'd-ngoai'
+            ? submitted('r-ngoai', 'd-ngoai', 'Khoa Ngoại (giả lập)', 22, true)
+            : departmentId === 'd-noi'
+              ? // Máy chủ không cho trả lại (ví dụ người chỉ có quyền xem): không có nút "Trả lại khoa".
+                submitted('r-noi', 'd-noi', 'Khoa Nội A (giả lập)', 30, false)
+              : report({ departmentId: departmentId ?? '', departmentName: 'Khoa Hồi sức (giả lập)', reportDate: end })
+        },
+        'GET /api/v1/nursing-reports/r-ngoai/pdf': () => new Response('%PDF-1.7', { headers: { 'Content-Type': 'application/pdf' } }),
+        'POST /api/v1/nursing-reports/r-ngoai/reopen': () => {
+          reopened = true
+          return report({
+            id: 'r-ngoai',
+            reportDate: end,
+            status: 'Draft',
+            values: { currentPatients: 22 },
+            reopenReason: 'Sai số NB hiện tại',
+            reopenedBy: 'Phòng Điều dưỡng Demo',
+            reopenedAtUtc: '2026-11-20T01:00:00Z',
+          })
+        },
+      })
+
+      renderApp('/dieu-duong/dashboard')
+      const picker = await screen.findByLabelText('Đến ngày')
+      await user.click(picker)
+      await user.clear(picker)
+      await user.type(picker, `${earlier.format('DD/MM/YYYY')}{Enter}`)
+      const table = (await screen.findByText(`Theo khoa – ngày ${earlier.format('DD/MM/YYYY')}`)).closest('.ant-card') as HTMLElement
+      const dashboardCalls = () => calls.filter((c) => c.path === '/api/v1/nursing-reports/dashboard' && c.search === `?to=${end}&days=30`).length
+      expect(dashboardCalls()).toBe(1)
+
+      // Khoa chưa gửi cũng bấm được: báo khoa chưa lập báo cáo, không có nút in hay trả lại.
+      await user.click(within(table).getByRole('button', { name: 'HSTC – Khoa Hồi sức (giả lập)' }))
+      let drawer = await dialogTitled(`Khoa Hồi sức (giả lập) – ngày ${earlier.format('DD/MM/YYYY')}`)
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')?.search).toBe(`?date=${end}&departmentId=d-hstc`)
+      expect(await within(drawer).findByText('Khoa chưa lập báo cáo ngày này.')).toBeInTheDocument()
+      expect(within(drawer).queryByRole('button', { name: /In PDF/ })).not.toBeInTheDocument()
+      await user.click(within(drawer).getByRole('button', { name: 'Đóng' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      // Máy chủ không cho trả lại: chỉ có nút In PDF.
+      await user.click(within(table).getByRole('button', { name: 'NOI A – Khoa Nội A (giả lập)' }))
+      drawer = await dialogTitled(`Khoa Nội A (giả lập) – ngày ${earlier.format('DD/MM/YYYY')}`)
+      expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toHaveValue('30')
+      expect(within(drawer).getByRole('button', { name: /In PDF/ })).toBeInTheDocument()
+      expect(within(drawer).queryByRole('button', { name: /Trả lại khoa/ })).not.toBeInTheDocument()
+      await user.click(within(drawer).getByRole('button', { name: 'Đóng' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      await user.click(within(table).getByRole('button', { name: 'NGOAI – Khoa Ngoại (giả lập)' }))
+      drawer = await dialogTitled(`Khoa Ngoại (giả lập) – ngày ${earlier.format('DD/MM/YYYY')}`)
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/daily')?.search).toBe(`?date=${end}&departmentId=d-ngoai`)
+      expect(await within(drawer).findByRole('spinbutton', { name: 'Số NB hiện tại' })).toBeDisabled()
+      expect(within(drawer).getByRole('spinbutton', { name: 'Số NB hiện tại' })).toHaveValue('22')
+
+      await user.click(within(drawer).getByRole('button', { name: /In PDF/ }))
+      expect(await screen.findByTitle('Báo cáo điều dưỡng Khoa Ngoại (giả lập)')).toHaveAttribute('src', 'blob:test/bao-cao')
+      expect(lastCall(calls, 'GET', '/api/v1/nursing-reports/r-ngoai/pdf')).toBeDefined()
+      const pdf = screen.getByTitle('Báo cáo điều dưỡng Khoa Ngoại (giả lập)').closest<HTMLElement>('[role="dialog"]')!
+      await user.click(within(pdf).getByRole('button', { name: 'Đóng' }))
+
+      await user.click(within(drawer).getByRole('button', { name: /Trả lại khoa/ }))
+      const modal = await dialogTitled('Trả lại báo cáo cho khoa sửa')
+      expect(within(modal).getByRole('button', { name: 'Trả lại khoa' })).toBeDisabled()
+      await user.type(within(modal).getByRole('textbox', { name: 'Lý do trả lại' }), 'Sai số NB hiện tại')
+      await user.click(within(modal).getByRole('button', { name: 'Trả lại khoa' }))
+
+      await waitFor(() =>
+        expect(lastCall(calls, 'POST', '/api/v1/nursing-reports/r-ngoai/reopen')?.body).toEqual({ reason: 'Sai số NB hiện tại' }),
+      )
+      expect(await screen.findByText('Đã trả lại báo cáo cho khoa. Khoa sửa và gửi lại.')).toBeInTheDocument()
+      expect(await within(drawer).findByText(/^Đã trả lại khoa lúc .* bởi Phòng Điều dưỡng Demo$/)).toBeInTheDocument()
+      expect(within(drawer).getByText('Lý do: Sai số NB hiện tại')).toBeInTheDocument()
+      expect(within(drawer).queryByRole('button', { name: /Trả lại khoa/ })).not.toBeInTheDocument()
+      // Dashboard tải lại: Khoa Ngoại thành "Chưa gửi".
+      await waitFor(() => expect(dashboardCalls()).toBe(2))
+      const ngoai = within(table).getByRole('button', { name: 'NGOAI – Khoa Ngoại (giả lập)' }).closest('tr')!
+      await waitFor(() => expect(within(ngoai).getAllByRole('cell')[0]).toHaveTextContent('NGOAIChưa gửi'))
+    },
+  )
 
   it('chưa khoa nào gửi trong kỳ: ô chỉ số để trống, không vẽ biểu đồ', async () => {
     mockApi({

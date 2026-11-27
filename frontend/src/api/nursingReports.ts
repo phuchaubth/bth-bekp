@@ -400,6 +400,8 @@ export const nursingKeys = {
   daily: (date: string, departmentId?: string) => ['nursing-reports', 'daily', date, departmentId ?? 'mine'] as const,
   summary: (date: string) => ['nursing-reports', 'summary', date] as const,
   departments: ['nursing-reports', 'departments'] as const,
+  /** Mọi khoảng ngày của Dashboard (làm mới sau khi trả lại báo cáo khoa, quyết định 55). */
+  dashboards: ['nursing-reports', 'dashboard'] as const,
   dashboard: (to: string, days: number) => ['nursing-reports', 'dashboard', to, days] as const,
   delegations: (all: boolean) => ['nursing-reports', 'delegations', all ? 'all' : 'mine'] as const,
   delegationCandidates: ['nursing-reports', 'delegation-candidates'] as const,

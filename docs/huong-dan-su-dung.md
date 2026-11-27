@@ -1201,7 +1201,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 |---|---|---|
 | Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5). Khi vắng: ủy quyền cho người khác làm thay; được ủy quyền thì làm báo cáo của khoa khác trong thời gian được ủy quyền (mục 9.7) | **Điều dưỡng** → **Báo cáo của khoa**, **Ủy quyền báo cáo** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard**, **Ủy quyền báo cáo** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem dashboard nhiều ngày, xem và trả lại báo cáo của khoa ngay trên dashboard (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày**, **Dashboard**, **Ủy quyền báo cáo** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1374,7 +1374,7 @@ Bảng tổng hợp dùng số như sau:
 
 ### 9.6. Dashboard điều dưỡng (Phòng Điều dưỡng)
 
-Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ số và biểu đồ. Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang chỉ để xem; muốn sửa số liệu thì trả lại báo cáo cho khoa (mục 9.3).
+Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ số và biểu đồ. Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang không sửa số liệu; số của khoa nào sai thì trả lại báo cáo cho khoa đó, ngay trên dashboard (bước 6) hoặc ở bảng tổng hợp (mục 9.3).
 
 1. Bấm **Điều dưỡng** → **Dashboard**.
 2. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày**, và ngày cuối ở ô ngày (mặc định hôm nay). Đổi lựa chọn thì số cũ mờ đi trong lúc tải số mới.
@@ -1398,7 +1398,13 @@ Trang **Dashboard** cho xem nhanh số liệu nhiều ngày bằng các ô chỉ
 
    ![Dashboard điều dưỡng: công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa](huong-dan-su-dung/dd-14b-dashboard-khoa.png)
 
-   *Hình 9.18. Phần dưới dashboard. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**.*
+   *Hình 9.18. Phần dưới dashboard. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**. Tên viết tắt của khoa ở bảng **Theo khoa** (chữ xanh) bấm được.*
+
+6. Ở bảng **Theo khoa**, bấm **tên viết tắt** của khoa. Báo cáo của khoa **ngày cuối** (ngày ở ô ngày) mở ở bên phải, chỉ xem, giống khi mở từ bảng tổng hợp (Hình 9.10).
+   - Bấm **In PDF** để xem và in báo cáo của khoa.
+   - Khoa cần sửa: bấm **Trả lại khoa**, ghi lý do, bấm **Trả lại khoa** trong hộp (Hình 9.11). Nút này chỉ có khi khoa đã gửi, và chỉ với tài khoản được trả lại báo cáo (vai trò Phòng Điều dưỡng). Dashboard tính lại ngay: khoa đó thành **Chưa gửi** cho tới khi khoa sửa và gửi lại.
+   - Khoa chưa lập báo cáo ngày đó thì ghi **Khoa chưa lập báo cáo ngày này.**; khoa đang làm dở thì thấy báo cáo nháp.
+   - Muốn xem báo cáo của ngày khác: đổi ngày ở ô ngày rồi bấm lại tên khoa.
 
 Lưu ý khi đọc:
 
