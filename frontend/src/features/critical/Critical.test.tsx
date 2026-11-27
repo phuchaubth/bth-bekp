@@ -220,13 +220,23 @@ async function pick(user: ReturnType<typeof userEvent.setup>, scope: HTMLElement
 }
 
 /** Âm thanh trình duyệt giả (jsdom không có Web Audio): đếm số lần chuông kêu. */
+/**
+ * AudioContext giả theo chính sách tự phát âm thanh của trình duyệt: chỉ chạy được sau khi người dùng bấm, gõ phím trên trang,
+ * hoặc khi trình duyệt cho tự phát (`autoplay`, như máy TV đặt cờ khởi động). Trạng thái để tĩnh vì phần mềm dùng chung một
+ * AudioContext cho cả trang; mỗi test bắt đầu lại từ "chưa cho phát".
+ */
 class FakeAudioContext {
   static chimes = 0
-  state = 'suspended'
+  static running = false
+  static gesture = false
+  static autoplay = false
   currentTime = 0
   destination = {}
+  get state() {
+    return FakeAudioContext.running ? 'running' : 'suspended'
+  }
   async resume() {
-    this.state = 'running'
+    if (FakeAudioContext.gesture || FakeAudioContext.autoplay) FakeAudioContext.running = true
   }
   createOscillator() {
     FakeAudioContext.chimes++
@@ -237,10 +247,17 @@ class FakeAudioContext {
   }
 }
 Object.defineProperty(window, 'AudioContext', { configurable: true, writable: true, value: FakeAudioContext })
+for (const type of ['click', 'keydown']) {
+  window.addEventListener(type, () => (FakeAudioContext.gesture = true), true)
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
   window.localStorage.clear()
+  FakeAudioContext.running = false
+  FakeAudioContext.gesture = false
+  FakeAudioContext.autoplay = false
+  FakeAudioContext.chimes = 0
 })
 
 describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
@@ -499,6 +516,16 @@ describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
     expect(screen.getByRole('button', { name: /Bấm để bật chuông/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Đã nhận cuộc gọi' })).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+  })
+
+  it('Máy TV cho tự phát âm thanh: chuông bật ngay khi mở, không cần ai bấm, kêu cho hồ sơ chờ khoa xác nhận', { timeout: 30_000 }, async () => {
+    FakeAudioContext.autoplay = true
+    mockApi({ ...common(screenSession()), [`GET ${base}/alerts`]: alerts({ awaitingAcknowledgement: [alertItem({ patientName: 'N.B.G.L' })] }) })
+    renderApp('/man-hinh-kqnc')
+
+    expect(await screen.findByRole('button', { name: /Chuông bật · thử chuông/ })).toBeInTheDocument()
+    await waitFor(() => expect(FakeAudioContext.chimes).toBeGreaterThan(0))
+    expect(FakeAudioContext.gesture).toBe(false)
   })
 
   it('Không cập nhật được thì báo mất kết nối trên toàn màn hình', { timeout: 30_000 }, async () => {

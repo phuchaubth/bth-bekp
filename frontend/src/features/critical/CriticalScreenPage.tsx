@@ -1,7 +1,7 @@
 import { CheckCircleFilled, CloseCircleFilled, SoundOutlined, WifiOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 import dayjs from 'dayjs'
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { useCriticalAlerts, useCriticalSettings, type CriticalAlertItem, type CriticalAlerts } from '../../api/critical'
 import { useAuth } from '../../auth/authContext'
@@ -139,6 +139,19 @@ export function CriticalScreenPage() {
       if (ok) playChime()
     })
   }
+
+  // Máy TV đặt trình duyệt cho tự phát âm thanh (tài liệu triển khai, mục 5.14) thì chuông bật ngay khi mở trang, không cần ai
+  // bấm sau mỗi lần máy khởi động lại. Trình duyệt chưa cho phép thì chờ lần bấm đầu tiên như cũ.
+  useEffect(() => {
+    if (!soundEnabled || audioOn) return
+    let active = true
+    void unlockChime().then((ok) => {
+      if (active && ok) setAudioOn(true)
+    })
+    return () => {
+      active = false
+    }
+  }, [soundEnabled, audioOn])
 
   const page: CSSProperties = {
     minHeight: '100vh',
