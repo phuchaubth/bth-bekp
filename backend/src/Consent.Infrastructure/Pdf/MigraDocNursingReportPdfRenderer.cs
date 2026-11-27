@@ -1,5 +1,6 @@
 using System.Globalization;
 using Consent.Application.NursingReports;
+using Consent.Infrastructure.Exports;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
@@ -84,7 +85,8 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         AddHeading(section, "A. Số liệu người bệnh nội trú");
         AddInpatientTable(section, summary);
 
-        // Bảng B–E ngắn, số dòng cố định: in liền trên một trang. Bảng F dài tùy phần khoa nhập thêm nên được tách trang.
+        // Bảng B–E ngắn, số dòng cố định: in liền trên một trang. Bảng F dài tùy phần khoa nhập thêm nên được tách trang; phần
+        // nhập thêm dài được chia thành nhiều dòng bảng để tách được (một dòng bảng không tách sang trang sau).
         AddHeading(section, "B. Số liệu khoa khám bệnh");
         AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Outpatient.Select(l => (l.Label, Number(l.Value))), keepTogether: true);
         AddReporters(section, summary.Reporters.Outpatient);
@@ -108,7 +110,7 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
             "NỘI DUNG BÁO CÁO SỰ CỐ",
             summary.Incidents.Count == 0
                 ? [(string.Empty, "Không có.")]
-                : summary.Incidents.Select(i => (i.DepartmentCode, i.Text)),
+                : NursingIncidentRows.For(summary.Incidents),
             centerFirstColumn: true);
         AddReporters(section, summary.Reporters.Incidents);
 

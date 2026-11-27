@@ -176,7 +176,7 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
             "NỘI DUNG BÁO CÁO SỰ CỐ",
             summary.Incidents.Count == 0
                 ? [(string.Empty, "Không có.")]
-                : summary.Incidents.Select(i => (i.DepartmentCode, (object?)i.Text)),
+                : NursingIncidentRows.For(summary.Incidents).Select(r => (r.Label, (object?)r.Text)),
             numbers: false,
             summary.Reporters.Incidents);
 
@@ -205,12 +205,18 @@ internal sealed class XlsxNursingSummaryWriter : INursingSummaryWorkbookWriter
     /// <summary>Vùng gộp từ cột <paramref name="from"/> đến cột cuối.</summary>
     private static IEnumerable<Cell> Spanned(int from, object? value, Style style) => Span(from, LastColumn, value, style);
 
-    /// <summary>Ô gộp không tự giãn chiều cao: ước lượng theo số dòng (khoảng 110 ký tự mỗi dòng trên 11 cột gộp).</summary>
+    /// <summary>Chiều cao tối đa Excel cho phép của một dòng (điểm): chữ dài hơn bị che khi xem và khi in.</summary>
+    internal const double MaxRowHeight = 409;
+
+    /// <summary>
+    /// Ô gộp không tự giãn chiều cao: ước lượng theo số dòng (khoảng 110 ký tự mỗi dòng trên 11 cột gộp). Phần nhập thêm dài của
+    /// mục F đã được chia nhỏ (<see cref="NursingIncidentRows"/>) để không dòng nào chạm <see cref="MaxRowHeight"/>.
+    /// </summary>
     private static double? EstimateHeight(string text)
     {
         var lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n')
             .Sum(line => Math.Max(1, (int)Math.Ceiling(line.Length / 110d)));
-        return lines <= 1 ? null : Math.Min(409, 13.5 * lines);
+        return lines <= 1 ? null : Math.Min(MaxRowHeight, 13.5 * lines);
     }
 
     private static string Range(int fromColumn, int toColumn, int row) => string.Create(

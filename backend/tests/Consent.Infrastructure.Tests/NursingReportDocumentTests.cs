@@ -5,6 +5,7 @@ using Consent.Application.NursingReports;
 using Consent.Domain.NursingReports;
 using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.Pdf;
+using MigraDoc.Rendering;
 using PdfSharp.Drawing;
 using PdfSharp.Events;
 using Mdom = MigraDoc.DocumentObjectModel;
@@ -32,7 +33,7 @@ public sealed class NursingReportDocumentTests
 
     private const string SurgeryNurse = "Điều dưỡng Ngoại B (giả lập)";
 
-    private static NursingSummaryDocument Summary(bool withIncidents = true)
+    private static NursingSummaryDocument Summary(bool withIncidents = true, string? incident = null)
     {
         var departments = new List<NursingSummaryDepartment>
         {
@@ -50,7 +51,7 @@ public sealed class NursingReportDocumentTests
                     ["boneMarrow"] = 3, ["outsideExams"] = 1,
                 },
                 NursingReportForm.Checks.ToDictionary(c => c.Key, _ => NursingReportForm.CheckOk, StringComparer.Ordinal)).ToJson(),
-            withIncidents ? "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp" : null,
+            withIncidents ? incident ?? "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp" : null,
             nurse,
             DateTimeOffset.UtcNow);
         report.Submit(nurse, DateTimeOffset.UtcNow);
@@ -80,6 +81,8 @@ public sealed class NursingReportDocumentTests
             Mdom.Character { SymbolName: Mdom.SymbolName.LineBreak } => "\n",
             _ => string.Empty,
         }));
+
+    private static string[] Words(string text) => text.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries);
 
     private static IEnumerable<string> Paragraphs(Mdom.Document document) =>
         Body(document).OfType<Mdom.Paragraph>().Select(TextOf);
@@ -240,6 +243,45 @@ public sealed class NursingReportDocumentTests
         }
     }
 
+    /// <summary>
+    /// Phần nhập thêm dài tối đa (20.000 ký tự) ở mục F được chia thành nhiều dòng bảng ("mã khoa (tiếp)"), không mất chữ nào, và
+    /// khi dàn trang không gì tràn quá lề dưới. Trước đây cả phần nhập thêm nằm trong một dòng bảng; một dòng bảng không tách sang
+    /// trang sau được nên chỉ in được khoảng 5.000 ký tự đầu, phần sau mất.
+    /// </summary>
+    [Theory]
+    [InlineData("paragraphs")]
+    [InlineData("short-lines")]
+    public void Summary_LongIncident_IsSplitIntoRows_ThatFitThePage(string shape)
+    {
+        var notes = shape == "paragraphs" ? NursingIncidentRowsTests.LongNotes() : NursingIncidentRowsTests.ManyShortLines();
+        var document = MigraDocNursingReportPdfRenderer.BuildSummary(Summary(incident: notes));
+
+        var incidents = Rows(Body(document).OfType<Mdom.Tables.Table>().ToList()[6]).Skip(1).ToList();
+        Assert.True(incidents.Count > 1);
+        Assert.Equal("NGOAIB", incidents[0][0]);
+        Assert.All(incidents.Skip(1), row => Assert.Equal("NGOAIB (tiếp)", row[0]));
+        Assert.Equal(Words(notes), incidents.SelectMany(row => Words(row[1])));
+
+        _ = new MigraDocNursingReportPdfRenderer(); // cài bộ phông nhúng
+        var renderer = new DocumentRenderer(document);
+        renderer.PrepareDocument();
+        var bottom = Mdom.Unit.FromMillimeter(297 - 15).Point; // A4 trừ lề dưới
+        var formatted = renderer.FormattedDocument;
+        Assert.NotNull(formatted);
+        Assert.True(formatted.PageCount > 4);
+        for (var page = 1; page <= formatted.PageCount; page++)
+        {
+            var infos = renderer.GetRenderInfoFromPage(page);
+            Assert.NotNull(infos);
+            Assert.NotEmpty(infos);
+            foreach (var info in infos)
+            {
+                var area = info.LayoutInfo.ContentArea;
+                Assert.True(area.Y.Point + area.Height.Point <= bottom + 0.5, $"Trang {page}: {info.DocumentObject.GetType().Name} tràn lề dưới");
+            }
+        }
+    }
+
     [Fact]
     public void Summary_WithoutIncidents_SaysSo_AndRendersAPdf()
     {
@@ -251,6 +293,28 @@ public sealed class NursingReportDocumentTests
         // Không khoa nào báo cáo sự cố: mục F tổng hợp từ mọi khoa đã gửi.
         Assert.Equal($"Người báo cáo: {NursingReportForm.AllSubmittedReporters}", Paragraphs(document).Last());
         Assert.StartsWith("%PDF", Encoding.Latin1.GetString(new MigraDocNursingReportPdfRenderer().RenderSummary(input)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Excel: phần nhập thêm dài tối đa ở mục F cũng được chia thành nhiều dòng, không mất chữ, không dòng nào cao tới giới hạn
+    /// của Excel (409 điểm): trước đây chữ vượt chiều cao đó bị che khi xem và khi in.
+    /// </summary>
+    [Theory]
+    [InlineData("paragraphs")]
+    [InlineData("short-lines")]
+    public void Workbook_LongIncident_IsSplitIntoRows_BelowTheMaxRowHeight(string shape)
+    {
+        var notes = shape == "paragraphs" ? NursingIncidentRowsTests.LongNotes() : NursingIncidentRowsTests.ManyShortLines();
+        var (rows, _) = XlsxNursingSummaryWriter.Layout(Summary(incident: notes));
+        object? Value(XlsxNursingSummaryWriter.Row row) => row.Cells.Single(c => c.Column == XlsxNursingSummaryWriter.LabelLastColumn + 1).Value;
+
+        var heading = rows.ToList().FindIndex(r => r.Cells.FirstOrDefault()?.Value as string == "F. Báo cáo cụ thể sự cố (nếu có)");
+        var incidents = rows.Skip(heading + 2).TakeWhile(r => r.Cells[0].Value is string label && label.StartsWith("NGOAIB", StringComparison.Ordinal)).ToList();
+        Assert.True(incidents.Count > 1);
+        Assert.Equal("NGOAIB", incidents[0].Cells[0].Value);
+        Assert.All(incidents.Skip(1), row => Assert.Equal("NGOAIB (tiếp)", row.Cells[0].Value));
+        Assert.Equal(Words(notes), incidents.SelectMany(row => Words((string)Value(row)!)));
+        Assert.All(incidents, row => Assert.True(row.Height is null || row.Height < XlsxNursingSummaryWriter.MaxRowHeight, $"Dòng cao {row.Height}"));
     }
 
     [Fact]

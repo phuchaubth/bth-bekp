@@ -1226,7 +1226,7 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
    *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn, gồm số NB ngày hôm trước. Ở mục VI, **Số NB hiện tại** tự tính theo công thức ghi dưới tên dòng, không nhập được; dòng **Số NB bao phòng** nằm ngay sau Số NB người nước ngoài.*
 
 4. Ở **Phần tick**, mỗi dòng chọn **Có sự cố/ Không ổn** hoặc **Không có sự cố/ Ổn**. Phải chọn đủ mọi dòng mới gửi được.
-5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được.
+5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được. Tối đa 20.000 ký tự, kể cả dấu cách và xuống dòng; bộ đếm dưới ô cho biết đã gõ bao nhiêu ký tự.
 
    ![Phần tick và phần báo cáo nhập thêm](huong-dan-su-dung/dd-02-phan-tick.png)
 
@@ -1281,7 +1281,7 @@ Lưu ý:
    *Hình 9.7. Bảng tổng hợp ngày HIS lỗi. Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Số NB ngày hôm trước**, **Người nước ngoài**, **Bao phòng**, **Chuyển khoa** và **Người báo cáo**. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
 
 6. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
-7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi.
+7. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi. Trong PDF và file Excel, phần nhập thêm dài được chia thành nhiều dòng (mỗi dòng khoảng 1.000 ký tự, chia ở chỗ xuống dòng hoặc giữa hai từ), các dòng sau ghi tên viết tắt kèm **(tiếp)** và tự sang trang, nên in đủ cả phần nhập thêm dài nhất.
 
    ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
 
