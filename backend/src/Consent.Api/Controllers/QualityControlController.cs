@@ -14,8 +14,16 @@ namespace Consent.Api.Controllers;
 [ApiController]
 [Route("api/v1/qc")]
 [Produces("application/json")]
-public sealed class QualityControlController(QcCatalogService catalog, QcBookService books) : ControllerBase
+public sealed class QualityControlController(QcCatalogService catalog, QcBookService books, QcDashboardService dashboard) : ControllerBase
 {
+    /// <summary>
+    /// Dashboard giám sát nội kiểm của một tháng (<c>yyyy-MM</c>, mặc định tháng này; quyết định 59): Khoa HSH và quyền xem
+    /// dashboard thấy mọi khoa, khoa thấy khoa của mình.
+    /// </summary>
+    [HttpGet("dashboard")]
+    public async Task<IActionResult> GetDashboard([FromQuery] string? month, CancellationToken cancellationToken) =>
+        this.ToActionResult(await dashboard.GetAsync(month, cancellationToken).ConfigureAwait(false));
+
     /// <summary>Danh mục: máy đo và lô (kể cả ngưng sử dụng).</summary>
     [HttpGet("catalog")]
     [HasPermission(Permissions.QcManage)]

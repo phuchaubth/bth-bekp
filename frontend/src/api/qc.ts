@@ -222,6 +222,129 @@ export interface QcReviewDayInput {
   note?: string | null
 }
 
+/**
+ * Số liệu nội kiểm của một sổ, một khoa hoặc cả tháng (dashboard, quyết định 59). Ngày phải thực hiện: mọi ngày đã qua của tháng
+ * (hôm nay chỉ tính khi đã có kết quả); không đạt tính ở lần chạy đầu.
+ */
+export interface QcDashboardFigures {
+  requiredDays: number
+  recordedDays: number
+  missingDays: number
+  lateDays: number
+  failedDays: number
+  repeatPassedDays: number
+  repeatFailedDays: number
+  /** Không đạt mà khoa chưa chạy lại (cần nhắc). */
+  notRepeatedDays: number
+  reviewedDays: number
+  /** Ngày đến hôm nay Khoa HSH chưa xem xét. */
+  daysToReview: number
+}
+
+/** Số sổ theo trạng thái; `notOpened`: máy đang dùng chưa mở sổ. */
+export interface QcDashboardBookCounts {
+  open: number
+  returned: number
+  submitted: number
+  confirmed: number
+  notOpened: number
+}
+
+/** Lần không đạt gần nhất; `reason` trống là khoa chưa ghi nguyên nhân. */
+export interface QcDashboardFailure {
+  date: string
+  meterLabel: string
+  reason: string | null
+}
+
+export interface QcDashboardMeter {
+  meterId: string
+  meterLabel: string
+  meterActive: boolean
+  /** Trống: máy đang dùng chưa mở sổ tháng này. */
+  bookId: string | null
+  status: QcBookStatus | null
+  /** Khoa HSH đã trả lại sổ, khoa đang ghi tiếp. */
+  returned: boolean
+  /** Người xem mở được sổ (quyền chỉ xem dashboard thì không). */
+  canOpen: boolean
+  figures: QcDashboardFigures
+  missingDates: string[]
+  latestFailure: QcDashboardFailure | null
+}
+
+export interface QcDashboardDepartment {
+  departmentId: string
+  departmentName: string
+  figures: QcDashboardFigures
+  books: QcDashboardBookCounts
+  latestFailure: QcDashboardFailure | null
+  meters: QcDashboardMeter[]
+}
+
+export interface QcDashboardMonth {
+  month: string
+  requiredDays: number
+  recordedDays: number
+  failedDays: number
+  lateDays: number
+}
+
+/** Lô đang dùng hết hạn hoặc còn ≤ 30 ngày (`daysLeft` âm là đã hết hạn); `usedBy`: khoa đang dùng lô. */
+export interface QcDashboardLotAlert {
+  lotId: string
+  kind: QcLotKind
+  productName: string
+  lotNumber: string
+  level: number | null
+  expiryDate: string
+  daysLeft: number
+  usedBy: string[]
+}
+
+export interface QcDashboardMeterRef {
+  meterId: string
+  meterLabel: string
+  departmentId: string
+  departmentName: string
+}
+
+export interface QcDashboardPendingBook {
+  bookId: string
+  month: string
+  departmentId: string
+  departmentName: string
+  meterLabel: string
+  status: QcBookStatus
+  returned: boolean
+  canOpen: boolean
+}
+
+/** Cảnh báo tính đến hôm nay (không theo tháng đang xem). */
+export interface QcDashboardAlerts {
+  currentMonth: string
+  lots: QcDashboardLotAlert[]
+  /** Các mức dung dịch chứng đang dùng còn hạn. */
+  controlLevels: number[]
+  /** Số lô que thử đang dùng còn hạn. */
+  stripLots: number
+  /** Máy đang dùng chưa mở sổ tháng này. */
+  metersWithoutBook: QcDashboardMeterRef[]
+  /** Sổ của 5 tháng trước chưa xác nhận. */
+  pendingBooks: QcDashboardPendingBook[]
+}
+
+/** Dashboard giám sát nội kiểm của một tháng (quyết định 59); `today` là hôm nay theo giờ bệnh viện. */
+export interface QcDashboard {
+  month: string
+  today: string
+  totals: { departments: number; meters: number; figures: QcDashboardFigures; books: QcDashboardBookCounts }
+  departments: QcDashboardDepartment[]
+  /** 6 tháng, tháng đang xem ở cuối. */
+  trend: QcDashboardMonth[]
+  alerts: QcDashboardAlerts
+}
+
 const base = '/api/v1/qc'
 
 export const qcApi = {
@@ -246,6 +369,7 @@ export const qcApi = {
   confirm: (id: string) => apiRequest<QcBook>(`${base}/books/${id}/confirm`, { method: 'POST' }),
   returnBook: (id: string, reason: string) => apiRequest<QcBook>(`${base}/books/${id}/return`, { method: 'POST', body: { reason } }),
   pdf: (id: string) => apiBlob(`${base}/books/${id}/pdf`),
+  dashboard: (month: string, signal?: AbortSignal) => apiRequest<QcDashboard>(`${base}/dashboard?month=${month}`, { signal }),
 }
 
 export const qcKeys = {
@@ -254,6 +378,8 @@ export const qcKeys = {
   books: ['qc', 'books'] as const,
   list: (month: string, departmentId: string | undefined) => ['qc', 'books', month, departmentId ?? ''] as const,
   book: (id: string) => ['qc', 'book', id] as const,
+  // Nằm dưới "books": sổ thay đổi (ghi kết quả, xem xét, gửi, xác nhận) thì dashboard cũng tải lại.
+  dashboard: (month: string) => ['qc', 'books', 'dashboard', month] as const,
 }
 
 export function useQcCatalog(enabled = true) {
@@ -270,6 +396,14 @@ export function useQcBooks(month: string, departmentId: string | undefined) {
 
 export function useQcBook(id: string) {
   return useQuery({ queryKey: qcKeys.book(id), queryFn: ({ signal }) => qcApi.book(id, signal) })
+}
+
+export function useQcDashboard(month: string) {
+  return useQuery({
+    queryKey: qcKeys.dashboard(month),
+    queryFn: ({ signal }) => qcApi.dashboard(month, signal),
+    placeholderData: keepPreviousData,
+  })
 }
 
 /** Số in như sổ: bỏ phần thập phân bằng 0 (140; 6.5). */

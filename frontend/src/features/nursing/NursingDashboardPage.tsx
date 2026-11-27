@@ -1,7 +1,6 @@
 import { ArrowDownOutlined, ArrowUpOutlined, CheckCircleFilled, WarningFilled } from '@ant-design/icons'
 import {
   Alert,
-  Button,
   Card,
   Col,
   DatePicker,
@@ -20,7 +19,8 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import { useState, type ReactNode } from 'react'
 import { useNursingDashboard, type NursingDashboard, type NursingDashboardDepartment } from '../../api/nursingReports'
-import { LineChart, SeriesTable, type LineChartProps } from '../../components/LineChart'
+import { Busy, ChartCard, StatTile } from '../../components/DashboardCards'
+import type { LineChartProps } from '../../components/LineChart'
 import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
@@ -154,15 +154,6 @@ export function NursingDashboardPage() {
   )
 }
 
-/** Đang tải ngày, khoảng ngày mới: giữ số cũ, mờ đi, không nháy trang. */
-function Busy({ busy, children }: { busy: boolean; children: ReactNode }) {
-  return (
-    <div aria-busy={busy} style={{ opacity: busy ? 0.6 : 1, transition: 'opacity 0.2s' }}>
-      {children}
-    </div>
-  )
-}
-
 /** Thẻ Biểu đồ: biểu đồ theo ngày, công suất giường và "Không ổn" theo khoa, bảng theo khoa ngày cuối kỳ. */
 function Trends({ data, onOpen }: { data: NursingDashboard; onOpen: (department: NursingDashboardDepartment) => void }) {
   if (!data.days.some((d) => d.submitted > 0)) {
@@ -185,20 +176,6 @@ function Trends({ data, onOpen }: { data: NursingDashboard; onOpen: (department:
       </Row>
       <DepartmentTable data={data} onOpen={onOpen} />
     </>
-  )
-}
-
-function StatTile({ label, value, children }: { label: string; value: ReactNode; children?: ReactNode }) {
-  return (
-    <Card size="small" role="group" aria-label={label} style={{ height: '100%' }}>
-      <Typography.Text type="secondary">{label}</Typography.Text>
-      <div style={{ fontSize: 28, fontWeight: 600, lineHeight: 1.3, margin: '2px 0 4px' }}>{value}</div>
-      {children && (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {children}
-        </Typography.Text>
-      )}
-    </Card>
   )
 }
 
@@ -286,30 +263,6 @@ function KpiRow({ data }: { data: NursingDashboard }) {
         </Col>
       ))}
     </Row>
-  )
-}
-
-/** Thẻ biểu đồ; bấm "Xem bảng" để đọc số chính xác từng ngày. */
-function ChartCard({ title, note, chart }: { title: string; note?: string; chart: LineChartProps }) {
-  const [asTable, setAsTable] = useState(false)
-  return (
-    <Card
-      size="small"
-      title={title}
-      style={{ height: '100%' }}
-      extra={
-        <Button type="link" size="small" onClick={() => setAsTable((value) => !value)} aria-label={`${asTable ? 'Xem biểu đồ' : 'Xem bảng'}: ${title}`}>
-          {asTable ? 'Xem biểu đồ' : 'Xem bảng'}
-        </Button>
-      }
-    >
-      {note && (
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 8 }}>
-          {note}
-        </Typography.Paragraph>
-      )}
-      {asTable ? <SeriesTable {...chart} /> : <LineChart {...chart} />}
-    </Card>
   )
 }
 

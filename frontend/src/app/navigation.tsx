@@ -62,6 +62,12 @@ export const navItems: NavItem[] = [
     icon: <ExperimentOutlined />,
     children: [
       { path: '/noi-kiem/so', label: 'Sổ nội kiểm', permission: [Permissions.QcRecord, Permissions.QcReview] },
+      // Quyết định 59: giám sát nội kiểm; quyền chỉ xem dashboard (lãnh đạo, Phòng Điều dưỡng, QLCL) chỉ thấy mục này.
+      {
+        path: '/noi-kiem/dashboard',
+        label: 'Dashboard',
+        permission: [Permissions.QcRecord, Permissions.QcReview, Permissions.QcMonitor],
+      },
       { path: '/noi-kiem/danh-muc', label: 'Máy đo và lô vật tư', permission: Permissions.QcManage },
     ],
   },

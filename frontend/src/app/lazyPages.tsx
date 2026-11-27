@@ -50,6 +50,7 @@ export const NursingDelegationsPage = lazy(() =>
 export const QcBooksPage = lazy(() => import('../features/qc/QcBooksPage').then((m) => ({ default: m.QcBooksPage })))
 export const QcBookPage = lazy(() => import('../features/qc/QcBookPage').then((m) => ({ default: m.QcBookPage })))
 export const QcCatalogPage = lazy(() => import('../features/qc/QcCatalogPage').then((m) => ({ default: m.QcCatalogPage })))
+export const QcDashboardPage = lazy(() => import('../features/qc/QcDashboardPage').then((m) => ({ default: m.QcDashboardPage })))
 export const TestAssignmentsPage = lazy(() =>
   import('../features/testing/TestAssignmentsPage').then((m) => ({ default: m.TestAssignmentsPage })),
 )

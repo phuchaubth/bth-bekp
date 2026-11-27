@@ -36,6 +36,8 @@ export const Permissions = {
   QcReview: 'qc.review',
   /** Khoa HSH: khai báo máy đo, lô que thử, lô dung dịch chứng. */
   QcManage: 'qc.manage',
+  /** Xem dashboard nội kiểm mọi khoa, chỉ xem (lãnh đạo, Phòng Điều dưỡng, QLCL; quyết định 59). */
+  QcMonitor: 'qc.monitor',
 } as const
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions]

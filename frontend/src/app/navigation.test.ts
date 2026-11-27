@@ -39,6 +39,16 @@ describe('navigation', () => {
     expect(nursing([Permissions.ConsentsRead])).toBeUndefined()
   })
 
+  it('nội kiểm: khoa và Khoa HSH thấy sổ và dashboard; quyền chỉ xem dashboard chỉ thấy Dashboard (quyết định 59)', () => {
+    const qc = (granted: string[]) =>
+      filterNavItems(navItems, (p) => granted.includes(p)).find((i) => i.label === 'Nội kiểm đường huyết')?.children?.map((c) => c.label)
+
+    expect(qc([Permissions.QcRecord])).toEqual(['Sổ nội kiểm', 'Dashboard'])
+    expect(qc([Permissions.QcReview, Permissions.QcManage])).toEqual(['Sổ nội kiểm', 'Dashboard', 'Máy đo và lô vật tư'])
+    expect(qc([Permissions.QcMonitor])).toEqual(['Dashboard'])
+    expect(qc([Permissions.ConsentsRead])).toBeUndefined()
+  })
+
   it('mục cần một trong nhiều quyền: có một quyền là thấy, không có quyền nào thì ẩn', () => {
     const items = [{ path: '/a', label: 'A', permission: ['x', 'y'] as const }, { path: '/b', label: 'B', permission: [] as const }]
 

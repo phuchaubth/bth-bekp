@@ -42,6 +42,12 @@ internal sealed class InMemoryQualityControlRepository(InMemoryStore store) : IQ
     public Task<IReadOnlyList<QcBook>> ListBooksAsync(int year, int month, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<QcBook>>([.. store.QcBooks.Where(b => b.Year == year && b.Month == month)]);
 
+    public Task<IReadOnlyList<QcBook>> ListBooksBetweenAsync(DateOnly firstMonth, DateOnly lastMonth, CancellationToken cancellationToken)
+    {
+        var (from, to) = (new DateOnly(firstMonth.Year, firstMonth.Month, 1), new DateOnly(lastMonth.Year, lastMonth.Month, 1));
+        return Task.FromResult<IReadOnlyList<QcBook>>([.. store.QcBooks.Where(b => b.FirstDay >= from && b.FirstDay <= to)]);
+    }
+
     public Task<QcRun?> FindLatestRunAsync(Guid meterId, CancellationToken cancellationToken) =>
         Task.FromResult(store.QcBooks
             .Where(b => b.MeterId == meterId)

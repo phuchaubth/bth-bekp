@@ -23,6 +23,8 @@ export interface LineChartProps {
   details?: (index: number) => string[]
   /** Đường mốc ngang có nhãn (ví dụ số khoa phải báo cáo). */
   reference?: { value: number; label: string }
+  /** Mỗi điểm là gì (cột đầu của bảng số, lời nhắc phím mũi tên): mặc định "Ngày"; biểu đồ theo tháng là "Tháng". */
+  pointLabel?: string
 }
 
 const TEXT_SECONDARY = '#55706d'
@@ -92,7 +94,16 @@ function lastPoint(values: (number | null)[]) {
  * phím mũi tên trái, phải trên biểu đồ để xem số của từng ngày (khung gợi ý ghi số mọi dãy). Có bảng số liệu ẩn cho trình đọc
  * màn hình; bảng hiện được bằng <see cref="SeriesTable" />.
  */
-export function LineChart({ labels, fullLabels = labels, series, title, height = 220, details, reference }: LineChartProps) {
+export function LineChart({
+  labels,
+  fullLabels = labels,
+  series,
+  title,
+  height = 220,
+  details,
+  reference,
+  pointLabel = 'Ngày',
+}: LineChartProps) {
   const [containerRef, width] = useContainerWidth(640)
   const [active, setActive] = useState<number | null>(null)
   const count = labels.length
@@ -148,7 +159,7 @@ export function LineChart({ labels, fullLabels = labels, series, title, height =
       ref={containerRef}
       tabIndex={0}
       role="group"
-      aria-label={`${title}. Dùng phím mũi tên trái, phải để xem số từng ngày.`}
+      aria-label={`${title}. Dùng phím mũi tên trái, phải để xem số từng ${pointLabel.toLowerCase()}.`}
       onKeyDown={onKeyDown}
       onFocus={() => setActive((current) => current ?? (count > 0 ? count - 1 : null))}
       onBlur={() => setActive(null)}
@@ -302,7 +313,7 @@ export function LineChart({ labels, fullLabels = labels, series, title, height =
         <caption>{title}</caption>
         <thead>
           <tr>
-            <th scope="col">Ngày</th>
+            <th scope="col">{pointLabel}</th>
             {series.map((s) => (
               <th key={s.name} scope="col">
                 {s.name}
@@ -326,7 +337,7 @@ export function LineChart({ labels, fullLabels = labels, series, title, height =
 }
 
 /** Bảng số liệu của biểu đồ đường (ngày mới nhất đứng đầu), cho người cần đọc số chính xác. */
-export function SeriesTable({ labels, fullLabels = labels, series, details }: LineChartProps) {
+export function SeriesTable({ labels, fullLabels = labels, series, details, pointLabel = 'Ngày' }: LineChartProps) {
   const rows = fullLabels.map((label, index) => ({ key: index, label })).reverse()
   return (
     <Table
@@ -335,7 +346,7 @@ export function SeriesTable({ labels, fullLabels = labels, series, details }: Li
       scroll={{ y: 260, x: 'max-content' }}
       dataSource={rows}
       columns={[
-        { title: 'Ngày', dataIndex: 'label', width: 110 },
+        { title: pointLabel, dataIndex: 'label', width: 110 },
         ...series.map((s) => ({
           title: s.name,
           key: s.name,

@@ -277,6 +277,9 @@ internal sealed class AppTestContext
         CreateSettingsService(),
         QcPdf);
 
+    public QcDashboardService CreateQcDashboardService() => new(
+        new InMemoryQualityControlRepository(Store), new InMemoryDepartmentRepository(Store), CurrentUser, Clock);
+
     public NursingReportService CreateNursingReportService() => new(
         new InMemoryNursingReportRepository(Store),
         new InMemoryDepartmentRepository(Store),

@@ -43,6 +43,17 @@ internal sealed class QualityControlRepository(ConsentDbContext db) : IQualityCo
     public async Task<IReadOnlyList<QcBook>> ListBooksAsync(int year, int month, CancellationToken cancellationToken) =>
         await Books().Where(b => b.Year == year && b.Month == month).ToListAsync(cancellationToken).ConfigureAwait(false);
 
+    public async Task<IReadOnlyList<QcBook>> ListBooksBetweenAsync(DateOnly firstMonth, DateOnly lastMonth, CancellationToken cancellationToken)
+    {
+        // So năm rồi tháng để dùng được chỉ mục (Year, Month).
+        var (fromYear, fromMonth, toYear, toMonth) = (firstMonth.Year, firstMonth.Month, lastMonth.Year, lastMonth.Month);
+        return await Books()
+            .Where(b => (b.Year > fromYear || (b.Year == fromYear && b.Month >= fromMonth))
+                        && (b.Year < toYear || (b.Year == toYear && b.Month <= toMonth)))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public Task<QcRun?> FindLatestRunAsync(Guid meterId, CancellationToken cancellationToken) =>
         db.Set<QcRun>()
             .Where(r => r.CancelledAtUtc == null && db.QcBooks.Any(b => b.Id == r.BookId && b.MeterId == meterId))

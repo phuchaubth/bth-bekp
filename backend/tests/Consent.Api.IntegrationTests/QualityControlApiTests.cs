@@ -205,4 +205,68 @@ public sealed class QualityControlApiTests(SqlServerFixture sql) : IAsyncLifetim
         Assert.True(counts.GetValueOrDefault("QcBook.Update") >= 10, string.Join(", ", counts));
         Assert.True(counts.GetValueOrDefault("QcLot.Create") >= 3, string.Join(", ", counts));
     }
+
+    /// <summary>
+    /// Dashboard nội kiểm (quyết định 59): khoa thấy khoa của mình, tính mọi ngày của tháng trước; người không có quyền nội kiểm
+    /// nhận 403; quản trị gán quyền chỉ xem dashboard cho vai trò Kiểm tra thì người đó thấy dashboard nhưng không mở được sổ.
+    /// </summary>
+    [Fact]
+    public async Task Dashboard_CountsEveryDay_AndTheMonitorPermissionOnlyShowsTheDashboard()
+    {
+        var nurse = (await _client.LoginAsync("dieuduong.demo", TestSettings.DemoPassword)).AccessToken!;
+        var lab = (await _client.LoginAsync("hsh.demo", TestSettings.DemoPassword)).AccessToken!;
+        var reception = (await _client.LoginAsync("tiepdon.demo", TestSettings.DemoPassword)).AccessToken!;
+        var admin = await _client.LoginAsAdministratorAsync();
+
+        // Máy và ba lô demo (dung dịch chứng mức 1: 40–70, mức 2: 100–140 mg/dL).
+        var (_, catalog) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/qc/catalog", lab);
+        var meterId = Assert.Single(catalog.GetProperty("meters").EnumerateArray()).GetProperty("id").GetString();
+        var lots = catalog.GetProperty("lots").EnumerateArray().ToList();
+        string LotId(string number) => lots.Single(l => l.GetProperty("lotNumber").GetString() == number).GetProperty("id").GetString()!;
+        var (strip, level1, level2) = (LotId("QT-DEMO-01"), LotId("DC1-DEMO-01"), LotId("DC2-DEMO-01"));
+
+        // Khoa Nội ghi hôm nay kết quả ngày 1 (đạt) và ngày 2 (không đạt) của tháng trước: hai ngày ghi muộn.
+        var month = FirstOfLastMonth.ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        var (_, book) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/qc/books", nurse, new { meterId, month });
+        var bookId = book.GetProperty("id").GetString()!;
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/qc/books/{bookId}/runs", nurse, Run(FirstOfLastMonth, strip, level1, 55, level2, 120))).Status);
+        Assert.Equal(HttpStatusCode.OK, (await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/qc/books/{bookId}/runs", nurse, Run(FirstOfLastMonth.AddDays(1), strip, level1, 80, level2, 120))).Status);
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/qc/dashboard", reception)).Status);
+        var next = FirstOfLastMonth.AddMonths(2).ToString("yyyy-MM", CultureInfo.InvariantCulture);
+        Assert.Equal(HttpStatusCode.BadRequest, (await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/qc/dashboard?month={next}", nurse)).Status);
+
+        var (status, dashboard) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/qc/dashboard?month={month}", nurse);
+        Assert.True(status == HttpStatusCode.OK, dashboard.ToString());
+        Assert.Equal(month, dashboard.GetProperty("month").GetString());
+        var department = Assert.Single(dashboard.GetProperty("departments").EnumerateArray());
+        Assert.Equal("Khoa Nội tổng hợp", department.GetProperty("departmentName").GetString());
+        var figures = department.GetProperty("figures");
+        var days = DateTime.DaysInMonth(FirstOfLastMonth.Year, FirstOfLastMonth.Month);
+        Assert.Equal(
+            (days, 2, days - 2, 2, 1, 1),
+            (figures.GetProperty("requiredDays").GetInt32(), figures.GetProperty("recordedDays").GetInt32(), figures.GetProperty("missingDays").GetInt32(),
+                figures.GetProperty("lateDays").GetInt32(), figures.GetProperty("failedDays").GetInt32(), figures.GetProperty("notRepeatedDays").GetInt32()));
+        var meter = Assert.Single(department.GetProperty("meters").EnumerateArray());
+        Assert.Equal((bookId, "Open", true), (meter.GetProperty("bookId").GetString(), meter.GetProperty("status").GetString(), meter.GetProperty("canOpen").GetBoolean()));
+        var trend = dashboard.GetProperty("trend").EnumerateArray().ToList();
+        Assert.Equal((6, month, 2), (trend.Count, trend[^1].GetProperty("month").GetString(), trend[^1].GetProperty("recordedDays").GetInt32()));
+        var pending = Assert.Single(dashboard.GetProperty("alerts").GetProperty("pendingBooks").EnumerateArray());
+        Assert.Equal((bookId, true), (pending.GetProperty("bookId").GetString(), pending.GetProperty("canOpen").GetBoolean()));
+
+        // Quản trị gán quyền chỉ xem dashboard cho vai trò Kiểm tra (QLCL): thấy dashboard, không mở được sổ, không vào danh sách sổ.
+        var (_, roles) = await _client.SendJsonAsync(HttpMethod.Get, "/api/v1/roles", admin);
+        var auditor = roles.EnumerateArray().Single(r => r.GetProperty("code").GetString() == "AUDITOR");
+        var permissions = auditor.GetProperty("permissions").EnumerateArray().Select(p => p.GetString()!).Append("qc.monitor").ToArray();
+        Assert.Equal(
+            HttpStatusCode.OK,
+            (await _client.SendJsonAsync(HttpMethod.Put, $"/api/v1/roles/{auditor.GetProperty("id").GetString()}/permissions", admin, new { permissions })).Status);
+        var monitor = (await _client.LoginAsync("kiemtra.demo", TestSettings.DemoPassword)).AccessToken!;
+        var (monitorStatus, monitored) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/qc/dashboard?month={month}", monitor);
+        Assert.True(monitorStatus == HttpStatusCode.OK, monitored.ToString());
+        var monitoredMeter = Assert.Single(Assert.Single(monitored.GetProperty("departments").EnumerateArray()).GetProperty("meters").EnumerateArray());
+        Assert.False(monitoredMeter.GetProperty("canOpen").GetBoolean());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/qc/books/{bookId}", monitor)).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/qc/books?month={month}", monitor)).Status);
+    }
 }

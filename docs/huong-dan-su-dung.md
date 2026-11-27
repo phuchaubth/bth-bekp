@@ -16,7 +16,7 @@
 8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu, bảo trì hệ thống
 9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
 10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
-11. [Sổ nội kiểm đường huyết tại giường](#noi-kiem): khoa ghi kết quả từng ngày, Khoa HSH xem xét và xác nhận sổ tháng, in PDF theo mẫu
+11. [Sổ nội kiểm đường huyết tại giường](#noi-kiem): khoa ghi kết quả từng ngày, Khoa HSH xem xét và xác nhận sổ tháng, in PDF theo mẫu; [dashboard giám sát](#dashboard-noi-kiem)
 12. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
@@ -1543,8 +1543,9 @@ Phần mềm thay **"Sổ theo dõi kết quả nội kiểm đường huyết t
 
 | Ai | Làm gì | Ở đâu |
 |---|---|---|
-| Khoa HSH: vai trò **Khoa HSH (nội kiểm)** | Khai báo máy đo, lô que thử, lô dung dịch chứng; xem xét từng ngày; trả lại ngày hoặc sổ; xác nhận sổ tháng; in PDF | **Nội kiểm** → **Máy đo và lô vật tư**, **Sổ nội kiểm** |
-| Điều dưỡng khoa (vai trò có quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng*, mục 8.3) | Mở sổ tháng, ghi kết quả từng ngày, ghi nguyên nhân và kết quả chạy lại, ghi điều chỉnh, gửi sổ tháng, in PDF | **Nội kiểm** → **Sổ nội kiểm** |
+| Khoa HSH: vai trò **Khoa HSH (nội kiểm)** | Khai báo máy đo, lô que thử, lô dung dịch chứng; xem xét từng ngày; trả lại ngày hoặc sổ; xác nhận sổ tháng; in PDF; giám sát mọi khoa | **Nội kiểm** → **Máy đo và lô vật tư**, **Sổ nội kiểm**, **Dashboard** |
+| Điều dưỡng khoa (vai trò có quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng*, mục 8.3) | Mở sổ tháng, ghi kết quả từng ngày, ghi nguyên nhân và kết quả chạy lại, ghi điều chỉnh, gửi sổ tháng, in PDF; xem dashboard của khoa mình | **Nội kiểm** → **Sổ nội kiểm**, **Dashboard** |
+| Lãnh đạo, Phòng Điều dưỡng, QLCL (vai trò có quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)*, mục 8.3) | Xem dashboard của mọi khoa. Không ghi, không xem xét, không mở được sổ | **Nội kiểm** → **Dashboard** |
 
 **Dữ liệu không bị sửa, có xác nhận giữa hai khoa:**
 
@@ -1660,6 +1661,54 @@ Bấm **In PDF** ở đầu trang sổ (khoa và Khoa HSH đều in được). P
 
 *Hình 11.11. Trang 2 PDF sổ tháng 11: ngày 20 và 25 có kết quả đã hủy (gạch ngang, kèm lý do), ngày 26 không đạt, đã chạy lại.*
 
+<a id="dashboard-noi-kiem"></a>
+
+### 11.8. Dashboard giám sát nội kiểm
+
+Bấm **Nội kiểm** → **Dashboard** (quyết định 59). Khoa HSH và người có quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)* thấy mọi khoa; khoa thấy khoa của mình. Chọn **tháng** ở góc trên bên phải (mặc định tháng này, xem được 24 tháng gần đây).
+
+**Cách tính tỷ lệ thực hiện:** mỗi máy, **mọi ngày** trong tháng (kể cả thứ bảy, chủ nhật) như sổ giấy.
+
+- Tháng này tính đến hôm qua; **hôm nay** chỉ tính khi khoa đã ghi kết quả. Tháng đã qua tính cả tháng.
+- Máy khai báo giữa tháng tính từ ngày khai báo. Khoa ghi bù kết quả trước ngày khai báo thì tính từ kết quả đầu tiên.
+- Máy đã ngưng sử dụng hoặc đã chuyển sang khoa khác: phần mềm không lưu ngày ngưng, ngày chuyển, nên sổ của khoa cũ chỉ tính đến ngày có kết quả cuối cùng. Khoa nhận máy tính từ ngày sau đó.
+- Máy đang dùng mà chưa mở sổ: mọi ngày đã qua là chưa ghi.
+
+Trên cùng là tám ô chỉ số của tháng:
+
+- **Tỷ lệ thực hiện**: số ngày có kết quả trên số ngày phải thực hiện.
+- **Ngày chưa ghi**: ngày đã qua chưa có kết quả.
+- **Ghi muộn**: ngày có nhãn Ghi muộn trong sổ.
+- **Không đạt**: tính ở lần chạy đầu; ô ghi thêm số lần chạy lại đạt và chạy lại vẫn không đạt.
+- **Không đạt, chưa chạy lại**: cần nhắc khoa chạy lại QC.
+- **Chờ Khoa HSH xem xét**: ngày đến hôm nay chưa xem xét, như cột *Chờ xem xét* ở danh sách sổ.
+- **Sổ đã xác nhận**: kèm số sổ chờ xác nhận, bị trả lại, đang ghi, máy chưa mở sổ.
+- **Máy đo**: số máy và số khoa.
+
+![Dashboard nội kiểm của Khoa HSH: ô chỉ số, cảnh báo, xu hướng 6 tháng](huong-dan-su-dung/nk-12-dashboard.png)
+
+*Hình 11.12. Dashboard tháng 11 của Khoa HSH, 5 khoa, 7 máy (dữ liệu giả lập): ô chỉ số, khung **Cần xử lý**, hai biểu đồ 6 tháng (rê chuột vào tháng 10).*
+
+Các phần dưới ô chỉ số:
+
+1. **Cần xử lý – tính đến hôm nay** (không theo tháng đang xem):
+   - lô que thử, dung dịch chứng **đã hết hạn** mà chưa ngưng sử dụng, hoặc **còn 30 ngày trở xuống**, kèm khoa đang dùng lô;
+   - danh mục **chưa đủ hai mức** dung dịch chứng còn hạn, hoặc không còn lô que thử còn hạn (khoa không ghi được kết quả);
+   - máy đang dùng **chưa mở sổ tháng này**;
+   - sổ của 5 tháng trước **chưa được xác nhận**: khoa chưa gửi, bị trả lại, hoặc chờ Khoa HSH xác nhận (bấm **Xem sổ** để mở).
+2. Hai biểu đồ 6 tháng (tháng đang xem ở cuối):
+   - **Tỷ lệ thực hiện**;
+   - **Tỷ lệ không đạt**: số ngày không đạt trên số ngày đã ghi.
+
+   Rê chuột vào điểm để xem số ngày; bấm **Xem bảng** để đọc số.
+3. Bảng **Theo khoa**: mỗi khoa một dòng, bấm dấu **+** để xem từng máy. Có tỷ lệ thực hiện, ngày chưa ghi (dòng máy ghi các ngày), ghi muộn, không đạt, chưa chạy lại, lần không đạt gần nhất kèm nguyên nhân (hoặc *khoa chưa ghi nguyên nhân*), chờ xem xét, trạng thái sổ. Bấm tiêu đề **Thực hiện** để xếp theo tỷ lệ (khoa thấp nhất lên đầu). Cột **Sổ tháng** của dòng máy có nút **Xem sổ** để mở sổ; người chỉ có quyền xem dashboard không có nút này.
+
+![Bảng theo khoa, mở từng máy: ngày chưa ghi, không đạt gần nhất, trạng thái sổ](huong-dan-su-dung/nk-13-theo-khoa.png)
+
+*Hình 11.13. Bảng theo khoa, mở khoa Khám bệnh và khoa Nội tổng hợp; khoa Nhi có máy mới chưa mở sổ (dữ liệu giả lập).*
+
+Người chỉ có quyền xem dashboard (lãnh đạo, Phòng Điều dưỡng, QLCL) do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Nội kiểm đường huyết**. Quyền này không cho ghi kết quả, không cho xem xét, không mở được sổ.
+
 ---
 
 <a id="hoi-dap"></a>
@@ -1756,7 +1805,7 @@ Thẻ chỉ có khi khoa phải gửi báo cáo, hoặc được Phòng Điều 
 Có. Đây là chức năng kế thừa phiếu lần trước (mục 2.7). Kiểm tra lại từng câu trước khi trình ký. Ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký không được điền sẵn.
 
 **Không thấy menu Nội kiểm, hoặc không mở được sổ của khoa?**
-Tài khoản cần quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng* (quản trị thêm cho vai trò ở mục 8.3, ví dụ vai trò Điều dưỡng) và đúng khoa (mục 8.1); đăng xuất rồi đăng nhập lại. Khoa chưa có máy trong danh sách sổ: nhờ Khoa HSH khai báo máy đo của khoa (mục 11.1).
+Tài khoản cần quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng* (quản trị thêm cho vai trò ở mục 8.3, ví dụ vai trò Điều dưỡng) và đúng khoa (mục 8.1); đăng xuất rồi đăng nhập lại. Khoa chưa có máy trong danh sách sổ: nhờ Khoa HSH khai báo máy đo của khoa (mục 11.1). Lãnh đạo, Phòng Điều dưỡng, QLCL chỉ cần xem số liệu: quản trị gán quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)*; menu **Nội kiểm** khi đó chỉ có **Dashboard** (mục 11.8).
 
 **Ghi nhầm kết quả nội kiểm mà không còn nút Ghi điều chỉnh?**
 Ngày đó Khoa HSH đã xem xét, hoặc khoa đã gửi sổ tháng. Báo Khoa HSH **trả lại ngày** (hoặc trả lại sổ), rồi ghi điều chỉnh có lý do (mục 11.4). Sổ đã được Khoa HSH xác nhận thì không thay đổi được nữa.

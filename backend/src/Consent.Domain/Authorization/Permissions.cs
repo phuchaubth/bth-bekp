@@ -69,6 +69,12 @@ public static class Permissions
 
     /// <summary>Khoa HSH: khai báo máy đo đường huyết của các khoa, lô que thử, lô dung dịch chứng và ngưỡng chấp nhận.</summary>
     public const string QcManage = "qc.manage";
+
+    /// <summary>
+    /// Xem dashboard giám sát nội kiểm đường huyết của mọi khoa (quyết định 59), chỉ xem: dành cho lãnh đạo, Phòng Điều dưỡng, QLCL.
+    /// Không ghi kết quả, không xem xét, không mở được sổ chi tiết.
+    /// </summary>
+    public const string QcMonitor = "qc.monitor";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -116,6 +122,7 @@ public static class PermissionCatalog
         new(Permissions.QcRecord, "Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng", QcGroup),
         new(Permissions.QcReview, "Khoa HSH: xem xét kết quả nội kiểm các khoa, xác nhận sổ tháng", QcGroup),
         new(Permissions.QcManage, "Khoa HSH: khai báo máy đo, lô que thử, lô dung dịch chứng", QcGroup),
+        new(Permissions.QcMonitor, "Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)", QcGroup),
     ];
 
     private static readonly HashSet<string> Codes = new(All.Select(p => p.Code), StringComparer.Ordinal);

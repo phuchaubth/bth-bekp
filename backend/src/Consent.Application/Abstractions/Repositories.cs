@@ -327,6 +327,12 @@ public interface IQualityControlRepository
     /// <summary>Các sổ của một tháng, kèm kết quả và lần xem xét (để đếm ngày đã ghi, đã xem xét).</summary>
     Task<IReadOnlyList<QcBook>> ListBooksAsync(int year, int month, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Các sổ từ tháng của <paramref name="firstMonth"/> đến tháng của <paramref name="lastMonth"/> (tính cả hai tháng), kèm kết quả
+    /// và lần xem xét: dashboard nội kiểm (quyết định 59).
+    /// </summary>
+    Task<IReadOnlyList<QcBook>> ListBooksBetweenAsync(DateOnly firstMonth, DateOnly lastMonth, CancellationToken cancellationToken);
+
     /// <summary>Kết quả còn hiệu lực ghi gần nhất của một máy (ở mọi sổ): gợi ý lô đang dùng khi ghi kết quả mới.</summary>
     Task<QcRun?> FindLatestRunAsync(Guid meterId, CancellationToken cancellationToken);
 }

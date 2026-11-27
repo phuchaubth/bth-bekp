@@ -195,7 +195,7 @@ Quyền mới có hiệu lực khi access token được làm mới (tối đa 1
 | Phiếu đồng thuận | `consents.read`, `consents.create`, `consents.sign`, `consents.revoke`, `kiosk.use` (dùng màn hình kiosk, quyết định 24) |
 | Báo cáo và xuất dữ liệu | `reports.read`, `exports.run`, `exports.sensitive` |
 | Phạm vi dữ liệu | `scope.all_departments` (xem dữ liệu mọi khoa) |
-| Nội kiểm đường huyết (quyết định 57) | `qc.record` (khoa ghi kết quả, gửi sổ tháng), `qc.review` (Khoa HSH xem xét, xác nhận sổ), `qc.manage` (Khoa HSH khai báo máy đo, lô) |
+| Nội kiểm đường huyết (quyết định 57) | `qc.record` (khoa ghi kết quả, gửi sổ tháng), `qc.review` (Khoa HSH xem xét, xác nhận sổ), `qc.manage` (Khoa HSH khai báo máy đo, lô), `qc.monitor` (quyết định 59: xem dashboard nội kiểm mọi khoa, chỉ xem; không vai trò mặc định nào ngoài Quản trị hệ thống có sẵn) |
 
 **Vai trò mặc định**: `ADMIN` (Quản trị hệ thống), `TEMPLATE_MANAGER`, `DOCTOR`, `NURSE`, `RECEPTIONIST`, `DEPARTMENT_HEAD`, `REPORTER`, `AUDITOR`, `LAB_QC` (Khoa HSH, quyết định 57: `qc.review`, `qc.manage`), `KIOSK` (máy kiosk người bệnh: chỉ `kiosk.use`; tài khoản mang vai trò này không được có vai trò khác và phải thuộc một khoa — `400` ở `roleIds`/`departmentId`). Vai trò hệ thống còn thiếu được tự tạo khi khởi động (nâng cấp phiên bản không cần thao tác). Quyền mặc định của từng vai trò: xem `backend/src/Consent.Domain/Identity/SystemRoles.cs`. Quyền thu hồi phiếu (`consents.revoke`) mặc định có ở Quản trị hệ thống và Trưởng khoa.
 
@@ -647,6 +647,30 @@ Sổ theo dõi kết quả nội kiểm theo mẫu giấy CT-ĐHTG/BM01 (lần b
 | POST | `/books/{id}/confirm` | `qc.review` | Xác nhận sổ đã gửi khi mọi ngày đã xem xét; người gửi sổ không tự xác nhận. Sổ khóa hẳn |
 | POST | `/books/{id}/return` | `qc.review` | `{ reason }`: trả lại sổ đã gửi |
 | GET | `/books/{id}/pdf` | Như xem sổ | PDF theo mẫu giấy (A4 ngang): đầu trang có logo, tên đơn vị (Cấu hình hệ thống), mã số mẫu; phần đầu sổ; bảng mỗi ngày một dòng; kết quả đã hủy và lần xem xét đã trả lại in chữ xám gạch ngang kèm lý do; kết quả ghi sau ngày thực hiện có dấu `*`. Tên file `so-noi-kiem-<mã khoa>-<yyyy>-<MM>-<seri>.pdf` |
+| GET | `/dashboard?month=` | `qc.review` hoặc `qc.monitor` (mọi khoa); `qc.record` (khoa của mình) | Dashboard giám sát của tháng (mặc định tháng này; quyết định 59), xem bên dưới. Tháng sau, quá 24 tháng trước hoặc sai dạng → `400 month`; không có quyền nào ở trên → `403`. `qc.monitor` không mở được sổ: `/books`, `/books/{id}` vẫn `403` |
+
+**Dashboard** `{ month, today, totals, departments, trend, alerts }` (chỉ đọc, chỉ khoa người xem thấy):
+
+- Số liệu `figures` `{ requiredDays, recordedDays, missingDays, lateDays, failedDays, repeatPassedDays, repeatFailedDays, notRepeatedDays, reviewedDays, daysToReview }`.
+- `requiredDays` (ngày phải thực hiện) tính **mọi ngày** của tháng cho mỗi máy:
+  - tháng này đến hôm qua, hôm nay chỉ tính khi đã có kết quả; tháng đã qua tính cả tháng;
+  - máy khai báo giữa tháng tính từ ngày khai báo (hoặc từ kết quả đầu tiên nếu ghi bù sớm hơn);
+  - máy đã ngưng hoặc đã chuyển khoa: sổ của khoa cũ tính đến kết quả cuối của sổ; khoa nhận máy trong tháng tính từ ngày sau kết quả cuối của khoa cũ;
+  - máy đang dùng chưa có sổ nào trong tháng là một dòng `bookId: null`, mọi ngày là chưa ghi.
+- Các số khác:
+  - `lateDays`: ngày có kết quả ghi sau ngày thực hiện (`late`);
+  - `failedDays`: không đạt ở lần chạy đầu, trong đó `repeatPassedDays`, `repeatFailedDays`, `notRepeatedDays` (chưa chạy lại);
+  - `reviewedDays`, `daysToReview`: như danh sách sổ.
+- `totals` `{ departments, meters, figures, books }`.
+- `books` `{ open, returned, submitted, confirmed, notOpened }`; `returned` là Khoa HSH đã trả lại sổ, khoa đang ghi tiếp.
+- `departments` (theo tên khoa) `{ departmentId, departmentName, figures, books, latestFailure, meters }`.
+- `meters` (theo tên máy) `{ meterId, meterLabel, meterActive, bookId, status, returned, canOpen, figures, missingDates, latestFailure }`; `latestFailure` `{ date, meterLabel, reason }` (`reason` `null` là khoa chưa ghi nguyên nhân).
+- `trend`: 6 tháng, tháng đang xem ở cuối, `{ month, requiredDays, recordedDays, failedDays, lateDays }`.
+- `alerts` tính đến hôm nay, không theo tháng đang xem: `{ currentMonth, lots, controlLevels, stripLots, metersWithoutBook, pendingBooks }`.
+  - `lots`: lô đang dùng đã hết hạn hoặc còn ≤ 30 ngày, `{ lotId, kind, productName, lotNumber, level, expiryDate, daysLeft, usedBy }`; `daysLeft` âm là đã hết hạn; `usedBy` là khoa có kết quả gần nhất (từ đầu tháng trước) của máy dùng lô.
+  - `controlLevels`: các mức dung dịch chứng đang dùng còn hạn; `stripLots`: số lô que thử đang dùng còn hạn.
+  - `metersWithoutBook`: máy đang dùng mà khoa đang giữ máy chưa mở sổ tháng này.
+  - `pendingBooks`: sổ của 5 tháng trước chưa xác nhận, `{ bookId, month, departmentId, departmentName, meterLabel, status, returned, canOpen }`.
 
 ---
 

@@ -652,6 +652,10 @@ Sau khi cài, quản trị làm một lần:
 2. **Tài khoản Khoa HSH.** *Quản trị → Người dùng*: gán vai trò **Khoa HSH (nội kiểm)** cho nhân viên Khoa Huyết học – Sinh hóa xem xét nội kiểm (nên đặt khoa là Khoa Huyết học – Sinh hóa). Vai trò này xem sổ của mọi khoa, xem xét từng ngày, trả lại ngày hoặc sổ, xác nhận sổ tháng, khai báo máy đo và lô. Muốn tách người khai báo danh mục với người xem xét thì tạo vai trò riêng (mục 8.3 hướng dẫn sử dụng) chỉ có `qc.manage` hoặc chỉ có `qc.review`.
 3. **Khai báo danh mục** (Khoa HSH, trước khi các khoa ghi): *Nội kiểm → Máy đo và lô vật tư*: máy đo của từng khoa (khoa, loại máy, số seri), lô que thử, lô dung dịch chứng (mức, hạn dùng, ngưỡng chấp nhận, đơn vị). Khoa chưa có máy đã khai báo thì chưa mở được sổ.
 4. **Tên đơn vị, logo trên PDF** lấy ở *Cấu hình hệ thống* như phiếu đồng thuận. Mã số mẫu, lần ban hành, ngày hiệu lực (CT-ĐHTG/BM01, 03, 16-06-2026) cố định trong phần mềm: bệnh viện ban hành lại mẫu thì báo để sửa trong bản sau.
+5. **Người xem dashboard nội kiểm** (quyết định 59, không có migration).
+   - Khoa HSH và các khoa có quyền ghi kết quả tự thấy *Nội kiểm → Dashboard*: Khoa HSH thấy mọi khoa, khoa thấy khoa mình.
+   - Lãnh đạo, Phòng Điều dưỡng, QLCL chỉ cần xem số liệu: vào *Quản trị → Vai trò và quyền*, chọn vai trò của họ (ví dụ **Phòng Điều dưỡng**, **Kiểm tra**), nhóm **Nội kiểm đường huyết**, đánh dấu *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)* (`qc.monitor`), bấm **Lưu**. Người dùng đăng nhập lại để quyền có hiệu lực.
+   - Quyền này không cho ghi, không cho xem xét, không mở được sổ. Vai trò có sẵn không tự thêm quyền này; chỉ Quản trị hệ thống tự có.
 
 Lưu ý: không có lệnh xóa sổ, kết quả hay lần xem xét (ghi sai thì ghi điều chỉnh có lý do; kết quả cũ vẫn giữ). Script xóa dữ liệu chạy thử (mục 5.11) **không xóa** dữ liệu nội kiểm: chạy thử nội kiểm trên môi trường UAT (mục 5.10).
 

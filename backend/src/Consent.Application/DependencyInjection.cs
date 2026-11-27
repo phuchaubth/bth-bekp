@@ -54,6 +54,7 @@ public static class DependencyInjection
         services.AddScoped<TestAssignmentService>();
         services.AddScoped<QcCatalogService>();
         services.AddScoped<QcBookService>();
+        services.AddScoped<QcDashboardService>();
         services.AddScoped<MaintenanceService>();
         services.AddSingleton(new MaintenanceStateCache(MaintenanceStateCache.DefaultLifetime));
 
