@@ -2,6 +2,7 @@ using Consent.Application.Abstractions;
 using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
 using Consent.Domain.ConsentTemplates;
+using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
@@ -62,6 +63,10 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<QcBook> QcBooks => Set<QcBook>();
 
+    public DbSet<CriticalTest> CriticalTests => Set<CriticalTest>();
+
+    public DbSet<CriticalResult> CriticalResults => Set<CriticalResult>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardAuditLogIsAppendOnly();
@@ -87,6 +92,7 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
         ConsentSignatureConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         UserConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         modelBuilder.HasSequence<long>(ConsentFormNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<long>(CriticalResultNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
         base.OnModelCreating(modelBuilder);
     }
 

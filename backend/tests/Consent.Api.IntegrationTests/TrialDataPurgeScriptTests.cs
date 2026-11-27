@@ -30,6 +30,9 @@ public sealed class TrialDataPurgeScriptTests(SqlServerFixture sql) : IAsyncLife
         "NursingReportDelegations", "TestAssignments", "ExportJobs", "__EFMigrationsHistory",
         // Sổ nội kiểm đường huyết (quyết định 57): danh mục máy, lô và sổ đã xác nhận không phải dữ liệu chạy thử của phiếu.
         "QcMeters", "QcLots", "QcBooks", "QcRuns", "QcDayReviews",
+        // Kết quả nguy cấp (quyết định 60): danh mục và hồ sơ là sổ điện tử thay sổ giấy ST01, ST02, sổ Vi sinh; chạy thử ở môi
+        // trường UAT. Hồ sơ chép thông tin người bệnh lúc ghi, không tham chiếu bảng Patients.
+        "CriticalTests", "CriticalResults", "CriticalNotifications",
     ];
 
     /// <summary>Đếm mọi bảng (câu lệnh cố định, không ghép chuỗi).</summary>
@@ -62,6 +65,9 @@ public sealed class TrialDataPurgeScriptTests(SqlServerFixture sql) : IAsyncLife
         SELECT 'QcBooks', COUNT(*) FROM dbo.QcBooks UNION ALL
         SELECT 'QcRuns', COUNT(*) FROM dbo.QcRuns UNION ALL
         SELECT 'QcDayReviews', COUNT(*) FROM dbo.QcDayReviews UNION ALL
+        SELECT 'CriticalTests', COUNT(*) FROM dbo.CriticalTests UNION ALL
+        SELECT 'CriticalResults', COUNT(*) FROM dbo.CriticalResults UNION ALL
+        SELECT 'CriticalNotifications', COUNT(*) FROM dbo.CriticalNotifications UNION ALL
         SELECT '__EFMigrationsHistory', COUNT(*) FROM dbo.__EFMigrationsHistory
         """;
 

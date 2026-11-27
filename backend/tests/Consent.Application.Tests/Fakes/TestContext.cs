@@ -1,6 +1,7 @@
 using Consent.Application.Auth;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.CriticalResults;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
@@ -279,6 +280,58 @@ internal sealed class AppTestContext
 
     public QcDashboardService CreateQcDashboardService() => new(
         new InMemoryQualityControlRepository(Store), new InMemoryDepartmentRepository(Store), CurrentUser, Clock);
+
+    public CapturingCriticalLogbookPdf CriticalPdf { get; } = new();
+
+    public SequentialCriticalNumbers CriticalNumbers { get; } = new();
+
+    public CriticalSettingsService CreateCriticalSettingsService() => new(
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock);
+
+    public CriticalCatalogService CreateCriticalCatalogService() => new(new InMemoryCriticalResultRepository(Store), Store, CurrentUser, Clock);
+
+    public PatientSourceService CreatePatientSourceService() => new(
+        PatientSource,
+        new InMemoryPatientRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        Microsoft.Extensions.Options.Options.Create(HisOptions));
+
+    public CriticalResultService CreateCriticalResultService() => new(
+        new InMemoryCriticalResultRepository(Store),
+        CriticalNumbers,
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        CreateCriticalSettingsService(),
+        CreatePatientSourceService());
+
+    public CriticalDashboardService CreateCriticalDashboardService() => new(
+        new InMemoryCriticalResultRepository(Store), new InMemoryDepartmentRepository(Store), CurrentUser, Clock, CreateCriticalSettingsService());
+
+    public CriticalLogbookService CreateCriticalLogbookService() => new(
+        new InMemoryCriticalResultRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock,
+        CreateCriticalSettingsService(),
+        CreateSettingsService(),
+        CriticalPdf);
 
     public NursingReportService CreateNursingReportService() => new(
         new InMemoryNursingReportRepository(Store),

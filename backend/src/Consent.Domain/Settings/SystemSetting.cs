@@ -120,12 +120,28 @@ public static class SettingKeys
     /// <summary>Người bật bảo trì: họ tên và tên đăng nhập.</summary>
     public const string MaintenanceStartedBy = "Maintenance.StartedBy";
 
+    /// <summary>
+    /// Thông số vận hành kết quả nguy cấp (quyết định 60): khóa <c>Critical.{tên thông số}</c>, mỗi thông số một dòng (thời hạn,
+    /// cảnh báo, mục tiêu, mã số sổ) và người sửa cuối (<c>Critical.UpdatedBy</c>).
+    /// </summary>
+    public const string CriticalPrefix = "Critical.";
+
+    /// <summary>Tên các thông số kết quả nguy cấp (không có tiền tố <see cref="CriticalPrefix"/>).</summary>
+    public static IReadOnlyList<string> CriticalNames { get; } =
+    [
+        "NotifyMinutes", "ActionMinutes", "WarnMinutes", "PollSeconds", "SoundEnabled", "SoundRepeatSeconds", "FlashEnabled",
+        "FlashPeriodMs", "KeepHours", "LateEntryMinutes", "RequireAddress", "DisplayFullName", "TargetNotifyPercent",
+        "TargetActionPercent", "TargetReadBackPercent", "TargetCompletePercent", "CodeLaboratory", "CodeClinical", "CodeMicrobiology",
+        "UpdatedBy",
+    ];
+
     public static IReadOnlySet<string> All { get; } =
         new HashSet<string>(
             [
                 HospitalParentAgency, HospitalName, HospitalPlace, LogoStorageKey, LogoContentType, KioskTemplateCodes, EncountersEnabled,
                 SignatureFrameStorageKey, SignatureFrameContentType, FormInheritanceDays, NursingHisEntryDepartments,
                 MaintenanceReason, MaintenanceExpectedEndAtUtc, MaintenanceStartedAtUtc, MaintenanceStartedBy,
+                .. CriticalNames.Select(name => CriticalPrefix + name),
             ],
             StringComparer.Ordinal);
 

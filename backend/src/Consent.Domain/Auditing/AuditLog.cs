@@ -140,4 +140,10 @@ public static class AuditActions
 
     /// <summary>Quản trị tắt chế độ bảo trì; chi tiết ghi thời điểm đã bật.</summary>
     public const string MaintenanceDisabled = "Maintenance.Disabled";
+
+    /// <summary>Sửa thông số vận hành kết quả nguy cấp (quyết định 60); chi tiết ghi từng thông số: giá trị cũ, giá trị mới.</summary>
+    public const string CriticalSettingsUpdated = "CriticalResults.SettingsUpdated";
+
+    /// <summary>Tải sổ kết quả nguy cấp (PDF); chi tiết ghi mẫu sổ, khoa, tháng (sổ có thông tin người bệnh).</summary>
+    public const string CriticalLogbookPrinted = "CriticalResults.LogbookPrinted";
 }

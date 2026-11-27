@@ -1,6 +1,7 @@
 using Consent.Application.Abstractions;
 using Consent.Application.ConsentTemplates;
 using Consent.Domain.ConsentTemplates;
+using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.Patients;
@@ -43,6 +44,9 @@ internal sealed partial class DatabaseSeeder(
         ("kiemtra.demo", "Kiểm tra Demo", "Chuyên viên", SystemRoles.Auditor, "KHTH"),
         ("phongdieuduong.demo", "Phòng Điều dưỡng Demo", "Điều dưỡng trưởng", SystemRoles.NursingOffice, "PDD"),
         ("hsh.demo", "Khoa HSH Demo", "Kỹ thuật viên", SystemRoles.LabQualityControl, "HSH"),
+        ("ktv.demo", "Kỹ thuật viên Demo", "Kỹ thuật viên", SystemRoles.CriticalLab, "HSH"),
+        ("qlcl.demo", "QLCL Demo", "Chuyên viên", SystemRoles.CriticalQuality, "KHTH"),
+        ("manhinh.demo", "Màn hình Khoa Nội Demo", "Màn hình theo dõi", SystemRoles.CriticalDisplay, "NOI"),
     ];
 
     /// <summary>Người bệnh demo: họ tên có "(giả lập)", số giấy tờ là số thử nghiệm, không phải người thật.</summary>
@@ -200,6 +204,29 @@ internal sealed partial class DatabaseSeeder(
         }
 
         await SeedDemoQualityControlAsync(departments["NOI"].Id, cancellationToken).ConfigureAwait(false);
+        await SeedDemoCriticalTestsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Danh mục kết quả nguy cấp demo (quyết định 60): vài mục ví dụ, tên có "(giả lập)", khoảng nguy cấp ghi "ví dụ". Khi dùng
+    /// thật, QLCL nhập danh mục theo Phụ lục 01 QT-KQNC đang hiệu lực. Chỉ tạo khi danh mục còn trống.
+    /// </summary>
+    private async Task SeedDemoCriticalTestsAsync(CancellationToken cancellationToken)
+    {
+        if (await db.CriticalTests.AnyAsync(cancellationToken).ConfigureAwait(false))
+        {
+            return;
+        }
+
+        var now = clock.UtcNow;
+        db.CriticalTests.Add(CriticalTest.Create(
+            new("Kali (K+) (giả lập)", "Ví dụ: ≤ 2,5 hoặc ≥ 6,0 mmol/L", null, "mmol/L", "Huyết học – Sinh hóa", CriticalLogbook.Laboratory, false, 1), now));
+        db.CriticalTests.Add(CriticalTest.Create(
+            new("Tiểu cầu (PLT) (giả lập)", "Ví dụ: < 10 K/µL", null, "K/µL", "Huyết học – Sinh hóa", CriticalLogbook.Laboratory, false, 2), now));
+        db.CriticalTests.Add(CriticalTest.Create(
+            new("Cấy máu (giả lập)", "Ví dụ: dương tính", null, null, "Vi sinh", CriticalLogbook.Microbiology, true, 3), now));
+        db.CriticalTests.Add(CriticalTest.Create(
+            new("Siêu âm tim (giả lập)", "Ví dụ: suy tim cấp, nghi nhồi máu cơ tim", null, null, "Chẩn đoán hình ảnh", CriticalLogbook.Laboratory, true, 4), now));
     }
 
     /// <summary>

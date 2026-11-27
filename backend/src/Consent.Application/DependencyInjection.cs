@@ -2,6 +2,7 @@ using Consent.Application.Auditing;
 using Consent.Application.Auth;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.CriticalResults;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
@@ -55,6 +56,11 @@ public static class DependencyInjection
         services.AddScoped<QcCatalogService>();
         services.AddScoped<QcBookService>();
         services.AddScoped<QcDashboardService>();
+        services.AddScoped<CriticalSettingsService>();
+        services.AddScoped<CriticalCatalogService>();
+        services.AddScoped<CriticalResultService>();
+        services.AddScoped<CriticalDashboardService>();
+        services.AddScoped<CriticalLogbookService>();
         services.AddScoped<MaintenanceService>();
         services.AddSingleton(new MaintenanceStateCache(MaintenanceStateCache.DefaultLifetime));
 

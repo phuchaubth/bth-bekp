@@ -11,6 +11,7 @@ using Consent.Domain.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
+using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
@@ -150,6 +151,10 @@ internal sealed class InMemoryStore : IUnitOfWork
     public List<QcLot> QcLots { get; } = [];
 
     public List<QcBook> QcBooks { get; } = [];
+
+    public List<CriticalTest> CriticalTests { get; } = [];
+
+    public List<CriticalResult> CriticalResults { get; } = [];
 
     public int SaveCount { get; private set; }
 
