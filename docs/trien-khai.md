@@ -714,6 +714,12 @@ Lưu ý:
 - Script xóa dữ liệu chạy thử (mục 5.11) **không xóa** dữ liệu kết quả nguy cấp: chạy thử trên môi trường UAT (mục 5.10).
 - Không có xuất Excel cho sổ và dashboard kết quả nguy cấp: sổ in PDF theo mẫu giấy; dashboard có bảng số liệu (**Xem bảng**).
 
+### 5.15. Menu Phiếu đồng thuận (quyết định 62)
+
+Các mục **Danh sách phiếu**, **Người bệnh**, **Mẫu phiếu**, **Xuất dữ liệu**, **Báo cáo thống kê** nằm chung menu **Phiếu đồng thuận**; **Nhật ký** chuyển sang cạnh **Quản trị** (hướng dẫn sử dụng, mục 1.3). Bản này chỉ đổi giao diện: không có migration, không đổi quyền, không cần cấu hình. Đường dẫn các trang giữ nguyên nên lối tắt, dấu trang đã lưu vẫn dùng được. Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần để tải giao diện mới.
+
+Bản này cũng ẩn nút **Mở màn hình theo dõi (TV)** với tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)**: màn hình theo dõi là của khoa nhận, tài khoản QLCL bấm vào trước đây gặp trang không có quyền.
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).

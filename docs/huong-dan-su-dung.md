@@ -2,7 +2,7 @@
 
 > Dành cho nhân viên bệnh viện: tiếp đón, điều dưỡng, bác sĩ, trưởng khoa, quản lý mẫu phiếu, báo cáo, kiểm tra, Phòng Điều dưỡng và quản trị hệ thống. Phần 1 dành cho mọi người. Các phần sau dành cho từng nhóm người dùng.
 >
-> Ảnh minh họa được chụp trên máy thử nghiệm với **dữ liệu giả lập**: tên người bệnh có chữ "(giả lập)", số CCCD, số điện thoại, số tiếp nhận đều là số thử. Tên đơn vị trên phiếu đang là giá trị mẫu. Màn hình của bạn có thể khác một chút: có logo và khung chữ ký của bệnh viện, hoặc ít mục menu hơn tùy vai trò.
+> Ảnh minh họa được chụp trên máy thử nghiệm với **dữ liệu giả lập**: tên người bệnh có chữ "(giả lập)", số CCCD, số điện thoại, số tiếp nhận đều là số thử. Tên đơn vị trên phiếu đang là giá trị mẫu. Màn hình của bạn có thể khác một chút: có logo và khung chữ ký của bệnh viện, hoặc ít mục menu hơn tùy vai trò. Từ quyết định 62, các mục phiếu đồng thuận nằm chung menu **Phiếu đồng thuận** (mục 1.3); một số ảnh chụp trước đó vẫn thấy các mục này nằm riêng trên thanh menu.
 
 ## Mục lục
 
@@ -95,9 +95,11 @@ Trên máy tính, thanh trên cùng có:
 - ở giữa: menu ngang;
 - bên phải: tên của bạn. Bấm vào tên để mở **Tài khoản của tôi** hoặc **Đăng xuất**.
 
-![Menu ngang của quản trị hệ thống, đang mở menu Quản trị](huong-dan-su-dung/03-menu-ngang.png)
+Menu ngang có **Tổng quan**, rồi mỗi phân hệ một menu: **Phiếu đồng thuận**, **Điều dưỡng**, **Nội kiểm**, **KQ nguy cấp**; cuối cùng là **Nhật ký** và **Quản trị**. Bấm tên menu để mở các mục con, bấm mục con để mở trang. Menu **Phiếu đồng thuận** gồm **Danh sách phiếu**, **Người bệnh**, **Mẫu phiếu**, **Xuất dữ liệu**, **Báo cáo thống kê** (quyết định 62). Trong hướng dẫn này, "bấm **Phiếu đồng thuận** → **Mẫu phiếu**" nghĩa là bấm menu rồi bấm mục con. Đường dẫn các trang không đổi: liên kết đã lưu trên trình duyệt vẫn mở đúng trang.
 
-*Hình 1.3. Menu ngang. Mục đang mở được gạch chân. Bấm **Quản trị** để mở các mục con.*
+![Menu ngang của quản trị hệ thống, đang mở menu Phiếu đồng thuận](huong-dan-su-dung/03-menu-ngang.png)
+
+*Hình 1.3. Menu ngang, đang mở menu **Phiếu đồng thuận**. Menu chứa trang đang mở được gạch chân.*
 
 <img src="huong-dan-su-dung/04-menu-tai-khoan.png" alt="Menu tài khoản" width="233">
 
@@ -108,13 +110,13 @@ Mỗi người chỉ thấy các mục menu được phép dùng. Với phân qu
 | Mục menu | Tiếp đón, Điều dưỡng, Bác sĩ | Trưởng khoa | Quản lý mẫu phiếu | Báo cáo / Xuất dữ liệu | Kiểm tra | Quản trị hệ thống |
 |---|---|---|---|---|---|---|
 | **Tổng quan** | có | có | có | có | có | có |
-| **Phiếu đồng thuận** | có | có | chỉ xem | chỉ xem | chỉ xem | có |
-| **Người bệnh** | có | có | không | chỉ xem | chỉ xem | có |
-| **Mẫu phiếu** | chỉ xem | chỉ xem | có | chỉ xem | chỉ xem | có |
-| **Xuất dữ liệu** | không | có | không | có | không | có |
-| **Báo cáo** (Báo cáo thống kê) | không | có | không | có | có | có |
-| **Nhật ký** (Nhật ký hệ thống) | không | không | không | không | có | có |
+| **Phiếu đồng thuận** → **Danh sách phiếu** | có | có | chỉ xem | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Người bệnh** | có | có | không | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Mẫu phiếu** | chỉ xem | chỉ xem | có | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Xuất dữ liệu** | không | có | không | có | không | có |
+| **Phiếu đồng thuận** → **Báo cáo thống kê** | không | có | không | có | có | có |
 | **Điều dưỡng** (Báo cáo điều dưỡng, mục 9) | chỉ Điều dưỡng: **Báo cáo của khoa** | không | không | không | không | có |
+| **Nhật ký** (Nhật ký hệ thống) | không | không | không | không | có | có |
 | **Quản trị** | không | không | không | không | chỉ **Người dùng** (xem) | có |
 
 Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Dashboard** (bảng tổng hợp hằng ngày nằm trong Dashboard, mục 9.2), **Ủy quyền báo cáo**.
@@ -192,7 +194,7 @@ Quy trình thường gặp:
 
 ### 2.1. Tìm người bệnh
 
-1. Bấm **Người bệnh** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Người bệnh** trên menu.
 2. Gõ vào ô tìm kiếm: họ tên (gõ không dấu cũng được), mã người bệnh, hoặc số CCCD đủ 12 số. Nhấn Enter.
 3. Bấm tên người bệnh để mở hồ sơ.
 
@@ -204,7 +206,7 @@ Danh sách chỉ có người bệnh **liên quan đến khoa của bạn**: có
 
 ### 2.2. Thêm người bệnh mới (Tiếp nhận người bệnh)
 
-Bấm **Người bệnh** → **Tiếp nhận người bệnh**. Có ba cách điền thông tin.
+Bấm **Phiếu đồng thuận** → **Người bệnh**, rồi bấm nút **Tiếp nhận người bệnh**. Có ba cách điền thông tin.
 
 **Cách 1: quét mã QR trên CCCD bằng máy quét 2D**
 
@@ -553,7 +555,7 @@ Phiếu đã **Hoàn tất** không trả về nháp, không hủy được. Mu�
 
 ### 2.14. Danh sách phiếu
 
-Bấm **Phiếu đồng thuận** trên menu để xem các phiếu bạn được phép xem.
+Bấm **Phiếu đồng thuận** → **Danh sách phiếu** trên menu để xem các phiếu bạn được phép xem.
 
 - Tìm theo số phiếu, họ tên, mã người bệnh.
 - Lọc theo **Trạng thái**, **Mẫu phiếu**, khoảng ngày lập (**Từ ngày** – **Đến ngày**).
@@ -797,7 +799,7 @@ Người quản lý mẫu phiếu tạo và sửa mẫu, quản lý phiên bản
 
 ### 5.1. Danh sách mẫu phiếu
 
-Bấm **Mẫu phiếu** trên menu. Bảng có: mã và tên mẫu, **Xác nhận phía bệnh viện** (vai trò xác nhận cuối), **Phạm vi**, **Đang phát hành** (phiên bản nào, từ khi nào), **Nháp**, **Trạng thái** (**Đang dùng** hoặc **Ngừng sử dụng**). Bấm tên mẫu để mở.
+Bấm **Phiếu đồng thuận** → **Mẫu phiếu** trên menu. Bảng có: mã và tên mẫu, **Xác nhận phía bệnh viện** (vai trò xác nhận cuối), **Phạm vi**, **Đang phát hành** (phiên bản nào, từ khi nào), **Nháp**, **Trạng thái** (**Đang dùng** hoặc **Ngừng sử dụng**). Bấm tên mẫu để mở.
 
 ![Danh sách mẫu phiếu](huong-dan-su-dung/70-danh-sach-mau.png)
 
@@ -901,7 +903,7 @@ Vai trò này xem báo cáo và xuất dữ liệu của toàn viện. Trưởng
 
 ### 6.1. Báo cáo thống kê
 
-1. Bấm **Báo cáo** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Báo cáo thống kê** trên menu.
 2. Chọn khoảng ngày lập phiếu (mặc định từ đầu tháng đến hôm nay), **Mẫu phiếu**, **Khoa/phòng** nếu cần.
 
 Báo cáo đếm phiếu theo **ngày lập** và theo **trạng thái hiện tại** của phiếu. Trang có:
@@ -919,7 +921,7 @@ Báo cáo đếm phiếu theo **ngày lập** và theo **trạng thái hiện t�
 
 ### 6.2. Xuất dữ liệu (Excel, CSV)
 
-1. Bấm **Xuất dữ liệu** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Xuất dữ liệu** trên menu.
 2. Ở **Bộ lọc**, chọn **Trạng thái**, **Mẫu phiếu**, **Khoa/phòng**, khoảng ngày lập. Để trống là lấy tất cả.
 3. Ở **Định dạng và dữ liệu**, chọn **Excel (.xlsx)** hoặc **CSV (.csv)**.
 4. Muốn có nội dung từng phiếu (mỗi câu hỏi một cột), đánh dấu **Kèm nội dung phiếu theo mẫu**. Ô này chỉ chọn được khi đã chọn đúng một mẫu ở bộ lọc.
@@ -1892,9 +1894,9 @@ Màn hình chỉ để xem, không có nút thao tác. Người nghe máy vẫn 
 
 Cách mở:
 
-- Tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy đặt ở khoa theo tài liệu triển khai, mục 5.14.
-- Điều dưỡng, bác sĩ mở bằng nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**.
-- Sau khi mở, **bấm vào màn hình một lần** để bật chuông (dòng **Bấm để bật chuông**).
+- **Máy đặt cố định ở khoa:** tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy theo tài liệu triển khai, mục 5.14 (trình duyệt toàn màn hình khi bật máy, chuông tự bật, nút ghi **Chuông bật · thử chuông**).
+- **Từ máy làm việc:** điều dưỡng, bác sĩ của khoa điều trị bấm nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**, rồi bấm **F11** để toàn màn hình. Bấm vào màn hình một lần để bật chuông (dòng **Bấm để bật chuông**). Bấm **Về trang làm việc** ở chân trang để quay lại.
+- Màn hình là của khoa nhận: tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)** không có nút này. QLCL xem mọi khoa ở trang **Gửi đến khoa tôi** và **Dashboard**.
 
 ![Màn hình theo dõi tại khoa: tên viết tắt, đồng hồ đếm ngược, dải đỏ chớp tắt](huong-dan-su-dung/kq-07-man-hinh-khoa.png)
 
