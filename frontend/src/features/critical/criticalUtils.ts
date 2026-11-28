@@ -7,6 +7,12 @@ import { Permissions } from '../../auth/permissions'
 /** Màn hình theo dõi kết quả nguy cấp tại khoa (TV): toàn màn hình, không có menu. */
 export const SCREEN_PATH = '/man-hinh-kqnc'
 
+/**
+ * Quyền mở màn hình theo dõi: tài khoản màn hình, người của khoa điều trị. QLCL chỉ giám sát (critical.monitor) không mở được
+ * vì màn hình là của khoa nhận; dùng chung cho route và nút mở màn hình.
+ */
+export const SCREEN_PERMISSIONS = [Permissions.CriticalDisplay, Permissions.CriticalReceive, Permissions.CriticalTreat] as const
+
 /** Trạng thái đồng hồ: còn hạn, sắp quá hạn (còn dưới mốc cảnh báo), quá hạn. */
 export type ClockState = 'ok' | 'warn' | 'late'
 

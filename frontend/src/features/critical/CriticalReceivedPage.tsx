@@ -7,13 +7,13 @@ import { useDepartments } from '../../api/admin'
 import { accountDepartments } from '../../api/auth'
 import { criticalApi, GENDER_LABELS, useCriticalReceived, useCriticalSettings, type CriticalResult } from '../../api/critical'
 import { useAuth } from '../../auth/authContext'
-import { Permissions } from '../../auth/permissions'
+import { hasAnyPermission, Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
 import { RejectModal } from './CriticalForms'
 import { useCriticalSaved } from './criticalHooks'
-import { dateOf, minutesBetween, SCREEN_PATH, secondsLeft, timeOf, useServerNow } from './criticalUtils'
+import { dateOf, minutesBetween, SCREEN_PATH, SCREEN_PERMISSIONS, secondsLeft, timeOf, useServerNow } from './criticalUtils'
 
 function PatientLine({ record }: { record: CriticalResult }) {
   return (
@@ -83,9 +83,12 @@ export function CriticalReceivedPage() {
       <PageHeader
         title="Gửi đến khoa tôi"
         extra={
-          <Button icon={<DesktopOutlined />} onClick={() => navigate(SCREEN_PATH)}>
-            Mở màn hình theo dõi (TV)
-          </Button>
+          // Chỉ hiện với tài khoản mở được màn hình (QLCL chỉ giám sát thì không: bấm vào sẽ ra trang không có quyền).
+          hasAnyPermission(SCREEN_PERMISSIONS, hasPermission) && (
+            <Button icon={<DesktopOutlined />} onClick={() => navigate(SCREEN_PATH)}>
+              Mở màn hình theo dõi (TV)
+            </Button>
+          )
         }
       />
       <Typography.Paragraph type="secondary">

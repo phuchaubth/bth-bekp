@@ -54,7 +54,7 @@ import {
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
 import { REMOTE_SIGNING_PATH } from '../api/remoteSigning'
-import { SCREEN_PATH } from '../features/critical/criticalUtils'
+import { SCREEN_PATH, SCREEN_PERMISSIONS } from '../features/critical/criticalUtils'
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
@@ -141,7 +141,7 @@ const pageRoutes: RouteObject[] = [
     path: SCREEN_PATH,
     element: (
       <RequireAuth>
-        <RequirePermission permission={[Permissions.CriticalDisplay, Permissions.CriticalReceive, Permissions.CriticalTreat]}>
+        <RequirePermission permission={SCREEN_PERMISSIONS}>
           <Lazy>
             <CriticalScreenPage />
           </Lazy>

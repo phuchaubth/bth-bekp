@@ -3,7 +3,7 @@ import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { accountDepartments } from '../../api/auth'
-import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
+import { filterNavItems, navItems, openNavKeys, selectedNavKey, type NavItem } from '../../app/navigation'
 import { BRAND } from '../../app/theme'
 import { CriticalAlertBanner } from '../../features/critical/CriticalAlertBanner'
 import { useAuth } from '../../auth/authContext'
@@ -24,12 +24,6 @@ function toMenuItems(items: NavItem[], compact = false): MenuProps['items'] {
   }))
 }
 
-function openKeysFor(items: NavItem[], pathname: string): string[] {
-  return items
-    .filter((item) => item.children?.some((child) => pathname.startsWith(child.path)))
-    .map((item) => item.path)
-}
-
 /** Nội dung căn giữa, rộng tối đa 1280 px (giống nhau giữa thanh trên, nội dung và chân trang). */
 const CONTAINER: CSSProperties = { maxWidth: 1280, margin: '0 auto', width: '100%', boxSizing: 'border-box' }
 
@@ -47,12 +41,8 @@ export function AppLayout() {
   const departmentNames = accountDepartments(user).map((d) => d.name)
 
   const visibleItems = useMemo(() => filterNavItems(navItems, hasPermission), [hasPermission])
-  // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /phieu-dong-thuan/... → Phiếu đồng thuận).
-  const selectedKey =
-    flattenNavItems(visibleItems)
-      .map((item) => item.path)
-      .filter((path) => (path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)))
-      .sort((a, b) => b.length - a.length)[0] ?? pathname
+  // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /mau-phieu/... → Mẫu phiếu, nhóm Phiếu đồng thuận gạch chân).
+  const selectedKey = selectedNavKey(visibleItems, pathname)
 
   const onNavigate: MenuProps['onClick'] = ({ key }) => {
     navigate(key)
@@ -158,7 +148,7 @@ export function AppLayout() {
             <Menu
               mode="inline"
               selectedKeys={[selectedKey]}
-              defaultOpenKeys={openKeysFor(visibleItems, pathname)}
+              defaultOpenKeys={openNavKeys(visibleItems, pathname)}
               items={toMenuItems(visibleItems)}
               onClick={onNavigate}
               style={{ borderInlineEnd: 0 }}

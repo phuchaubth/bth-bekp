@@ -1,20 +1,17 @@
 import {
   AlertOutlined,
   AuditOutlined,
-  BarChartOutlined,
   DashboardOutlined,
   ExperimentOutlined,
-  ExportOutlined,
   FileProtectOutlined,
-  FileTextOutlined,
   MedicineBoxOutlined,
   SettingOutlined,
-  TeamOutlined,
 } from '@ant-design/icons'
 import type { ReactNode } from 'react'
 import { Permissions, hasAnyPermission } from '../auth/permissions'
 
 export interface NavItem {
+  /** Đường dẫn trang; với nhóm (có children) chỉ là khóa menu, không phải trang. */
   path: string
   label: string
   /** Tên ngắn trên thanh menu ngang (máy tính); menu điện thoại dùng tên đầy đủ. */
@@ -30,12 +27,20 @@ export interface NavItem {
 /** Menu chính. Dùng chung cho thanh điều hướng và định nghĩa route. */
 export const navItems: NavItem[] = [
   { path: '/', label: 'Tổng quan', icon: <DashboardOutlined /> },
-  { path: '/phieu-dong-thuan', label: 'Phiếu đồng thuận', icon: <FileProtectOutlined />, permission: Permissions.ConsentsRead },
-  { path: '/nguoi-benh', label: 'Người bệnh', icon: <TeamOutlined />, permission: Permissions.PatientsRead },
-  { path: '/mau-phieu', label: 'Mẫu phiếu', icon: <FileTextOutlined />, permission: Permissions.TemplatesRead },
-  { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', icon: <ExportOutlined />, permission: Permissions.ExportsRun },
-  { path: '/bao-cao', label: 'Báo cáo thống kê', shortLabel: 'Báo cáo', icon: <BarChartOutlined />, permission: Permissions.ReportsRead },
-  { path: '/nhat-ky', label: 'Nhật ký hệ thống', shortLabel: 'Nhật ký', icon: <AuditOutlined />, permission: Permissions.AuditRead },
+  {
+    // Quyết định 62: các chức năng phiếu đồng thuận chung một menu. Đường dẫn và quyền từng trang giữ nguyên (liên kết đã lưu
+    // vẫn mở được); "/dong-thuan" chỉ là khóa của nhóm, không có trang riêng.
+    path: '/dong-thuan',
+    label: 'Phiếu đồng thuận',
+    icon: <FileProtectOutlined />,
+    children: [
+      { path: '/phieu-dong-thuan', label: 'Danh sách phiếu', permission: Permissions.ConsentsRead },
+      { path: '/nguoi-benh', label: 'Người bệnh', permission: Permissions.PatientsRead },
+      { path: '/mau-phieu', label: 'Mẫu phiếu', permission: Permissions.TemplatesRead },
+      { path: '/xuat-du-lieu', label: 'Xuất dữ liệu', permission: Permissions.ExportsRun },
+      { path: '/bao-cao', label: 'Báo cáo thống kê', permission: Permissions.ReportsRead },
+    ],
+  },
   {
     // Quyết định 31: khoa lập báo cáo hằng ngày, Phòng Điều dưỡng tổng hợp.
     path: '/dieu-duong',
@@ -95,6 +100,8 @@ export const navItems: NavItem[] = [
       { path: '/ket-qua-nguy-cap/danh-muc', label: 'Danh mục và cấu hình', permission: Permissions.CriticalManage },
     ],
   },
+  // Nhật ký ghi thao tác của mọi phân hệ nên đứng riêng, cạnh Quản trị (quyết định 62).
+  { path: '/nhat-ky', label: 'Nhật ký hệ thống', shortLabel: 'Nhật ký', icon: <AuditOutlined />, permission: Permissions.AuditRead },
   {
     path: '/quan-tri',
     label: 'Quản trị',
@@ -129,4 +136,26 @@ export function filterNavItems(items: NavItem[], hasPermission: (permission: str
 /** Danh sách phẳng các mục có trang riêng (bỏ nhóm cha). */
 export function flattenNavItems(items: NavItem[] = navItems): NavItem[] {
   return items.flatMap((item) => (item.children ? flattenNavItems(item.children) : [item]))
+}
+
+/** Trang đang mở là trang của mục menu hoặc trang con của nó (/mau-phieu/... thuộc /mau-phieu, /bao-cao-x thì không). */
+export function matchesNavPath(path: string, pathname: string): boolean {
+  return path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)
+}
+
+/** Mục menu đang chọn: mục có đường dẫn dài nhất khớp với trang đang mở. */
+export function selectedNavKey(items: NavItem[], pathname: string): string {
+  return (
+    flattenNavItems(items)
+      .map((item) => item.path)
+      .filter((path) => matchesNavPath(path, pathname))
+      .sort((a, b) => b.length - a.length)[0] ?? pathname
+  )
+}
+
+/** Nhóm mở sẵn trên menu điện thoại: nhóm chứa trang đang mở. */
+export function openNavKeys(items: NavItem[], pathname: string): string[] {
+  return items
+    .filter((item) => item.children?.some((child) => matchesNavPath(child.path, pathname)))
+    .map((item) => item.path)
 }

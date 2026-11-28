@@ -546,6 +546,25 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
 })
 
 describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
+  it('Khoa điều trị mở màn hình theo dõi bằng nút ở trang Gửi đến khoa tôi', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    mockApi({ ...common(nurseSession()), [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] } })
+    const { router } = renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    await user.click(await screen.findByRole('button', { name: /Mở màn hình theo dõi \(TV\)/ }))
+
+    expect(router.state.location.pathname).toBe('/man-hinh-kqnc')
+    expect(await screen.findByText('Không có kết quả nguy cấp chờ khoa xác nhận.')).toBeInTheDocument()
+  })
+
+  it('QLCL chỉ giám sát không thấy nút mở màn hình theo dõi (màn hình là của khoa nhận, bấm vào sẽ không có quyền)', async () => {
+    mockApi({ ...common(qualitySession()), [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] } })
+    renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    expect(await screen.findByRole('heading', { name: 'Gửi đến khoa tôi' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mở màn hình theo dõi/ })).not.toBeInTheDocument()
+  })
+
   it('Tài khoản màn hình mở trang nào cũng về màn hình theo dõi: tên viết tắt, không có nút thao tác', { timeout: 30_000 }, async () => {
     mockApi({
       ...common(screenSession()),
