@@ -2,6 +2,7 @@ import { DeleteOutlined, UploadOutlined } from '@ant-design/icons'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Flex, Popconfirm, Spin, Typography } from 'antd'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { brandingKeys } from '../../../api/branding'
 import { LOGO_MAX_BYTES, settingsApi, settingsKeys, type SystemSettings } from '../../../api/settings'
 import { ApiError } from '../../../api/http'
 import { errorMessage } from '../../../utils/formErrors'
@@ -39,6 +40,8 @@ export function LogoCard({ settings }: { settings: SystemSettings }) {
 
   const onSaved = (updated: SystemSettings, text: string) => {
     queryClient.setQueryData(settingsKeys.all, updated)
+    // Logo phần mềm trên web (thanh trên, trang đăng nhập, biểu tượng thẻ) đổi theo ngay (quyết định 61).
+    void queryClient.invalidateQueries({ queryKey: brandingKeys.logo })
     setProblem(null)
     message.success(text)
   }

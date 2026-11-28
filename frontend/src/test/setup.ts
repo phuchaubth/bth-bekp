@@ -2,6 +2,7 @@ import '@testing-library/jest-dom/vitest'
 import { cleanup, configure } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 import { setRefreshHandler } from '../api/http'
+import { maintenanceStore } from '../api/maintenanceStore'
 import { tokenStore } from '../auth/tokenStore'
 
 // Các trang được tải khi cần (lazy); khi chạy cả bộ test song song có thể mất hơn 1 giây mặc định.
@@ -23,6 +24,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   tokenStore.set(null)
   setRefreshHandler(null)
+  maintenanceStore.clear()
 
   if (antdWarnings.length > 0) {
     const unique = [...new Set(antdWarnings)]

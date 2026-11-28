@@ -51,9 +51,9 @@ docker compose up -d --build
 | Tài khoản | Vai trò | Mật khẩu |
 |---|---|---|
 | `admin` | Quản trị hệ thống | `SEED_ADMIN_PASSWORD`; **phải đổi ở lần đăng nhập đầu** |
-| `bacsi.demo`, `dieuduong.demo`, `tiepdon.demo`, `truongkhoa.demo`, `mauphieu.demo`, `baocao.demo`, `kiemtra.demo` | Bác sĩ, Điều dưỡng, Tiếp đón, Trưởng khoa, Quản lý mẫu phiếu, Báo cáo, Kiểm tra | `SEED_DEMO_PASSWORD` |
+| `bacsi.demo`, `dieuduong.demo`, `tiepdon.demo`, `truongkhoa.demo`, `mauphieu.demo`, `baocao.demo`, `kiemtra.demo`, `phongdieuduong.demo`, `hsh.demo`, `ktv.demo`, `qlcl.demo`, `manhinh.demo` | Bác sĩ, Điều dưỡng, Tiếp đón, Trưởng khoa, Quản lý mẫu phiếu, Báo cáo, Kiểm tra, Phòng Điều dưỡng, Khoa HSH (nội kiểm), Khoa cận lâm sàng (KQNC), QLCL (kết quả nguy cấp), Màn hình theo dõi KQNC | `SEED_DEMO_PASSWORD` |
 
-Tài khoản, khoa và 3 người bệnh demo (họ tên có "(giả lập)") chỉ là dữ liệu giả lập; tắt bằng `SEED_DEMO_DATA=false`.
+Tài khoản, khoa, 3 người bệnh demo (họ tên có "(giả lập)"), danh mục nội kiểm và danh mục kết quả nguy cấp ví dụ chỉ là dữ liệu giả lập; tắt bằng `SEED_DEMO_DATA=false`.
 
 **Thử quét CCCD không cần thẻ thật:** ở màn hình *Người bệnh → Tiếp nhận người bệnh*, nhấn vào ô quét rồi dán/gõ một chuỗi QR giả lập và nhấn Enter, ví dụ:
 

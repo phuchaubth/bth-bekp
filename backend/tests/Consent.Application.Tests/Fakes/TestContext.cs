@@ -1,10 +1,14 @@
 using Consent.Application.Auth;
 using Consent.Application.ConsentForms;
 using Consent.Application.ConsentTemplates;
+using Consent.Application.CriticalResults;
 using Consent.Application.Departments;
 using Consent.Application.Exports;
 using Consent.Application.Kiosk;
+using Consent.Application.Maintenance;
 using Consent.Application.NursingReports;
+using Consent.Application.QualityControl;
+using Consent.Application.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Reports;
 using Consent.Application.Roles;
@@ -110,7 +114,25 @@ internal sealed class AppTestContext
         new FakeRequestContext(),
         Microsoft.Extensions.Options.Options.Create(Options),
         new LoginRequestValidator(),
-        new ChangePasswordRequestValidator());
+        new ChangePasswordRequestValidator(),
+        CreateMaintenanceService());
+
+    /// <summary>
+    /// Trạng thái bảo trì dùng chung như singleton của ứng dụng (quyết định 53); mặc định không giữ trong bộ nhớ để test thấy ngay
+    /// thay đổi trong kho.
+    /// </summary>
+    public MaintenanceStateCache MaintenanceCache { get; set; } = new(TimeSpan.Zero);
+
+    public MaintenanceService CreateMaintenanceService() => new(
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        MaintenanceCache,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock,
+        new UpdateMaintenanceRequestValidator(Clock));
 
     public UserAdminService CreateUserAdminService() => new(
         new InMemoryUserRepository(Store),
@@ -241,6 +263,76 @@ internal sealed class AppTestContext
 
     public CapturingNursingDocuments NursingDocuments { get; } = new();
 
+    public CapturingQcLogPdf QcPdf { get; } = new();
+
+    public QcCatalogService CreateQcCatalogService() => new(
+        new InMemoryQualityControlRepository(Store), new InMemoryDepartmentRepository(Store), Store, CurrentUser, Clock);
+
+    public QcBookService CreateQcBookService() => new(
+        new InMemoryQualityControlRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        CreateSettingsService(),
+        QcPdf);
+
+    public QcDashboardService CreateQcDashboardService() => new(
+        new InMemoryQualityControlRepository(Store), new InMemoryDepartmentRepository(Store), CurrentUser, Clock);
+
+    public CapturingCriticalLogbookPdf CriticalPdf { get; } = new();
+
+    public SequentialCriticalNumbers CriticalNumbers { get; } = new();
+
+    public CriticalSettingsService CreateCriticalSettingsService() => new(
+        new InMemorySystemSettingRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock);
+
+    public CriticalCatalogService CreateCriticalCatalogService() => new(new InMemoryCriticalResultRepository(Store), Store, CurrentUser, Clock);
+
+    public PatientSourceService CreatePatientSourceService() => new(
+        PatientSource,
+        new InMemoryPatientRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        Clock,
+        CurrentUser,
+        new FakeRequestContext(),
+        Microsoft.Extensions.Options.Options.Create(HisOptions));
+
+    public CriticalResultService CreateCriticalResultService() => new(
+        new InMemoryCriticalResultRepository(Store),
+        CriticalNumbers,
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        CreateCriticalSettingsService(),
+        CreatePatientSourceService());
+
+    public CriticalDashboardService CreateCriticalDashboardService() => new(
+        new InMemoryCriticalResultRepository(Store), new InMemoryDepartmentRepository(Store), CurrentUser, Clock, CreateCriticalSettingsService());
+
+    public CriticalLogbookService CreateCriticalLogbookService() => new(
+        new InMemoryCriticalResultRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryAuditLogRepository(Store),
+        Store,
+        CurrentUser,
+        new FakeRequestContext(),
+        Clock,
+        CreateCriticalSettingsService(),
+        CreateSettingsService(),
+        CriticalPdf);
+
     public NursingReportService CreateNursingReportService() => new(
         new InMemoryNursingReportRepository(Store),
         new InMemoryDepartmentRepository(Store),
@@ -264,6 +356,31 @@ internal sealed class AppTestContext
         NursingDocuments,
         NursingDocuments,
         new InMemorySystemSettingRepository(Store));
+
+    public NursingDelegationService CreateNursingDelegationService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryRoleRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        new InMemorySystemSettingRepository(Store));
+
+    public TestAssignmentService CreateTestAssignmentService() => new(
+        new InMemoryTestAssignmentRepository(Store),
+        new InMemoryUserRepository(Store),
+        new InMemoryRoleRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        Store,
+        CurrentUser,
+        Clock,
+        [XlsxWriter, CsvWriter]);
+
+    public NursingDashboardService CreateNursingDashboardService() => new(
+        new InMemoryNursingReportRepository(Store),
+        new InMemoryDepartmentRepository(Store),
+        Clock);
 
     /// <summary>Đã cấu hình API thông tin người bệnh và quản trị đã bật gắn lượt tiếp nhận (quyết định 25).</summary>
     public void TurnOnEncounters()

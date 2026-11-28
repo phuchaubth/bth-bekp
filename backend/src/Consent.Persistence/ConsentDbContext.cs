@@ -2,12 +2,15 @@ using Consent.Application.Abstractions;
 using Consent.Domain.Auditing;
 using Consent.Domain.ConsentForms;
 using Consent.Domain.ConsentTemplates;
+using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Exports;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Consent.Domain.Settings;
+using Consent.Domain.Testing;
 using Consent.Persistence.Configurations;
 using Consent.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +53,20 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
 
     public DbSet<NursingDepartmentStatistics> NursingDepartmentStatistics => Set<NursingDepartmentStatistics>();
 
+    public DbSet<NursingReportDelegation> NursingReportDelegations => Set<NursingReportDelegation>();
+
+    public DbSet<TestAssignment> TestAssignments => Set<TestAssignment>();
+
+    public DbSet<QcMeter> QcMeters => Set<QcMeter>();
+
+    public DbSet<QcLot> QcLots => Set<QcLot>();
+
+    public DbSet<QcBook> QcBooks => Set<QcBook>();
+
+    public DbSet<CriticalTest> CriticalTests => Set<CriticalTest>();
+
+    public DbSet<CriticalResult> CriticalResults => Set<CriticalResult>();
+
     public override int SaveChanges(bool acceptAllChangesOnSuccess)
     {
         GuardAuditLogIsAppendOnly();
@@ -70,10 +87,12 @@ public sealed class ConsentDbContext(DbContextOptions<ConsentDbContext> options,
         PatientConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         ConsentFormConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         NursingDailyReportConfiguration.ConfigureEncryption(modelBuilder, encrypted);
+        TestAssignmentConfiguration.ConfigureEncryption(modelBuilder, encrypted);
         var encryptedBytes = new EncryptedBytesConverter(fieldEncryptor);
         ConsentSignatureConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         UserConfiguration.ConfigureEncryption(modelBuilder, encryptedBytes);
         modelBuilder.HasSequence<long>(ConsentFormNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
+        modelBuilder.HasSequence<long>(CriticalResultNumberGenerator.SequenceName).StartsAt(1).IncrementsBy(1);
         base.OnModelCreating(modelBuilder);
     }
 

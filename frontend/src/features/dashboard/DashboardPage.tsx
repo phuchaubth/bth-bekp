@@ -3,6 +3,7 @@ import dayjs from 'dayjs'
 import { Link } from 'react-router'
 import { accountDepartments } from '../../api/auth'
 import { useDashboard, type DashboardFormItem } from '../../api/reports'
+import { useMyTestAssignments } from '../../api/testing'
 import { useAuth } from '../../auth/authContext'
 import { Permissions } from '../../auth/permissions'
 import { BarChart } from '../../components/BarChart'
@@ -20,6 +21,10 @@ export function DashboardPage() {
   const canSeeForms = hasPermission(Permissions.ConsentsRead)
   const dashboard = useDashboard(canSeeForms)
   const data = dashboard.data
+  // Việc kiểm thử đang trong thời gian hoặc quá hạn mà chưa báo cáo (quyết định 49): báo cáo là bắt buộc nên nhắc ngay trang đầu.
+  const myTests = useMyTestAssignments()
+  const openTests = (myTests.data ?? []).filter((a) => a.status === 'InProgress' || a.status === 'Overdue')
+  const overdueTests = openTests.filter((a) => a.status === 'Overdue').length
 
   const statusCards = [
     { title: 'Phiếu nháp', value: data?.drafts, color: '#8c96a3' },
@@ -37,6 +42,15 @@ export function DashboardPage() {
         Xin chào {user?.fullName}
         {departmentNames ? ` – ${departmentNames}` : ''}.
       </Typography.Paragraph>
+      {openTests.length > 0 && (
+        <Alert
+          type={overdueTests > 0 ? 'warning' : 'info'}
+          showIcon
+          style={{ marginBottom: 16 }}
+          title={`Bạn có ${openTests.length} việc kiểm thử chưa báo cáo${overdueTests > 0 ? ` (${overdueTests} quá hạn)` : ''}.`}
+          action={<Link to="/kiem-thu">Xem và báo cáo</Link>}
+        />
+      )}
       {dashboard.isError && <Alert type="error" showIcon title={errorMessage(dashboard.error)} style={{ marginBottom: 16 }} />}
       <Row gutter={[16, 16]}>
         {canSeeForms &&

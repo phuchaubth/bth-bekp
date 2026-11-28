@@ -12,7 +12,9 @@ public enum NursingReportState
 /// Báo cáo điều dưỡng của một khoa trong một ngày. <paramref name="CarriedOverKeys"/>: các dòng điền sẵn theo báo cáo đã gửi
 /// gần nhất (chỉ khi báo cáo còn là <see cref="NursingReportState.New"/>). <paramref name="IsReportingDepartment"/>: khoa có
 /// trong danh sách khoa báo cáo do Phòng Điều dưỡng cài (chưa có thì chưa lập được). <paramref name="HisEntry"/>: số liệu HIS
-/// khoa nhập khi HIS lỗi (quyết định 35); <c>null</c> khi khoa không có dòng nào phải nhập.
+/// khoa nhập khi HIS lỗi (quyết định 35); <c>null</c> khi khoa không có dòng nào phải nhập. <paramref name="SubmittedBy"/>: người
+/// gửi, gửi theo ủy quyền thì ghi kèm người ủy quyền (quyết định 48). <paramref name="ReportVisible"/> <c>false</c>: người xem
+/// chỉ được ủy quyền nhập số liệu HIS của khoa, không xem báo cáo (các ô báo cáo để trống).
 /// </summary>
 public sealed record NursingReportDto(
     Guid? Id,
@@ -34,7 +36,8 @@ public sealed record NursingReportDto(
     string? ReopenReason,
     IReadOnlyList<string> CarriedOverKeys,
     bool IsReportingDepartment,
-    NursingHisEntryDto? HisEntry);
+    NursingHisEntryDto? HisEntry,
+    bool ReportVisible = true);
 
 /// <summary>
 /// Một dòng số liệu HIS khoa nhập. <paramref name="Value"/>: số khoa đã nhập. <paramref name="HisValue"/>: số lấy từ HIS của
@@ -75,9 +78,14 @@ public sealed record SaveNursingReportRequest(
 
 public sealed record ReopenNursingReportRequest(string? Reason);
 
-/// <summary>Một dòng (khoa) của bảng A. <paramref name="Cells"/>: theo khóa cột, <c>null</c> là ô trống.</summary>
+/// <summary>
+/// Một dòng (khoa) của bảng A. <paramref name="DepartmentCode"/>: mã khoa (tên viết tắt) in ở cột khoa phòng (quyết định 44).
+/// <paramref name="SubmittedBy"/>: người gửi báo cáo, in ở cột "Người báo cáo". <paramref name="Cells"/>: theo khóa cột,
+/// <c>null</c> là ô trống.
+/// </summary>
 public sealed record NursingSummaryRowDto(
     Guid DepartmentId,
+    string DepartmentCode,
     string DepartmentName,
     bool IsReporting,
     Guid? ReportId,
@@ -86,14 +94,21 @@ public sealed record NursingSummaryRowDto(
     DateTimeOffset? SubmittedAtUtc,
     IReadOnlyDictionary<string, int?> Cells);
 
-/// <summary>Một dòng mục B, C, D. <paramref name="EnteredBy"/>: tên khoa đã nhập tay số này khi HIS lỗi (mục B, D).</summary>
+/// <summary>Một dòng mục B, C, D. <paramref name="EnteredBy"/>: mã khoa đã nhập tay số này khi HIS lỗi (mục B, D).</summary>
 public sealed record NursingSummaryLineDto(string Key, string Label, int? Value, string? EnteredBy = null);
 
-/// <summary>Một dòng mục E: "Ổn", "Không ổn: khoa…" hoặc trống khi chưa khoa nào gửi.</summary>
+/// <summary>Một dòng mục E: "Ổn", "Không ổn: mã khoa…" hoặc trống khi chưa khoa nào gửi.</summary>
 public sealed record NursingSummaryCheckDto(string Key, string Label, string? Text, IReadOnlyList<string> IssueDepartments);
 
-/// <summary>Một dòng mục F: phần báo cáo nhập thêm của khoa.</summary>
-public sealed record NursingSummaryNoteDto(Guid DepartmentId, string DepartmentName, string Text);
+/// <summary>Một dòng mục F: phần báo cáo nhập thêm của khoa (mã khoa in ở cột khoa).</summary>
+public sealed record NursingSummaryNoteDto(Guid DepartmentId, string DepartmentCode, string DepartmentName, string Text);
+
+/// <summary>
+/// Người báo cáo từng mục B–F (quyết định 44), dạng "Họ tên (mã khoa)" cách nhau bởi dấu chấm phẩy; <c>null</c> khi mục chưa
+/// có số liệu. B, D: người khoa nhập tay khi HIS lỗi, hoặc người lấy số liệu từ HIS. C, E, F: người gửi báo cáo của các khoa có
+/// số liệu PTTT, báo "Không ổn", báo cáo sự cố; không khoa nào có thì là <see cref="NursingReportForm.AllSubmittedReporters"/>.
+/// </summary>
+public sealed record NursingSummaryReportersDto(string? Outpatient, string? Procedures, string? Imaging, string? Situation, string? Incidents);
 
 /// <summary>
 /// Số liệu HIS của ngày: số lấy từ HIS (lúc lấy, người bấm; <paramref name="Source"/> <c>Manual</c> là số Phòng Điều dưỡng
@@ -109,13 +124,31 @@ public sealed record NursingStatisticsInfoDto(
     IReadOnlyList<NursingHisEntryStatusDto> Entries,
     bool UsesDepartmentEntries);
 
-/// <summary>Một khoa phải nhập số liệu HIS khi HIS lỗi: các dòng (mã chỉ số) của khoa, đã nhập lúc nào, bởi ai.</summary>
+/// <summary>
+/// Một khoa phải nhập số liệu HIS khi HIS lỗi: các dòng (mã chỉ số) của khoa, đã nhập lúc nào, bởi ai.
+/// <paramref name="EnteredByDelegator"/>: người ủy quyền khi người nhập làm theo ủy quyền (quyết định 48).
+/// </summary>
 public sealed record NursingHisEntryStatusDto(
     Guid DepartmentId,
     string DepartmentName,
     IReadOnlyList<string> Keys,
     DateTimeOffset? EnteredAtUtc,
-    string? EnteredBy);
+    string? EnteredBy,
+    string? EnteredByDelegator = null);
+
+/// <summary>
+/// Một ủy quyền báo cáo điều dưỡng có hiệu lực trong ngày của bảng tổng hợp (quyết định 48): khoa (tên viết tắt), người được ủy
+/// quyền, người ủy quyền, thời gian, nội dung (<c>report</c>, <c>hisEntry</c>).
+/// </summary>
+public sealed record NursingSummaryDelegationDto(
+    Guid DepartmentId,
+    string DepartmentCode,
+    string DepartmentName,
+    string DelegateName,
+    string DelegatorName,
+    DateOnly StartDate,
+    DateOnly EndDate,
+    IReadOnlyList<string> Contents);
 
 /// <summary>Bảng "Tổng kết báo cáo Phòng Điều dưỡng hằng ngày" của một ngày (mục A–F như bản giấy).</summary>
 public sealed record NursingSummaryDto(
@@ -130,25 +163,40 @@ public sealed record NursingSummaryDto(
     IReadOnlyList<NursingSummaryNoteDto> Incidents,
     NursingStatisticsInfoDto Statistics,
     int SubmittedCount,
-    int ReportingCount);
+    int ReportingCount,
+    NursingSummaryReportersDto Reporters,
+    IReadOnlyList<NursingSummaryDelegationDto>? Delegations = null);
 
 /// <summary>
 /// Một khoa trên màn hình cài khoa báo cáo: có phải báo cáo không, số giường thực kê, các chỉ số toàn viện khoa nhập tay khi
-/// HIS lỗi (quyết định 35).
+/// HIS lỗi (quyết định 35). <paramref name="IsActive"/> <c>false</c>: khoa đã ngừng sử dụng (ví dụ không còn trong danh mục khoa lấy
+/// từ HIS, quyết định 42) nhưng còn trong danh sách báo cáo hoặc còn được giao chỉ số; lưu lại thì phải bỏ khoa này.
+/// <paramref name="ShortName"/>: tên viết tắt in trên bảng tổng hợp (<c>null</c> là dùng mã khoa, quyết định 45). Danh sách trả về
+/// theo thứ tự: khoa phải báo cáo theo thứ tự trên bảng tổng hợp, rồi các khoa khác theo tên.
 /// </summary>
 public sealed record NursingReportDepartmentDto(
-    Guid DepartmentId, string Code, string Name, bool IsReporting, int? BedCount, IReadOnlyList<string> HisIndicators);
+    Guid DepartmentId,
+    string Code,
+    string Name,
+    string? ShortName,
+    bool IsActive,
+    bool IsReporting,
+    int? BedCount,
+    IReadOnlyList<string> HisIndicators);
 
 public sealed record NursingReportDepartmentItem(Guid DepartmentId, int BedCount);
 
 /// <summary>
-/// Đặt danh sách khoa phải báo cáo (khoa không có trong danh sách thì bỏ ra) và số giường từng khoa. <paramref name="HisEntry"/>:
-/// khoa nhập tay từng chỉ số toàn viện khi HIS lỗi (quyết định 35), đủ cả bảng (chỉ số không có hoặc <c>null</c> là chưa giao);
-/// bỏ trống thì giữ nguyên.
+/// Đặt danh sách khoa phải báo cáo (khoa không có trong danh sách thì bỏ ra) và số giường từng khoa; thứ tự trong
+/// <paramref name="Items"/> là thứ tự các khoa trên bảng tổng hợp (quyết định 45). <paramref name="HisEntry"/>: khoa nhập tay từng
+/// chỉ số toàn viện khi HIS lỗi (quyết định 35), đủ cả bảng (chỉ số không có hoặc <c>null</c> là chưa giao); bỏ trống thì giữ
+/// nguyên. <paramref name="ShortNames"/>: tên viết tắt của các khoa cần đổi (rỗng hoặc <c>null</c> là dùng lại mã khoa); khoa
+/// không có trong đây giữ nguyên.
 /// </summary>
 public sealed record UpdateNursingReportDepartmentsRequest(
     IReadOnlyList<NursingReportDepartmentItem>? Items,
-    IReadOnlyDictionary<string, Guid?>? HisEntry = null);
+    IReadOnlyDictionary<string, Guid?>? HisEntry = null,
+    IReadOnlyDictionary<Guid, string?>? ShortNames = null);
 
 public sealed record RefreshNursingStatisticsRequest(DateOnly ReportDate);
 

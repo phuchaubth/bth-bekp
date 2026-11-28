@@ -1,0 +1,23 @@
+/* Kết quả nguy cấp (quyết định 60): dải cảnh báo chớp tắt. Một chu kỳ (sáng rồi tối) kéo dài theo thông số FlashPeriodMs
+   (từ 1 giây trở lên): không quá 1 lần chớp mỗi giây, dưới ngưỡng 3 lần mỗi giây của WCAG 2.3.1. Hai màu đỏ đều đủ tương phản
+   với chữ trắng. Người dùng chọn giảm chuyển động thì không chớp. */
+.critical-flash {
+  animation-name: critical-flash;
+  animation-timing-function: step-end;
+  animation-iteration-count: infinite;
+}
+
+@keyframes critical-flash {
+  0% {
+    background-color: #9b1c1c;
+  }
+  50% {
+    background-color: #d32f2f;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .critical-flash {
+    animation: none;
+  }
+}

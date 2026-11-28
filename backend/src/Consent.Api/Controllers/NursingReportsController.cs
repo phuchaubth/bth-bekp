@@ -10,12 +10,13 @@ namespace Consent.Api.Controllers;
 /// <summary>
 /// Báo cáo điều dưỡng hằng ngày (quyết định 31): khoa lập và gửi báo cáo của mình, và nhập tay số liệu HIS của khoa khi HIS
 /// lỗi (quyết định 35); Phòng Điều dưỡng xem bảng tổng hợp, in PDF, xuất Excel, mở lại báo cáo, cài khoa báo cáo, số giường và
-/// khoa nhập từng chỉ số, lấy số liệu HIS.
+/// khoa nhập từng chỉ số, lấy số liệu HIS, xem dashboard (quyết định 47).
 /// </summary>
 [ApiController]
 [Route("api/v1/nursing-reports")]
 [Produces("application/json")]
-public sealed class NursingReportsController(NursingReportService reports, NursingSummaryService summaries) : ControllerBase
+public sealed class NursingReportsController(
+    NursingReportService reports, NursingSummaryService summaries, NursingDashboardService dashboard) : ControllerBase
 {
     /// <summary>Mẫu báo cáo khoa (mục, dòng, phần tick) để dựng màn hình nhập.</summary>
     [HttpGet("form")]
@@ -86,6 +87,15 @@ public sealed class NursingReportsController(NursingReportService reports, Nursi
         Response.Headers.CacheControl = "no-store";
         return File(file.Content, file.ContentType, file.FileName);
     }
+
+    /// <summary>
+    /// Dashboard điều dưỡng (quyết định 47): số liệu các khoa đã gửi báo cáo trong <paramref name="days"/> ngày (1–92, mặc định
+    /// 30) đến hết ngày <paramref name="to"/> (bỏ trống là hôm nay).
+    /// </summary>
+    [HttpGet("dashboard")]
+    [HasPermission(Permissions.NursingReportsRead)]
+    public async Task<IActionResult> GetDashboard([FromQuery] DateOnly? to, [FromQuery] int? days, CancellationToken cancellationToken) =>
+        this.ToActionResult(await dashboard.GetAsync(to, days ?? 30, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Lấy số liệu của ngày từ HIS (người bệnh đến khám, chẩn đoán hình ảnh, chờ nhập viện) và lưu lại.</summary>
     [HttpPost("statistics/refresh")]

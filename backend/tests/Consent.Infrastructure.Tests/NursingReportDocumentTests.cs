@@ -5,6 +5,9 @@ using Consent.Application.NursingReports;
 using Consent.Domain.NursingReports;
 using Consent.Infrastructure.Exports;
 using Consent.Infrastructure.Pdf;
+using MigraDoc.Rendering;
+using PdfSharp.Drawing;
+using PdfSharp.Events;
 using Mdom = MigraDoc.DocumentObjectModel;
 
 namespace Consent.Infrastructure.Tests;
@@ -22,27 +25,33 @@ public sealed class NursingReportDocumentTests
         "Khoa Nội A (giả lập)",
         Day,
         new NursingReportFigures(
-            new Dictionary<string, int> { ["nurses"] = 18, ["orderlies"] = 1, ["adr"] = 2, ["currentPatients"] = 47 },
+            new Dictionary<string, int> { ["nurses"] = 18, ["orderlies"] = 1, ["adr"] = 2, ["currentPatients"] = 47, ["privateRoomPatients"] = 5 },
             NursingReportForm.Checks.ToDictionary(
                 c => c.Key, c => c.Key == "security" ? NursingReportForm.CheckIssue : NursingReportForm.CheckOk, StringComparer.Ordinal)),
         notes,
         "Đã gửi lúc 07:45 16/11/2026 bởi Điều dưỡng Demo");
 
-    private static NursingSummaryDocument Summary(bool withIncidents = true)
+    private const string SurgeryNurse = "Điều dưỡng Ngoại B (giả lập)";
+
+    private static NursingSummaryDocument Summary(bool withIncidents = true, string? incident = null)
     {
         var departments = new List<NursingSummaryDepartment>
         {
-            new(Ward, "Khoa Nội A (giả lập)", IsReporting: true, BedCount: 48),
-            new(Surgery, "Khoa Ngoại B (giả lập)", IsReporting: true, BedCount: 25),
+            new(Ward, "NOIA", "Khoa Nội A (giả lập)", IsReporting: true, BedCount: 48),
+            new(Surgery, "NGOAIB", "Khoa Ngoại B (giả lập)", IsReporting: true, BedCount: 25),
         };
         var nurse = Guid.NewGuid();
         var report = NursingDailyReport.Create(
             Surgery,
             Day,
             new NursingReportFigures(
-                new Dictionary<string, int> { ["currentPatients"] = 20, ["boneMarrow"] = 3, ["outsideExams"] = 1 },
+                new Dictionary<string, int>
+                {
+                    ["previousDayPatients"] = 22, ["dischargesYesterday"] = 2, ["currentPatients"] = 20, ["privateRoomPatients"] = 4,
+                    ["boneMarrow"] = 3, ["outsideExams"] = 1,
+                },
                 NursingReportForm.Checks.ToDictionary(c => c.Key, _ => NursingReportForm.CheckOk, StringComparer.Ordinal)).ToJson(),
-            withIncidents ? "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp" : null,
+            withIncidents ? incident ?? "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp" : null,
             nurse,
             DateTimeOffset.UtcNow);
         report.Submit(nurse, DateTimeOffset.UtcNow);
@@ -50,7 +59,7 @@ public sealed class NursingReportDocumentTests
             Day,
             departments,
             [report],
-            new Dictionary<Guid, string>(),
+            new Dictionary<Guid, string> { [nurse] = SurgeryNurse },
             new NursingStatisticsValues(
                 new Dictionary<string, int> { [NursingHisIndicators.OutpatientVisits] = 686 },
                 new Dictionary<Guid, int> { [Ward] = 2 }),
@@ -73,6 +82,8 @@ public sealed class NursingReportDocumentTests
             _ => string.Empty,
         }));
 
+    private static string[] Words(string text) => text.Split([' ', '\n'], StringSplitOptions.RemoveEmptyEntries);
+
     private static IEnumerable<string> Paragraphs(Mdom.Document document) =>
         Body(document).OfType<Mdom.Paragraph>().Select(TextOf);
 
@@ -94,18 +105,27 @@ public sealed class NursingReportDocumentTests
             Paragraphs(document).Take(3));
 
         var figures = Rows(tables[1]);
-        Assert.Equal(1 + 4 + 1 + 8 + 1 + 30 + 1 + 1 + 4 + 1 + 9, figures.Count);
+        Assert.Equal(1 + 4 + 1 + 8 + 1 + 30 + 1 + 1 + 4 + 1 + 13, figures.Count);
         Assert.Equal(["I. NHÂN SỰ", ""], figures[0]);
         Assert.Equal(["Điều dưỡng", "18"], figures[1]);
         Assert.Equal(["KTV", ""], figures[2]);
         Assert.Equal(["HL - YC", "1"], figures[4]);
         Assert.Contains(["IV. PHẢN ỨNG CÓ HẠI THUỐC (ADR)", "2"], figures);
         Assert.Contains(["Số NB hiện tại", "47"], figures);
+        // Quyết định 46: "Số NB ngày hôm trước" ngay trước "Số NB hiện tại".
+        Assert.Equal(["Số NB ngày hôm trước", ""], figures[figures.FindIndex(r => r[0] == "Số NB hiện tại") - 1]);
         Assert.Contains(["* Chưa có giường", ""], figures);
         // "Số ca nhập viện ngày hôm trước" tách thành nhập khoa từ PK và do CK (quyết định 38).
         var admissions = figures.FindIndex(r => r[0] == "Số ca nhập khoa từ PK ngày hôm trước");
         Assert.Equal(["Số ca nhập khoa do CK ngày hôm trước", ""], figures[admissions + 1]);
         Assert.DoesNotContain(figures, r => r[0] == "Số ca nhập viện ngày hôm trước");
+        // Hai dòng thêm ở mục VI (quyết định 44).
+        var current = figures.FindIndex(r => r[0] == "Số NB hiện tại");
+        Assert.Equal(["Số NB người nước ngoài", ""], figures[current + 1]);
+        // Quyết định 54: "Số NB bao phòng" ngay sau "Số NB người nước ngoài".
+        Assert.Equal(["Số NB bao phòng", "5"], figures[current + 2]);
+        var discharges = figures.FindIndex(r => r[0] == "Số ca xuất viện ngày hôm trước");
+        Assert.Equal(["Số ca chuyển khoa ngày hôm trước", ""], figures[discharges + 1]);
         // Dòng tiêu đề mục gộp hai cột, trừ mục IV có ô nhập số.
         Assert.Equal(1, tables[1].Rows[0].Cells[0].MergeRight);
 
@@ -139,23 +159,38 @@ public sealed class NursingReportDocumentTests
         var paragraphs = Paragraphs(document).ToList();
 
         Assert.Equal(["BỆNH VIỆN GIẢ LẬP\nPhòng Điều dưỡng", ""], Rows(tables[0])[0]);
+        // Mỗi mục B–F có dòng người báo cáo (quyết định 44).
         Assert.Equal(
             ["TỔNG KẾT BÁO CÁO PHÒNG ĐIỀU DƯỠNG HẰNG NGÀY", "Ngày 16 tháng 11 năm 2026", "A. Số liệu người bệnh nội trú",
-             "B. Số liệu khoa khám bệnh", "C. Số liệu PTTT", "D. Số liệu CĐHA", "E. Tình hình trong ngày",
-             "F. Báo cáo cụ thể sự cố (nếu có)"],
+             "B. Số liệu khoa khám bệnh", "Người báo cáo: Phòng Điều dưỡng Demo (lấy từ HIS)",
+             "C. Số liệu PTTT", $"Người báo cáo: {SurgeryNurse} (NGOAIB)",
+             "D. Số liệu CĐHA", "Người báo cáo: chưa có",
+             "E. Tình hình trong ngày", $"Người báo cáo: {NursingReportForm.AllSubmittedReporters}",
+             "F. Báo cáo cụ thể sự cố (nếu có)", $"Người báo cáo: {SurgeryNurse} (NGOAIB)"],
             paragraphs);
 
+        // Bảng A: mã khoa (tên viết tắt), 16 cột số gồm "Số NB ngày hôm trước", "Người nước ngoài", "Bao phòng" (quyết định 54) và
+        // "Chuyển khoa", cột người báo cáo cuối cùng.
         var inpatients = Rows(tables[1]);
-        Assert.Equal(13, inpatients[0].Length);
+        Assert.Equal(18, inpatients[0].Length);
         Assert.Equal("KHOA PHÒNG", inpatients[0][0]);
-        Assert.Equal("Số giường thực kê (Không tính băng ca)", inpatients[0][1]);
-        Assert.Equal(["Nhập khoa từ PK", "Nhập khoa do CK"], inpatients[0][3..5]);
-        Assert.Equal("Số ca đi ngoại viện", inpatients[0][12]);
+        Assert.Equal(["Số giường thực kê (Không tính băng ca)", "Số NB ngày hôm trước"], inpatients[0][1..3]);
+        Assert.Equal(["Số NB hiện tại", "Người nước ngoài", "Bao phòng", "Nhập khoa từ PK", "Nhập khoa do CK"], inpatients[0][3..8]);
+        Assert.Equal(["Số ca Xuất viện ngày hôm trước", "Chuyển khoa"], inpatients[0][8..10]);
+        Assert.Equal("Số ca đi ngoại viện", inpatients[0][16]);
+        Assert.Equal("Người báo cáo", inpatients[0][17]);
         Assert.True(tables[1].Rows[0].HeadingFormat);
-        // Khoa sắp theo tên; khoa chưa gửi chỉ có số giường và số HIS.
-        Assert.Equal(["Khoa Ngoại B (giả lập)", "25", "20", "0", "0", "0", "0", "0", "0", "", "0", "0", "1"], inpatients[1]);
-        Assert.Equal(["Khoa Nội A (giả lập)", "48", "", "", "", "", "", "", "", "2", "", "", ""], inpatients[2]);
-        Assert.Equal(["Tổng", "73", "20", "0", "0", "0", "0", "0", "0", "2", "0", "0", "1"], inpatients[3]);
+        // Khoa sắp theo mã; khoa chưa gửi chỉ có số giường và số HIS, không có người báo cáo.
+        Assert.Equal(
+            ["NGOAIB", "25", "22", "20", "0", "4", "0", "0", "2", "0", "0", "0", "0", "", "0", "0", "1", SurgeryNurse], inpatients[1]);
+        Assert.Equal(["NOIA", "48", "", "", "", "", "", "", "", "", "", "", "", "2", "", "", "", ""], inpatients[2]);
+        Assert.Equal(["Tổng", "73", "22", "20", "0", "4", "0", "0", "2", "0", "0", "0", "0", "2", "0", "0", "1", ""], inpatients[3]);
+        // Vừa bề rộng trang: cột mã khoa, cột người báo cáo và 16 cột số bằng nhau.
+        var widths = Enumerable.Range(0, tables[1].Columns.Count).Select(c => tables[1].Columns[c].Width.Millimeter).ToList();
+        Assert.Equal(MigraDocNursingReportPdfRenderer.ContentWidthMm, widths.Sum(), 1);
+        Assert.Equal(MigraDocNursingReportPdfRenderer.CodeColumnMm, widths[0], 1);
+        Assert.Equal(MigraDocNursingReportPdfRenderer.ReporterColumnMm, widths[^1], 1);
+        Assert.Single(widths.Skip(1).SkipLast(1).Select(w => Math.Round(w, 2)).Distinct());
 
         Assert.Equal([["NỘI DUNG", "SỐ LIỆU"], ["TSNB đến khám", "686"]], Rows(tables[2]));
         Assert.Equal(["Tủy xương", "3"], Rows(tables[3])[1]);
@@ -164,8 +199,87 @@ public sealed class NursingReportDocumentTests
         Assert.Equal(["NỘI DUNG", "PHẦN BÁO CÁO"], Rows(tables[5])[0]);
         Assert.Equal(["Vấn đề chuyên môn", "Ổn"], Rows(tables[5])[1]);
         Assert.Equal(
-            [["KHOA", "NỘI DUNG BÁO CÁO SỰ CỐ"], ["Khoa Ngoại B (giả lập)", "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp"]],
+            [["KHOA", "NỘI DUNG BÁO CÁO SỰ CỐ"], ["NGOAIB", "Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp"]],
             Rows(tables[6]));
+        // Bảng B–E ngắn in liền một trang; bảng F (dài tùy phần nhập thêm) được tách trang.
+        Assert.All(tables[2..6], t => Assert.Equal(t.Rows.Count - 1, t.Rows[0].KeepWith));
+        Assert.Equal(0, tables[6].Rows[0].KeepWith);
+
+        // Cuối báo cáo: chỗ Phòng Điều dưỡng ký ở nửa phải trang, chừa chỗ ký (quyết định 44).
+        var signature = tables[7];
+        Assert.Same(signature, Body(document)[^1]);
+        Assert.Equal([["", "PHÒNG ĐIỀU DƯỠNG\n(Ký, ghi rõ họ tên)"]], Rows(signature));
+        var signParagraphs = signature.Rows[0].Cells[1].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.Paragraph>().ToList();
+        Assert.All(signParagraphs, p => Assert.Equal(Mdom.ParagraphAlignment.Center, p.Format.Alignment));
+        Assert.True(Assert.Single(signParagraphs[0].Elements.Cast<Mdom.DocumentObject>().OfType<Mdom.FormattedText>()).Bold);
+        Assert.Equal(MigraDocNursingReportPdfRenderer.SignatureSpaceMm, signParagraphs[1].Format.SpaceAfter.Millimeter, 1);
+    }
+
+    /// <summary>
+    /// Quyết định 54: 16 cột số làm mỗi cột còn 8,75 mm. Từng chữ ở đầu các cột số (đo bằng PDFsharp với phông in, như khi in)
+    /// nằm gọn trong ô, không tràn qua viền sang cột bên.
+    /// </summary>
+    [Fact]
+    public void Summary_NumberColumnHeaders_FitTheirColumns()
+    {
+        var table = Body(MigraDocNursingReportPdfRenderer.BuildSummary(Summary())).OfType<Mdom.Tables.Table>().ToList()[1];
+        _ = new MigraDocNursingReportPdfRenderer(); // cài bộ phông nhúng
+        using var measure = XGraphics.CreateMeasureContext(new XSize(2000, 2000), XGraphicsUnit.Point, XPageDirection.Downwards, new RenderEvents());
+        var font = new XFont(EmbeddedFontResolver.FamilyName, MigraDocNursingReportPdfRenderer.NumberHeaderFontSize, XFontStyleEx.Bold);
+
+        // Khoảng cách chữ tới viền ô: của cột nếu cột có đặt, không thì của bảng (như khi in).
+        double Padding(Mdom.Unit column, Mdom.Unit table) => (column.IsEmpty ? table : column).Point;
+
+        Assert.Equal(NursingReportForm.SummaryColumns.Count + 2, table.Columns.Count);
+        for (var c = 1; c < table.Columns.Count - 1; c++)
+        {
+            var column = table.Columns[c];
+            var available = column.Width.Point - Padding(column.LeftPadding, table.LeftPadding) - Padding(column.RightPadding, table.RightPadding);
+            var header = (Mdom.Paragraph)table.Rows[0].Cells[c].Elements[0]!;
+            Assert.Equal(MigraDocNursingReportPdfRenderer.NumberHeaderFontSize, header.Format.Font.Size.Point);
+            Assert.All(
+                TextOf(header).Split(' ', StringSplitOptions.RemoveEmptyEntries),
+                word => Assert.True(measure.MeasureString(word, font).Width <= available, $"\"{word}\" rộng hơn ô cột {c}"));
+        }
+    }
+
+    /// <summary>
+    /// Phần nhập thêm dài tối đa (20.000 ký tự) ở mục F được chia thành nhiều dòng bảng ("mã khoa (tiếp)"), không mất chữ nào, và
+    /// khi dàn trang không gì tràn quá lề dưới. Trước đây cả phần nhập thêm nằm trong một dòng bảng; một dòng bảng không tách sang
+    /// trang sau được nên chỉ in được khoảng 5.000 ký tự đầu, phần sau mất.
+    /// </summary>
+    [Theory]
+    [InlineData("paragraphs")]
+    [InlineData("short-lines")]
+    public void Summary_LongIncident_IsSplitIntoRows_ThatFitThePage(string shape)
+    {
+        var notes = shape == "paragraphs" ? NursingIncidentRowsTests.LongNotes() : NursingIncidentRowsTests.ManyShortLines();
+        var document = MigraDocNursingReportPdfRenderer.BuildSummary(Summary(incident: notes));
+
+        var incidents = Rows(Body(document).OfType<Mdom.Tables.Table>().ToList()[6]).Skip(1).ToList();
+        Assert.True(incidents.Count > 1);
+        Assert.Equal("NGOAIB", incidents[0][0]);
+        Assert.All(incidents.Skip(1), row => Assert.Equal("NGOAIB (tiếp)", row[0]));
+        Assert.Equal(Words(notes), incidents.SelectMany(row => Words(row[1])));
+
+        _ = new MigraDocNursingReportPdfRenderer(); // cài bộ phông nhúng
+        var renderer = new DocumentRenderer(document);
+        renderer.PrepareDocument();
+        var bottom = Mdom.Unit.FromMillimeter(297 - 15).Point; // A4 trừ lề dưới
+        var formatted = renderer.FormattedDocument;
+        Assert.NotNull(formatted);
+        Assert.True(formatted.PageCount > 4);
+        for (var page = 1; page <= formatted.PageCount; page++)
+        {
+            var infos = renderer.GetRenderInfoFromPage(page);
+            Assert.NotNull(infos);
+            Assert.NotEmpty(infos);
+            foreach (var info in infos)
+            {
+                var area = info.LayoutInfo.ContentArea;
+                Assert.True(area.Y.Point + area.Height.Point <= bottom + 0.5, $"Trang {page}: {info.DocumentObject.GetType().Name} tràn lề dưới");
+            }
+        }
     }
 
     [Fact]
@@ -174,8 +288,33 @@ public sealed class NursingReportDocumentTests
         var input = Summary(withIncidents: false);
         var document = MigraDocNursingReportPdfRenderer.BuildSummary(input);
 
-        Assert.Equal(["", "Không có."], Rows(Body(document).OfType<Mdom.Tables.Table>().Last())[1]);
+        var tables = Body(document).OfType<Mdom.Tables.Table>().ToList();
+        Assert.Equal(["", "Không có."], Rows(tables[6])[1]);
+        // Không khoa nào báo cáo sự cố: mục F tổng hợp từ mọi khoa đã gửi.
+        Assert.Equal($"Người báo cáo: {NursingReportForm.AllSubmittedReporters}", Paragraphs(document).Last());
         Assert.StartsWith("%PDF", Encoding.Latin1.GetString(new MigraDocNursingReportPdfRenderer().RenderSummary(input)), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Excel: phần nhập thêm dài tối đa ở mục F cũng được chia thành nhiều dòng, không mất chữ, không dòng nào cao tới giới hạn
+    /// của Excel (409 điểm): trước đây chữ vượt chiều cao đó bị che khi xem và khi in.
+    /// </summary>
+    [Theory]
+    [InlineData("paragraphs")]
+    [InlineData("short-lines")]
+    public void Workbook_LongIncident_IsSplitIntoRows_BelowTheMaxRowHeight(string shape)
+    {
+        var notes = shape == "paragraphs" ? NursingIncidentRowsTests.LongNotes() : NursingIncidentRowsTests.ManyShortLines();
+        var (rows, _) = XlsxNursingSummaryWriter.Layout(Summary(incident: notes));
+        object? Value(XlsxNursingSummaryWriter.Row row) => row.Cells.Single(c => c.Column == XlsxNursingSummaryWriter.LabelLastColumn + 1).Value;
+
+        var heading = rows.ToList().FindIndex(r => r.Cells.FirstOrDefault()?.Value as string == "F. Báo cáo cụ thể sự cố (nếu có)");
+        var incidents = rows.Skip(heading + 2).TakeWhile(r => r.Cells[0].Value is string label && label.StartsWith("NGOAIB", StringComparison.Ordinal)).ToList();
+        Assert.True(incidents.Count > 1);
+        Assert.Equal("NGOAIB", incidents[0].Cells[0].Value);
+        Assert.All(incidents.Skip(1), row => Assert.Equal("NGOAIB (tiếp)", row.Cells[0].Value));
+        Assert.Equal(Words(notes), incidents.SelectMany(row => Words((string)Value(row)!)));
+        Assert.All(incidents, row => Assert.True(row.Height is null || row.Height < XlsxNursingSummaryWriter.MaxRowHeight, $"Dòng cao {row.Height}"));
     }
 
     [Fact]
@@ -188,29 +327,73 @@ public sealed class NursingReportDocumentTests
         Assert.Equal("Phòng Điều dưỡng", Texts(1)[0]);
         Assert.Equal(NursingReportForm.SummaryTitle, Texts(3)[0]);
         Assert.Equal("Ngày 16 tháng 11 năm 2026", Texts(4)[0]);
-        // Cột khoa phòng và 12 cột số của bảng A (A–M).
-        Assert.Contains("A4:M4", merges);
-        Assert.Contains("A5:M5", merges);
+        // Cột khoa phòng (mã khoa), 16 cột số và cột người báo cáo của bảng A (A–R).
+        Assert.Contains("A4:R4", merges);
+        Assert.Contains("A5:R5", merges);
         Assert.Equal("A. Số liệu người bệnh nội trú", Texts(6)[0]);
         Assert.Equal("KHOA PHÒNG", Texts(7)[0]);
-        Assert.Equal(13, rows[7].Cells.Count);
-        Assert.Equal("Nhập khoa từ PK", Texts(7)[3]);
-        Assert.Equal("Nhập khoa do CK", Texts(7)[4]);
-        Assert.Equal(20, rows[8].Cells[2].Value);
+        Assert.Equal(18, rows[7].Cells.Count);
+        Assert.Equal("Số NB ngày hôm trước|Số NB hiện tại", string.Join('|', Texts(7)[2..4]));
+        Assert.Equal("Người nước ngoài|Bao phòng|Nhập khoa từ PK|Nhập khoa do CK", string.Join('|', Texts(7)[4..8]));
+        Assert.Equal("Chuyển khoa", Texts(7)[9]);
+        Assert.Equal("Người báo cáo", Texts(7)[17]);
+        Assert.Equal("NGOAIB", Texts(8)[0]);
+        Assert.Equal(22, rows[8].Cells[2].Value);
+        Assert.Equal(20, rows[8].Cells[3].Value);
+        Assert.Equal(0, rows[8].Cells[4].Value);
+        Assert.Equal(4, rows[8].Cells[5].Value);
+        Assert.Equal(SurgeryNurse, Texts(8)[17]);
+        Assert.Equal("NOIA", Texts(9)[0]);
         Assert.Null(rows[9].Cells[2].Value);
+        Assert.Null(rows[9].Cells[3].Value);
+        Assert.Null(rows[9].Cells[5].Value);
+        Assert.Null(rows[9].Cells[17].Value);
         Assert.Equal("Tổng", Texts(10)[0]);
         Assert.Equal(73, rows[10].Cells[1].Value);
+        Assert.Equal(22, rows[10].Cells[2].Value);
+        Assert.Equal(4, rows[10].Cells[5].Value);
 
         var headings = rows.Select(r => r.Cells.FirstOrDefault()?.Value as string).Where(t => t is not null && t.Length > 2 && t[1] == '.').ToList();
         Assert.Equal(
             ["A. Số liệu người bệnh nội trú", "B. Số liệu khoa khám bệnh", "C. Số liệu PTTT", "D. Số liệu CĐHA",
              "E. Tình hình trong ngày", "F. Báo cáo cụ thể sự cố (nếu có)"],
             headings);
-        var visits = rows.Single(r => r.Cells.FirstOrDefault()?.Value as string == "TSNB đến khám");
-        Assert.Equal(686, visits.Cells[1].Value);
-        var incident = rows.Single(r => r.Cells.FirstOrDefault()?.Value as string == "Khoa Ngoại B (giả lập)" && r.Cells[1].Value is string);
-        Assert.Equal("Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp", incident.Cells[1].Value);
+        // Mục B–F: nhãn gộp cột A–D (cột A hẹp, chỉ ghi mã khoa), số liệu và phần báo cáo gộp E–R.
+        object? Value(XlsxNursingSummaryWriter.Row row) => row.Cells.Single(c => c.Column == XlsxNursingSummaryWriter.LabelLastColumn + 1).Value;
+        var visitsIndex = rows.ToList().FindIndex(r => r.Cells.FirstOrDefault()?.Value as string == "TSNB đến khám");
+        Assert.Equal(686, Value(rows[visitsIndex]));
+        Assert.Equal(XlsxNursingSummaryWriter.LabelLastColumn + 1 + 14, rows[visitsIndex].Cells.Count);
+        Assert.Contains($"A{visitsIndex + 1}:D{visitsIndex + 1}", merges);
+        Assert.Contains($"E{visitsIndex + 1}:R{visitsIndex + 1}", merges);
+        Assert.Contains($"A{visitsIndex}:D{visitsIndex}", merges);
+        var incident = rows.Single(r => r.Cells.FirstOrDefault()?.Value as string == "NGOAIB" && Value(r) is string);
+        Assert.Equal("Người bệnh B (giả lập) chuyển khoa\nTheo dõi tiếp", Value(incident));
         Assert.NotNull(incident.Height);
+
+        // Mỗi mục B–F có dòng người báo cáo, gộp cả bề rộng trang (quyết định 44).
+        var reporters = rows.Select((r, i) => (Row: r, Number: i + 1))
+            .Where(r => r.Row.Cells.FirstOrDefault()?.Value is string text && text.StartsWith("Người báo cáo: ", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(
+            ["Người báo cáo: Phòng Điều dưỡng Demo (lấy từ HIS)", $"Người báo cáo: {SurgeryNurse} (NGOAIB)", "Người báo cáo: chưa có",
+             $"Người báo cáo: {NursingReportForm.AllSubmittedReporters}", $"Người báo cáo: {SurgeryNurse} (NGOAIB)"],
+            reporters.Select(r => r.Row.Cells[0].Value));
+        Assert.All(reporters, r =>
+        {
+            Assert.Equal(XlsxNursingSummaryWriter.Style.Note, r.Row.Cells[0].Style);
+            Assert.Contains($"A{r.Number}:R{r.Number}", merges);
+        });
+
+        // Chỗ Phòng Điều dưỡng ký ở góc phải cuối trang (cột L–R), vài dòng trống để ký, rồi dòng in lúc.
+        var sign = rows.ToList().FindIndex(r => r.Cells.FirstOrDefault()?.Value as string == NursingReportForm.SignatureTitle);
+        Assert.Equal(11, rows[sign].Cells[0].Column);
+        Assert.Equal(XlsxNursingSummaryWriter.Style.CenterBold, rows[sign].Cells[0].Style);
+        Assert.Equal(NursingReportForm.SignatureHint, rows[sign + 1].Cells[0].Value);
+        Assert.Contains($"L{sign + 1}:R{sign + 1}", merges);
+        Assert.Contains($"L{sign + 2}:R{sign + 2}", merges);
+        Assert.All(rows.Skip(sign + 2).Take(XlsxNursingSummaryWriter.SignatureBlankRows), r => Assert.Empty(r.Cells));
+        Assert.Equal("In lúc 08:00 16/11/2026 · Khoa đã gửi: 1/2", Texts(rows.Count - 1)[0]);
+        Assert.Equal(sign + 2 + XlsxNursingSummaryWriter.SignatureBlankRows, rows.Count - 1);
     }
 
     [Fact]
@@ -226,14 +409,29 @@ public sealed class NursingReportDocumentTests
         using var stream = zip.GetEntry("xl/worksheets/sheet1.xml")!.Open();
         var sheet = XDocument.Load(stream);
         var cells = sheet.Descendants(main + "c").ToList();
-        Assert.Contains(cells, c => (string?)c.Attribute("r") == "A9" && c.Value == "Khoa Ngoại B (giả lập)");
-        Assert.Contains(cells, c => (string?)c.Attribute("r") == "C9" && c.Attribute("t") is null && c.Value == "20");
+        Assert.Contains(cells, c => (string?)c.Attribute("r") == "A9" && c.Value == "NGOAIB");
+        Assert.Contains(cells, c => (string?)c.Attribute("r") == "R9" && c.Value == SurgeryNurse);
+        Assert.Contains(cells, c => (string?)c.Attribute("r") == "C9" && c.Attribute("t") is null && c.Value == "22");
+        Assert.Contains(cells, c => (string?)c.Attribute("r") == "D9" && c.Attribute("t") is null && c.Value == "20");
+        // Cột "Bao phòng" (quyết định 54) ghi dạng số.
+        Assert.Contains(cells, c => (string?)c.Attribute("r") == "F9" && c.Attribute("t") is null && c.Value == "4");
         Assert.Equal(
             sheet.Descendants(main + "mergeCell").Count(),
             (int)sheet.Descendants(main + "mergeCells").Single().Attribute("count")!);
+        // Cột mã khoa hẹp, 16 cột số, cột người báo cáo rộng đủ ghi họ tên (quyết định 44, 46, 54).
+        Assert.Equal(
+            ["1-1:12", "2-17:10.5", "18-18:22"],
+            sheet.Descendants(main + "col").Select(c => $"{c.Attribute("min")!.Value}-{c.Attribute("max")!.Value}:{c.Attribute("width")!.Value}"));
         using var styles = zip.GetEntry("xl/styles.xml")!.Open();
         var cellStyles = XDocument.Load(styles).Descendants(main + "cellXfs").Single();
         Assert.Equal(cellStyles.Elements(main + "xf").Count(), (int)cellStyles.Attribute("count")!);
         Assert.Equal(Enum.GetValues<XlsxNursingSummaryWriter.Style>().Length, cellStyles.Elements(main + "xf").Count());
+        // Dòng người báo cáo xuống dòng trong ô (danh sách người báo cáo có thể dài), chỗ ký canh giữa, chữ đậm.
+        var note = cellStyles.Elements(main + "xf").ElementAt((int)XlsxNursingSummaryWriter.Style.Note).Element(main + "alignment");
+        Assert.Equal("1", (string?)note?.Attribute("wrapText"));
+        Assert.Equal("top", (string?)note?.Attribute("vertical"));
+        var sign = cellStyles.Elements(main + "xf").ElementAt((int)XlsxNursingSummaryWriter.Style.CenterBold);
+        Assert.Equal("center", (string?)sign.Element(main + "alignment")?.Attribute("horizontal"));
+        Assert.Equal("1", (string?)sign.Attribute("fontId"));
     }
 }

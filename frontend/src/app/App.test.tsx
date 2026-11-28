@@ -31,10 +31,10 @@ describe('Đăng nhập và phiên làm việc', () => {
 
     expect(await screen.findByText('Xin chào Bác sĩ Demo – Khoa Nội tổng hợp.')).toBeInTheDocument()
     const nav = screen.getByRole('navigation')
-    expect(within(nav).getByText('Phiếu đồng thuận')).toBeInTheDocument()
-    expect(within(nav).getByText('Người bệnh')).toBeInTheDocument()
     expect(within(nav).queryByText('Quản trị')).not.toBeInTheDocument()
-    expect(within(nav).queryByText('Xuất dữ liệu')).not.toBeInTheDocument()
+    // Quyết định 62: các chức năng phiếu đồng thuận nằm chung menu "Phiếu đồng thuận" (mục con trong khung thả xuống).
+    expect(within(nav).getByText('Phiếu đồng thuận')).toBeInTheDocument()
+    expect(within(nav).queryByText('Người bệnh')).not.toBeInTheDocument()
 
     const login = calls.find((c) => c.path === '/api/v1/auth/login')!
     expect(login.body).toEqual({ userName: 'bacsi.demo', password: 'Mat-Khau-2026!' })
@@ -190,15 +190,61 @@ describe('Đăng nhập và phiên làm việc', () => {
     expect(await screen.findByText('Không tìm thấy trang')).toBeInTheDocument()
   })
 
-  it('điều hướng tới trang chức năng khi chọn menu', async () => {
+  it('điều hướng tới trang chức năng khi chọn menu (menu điện thoại: mở nhóm Phiếu đồng thuận, chọn Mẫu phiếu)', async () => {
+    // Khung thả xuống của menu ngang trên máy tính không mở được trong jsdom; kiểm tra bằng trình duyệt thật. Menu trên điện
+    // thoại dùng cùng danh sách mục, mở nhóm ngay trong ngăn kéo.
+    const original = window.matchMedia
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: false })) as typeof window.matchMedia
+    try {
+      mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/consent-templates': [] })
+      const user = userEvent.setup()
+      const { router } = renderApp('/')
+
+      await user.click(await screen.findByRole('button', { name: 'Mở menu' }))
+      const nav = await screen.findByRole('navigation', { name: 'Điều hướng chính' })
+      expect(within(nav).queryByText('Mẫu phiếu')).not.toBeInTheDocument()
+      await user.click(within(nav).getByText('Phiếu đồng thuận'))
+      await user.click(await within(nav).findByText('Mẫu phiếu'))
+
+      expect(router.state.location.pathname).toBe('/mau-phieu')
+      expect(await screen.findByRole('heading', { name: 'Mẫu phiếu' })).toBeInTheDocument()
+      // Mở lại menu: nhóm đang mở, mục Mẫu phiếu được đánh dấu.
+      await user.click(screen.getByRole('button', { name: 'Mở menu' }))
+      const item = (await within(screen.getByRole('navigation', { name: 'Điều hướng chính' })).findByText('Mẫu phiếu')).closest('li')!
+      expect(item).toHaveClass('ant-menu-item-selected')
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
+  it('menu điện thoại mở sẵn nhóm chứa trang đang xem (đang ở Mẫu phiếu thì thấy ngay các mục Phiếu đồng thuận)', async () => {
+    const original = window.matchMedia
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: false })) as typeof window.matchMedia
+    try {
+      mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/consent-templates': [] })
+      const user = userEvent.setup()
+      renderApp('/mau-phieu/m-1')
+
+      await user.click(await screen.findByRole('button', { name: 'Mở menu' }))
+      const nav = await screen.findByRole('navigation', { name: 'Điều hướng chính' })
+      // Không bấm nhóm: các mục con đã hiện, Mẫu phiếu được đánh dấu; nhóm khác vẫn đóng.
+      expect((await within(nav).findByText('Mẫu phiếu')).closest('li')).toHaveClass('ant-menu-item-selected')
+      expect(within(nav).getByText('Danh sách phiếu')).toBeInTheDocument()
+      expect(within(nav).queryByText('Người dùng')).not.toBeInTheDocument()
+    } finally {
+      window.matchMedia = original
+    }
+  })
+
+  it('trang con của mục trong nhóm: nhóm Phiếu đồng thuận được đánh dấu đang mở, liên kết cũ vẫn mở đúng trang', async () => {
     mockApi({ ...baseRoutes(adminSession()), 'GET /api/v1/consent-templates': [] })
-    const user = userEvent.setup()
-    const { router } = renderApp('/')
 
-    // Menu ngang ở thanh trên cùng (menu con của "Quản trị" mở trong khung thả xuống, kiểm tra bằng trình duyệt thật).
-    await user.click(within(await screen.findByRole('navigation', { name: 'Điều hướng chính' })).getByText('Mẫu phiếu'))
+    renderApp('/mau-phieu')
 
-    expect(router.state.location.pathname).toBe('/mau-phieu')
     expect(await screen.findByRole('heading', { name: 'Mẫu phiếu' })).toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Điều hướng chính' })
+    const group = within(nav).getByText('Phiếu đồng thuận').closest('li')!
+    expect(group).toHaveClass('ant-menu-submenu-selected')
+    expect(within(nav).getByText('Quản trị').closest('li')).not.toHaveClass('ant-menu-submenu-selected')
   })
 })

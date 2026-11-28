@@ -1,6 +1,7 @@
 using Consent.Api.Infrastructure;
 using Consent.Application.Abstractions;
 using Consent.Application.Auth;
+using Consent.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -25,6 +26,7 @@ public sealed class AuthController(AuthService auth, ICurrentUser currentUser, I
     /// <summary>Đăng nhập bằng tên đăng nhập và mật khẩu.</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [AllowDuringMaintenance]
     [EnableRateLimiting(RateLimitPolicies.Auth)]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
     {
@@ -35,12 +37,14 @@ public sealed class AuthController(AuthService auth, ICurrentUser currentUser, I
     /// <summary>Làm mới access token bằng refresh token trong cookie (xoay vòng refresh token).</summary>
     [HttpPost("refresh")]
     [AllowAnonymous]
+    [AllowDuringMaintenance]
     [EnableRateLimiting(RateLimitPolicies.Refresh)]
     [RequireRequestedWithHeader]
     public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
     {
         var result = await auth.RefreshAsync(RefreshTokenCookie.Read(HttpContext), cancellationToken).ConfigureAwait(false);
-        if (result.IsFailure && result.Error != AuthErrors.RefreshSuperseded)
+        // Giữ cookie khi phiên vừa được làm mới ở nơi khác hoặc khi đang bảo trì (quyết định 53: tắt bảo trì là làm tiếp được).
+        if (result.IsFailure && result.Error != AuthErrors.RefreshSuperseded && result.Error!.Type != ErrorType.Unavailable)
         {
             RefreshTokenCookie.Clear(HttpContext, environment);
         }
@@ -51,6 +55,7 @@ public sealed class AuthController(AuthService auth, ICurrentUser currentUser, I
     /// <summary>Đăng xuất: thu hồi refresh token của thiết bị hiện tại và xóa cookie.</summary>
     [HttpPost("logout")]
     [AllowAnonymous]
+    [AllowDuringMaintenance]
     [RequireRequestedWithHeader]
     public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {

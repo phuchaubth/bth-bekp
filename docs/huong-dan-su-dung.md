@@ -2,7 +2,7 @@
 
 > Dành cho nhân viên bệnh viện: tiếp đón, điều dưỡng, bác sĩ, trưởng khoa, quản lý mẫu phiếu, báo cáo, kiểm tra, Phòng Điều dưỡng và quản trị hệ thống. Phần 1 dành cho mọi người. Các phần sau dành cho từng nhóm người dùng.
 >
-> Ảnh minh họa được chụp trên máy thử nghiệm với **dữ liệu giả lập**: tên người bệnh có chữ "(giả lập)", số CCCD, số điện thoại, số tiếp nhận đều là số thử. Tên đơn vị trên phiếu đang là giá trị mẫu. Màn hình của bạn có thể khác một chút: có logo và khung chữ ký của bệnh viện, hoặc ít mục menu hơn tùy vai trò.
+> Ảnh minh họa được chụp trên máy thử nghiệm với **dữ liệu giả lập**: tên người bệnh có chữ "(giả lập)", số CCCD, số điện thoại, số tiếp nhận đều là số thử. Tên đơn vị trên phiếu đang là giá trị mẫu. Màn hình của bạn có thể khác một chút: có logo và khung chữ ký của bệnh viện, hoặc ít mục menu hơn tùy vai trò. Từ quyết định 62, các mục phiếu đồng thuận nằm chung menu **Phiếu đồng thuận** (mục 1.3); một số ảnh chụp trước đó vẫn thấy các mục này nằm riêng trên thanh menu.
 
 ## Mục lục
 
@@ -13,9 +13,12 @@
 5. [Quản lý mẫu phiếu](#quan-ly-mau-phieu): phiên bản, định nghĩa (JSON), cấu hình ký, phát hành
 6. [Báo cáo / Xuất dữ liệu](#bao-cao): báo cáo thống kê, xuất Excel/CSV, lịch sử xuất
 7. [Kiểm tra](#kiem-tra): nhật ký hệ thống, xem phiếu
-8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu
-9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel
-10. [Câu hỏi thường gặp](#hoi-dap)
+8. [Quản trị hệ thống](#quan-tri): người dùng, vai trò và quyền, khoa/phòng, cấu hình hệ thống, chữ ký mẫu, bảo trì hệ thống
+9. [Báo cáo điều dưỡng hằng ngày](#bao-cao-dieu-duong): điều dưỡng khoa lập và gửi báo cáo, ủy quyền khi vắng; Phòng Điều dưỡng tổng hợp, trả lại khoa, in PDF, xuất Excel, dashboard
+10. [Kiểm thử tính năng mới](#kiem-thu): phân công kiểm thử theo người và thời gian, báo cáo kiểm thử, hướng xử lý
+11. [Sổ nội kiểm đường huyết tại giường](#noi-kiem): khoa ghi kết quả từng ngày, Khoa HSH xem xét và xác nhận sổ tháng, in PDF theo mẫu; [dashboard giám sát](#dashboard-noi-kiem)
+12. [Kết quả nguy cấp](#ket-qua-nguy-cap): khoa cận lâm sàng ghi kết quả và lần báo, khoa điều trị xác nhận đã nhận, bác sĩ ghi hướng xử trí, cảnh báo đỏ chớp tắt và chuông, [màn hình theo dõi tại khoa](#man-hinh-kqnc), sổ ST01, ST02, sổ Vi sinh in PDF, dashboard QLCL
+13. [Câu hỏi thường gặp](#hoi-dap)
 
 ### Một số từ dùng trong hướng dẫn
 
@@ -58,6 +61,11 @@ Lưu ý:
 - Nhập sai mật khẩu 5 lần thì tài khoản bị tạm khóa (mặc định 15 phút). Chờ hết thời gian, hoặc nhờ quản trị hệ thống mở khóa.
 - Quên mật khẩu: liên hệ bộ phận CNTT để được đặt lại mật khẩu tạm.
 - Khi phiên đăng nhập hết hạn, phần mềm đưa bạn về trang đăng nhập. Đăng nhập lại, phần mềm mở lại đúng trang bạn đang làm.
+- Đầu trang có **dải vàng "UAT: môi trường kiểm thử"** (tab trình duyệt ghi `[UAT]`): bạn đang ở **môi trường kiểm thử**, dùng để thử bản mới trước khi đưa vào chạy thật (quyết định 50). Phiếu, báo cáo lập ở đây không có giá trị; không dùng cho người bệnh thật. Môi trường chạy thật không có dải này. Tài khoản và mật khẩu trên hai môi trường là riêng.
+
+  ![Trang đăng nhập trên môi trường kiểm thử UAT: dải vàng UAT ở đầu trang](huong-dan-su-dung/uat-dang-nhap.png)
+
+  *Hình 1.1a. Môi trường kiểm thử UAT: dải vàng ở đầu mọi trang, kể cả trang đăng nhập.*
 
 ### 1.2. Đổi mật khẩu lần đầu
 
@@ -87,9 +95,11 @@ Trên máy tính, thanh trên cùng có:
 - ở giữa: menu ngang;
 - bên phải: tên của bạn. Bấm vào tên để mở **Tài khoản của tôi** hoặc **Đăng xuất**.
 
-![Menu ngang của quản trị hệ thống, đang mở menu Quản trị](huong-dan-su-dung/03-menu-ngang.png)
+Menu ngang có **Tổng quan**, rồi mỗi phân hệ một menu: **Phiếu đồng thuận**, **Điều dưỡng**, **Nội kiểm**, **KQ nguy cấp**; cuối cùng là **Nhật ký** và **Quản trị**. Bấm tên menu để mở các mục con, bấm mục con để mở trang. Menu **Phiếu đồng thuận** gồm **Danh sách phiếu**, **Người bệnh**, **Mẫu phiếu**, **Xuất dữ liệu**, **Báo cáo thống kê** (quyết định 62). Trong hướng dẫn này, "bấm **Phiếu đồng thuận** → **Mẫu phiếu**" nghĩa là bấm menu rồi bấm mục con. Đường dẫn các trang không đổi: liên kết đã lưu trên trình duyệt vẫn mở đúng trang.
 
-*Hình 1.3. Menu ngang. Mục đang mở được gạch chân. Bấm **Quản trị** để mở các mục con.*
+![Menu ngang của quản trị hệ thống, đang mở menu Phiếu đồng thuận](huong-dan-su-dung/03-menu-ngang.png)
+
+*Hình 1.3. Menu ngang, đang mở menu **Phiếu đồng thuận**. Menu chứa trang đang mở được gạch chân.*
 
 <img src="huong-dan-su-dung/04-menu-tai-khoan.png" alt="Menu tài khoản" width="233">
 
@@ -100,16 +110,16 @@ Mỗi người chỉ thấy các mục menu được phép dùng. Với phân qu
 | Mục menu | Tiếp đón, Điều dưỡng, Bác sĩ | Trưởng khoa | Quản lý mẫu phiếu | Báo cáo / Xuất dữ liệu | Kiểm tra | Quản trị hệ thống |
 |---|---|---|---|---|---|---|
 | **Tổng quan** | có | có | có | có | có | có |
-| **Phiếu đồng thuận** | có | có | chỉ xem | chỉ xem | chỉ xem | có |
-| **Người bệnh** | có | có | không | chỉ xem | chỉ xem | có |
-| **Mẫu phiếu** | chỉ xem | chỉ xem | có | chỉ xem | chỉ xem | có |
-| **Xuất dữ liệu** | không | có | không | có | không | có |
-| **Báo cáo** (Báo cáo thống kê) | không | có | không | có | có | có |
-| **Nhật ký** (Nhật ký hệ thống) | không | không | không | không | có | có |
+| **Phiếu đồng thuận** → **Danh sách phiếu** | có | có | chỉ xem | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Người bệnh** | có | có | không | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Mẫu phiếu** | chỉ xem | chỉ xem | có | chỉ xem | chỉ xem | có |
+| **Phiếu đồng thuận** → **Xuất dữ liệu** | không | có | không | có | không | có |
+| **Phiếu đồng thuận** → **Báo cáo thống kê** | không | có | không | có | có | có |
 | **Điều dưỡng** (Báo cáo điều dưỡng, mục 9) | chỉ Điều dưỡng: **Báo cáo của khoa** | không | không | không | không | có |
+| **Nhật ký** (Nhật ký hệ thống) | không | không | không | không | có | có |
 | **Quản trị** | không | không | không | không | chỉ **Người dùng** (xem) | có |
 
-Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Tổng hợp hằng ngày**.
+Vai trò **Phòng Điều dưỡng** thấy **Tổng quan** và **Điều dưỡng** → **Dashboard** (bảng tổng hợp hằng ngày nằm trong Dashboard, mục 9.2), **Ủy quyền báo cáo**.
 
 Quản trị hệ thống có thể đổi quyền của từng vai trò (mục 8.3), nên menu của bạn có thể khác bảng trên.
 
@@ -184,7 +194,7 @@ Quy trình thường gặp:
 
 ### 2.1. Tìm người bệnh
 
-1. Bấm **Người bệnh** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Người bệnh** trên menu.
 2. Gõ vào ô tìm kiếm: họ tên (gõ không dấu cũng được), mã người bệnh, hoặc số CCCD đủ 12 số. Nhấn Enter.
 3. Bấm tên người bệnh để mở hồ sơ.
 
@@ -196,7 +206,7 @@ Danh sách chỉ có người bệnh **liên quan đến khoa của bạn**: có
 
 ### 2.2. Thêm người bệnh mới (Tiếp nhận người bệnh)
 
-Bấm **Người bệnh** → **Tiếp nhận người bệnh**. Có ba cách điền thông tin.
+Bấm **Phiếu đồng thuận** → **Người bệnh**, rồi bấm nút **Tiếp nhận người bệnh**. Có ba cách điền thông tin.
 
 **Cách 1: quét mã QR trên CCCD bằng máy quét 2D**
 
@@ -545,7 +555,7 @@ Phiếu đã **Hoàn tất** không trả về nháp, không hủy được. Mu�
 
 ### 2.14. Danh sách phiếu
 
-Bấm **Phiếu đồng thuận** trên menu để xem các phiếu bạn được phép xem.
+Bấm **Phiếu đồng thuận** → **Danh sách phiếu** trên menu để xem các phiếu bạn được phép xem.
 
 - Tìm theo số phiếu, họ tên, mã người bệnh.
 - Lọc theo **Trạng thái**, **Mẫu phiếu**, khoảng ngày lập (**Từ ngày** – **Đến ngày**).
@@ -789,7 +799,7 @@ Người quản lý mẫu phiếu tạo và sửa mẫu, quản lý phiên bản
 
 ### 5.1. Danh sách mẫu phiếu
 
-Bấm **Mẫu phiếu** trên menu. Bảng có: mã và tên mẫu, **Xác nhận phía bệnh viện** (vai trò xác nhận cuối), **Phạm vi**, **Đang phát hành** (phiên bản nào, từ khi nào), **Nháp**, **Trạng thái** (**Đang dùng** hoặc **Ngừng sử dụng**). Bấm tên mẫu để mở.
+Bấm **Phiếu đồng thuận** → **Mẫu phiếu** trên menu. Bảng có: mã và tên mẫu, **Xác nhận phía bệnh viện** (vai trò xác nhận cuối), **Phạm vi**, **Đang phát hành** (phiên bản nào, từ khi nào), **Nháp**, **Trạng thái** (**Đang dùng** hoặc **Ngừng sử dụng**). Bấm tên mẫu để mở.
 
 ![Danh sách mẫu phiếu](huong-dan-su-dung/70-danh-sach-mau.png)
 
@@ -893,7 +903,7 @@ Vai trò này xem báo cáo và xuất dữ liệu của toàn viện. Trưởng
 
 ### 6.1. Báo cáo thống kê
 
-1. Bấm **Báo cáo** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Báo cáo thống kê** trên menu.
 2. Chọn khoảng ngày lập phiếu (mặc định từ đầu tháng đến hôm nay), **Mẫu phiếu**, **Khoa/phòng** nếu cần.
 
 Báo cáo đếm phiếu theo **ngày lập** và theo **trạng thái hiện tại** của phiếu. Trang có:
@@ -911,7 +921,7 @@ Báo cáo đếm phiếu theo **ngày lập** và theo **trạng thái hiện t�
 
 ### 6.2. Xuất dữ liệu (Excel, CSV)
 
-1. Bấm **Xuất dữ liệu** trên menu.
+1. Bấm **Phiếu đồng thuận** → **Xuất dữ liệu** trên menu.
 2. Ở **Bộ lọc**, chọn **Trạng thái**, **Mẫu phiếu**, **Khoa/phòng**, khoảng ngày lập. Để trống là lấy tất cả.
 3. Ở **Định dạng và dữ liệu**, chọn **Excel (.xlsx)** hoặc **CSV (.csv)**.
 4. Muốn có nội dung từng phiếu (mỗi câu hỏi một cột), đánh dấu **Kèm nội dung phiếu theo mẫu**. Ô này chỉ chọn được khi đã chọn đúng một mẫu ở bộ lọc.
@@ -976,11 +986,11 @@ Quản trị hệ thống có toàn quyền: mọi chức năng ở các phần 
 
 ### 8.1. Người dùng
 
-Bấm **Quản trị** → **Người dùng**. Tìm theo họ tên, tên đăng nhập, chức danh. Lọc theo **Khoa/phòng**, **Trạng thái**. Cột **Trạng thái**: **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Đã khóa**.
+Bấm **Quản trị** → **Người dùng**. Danh sách chia hai thẻ: **Đang sử dụng** và **Ngưng sử dụng** (số trong ngoặc là số tài khoản của thẻ, quyết định 51). Tìm theo họ tên, tên đăng nhập, chức danh; lọc theo **Khoa/phòng**. Cột **Trạng thái** (thẻ Đang sử dụng): **Hoạt động**, **Tạm khóa** (nhập sai mật khẩu nhiều lần), **Tạm khóa tra cứu** (tài khoản kiosk).
 
 ![Danh sách người dùng](huong-dan-su-dung/90-nguoi-dung.png)
 
-*Hình 8.1. Danh sách người dùng: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
+*Hình 8.1. Thẻ **Đang sử dụng**: khoa chính (dưới đó là dòng "Khoa khác: …" nếu có), vai trò, trạng thái, lần đăng nhập gần nhất. Cột **Thao tác** ở bên phải. Màn hình hẹp thì menu **Quản trị** nằm trong nút **···** trên thanh menu.*
 
 Thêm người dùng:
 
@@ -995,17 +1005,34 @@ Thêm người dùng:
 
 *Hình 8.2. Hộp **Thêm người dùng**: điều dưỡng khoa chính Khoa Khám bệnh, làm thêm ở Khoa Nội tổng hợp.*
 
-Sửa, khóa, mở khóa, đặt lại mật khẩu:
+Sửa, ngưng sử dụng, mở khóa, đặt lại mật khẩu (thẻ **Đang sử dụng**):
 
 - Bấm **Sửa** để sửa họ tên, chức danh, khoa/phòng chính, khoa/phòng khác, vai trò, email, số điện thoại. Không đổi được tên đăng nhập.
 - Bấm nút **⋯** ở cột **Thao tác** để chọn:
-  - **Khóa tài khoản**: người dùng bị đăng xuất khỏi mọi thiết bị và không đăng nhập được cho đến khi mở khóa. Khi nhân viên nghỉ việc, hãy khóa tài khoản thay vì xóa, để giữ nhật ký;
-  - **Mở khóa**: chỉ có khi tài khoản đang bị khóa, tạm khóa (nhập sai mật khẩu), hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
+  - **Ngưng sử dụng**: khi nhân viên nghỉ việc, chuyển công tác, nghỉ dài ngày. Người dùng bị đăng xuất khỏi mọi thiết bị, không đăng nhập được; tài khoản chuyển sang thẻ **Ngưng sử dụng**. Phiếu, báo cáo, nhật ký đã có vẫn giữ nguyên;
+  - **Mở khóa**: chỉ có khi tài khoản đang **Tạm khóa** (nhập sai mật khẩu) hoặc là tài khoản kiosk đang **Tạm khóa tra cứu** (người bệnh nhập sai ngày sinh nhiều lần). Mở khóa tài khoản kiosk thì máy tra cứu lại được ngay;
   - **Đặt lại mật khẩu**: đặt mật khẩu tạm. Mọi phiên đăng nhập của người dùng bị đăng xuất. Người dùng phải đổi mật khẩu ở lần đăng nhập tiếp theo.
 
 <img src="huong-dan-su-dung/92-thao-tac-nguoi-dung.png" alt="Menu thao tác khác của một người dùng" width="600">
 
-*Hình 8.3. Menu **⋯**: **Khóa tài khoản**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang khóa).*
+*Hình 8.3. Menu **⋯**: **Ngưng sử dụng**, **Đặt lại mật khẩu** (và **Mở khóa** khi tài khoản đang tạm khóa).*
+
+Thẻ **Ngưng sử dụng** (quyết định 51): các tài khoản đã ngưng sử dụng, mỗi dòng có **Sửa**, **Sử dụng lại**, **Xóa**.
+
+- **Sử dụng lại**: khi nhân viên quay lại làm việc. Người dùng đăng nhập lại được ngay với mật khẩu hiện tại (quên mật khẩu thì **Đặt lại mật khẩu** ở thẻ **Đang sử dụng**). Nên kiểm tra lại khoa, vai trò bằng nút **Sửa** trước khi sử dụng lại.
+- **Xóa**: khi tài khoản tạo nhầm, trùng, hoặc không còn cần giữ trong danh sách. Chỉ xóa được tài khoản đã ngưng sử dụng (ngưng sử dụng trước, rồi xóa ở thẻ này). Bấm **Xóa**, đọc hộp xác nhận rồi bấm **Xóa**:
+  - tài khoản biến khỏi cả hai thẻ, không đăng nhập và không sử dụng lại được; vai trò, khoa của tài khoản được gỡ;
+  - **tên đăng nhập đó không tạo lại được** (để nhật ký không nhầm người); cần tài khoản mới thì đặt tên đăng nhập khác;
+  - phiếu đã ký, báo cáo, nhật ký vẫn giữ tên người này; nhật ký hệ thống ghi người xóa, lúc xóa;
+  - **không hoàn tác được**.
+
+![Thẻ Ngưng sử dụng: các tài khoản đã ngưng, nút Sửa, Sử dụng lại, Xóa](huong-dan-su-dung/92a-ngung-su-dung.png)
+
+*Hình 8.3a. Thẻ **Ngưng sử dụng**: tài khoản nghỉ việc, chuyển công tác và một tài khoản tạo nhầm (dữ liệu giả lập).*
+
+![Hộp xác nhận xóa tài khoản](huong-dan-su-dung/92b-xoa-tai-khoan.png)
+
+*Hình 8.3b. Hộp xác nhận **Xóa tài khoản**: tài khoản tạo nhầm được xóa; tên đăng nhập không tạo lại được.*
 
 Dữ liệu theo khoa:
 
@@ -1038,7 +1065,7 @@ Bấm **Quản trị** → **Vai trò và quyền**. Cột trái liệt kê các
 **Sửa quyền của vai trò:**
 
 1. Chọn vai trò ở cột trái.
-2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**.
+2. Đánh dấu hoặc bỏ dấu các quyền theo nhóm: **Hệ thống**, **Người bệnh**, **Mẫu phiếu**, **Phiếu đồng thuận**, **Báo cáo và xuất dữ liệu**, **Báo cáo điều dưỡng**, **Phạm vi dữ liệu**, **Kiểm thử**, **Nội kiểm đường huyết** (mục 11), **Kết quả nguy cấp** (mục 12).
 3. Bấm **Lưu thay đổi** (hoặc **Hủy thay đổi** để bỏ).
 
 **Thêm vai trò** (ví dụ vai trò cho Ban giám đốc, Dược sĩ lâm sàng):
@@ -1096,7 +1123,16 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 **Tên đơn vị in trên phiếu.** Nhập **Cơ quan chủ quản**, **Tên bệnh viện**, **Địa danh** (in ở dòng ngày tháng, ví dụ "Hà Nội, ngày … tháng … năm …"), bấm **Lưu**. Phiếu in sau khi lưu dùng tên mới. PDF đã ký giữ nguyên. Khi chưa nhập, phiếu dùng giá trị mẫu như trong ảnh. Hãy nhập tên đơn vị thật trước khi đưa vào sử dụng.
 
-**Logo bệnh viện.** Bấm **Tải logo lên** (hoặc **Thay logo**), chọn ảnh PNG hoặc JPG, tối đa 1 MB, nên là ảnh vuông nền trắng hoặc trong suốt, rộng từ 300 điểm ảnh. Logo in ở góc trên bên trái mọi phiếu tạo sau khi lưu. Bấm **Bỏ logo** để bỏ.
+**Logo bệnh viện.** Bấm **Tải logo lên** (hoặc **Thay logo**), chọn ảnh PNG hoặc JPG, tối đa 1 MB, nên là ảnh vuông nền trắng hoặc trong suốt, rộng từ 300 điểm ảnh. Bấm **Bỏ logo** để bỏ. Logo dùng ở:
+
+- góc trên bên trái PDF phiếu đồng thuận, sổ nội kiểm, sổ kết quả nguy cấp tạo sau khi lưu;
+- **logo của phần mềm trên web** (quyết định 61): thanh trên cùng, trang đăng nhập, biểu tượng trên thẻ trình duyệt. Máy đang mở phần mềm thấy logo mới khi tải lại trang. Chưa có logo thì phần mềm dùng biểu tượng mặc định.
+
+![Thanh trên cùng có logo bệnh viện](huong-dan-su-dung/logo-01-thanh-tren.png)
+
+<img src="huong-dan-su-dung/logo-02-dang-nhap.png" alt="Trang đăng nhập có logo bệnh viện" width="320">
+
+*Hình 8.6a. Logo bệnh viện (logo giả lập) trên thanh trên cùng và trang đăng nhập.*
 
 ![Cấu hình tên đơn vị và logo](huong-dan-su-dung/96-cau-hinh-ten-don-vi-logo.png)
 
@@ -1135,6 +1171,56 @@ Bấm **Quản trị** → **Cấu hình hệ thống**. Mọi thay đổi ở �
 
 Mỗi nhân viên tự ký chữ ký mẫu của mình ở **Tài khoản của tôi** (mục 1.5). Quản trị không ký thay được. Khi xác nhận phiếu, tài khoản đã có chữ ký mẫu thì ký bằng chữ ký mẫu, không phải vẽ lại. Vẫn chọn **Ký tay lần này** được. Tài khoản chưa có chữ ký mẫu thì vẽ vào khung ký mỗi lần xác nhận. Hãy nhắc nhân viên xác nhận phiếu (tiếp đón, điều dưỡng, bác sĩ) ký chữ ký mẫu trước khi dùng.
 
+<a id="bao-tri"></a>
+
+### 8.7. Bảo trì hệ thống
+
+Dùng khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà không để người khác thao tác cùng lúc. Trong lúc bảo trì, người dùng khác **không đăng nhập, không thao tác được**, kể cả kiosk và người bệnh đang ký qua mã QR. Tài khoản quản trị vẫn làm việc như thường.
+
+**Bật chế độ bảo trì.** Bấm **Quản trị** → **Bảo trì hệ thống**. Nhập **Lý do** (hiện cho người dùng, ví dụ "Nâng cấp phần mềm, cập nhật mẫu phiếu") và **Dự kiến xong lúc** (để trống nếu chưa rõ), bấm **Bật chế độ bảo trì**, đọc thông báo rồi bấm **Bật bảo trì**. Có hiệu lực ngay.
+
+![Trang Bảo trì hệ thống](huong-dan-su-dung/bt-01-trang-bao-tri.png)
+
+*Hình 8.11. Đang bảo trì: ghi lúc bật, người bật; sửa được lý do, giờ dự kiến xong.*
+
+**Người dùng thấy gì.** Mọi máy đang mở phần mềm (máy tính, máy tính bảng, kiosk, điện thoại người bệnh) hiện màn hình **"Hệ thống đang bảo trì"** kèm lý do và giờ dự kiến xong, ngay khi họ thao tác (mở trang, bấm lưu…). Người chưa đăng nhập thấy màn hình này thay cho trang đăng nhập.
+
+- Trang họ đang mở và **dữ liệu đang nhập vẫn giữ** dưới màn hình bảo trì. Màn hình tự kiểm tra lại mỗi 30 giây (hoặc bấm **Kiểm tra lại**). Bảo trì xong, màn hình tự đóng, làm tiếp được, không phải đăng nhập lại. Thao tác bấm lúc đang bảo trì chưa được lưu: bấm lưu lại.
+- Kiosk và điện thoại người bệnh có lời mời chờ hoặc liên hệ nhân viên, không có nút của nhân viên.
+
+![Màn hình Hệ thống đang bảo trì](huong-dan-su-dung/bt-02-man-hinh-bao-tri.png)
+
+*Hình 8.12. Màn hình bảo trì trên máy của một điều dưỡng: trang đang mở (ô tìm người bệnh vừa gõ) vẫn giữ bên dưới.*
+
+**Quản trị trong lúc bảo trì.** Tài khoản có quyền **Bảo trì hệ thống** (vai trò Quản trị hệ thống; thêm cho vai trò khác ở mục 8.3) vẫn đăng nhập, thao tác như thường, và thấy dải vàng **"Đang bật chế độ bảo trì"** ở đầu mọi trang. Máy đang hiện màn hình bảo trì mà quản trị cần đăng nhập: bấm **Đăng nhập bằng tài khoản quản trị** (máy đang giữ phiên của tài khoản khác thì bấm **Đăng xuất** trước). Tài khoản khác đăng nhập ở đây bị báo *Trong lúc bảo trì chỉ tài khoản có quyền bảo trì hệ thống đăng nhập được*.
+
+![Dải báo đang bảo trì cho quản trị](huong-dan-su-dung/bt-03-dai-bao-quan-tri.png)
+
+*Hình 8.13. Quản trị vẫn làm việc khi đang bảo trì, có dải vàng nhắc.*
+
+**Tắt chế độ bảo trì.** Vào lại **Bảo trì hệ thống**, bấm **Tắt chế độ bảo trì**. Mọi người làm việc lại được ngay. Giờ dự kiến xong chỉ để thông báo: **hết giờ hệ thống không tự tắt**. Bảo trì lâu hơn dự kiến thì sửa giờ, bấm **Lưu lý do, giờ dự kiến** để người dùng thấy giờ mới.
+
+Mọi lần bật, sửa, tắt đều ghi **Nhật ký hệ thống**. Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì theo hướng dẫn triển khai (mục 5.12). Khi phòng CNTT cài bản mới hoặc chạy script xóa dữ liệu chạy thử, người dùng cũng thấy màn hình bảo trì vài phút; xong thì trang tự tải lại.
+
+**Phiên bản đã cài** (quyết định 67). Thẻ **Phiên bản đã cài** (dưới thẻ *Trong lúc bảo trì*) cho biết gói phần mềm đang chạy. Số gói trùng với số trong hướng dẫn cài ("Cài gói lần 97"): so số đang chạy với số của gói mới để biết đã cài gói mới chưa.
+
+- **Máy chủ (API)**: số gói, mã (7 ký tự đầu của mã commit), ngày giờ đóng gói của bản đang chạy trên máy chủ.
+- **Giao diện trên trình duyệt này**: bản giao diện mà máy đang mở trang chạy.
+- Dòng xanh **Giao diện và máy chủ cùng gói …**: đã cài xong, máy này đã tải giao diện mới.
+- Dòng vàng **Trình duyệt này đang chạy giao diện gói …, cũ hơn máy chủ**: nhấn **Ctrl+F5**. Tải lại rồi vẫn thấy dòng vàng thì báo phòng CNTT: thư mục giao diện trên máy chủ chưa được chép gói mới.
+- Dòng vàng **Máy chủ (API) đang chạy gói …, cũ hơn giao diện** hoặc **Máy chủ (API) chưa có thông tin phiên bản**: báo phòng CNTT (thư mục API chưa được chép gói mới, hoặc API chưa khởi động lại).
+- Không thấy thẻ này sau khi cài gói mới: máy đang chạy giao diện cũ, nhấn **Ctrl+F5**.
+
+Phòng CNTT so gói vừa tải về với bản đang cài trên máy chủ bằng script `xem-phien-ban.ps1` có trong gói (hướng dẫn triển khai, mục 5.17).
+
+![Phiên bản đã cài: cùng gói](huong-dan-su-dung/bt-04-phien-ban.png)
+
+*Hình 8.14. Giao diện và máy chủ cùng gói 97.*
+
+![Phiên bản đã cài: giao diện cũ hơn máy chủ](huong-dan-su-dung/bt-05-phien-ban-lech.png)
+
+*Hình 8.15. Máy này chưa tải lại giao diện sau khi cài gói 97: nhấn Ctrl+F5.*
+
 ---
 
 <a id="bao-cao-dieu-duong"></a>
@@ -1145,9 +1231,9 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
 
 | Ai | Làm gì | Menu |
 |---|---|---|
-| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
+| Điều dưỡng của khoa | Lập, lưu nháp, gửi báo cáo của khoa mình (mục 9.1). Khi HIS lỗi: nhập số liệu HIS của khoa (mục 9.5). Khi vắng: ủy quyền cho người khác làm thay; được ủy quyền thì làm báo cáo của khoa khác trong thời gian được ủy quyền (mục 9.7) | **Điều dưỡng** → **Báo cáo của khoa**, **Ủy quyền báo cáo** |
 | Khoa được giao nhập số liệu HIS (ví dụ Khoa Khám bệnh, Khoa Chẩn đoán hình ảnh) | Khi HIS lỗi: nhập các chỉ số mục B, D được giao (mục 9.5) | **Điều dưỡng** → **Báo cáo của khoa** |
-| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5). Không nhập số liệu thay khoa | **Điều dưỡng** → **Tổng hợp hằng ngày** |
+| Phòng Điều dưỡng | Xem bảng tổng hợp; xem, in và trả lại báo cáo cho khoa; cài khoa báo cáo, số giường, khoa nhập số liệu HIS; lấy số liệu HIS (mục 9.2–9.5); xem biểu đồ nhiều ngày (mục 9.6); xem và hủy ủy quyền của các khoa (mục 9.7). Mọi việc trên bảng tổng hợp và biểu đồ làm ở một trang **Dashboard**. Không nhập số liệu thay khoa | **Điều dưỡng** → **Dashboard**, **Ủy quyền báo cáo** |
 
 ### 9.1. Lập và gửi báo cáo của khoa (điều dưỡng)
 
@@ -1158,14 +1244,21 @@ Mỗi khoa lập một **Báo cáo công tác điều dưỡng** mỗi ngày the
    *Hình 9.1. Menu **Điều dưỡng** chỉ hiện với tài khoản được lập hoặc xem báo cáo điều dưỡng.*
 
 2. Báo cáo lập cho khoa của tài khoản (ghi dưới tên phần mềm, góc trên bên trái). Tài khoản làm ở nhiều khoa có thêm ô chọn khoa cạnh ô ngày: mặc định khoa chính, chọn khoa khác để lập báo cáo của khoa đó. Ngày báo cáo mặc định là hôm nay. Muốn lập bù cho ngày trước, chọn ngày ở góc trên bên phải. Lập bù được trong vòng một năm; không chọn được ngày sau hôm nay.
-3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**, số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
+3. Nhập số liệu theo mẫu giấy. Ô nào không có số thì để trống. Mục **I. Nhân sự** và ô **Số NB theo chỉ tiêu** được điền sẵn theo báo cáo khoa đã gửi gần nhất: kiểm tra lại cho đúng ngày hôm nay. Ở mục **VI. Số lượng NB**:
+   - **Số NB ngày hôm trước** được điền sẵn bằng **Số NB hiện tại** của báo cáo khoa đã gửi hôm trước. Hôm trước khoa chưa gửi báo cáo, hoặc số chưa đúng, thì nhập tay.
+   - **Số NB hiện tại** không nhập: phần mềm tự tính = Số NB ngày hôm trước + Số ca nhập khoa từ PK + Số ca nhập khoa do CK − Số ca xuất viện − Số ca chuyển khoa (các số ca đều của ngày hôm trước). Số tự đổi khi nhập các ô này. Số âm có viền đỏ: có ô nhập nhầm. Gửi báo cáo thì phải có Số NB ngày hôm trước.
+   - Số ca nhập viện ngày hôm trước nhập riêng hai dòng: **Số ca nhập khoa từ PK ngày hôm trước** (từ phòng khám) và **Số ca nhập khoa do CK ngày hôm trước** (khoa khác chuyển đến).
+   - **Số NB người nước ngoài**: trong số NB hiện tại, số người bệnh là người nước ngoài. **Số ca chuyển khoa ngày hôm trước**: số người bệnh khoa chuyển sang khoa khác.
+   - **Số NB bao phòng** (ngay sau Số NB người nước ngoài): trong số NB hiện tại, số người bệnh bao phòng. Khoa nhập mỗi ngày, không điền sẵn theo hôm trước.
 
    ![Báo cáo mới của khoa, có số điền sẵn](huong-dan-su-dung/dd-01-bao-cao-khoa.png)
 
-   *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn.*
+   ![Mục VI: số NB ngày hôm trước điền sẵn, số NB hiện tại tự tính, dòng Số NB bao phòng](huong-dan-su-dung/dd-01b-so-luong-nb.png)
+
+   *Hình 9.2. Báo cáo chưa lập (nhãn **Chưa lập**). Khung xanh cho biết các số đã được điền sẵn, gồm số NB ngày hôm trước. Ở mục VI, **Số NB hiện tại** tự tính theo công thức ghi dưới tên dòng, không nhập được; dòng **Số NB bao phòng** nằm ngay sau Số NB người nước ngoài.*
 
 4. Ở **Phần tick**, mỗi dòng chọn **Có sự cố/ Không ổn** hoặc **Không có sự cố/ Ổn**. Phải chọn đủ mọi dòng mới gửi được.
-5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được.
+5. Ở **Phần báo cáo (nhập thêm)**, ghi các vấn đề bất thường trong ngày (nếu có). Xuống dòng được. Tối đa 20.000 ký tự, kể cả dấu cách và xuống dòng; bộ đếm dưới ô cho biết đã gõ bao nhiêu ký tự.
 
    ![Phần tick và phần báo cáo nhập thêm](huong-dan-su-dung/dd-02-phan-tick.png)
 
@@ -1198,34 +1291,48 @@ Lưu ý:
 
 ### 9.2. Bảng tổng hợp hằng ngày (Phòng Điều dưỡng)
 
-1. Bấm **Điều dưỡng** trên menu, chọn **Tổng hợp hằng ngày**. Chọn ngày ở góc trên bên phải.
-2. Ô trên cùng ghi:
-   - **Khoa đã gửi**: số khoa đã gửi trên số khoa phải báo cáo.
+Bảng tổng hợp nằm trong trang **Dashboard** điều dưỡng (không còn mục menu **Tổng hợp hằng ngày** riêng; đường dẫn cũ đã lưu trên trình duyệt tự mở Dashboard).
+
+1. Bấm **Điều dưỡng** trên menu, chọn **Dashboard**. Chọn ngày ở ô **Ngày báo cáo**, góc trên bên phải (mặc định hôm nay). Một ô ngày dùng cho cả trang: ô chỉ số, bảng tổng hợp, PDF, Excel và biểu đồ đều theo ngày này.
+2. Phần trên cùng là **tám ô chỉ số** của ngày đó (mục 9.6), trong đó ô **Khoa đã gửi báo cáo** ghi số khoa đã gửi trên số khoa phải báo cáo, kèm tên viết tắt các khoa chưa gửi để nhắc. Dưới các ô chỉ số có hai thẻ: **Bảng tổng hợp** (mở sẵn) và **Biểu đồ** (mục 9.6).
+3. Ở thẻ **Bảng tổng hợp**, ô đầu tiên ghi:
    - Số liệu HIS lấy lúc nào, bởi ai.
    - Khi HIS lỗi: dòng **Khoa nhập tay khi HIS lỗi** cho biết khoa nào đã nhập số liệu HIS, khoa nào chưa nhập (mục 9.5).
-3. **Mục A** có một dòng cho mỗi khoa phải báo cáo, kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa. Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
-4. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
+   - Các nút **In PDF**, **Xuất Excel** (bước 9), và với tài khoản Phòng Điều dưỡng: **Lấy số liệu HIS** (mục 9.5), **Khoa báo cáo và số giường** (mục 9.4).
+4. **Mục A** có một dòng cho mỗi khoa phải báo cáo, ghi bằng **tên viết tắt** của khoa (khoa chưa đặt tên viết tắt thì ghi mã khoa), theo **thứ tự Phòng Điều dưỡng xếp**. Phòng Điều dưỡng đặt thứ tự và tên viết tắt ở mục 9.4. Rê chuột vào tên viết tắt để xem tên khoa. Mỗi dòng kèm trạng thái **Đã gửi**, **Nháp** hoặc **Chưa lập**. Chỉ báo cáo **đã gửi** được tính. Khoa chưa gửi thì để trống các ô do khoa báo cáo, chỉ có số giường và cột **NB PK chờ nhập viện**. Dòng **Tổng** cộng các khoa.
+   - Số ca nhập viện ngày hôm trước chia hai cột **Nhập khoa từ PK** và **Nhập khoa do CK**; báo cáo đã gửi trước khi tách cột chỉ có số tổng nên hai cột này để trống.
+   - Cột **Người nước ngoài** và cột **Chuyển khoa** lấy từ hai dòng cùng tên ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có hai dòng này thì hai cột để trống.
+   - Cột **Bao phòng** (ngay sau cột Người nước ngoài) lấy từ dòng **Số NB bao phòng** ở mục VI của báo cáo khoa. Báo cáo gửi trước khi có dòng này thì cột để trống (không ghi 0); cần đủ số thì trả lại khoa (mục 9.3) để khoa nhập thêm rồi gửi lại.
+   - Cột **Số NB ngày hôm trước** đứng trước **Số NB hiện tại**. Số NB hiện tại = Số NB ngày hôm trước + Nhập khoa từ PK + Nhập khoa do CK − Xuất viện − Chuyển khoa; khoa không nhập, phần mềm tính khi khoa lưu báo cáo (mục 9.1). Báo cáo gửi trước khi có cách tính này để trống cột Số NB ngày hôm trước và giữ Số NB hiện tại khoa đã nhập.
+   - Cột cuối **Người báo cáo** là người gửi báo cáo của khoa.
+5. **Mục C** cộng số liệu thủ thuật các khoa đã gửi. **Mục B**, **mục D** và cột **NB PK chờ nhập viện** là số liệu HIS (mục 9.5).
+6. Dưới mỗi mục B, C, D, E, F có dòng **Người báo cáo**, ghi họ tên kèm tên viết tắt của khoa:
+   - Mục B, D: người của khoa đã nhập tay số liệu HIS, hoặc người đã bấm **Lấy số liệu HIS** (ghi *lấy từ HIS*).
+   - Mục C, E, F: người gửi báo cáo của các khoa có số thủ thuật (mục C), báo **Không ổn** (mục E), có phần nhập thêm (mục F). Không khoa nào có thì ghi *Các khoa đã gửi báo cáo (cột Người báo cáo, mục A)*.
+   - Mục chưa có số liệu thì ghi *chưa có*.
 
    ![Bảng tổng hợp](huong-dan-su-dung/dd-05-tong-hop.png)
 
-   *Hình 9.7. Bảng tổng hợp, mục A–D, ngày HIS lỗi. Ô trên cùng ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS. Hai nút **Lấy số liệu HIS** và **Khoa báo cáo và số giường** chỉ có với tài khoản Phòng Điều dưỡng.*
+   *Hình 9.7. Thẻ **Bảng tổng hợp** của Dashboard ngày HIS lỗi (kéo xuống dưới tám ô chỉ số). Ô đầu thẻ ghi khoa nào đã nhập, khoa nào chưa nhập số liệu HIS, và có các nút **In PDF**, **Xuất Excel**, **Lấy số liệu HIS**, **Khoa báo cáo và số giường** (hai nút sau chỉ có với tài khoản Phòng Điều dưỡng). Mục A ghi tên viết tắt của khoa theo thứ tự Phòng Điều dưỡng xếp (khoa HSTC chưa đặt tên viết tắt nên ghi mã khoa), có cột **Số NB ngày hôm trước**, **Người nước ngoài**, **Bao phòng**, **Chuyển khoa** và **Người báo cáo**.*
 
-5. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
-6. **Mục F** là phần báo cáo nhập thêm của các khoa, giữ nguyên xuống dòng như khoa đã ghi.
+7. **Mục E** ghi **Ổn** khi mọi khoa đã gửi đều báo ổn. Có khoa báo sự cố thì ghi **Không ổn** kèm tên viết tắt của khoa, chữ màu đỏ. Dòng **ĐD thực hiện thuốc** của phần tick không có trong mục E (mẫu giấy tổng hợp không có dòng này); xem dòng này trong báo cáo của từng khoa.
+8. **Mục F** là phần báo cáo nhập thêm của các khoa (cột **Khoa** ghi tên viết tắt), giữ nguyên xuống dòng như khoa đã ghi. Trong PDF và file Excel, phần nhập thêm dài được chia thành nhiều dòng (mỗi dòng khoảng 1.000 ký tự, chia ở chỗ xuống dòng hoặc giữa hai từ), các dòng sau ghi tên viết tắt kèm **(tiếp)** và tự sang trang, nên in đủ cả phần nhập thêm dài nhất.
 
    ![Mục E và mục F của bảng tổng hợp](huong-dan-su-dung/dd-06-tong-hop-e-f.png)
 
-   *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa.*
+   *Hình 9.8. Mục E: một khoa báo sự cố về cung cấp thuốc. Mục F: phần nhập thêm của hai khoa. Dưới mỗi mục là người báo cáo.*
 
-7. Bấm **In PDF** để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel.
+9. Bấm **In PDF** (ô đầu thẻ **Bảng tổng hợp**) để xem và in bảng tổng hợp theo mẫu giấy. Bấm **Xuất Excel** để tải file Excel. Cuối PDF và file Excel có chỗ **Phòng Điều dưỡng** ký, ghi rõ họ tên.
 
    <img src="huong-dan-su-dung/dd-12-pdf-tong-hop.png" alt="PDF bảng tổng hợp, trang 1" width="560">
 
-   *Hình 9.9. PDF bảng tổng hợp (trang 1). Chân trang ghi giờ in, số khoa đã gửi và nguồn số liệu HIS: lấy từ HIS lúc nào, hoặc do khoa nhập tay.*
+   <img src="huong-dan-su-dung/dd-12b-pdf-tong-hop-ky.png" alt="PDF bảng tổng hợp, đầu trang 2: mục F, người báo cáo và chỗ Phòng Điều dưỡng ký" width="560">
+
+   *Hình 9.9. PDF bảng tổng hợp: trang 1 và đầu trang 2. Dưới mỗi mục B–F là người báo cáo; cuối bảng có chỗ Phòng Điều dưỡng ký. Chân trang ghi giờ in, số khoa đã gửi và nguồn số liệu HIS: lấy từ HIS lúc nào, hoặc do khoa nhập tay.*
 
 ### 9.3. Xem và trả lại báo cáo cho khoa (Phòng Điều dưỡng)
 
-1. Trong mục A, bấm **tên khoa**. Báo cáo của khoa mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
+1. Trong mục A của bảng tổng hợp (Dashboard, thẻ **Bảng tổng hợp**), bấm **tên viết tắt** của khoa. Báo cáo của khoa ngày ở ô **Ngày báo cáo** mở ở bên phải, chỉ xem. Bấm **In PDF** để in báo cáo của khoa.
 
    ![Báo cáo của một khoa mở từ bảng tổng hợp](huong-dan-su-dung/dd-07-xem-bao-cao-khoa.png)
 
@@ -1237,29 +1344,37 @@ Lưu ý:
 
    *Hình 9.11. Bắt buộc ghi lý do. Lý do được ghi vào nhật ký và hiện cho khoa.*
 
-### 9.4. Cài khoa báo cáo, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
+### 9.4. Cài khoa báo cáo, thứ tự, tên viết tắt, số giường và khoa nhập số liệu HIS (Phòng Điều dưỡng, làm khi bắt đầu dùng)
 
-1. Trên trang **Tổng hợp hằng ngày**, bấm **Khoa báo cáo và số giường**.
+1. Trên trang **Dashboard**, thẻ **Bảng tổng hợp**, bấm **Khoa báo cáo và số giường** (ô đầu thẻ).
 2. Tick các khoa phải gửi báo cáo, nhập **số giường thực kê** (không tính băng ca).
+3. Xếp **thứ tự** các khoa ở mục A của bảng tổng hợp. Các khoa được tick đứng đầu danh sách; cột **Thứ tự** ghi số thứ tự của khoa trên bảng tổng hợp.
+   - Gõ số thứ tự mới rồi bấm **Enter** (hoặc bấm ra ngoài ô): khoa chuyển tới vị trí đó, các khoa khác dịch xuống. Gõ số lớn hơn số khoa thì khoa xuống cuối.
+   - Bấm mũi tên **↑**, **↓** để đổi chỗ với khoa liền trên, liền dưới.
+   - Khoa mới tick xếp cuối. Bỏ tick thì khoa ra khỏi thứ tự.
+4. Đặt **tên viết tắt** của khoa ở cột **Tên viết tắt**, ví dụ *Nội TH*, tối đa 20 ký tự. Tên viết tắt in ở cột khoa phòng của mục A, ở mục E, mục F và dòng người báo cáo. Để trống thì in mã khoa (chữ mờ trong ô).
+   - Hai khoa không được trùng tên viết tắt, kể cả trùng mã của khoa khác; chữ hoa, chữ thường coi như nhau. Ô bị trùng có viền đỏ và dòng **Trùng với** tên khoa kia. Bấm **Lưu** khi còn trùng thì phần mềm báo lỗi, không lưu gì.
+   - Tên viết tắt không đổi khi quản trị lấy lại danh mục khoa/phòng từ HIS (mục 8.2). Phần mềm vẫn dùng mã khoa HIS để ghép số liệu.
 
    ![Hộp khoa báo cáo và số giường](huong-dan-su-dung/dd-09-khoa-bao-cao.png)
 
-   *Hình 9.12. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
+   *Hình 9.12. Các khoa được tick đứng đầu, theo thứ tự in ở mục A. Khoa HSTC để trống tên viết tắt nên bảng tổng hợp in mã khoa. Khoa chưa được tick thì chưa lập được báo cáo và không có dòng trên bảng tổng hợp.*
 
-3. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
-4. Bấm **Lưu**.
+5. Kéo xuống phần **Khoa nhập số liệu HIS khi HIS lỗi**. Với mỗi chỉ số mục B, D, chọn khoa có nhiệm vụ nhập. Ví dụ: **TSNB đến khám** giao Khoa Khám bệnh; **TS X-quang**, **TS CT Scan** giao Khoa Chẩn đoán hình ảnh. Để trống là chưa giao.
+6. Bấm **Lưu**.
 
    ![Phần giao khoa nhập số liệu HIS](huong-dan-su-dung/dd-09b-giao-khoa-nhap-his.png)
 
    *Hình 9.13. Giao khoa nhập từng chỉ số mục B, D khi HIS lỗi. Không cần giao **NB PK chờ nhập viện**: mỗi khoa phải báo cáo tự nhập số của khoa mình.*
 
-5. Khi khoa đổi số giường, có khoa mới phải báo cáo, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+7. Khi khoa đổi số giường, có khoa mới phải báo cáo, cần đổi thứ tự, tên viết tắt, hoặc đổi khoa nhập số liệu HIS, vào lại đây sửa.
+8. Sau khi quản trị **lấy danh mục khoa/phòng từ HIS** (mục 8.2), khoa cũ không còn trên HIS chuyển sang ngừng sử dụng. Trong hộp này, khoa đó có nhãn **Ngừng sử dụng**, nằm cuối danh sách và không chọn được; đầu hộp có khung vàng ghi tên các khoa này. Bấm **Lưu** thì khoa ngừng sử dụng được bỏ khỏi danh sách khoa báo cáo. Chỉ số mục B, D đang giao cho khoa ngừng sử dụng để trống, có dòng nhắc; chọn khoa thay thế (thường là khoa cùng tên trên HIS) rồi lưu.
 
 Người nhập số liệu HIS cho một khoa cần tài khoản thuộc đúng khoa đó, có vai trò **Điều dưỡng** (quyền **Lập và gửi báo cáo điều dưỡng của khoa**). Khoa được giao nhập không cần được tick báo cáo. Quản trị tạo hoặc sửa tài khoản ở mục 8.1.
 
 ### 9.5. Số liệu HIS (mục B, mục D, cột "NB PK chờ nhập viện")
 
-**Khi HIS chạy bình thường.** Phòng CNTT cài câu truy vấn số liệu. Phòng Điều dưỡng bấm **Lấy số liệu HIS**. Số liệu được lưu theo ngày. Số **NB PK chờ nhập viện** là số tại lúc bấm. Nếu có mã khoa trên HIS không khớp khoa nào, phần mềm báo để phòng CNTT kiểm tra.
+**Khi HIS chạy bình thường.** Phòng CNTT cài câu truy vấn số liệu. Phòng Điều dưỡng bấm **Lấy số liệu HIS** (Dashboard, thẻ **Bảng tổng hợp**). Số liệu được lưu theo ngày. Số **NB PK chờ nhập viện** là số tại lúc bấm. Nếu có mã khoa trên HIS không khớp khoa nào, phần mềm báo để phòng CNTT kiểm tra.
 
 **Khi HIS lỗi hoặc chưa cài câu truy vấn.** Nhiệm vụ khoa nào thì khoa đó nhập. Phòng Điều dưỡng không nhập thay, chỉ tổng hợp.
 
@@ -1285,24 +1400,717 @@ Ngày đã có số liệu HIS (lấy được một phần) thì thẻ ghi rõ,
 Bảng tổng hợp dùng số như sau:
 
 - Số lấy từ HIS được dùng trước. Ô HIS không có số mới dùng số khoa nhập. Khi HIS chạy lại, bấm **Lấy số liệu HIS**: ô nào HIS có số thì dùng số HIS.
-- Số do khoa nhập có dòng chữ nhỏ ghi tên khoa đã nhập, ví dụ *Khoa Khám bệnh nhập tay*.
-- Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô trên cùng (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
+- Số do khoa nhập có dòng chữ nhỏ ghi tên viết tắt (hoặc mã) của khoa đã nhập, ví dụ *KKB nhập tay*. Dòng **Người báo cáo** dưới mục ghi người đã nhập.
+- Chưa có khoa nào nhập thì ô để trống. Xem dòng **Khoa nhập tay khi HIS lỗi** ở ô đầu thẻ **Bảng tổng hợp** (Hình 9.7) để biết khoa nào chưa nhập và nhắc khoa đó.
 
 ![Mục B, C, D với số khoa nhập tay](huong-dan-su-dung/dd-05b-tong-hop-b-d.png)
 
-*Hình 9.16. Mục B và mục D ghi khoa đã nhập từng số. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+*Hình 9.16. Mục B và mục D ghi tên viết tắt (hoặc mã) của khoa đã nhập từng số; dòng người báo cáo ghi người đã nhập. Hai dòng siêu âm tim và điện tâm đồ để trống vì khoa được giao chưa nhập.*
+
+### 9.6. Dashboard điều dưỡng: ô chỉ số và biểu đồ (Phòng Điều dưỡng)
+
+Trang **Dashboard** là trang làm việc hằng ngày của Phòng Điều dưỡng: bảng tổng hợp của một ngày (thẻ **Bảng tổng hợp**, mục 9.2) và số liệu nhiều ngày bằng các ô chỉ số và biểu đồ (thẻ **Biểu đồ**). Số liệu lấy từ báo cáo các khoa **đã gửi**, như bảng tổng hợp: khoa chưa gửi không được tính. Trang không sửa số liệu; số của khoa nào sai thì trả lại báo cáo cho khoa đó (mục 9.3, hoặc bước 6 dưới đây).
+
+1. Bấm **Điều dưỡng** → **Dashboard**. Chọn ngày ở ô **Ngày báo cáo** (mặc định hôm nay).
+2. Phần trên cùng là **tám ô chỉ số của ngày đã chọn**, luôn hiện ở cả hai thẻ:
+   - **Khoa đã gửi báo cáo**, kèm tên viết tắt các khoa chưa gửi để nhắc.
+   - **Số NB hiện tại**, tăng hay giảm bao nhiêu so với ngày hôm trước (tính trên các báo cáo có Số NB ngày hôm trước).
+   - **Công suất giường**: Số NB hiện tại chia số giường của các khoa đã gửi. Vượt 100% có biểu tượng cảnh báo và chữ **Vượt số giường**.
+   - **NB chăm sóc cấp 1**, kèm số NB thở máy, theo dõi monitor, thở oxy.
+   - **Nhập khoa**, **Xuất viện**, **Chuyển khoa**: số ca của ngày hôm trước.
+   - **Khoa báo "Không ổn"**, kèm số ca ADR và số báo cáo có nội dung bất thường (phần nhập thêm).
+3. Bấm thẻ **Biểu đồ**. Chọn khoảng thời gian **7 ngày**, **30 ngày** hoặc **90 ngày** ở góc phải của thẻ; kỳ là các ngày đến hết ngày ở ô **Ngày báo cáo** (dòng *Từ … đến …* ghi rõ). Đổi ngày hoặc khoảng thời gian thì số cũ mờ đi trong lúc tải số mới. Đổi khoảng thời gian không tải lại bảng tổng hợp.
+
+   ![Dashboard điều dưỡng: ô chỉ số và thẻ Biểu đồ](huong-dan-su-dung/dd-14-dashboard.png)
+
+   *Hình 9.17. Dashboard, thẻ **Biểu đồ**, 30 ngày. Tám ô chỉ số ở trên hai thẻ. Rê chuột vào biểu đồ để xem số của từng ngày: khung gợi ý ghi cả số khoa đã gửi và công suất giường của ngày đó.*
+
+4. Bốn **biểu đồ theo ngày**: Số NB hiện tại; nhập khoa, xuất viện, chuyển khoa; NB chăm sóc cấp 1, thở máy, monitor; số khoa đã gửi báo cáo (đường đứt nét là số khoa phải báo cáo). Rê chuột, hoặc bấm vào biểu đồ rồi dùng phím mũi tên trái, phải, để xem số từng ngày. Bấm **Xem bảng** để đọc số dạng bảng (ngày mới nhất ở trên).
+5. Phần dưới của thẻ **Biểu đồ**:
+   - **Công suất giường theo khoa** của ngày cuối, khoa cao nhất ở trên.
+   - **"Không ổn" theo nội dung**: số lượt khoa báo "Không ổn" trong cả kỳ theo từng dòng của phần tick (mỗi khoa, mỗi ngày, mỗi dòng tính một lượt), kèm khoa báo trong ngày cuối. Có tính cả dòng **ĐD thực hiện thuốc** (bảng tổng hợp giấy không có dòng này).
+   - **Theo khoa**: số liệu từng khoa ngày cuối, và số ngày khoa đã gửi báo cáo trong kỳ.
+
+   ![Dashboard điều dưỡng: công suất giường theo khoa, "Không ổn" theo nội dung và bảng theo khoa](huong-dan-su-dung/dd-14b-dashboard-khoa.png)
+
+   *Hình 9.18. Phần dưới thẻ **Biểu đồ**. Khoa vượt số giường có biểu tượng cảnh báo; khoa chưa gửi ghi **Chưa gửi**. Tên viết tắt của khoa ở bảng **Theo khoa** (chữ xanh) bấm được.*
+
+6. Ở bảng **Theo khoa**, bấm **tên viết tắt** của khoa. Báo cáo của khoa **ngày cuối** (ngày ở ô **Ngày báo cáo**) mở ở bên phải, chỉ xem, giống khi bấm ở mục A của bảng tổng hợp (Hình 9.10).
+   - Bấm **In PDF** để xem và in báo cáo của khoa.
+   - Khoa cần sửa: bấm **Trả lại khoa**, ghi lý do, bấm **Trả lại khoa** trong hộp (Hình 9.11). Nút này chỉ có khi khoa đã gửi, và chỉ với tài khoản được trả lại báo cáo (vai trò Phòng Điều dưỡng). Dashboard tính lại ngay, cả ô chỉ số, biểu đồ và bảng tổng hợp: khoa đó thành **Chưa gửi** cho tới khi khoa sửa và gửi lại.
+   - Khoa chưa lập báo cáo ngày đó thì ghi **Khoa chưa lập báo cáo ngày này.**; khoa đang làm dở thì thấy báo cáo nháp.
+   - Muốn xem báo cáo của ngày khác: đổi ngày ở ô **Ngày báo cáo** rồi bấm lại tên khoa.
+
+Lưu ý khi đọc:
+
+- Ngày ít khoa gửi báo cáo thì tổng Số NB hiện tại thấp hơn thực tế. Xem biểu đồ **Khoa đã gửi báo cáo** cùng ngày đó.
+- Công suất giường dùng số giường đang cài trong hộp **Khoa báo cáo và số giường** (mục 9.4), kể cả khi xem ngày cũ.
+
+### 9.7. Ủy quyền báo cáo khi vắng
+
+Khi vắng (nghỉ phép, đi học, đi công tác…), người lập báo cáo của khoa **ủy quyền** cho người khác làm thay trong một khoảng ngày. Người được ủy quyền chỉ làm được **trong đúng thời gian đó** và **đúng nội dung được ủy quyền**. Bảng tổng hợp ghi rõ báo cáo nào do người được ủy quyền làm, được ai ủy quyền.
+
+**Người ủy quyền (người lập báo cáo của khoa):**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**, rồi bấm **Ủy quyền mới**.
+2. Điền hộp **Ủy quyền báo cáo điều dưỡng**:
+   - **Khoa**: khoa của mình (tài khoản thuộc nhiều khoa chọn khoa cần ủy quyền).
+   - **Người được ủy quyền**: gõ tên để tìm. Danh sách chỉ có tài khoản đang dùng, thuộc một khoa, được quyền lập báo cáo điều dưỡng (điều dưỡng cùng khoa hoặc khoa khác).
+   - **Thời gian ủy quyền**: từ ngày, đến ngày, tính cả hai ngày; bắt đầu từ hôm nay trở đi, tối đa 366 ngày.
+   - **Nội dung ủy quyền**: **Báo cáo của khoa** (lập, lưu nháp, gửi báo cáo hằng ngày), **Số liệu HIS khi HIS lỗi** (nhập số liệu HIS của khoa, mục 9.5), hoặc cả hai.
+   - **Lý do** (không bắt buộc), ví dụ "Nghỉ phép".
+3. Bấm **Ủy quyền**.
+
+   ![Hộp Ủy quyền mới: khoa, người được ủy quyền, thời gian, nội dung, lý do](huong-dan-su-dung/dd-15-uy-quyen-moi.png)
+
+   *Hình 9.19. Điều dưỡng Khoa Nhi ủy quyền cho điều dưỡng Khoa Ngoại tổng hợp làm báo cáo và nhập số liệu HIS của Khoa Nhi trong hai ngày.*
+
+4. Ủy quyền hiện ở bảng **Tôi đã ủy quyền**, có trạng thái **Sắp tới** (chưa tới ngày bắt đầu), **Đang hiệu lực**, **Đã hết hạn** hoặc **Đã hủy**. Đi làm lại sớm hoặc ủy quyền nhầm thì bấm **Hủy ủy quyền**: người được ủy quyền không làm được nữa; báo cáo đã gửi theo ủy quyền vẫn giữ nguyên và vẫn ghi là được ủy quyền.
+
+**Người được ủy quyền:**
+
+1. Bấm **Điều dưỡng** → **Ủy quyền báo cáo**. Bảng **Tôi được ủy quyền** liệt kê các ủy quyền giao cho mình; ủy quyền đang hiệu lực có nút **Mở báo cáo của khoa**.
+
+   ![Trang Ủy quyền của người được ủy quyền: ủy quyền đang hiệu lực có nút Mở báo cáo của khoa](huong-dan-su-dung/dd-15b-duoc-uy-quyen.png)
+
+   *Hình 9.20. Điều dưỡng Khoa Nội được Khoa Nhi ủy quyền (đang hiệu lực); một ủy quyền khác đã bị hủy.*
+
+2. Bấm **Mở báo cáo của khoa**, hoặc vào **Báo cáo của khoa** rồi chọn khoa có chữ **(được ủy quyền)** ở ô khoa đầu trang. Dòng xanh trên cùng ghi đang làm thay ai, thời gian và nội dung được ủy quyền. Ô ngày chỉ chọn được các ngày trong thời gian ủy quyền.
+
+   ![Báo cáo của khoa khi làm thay theo ủy quyền](huong-dan-su-dung/dd-15c-bao-cao-thay.png)
+
+   *Hình 9.21. Điều dưỡng Khoa Nội làm báo cáo của Khoa Nhi theo ủy quyền.*
+
+3. Lập, lưu nháp và gửi báo cáo như mục 9.1; khi HIS lỗi, nhập số liệu HIS của khoa như mục 9.5. Người chỉ được ủy quyền số liệu HIS thì chỉ thấy thẻ số liệu HIS, không xem được báo cáo của khoa.
+4. Hết thời gian ủy quyền hoặc ủy quyền bị hủy thì khoa đó không còn trong ô khoa, và phần mềm không cho xem, sửa báo cáo của khoa đó nữa, kể cả báo cáo của các ngày trong thời gian ủy quyền. Báo cáo đã gửi cần sửa thì Phòng Điều dưỡng **Trả lại khoa** (mục 9.3) để người của khoa sửa.
+
+**Phòng Điều dưỡng:**
+
+- Bảng tổng hợp (Dashboard, thẻ **Bảng tổng hợp**, mục 9.2) có ô **Ủy quyền báo cáo trong ngày**: khoa nào, ai làm thay, được ai ủy quyền, thời gian và nội dung. Báo cáo gửi theo ủy quyền ghi "Họ tên (được … ủy quyền)" ở cột **Người báo cáo**; dòng **Người báo cáo** dưới các mục B–F cũng ghi như vậy. PDF và Excel ghi giống màn hình.
+
+   ![Bảng tổng hợp: ô Ủy quyền báo cáo trong ngày và cột Người báo cáo ghi được ủy quyền](huong-dan-su-dung/dd-15d-tong-hop-uy-quyen.png)
+
+   *Hình 9.22. Báo cáo Khoa Nhi do Điều dưỡng Demo gửi theo ủy quyền của Điều dưỡng Nhi Demo.*
+
+- Trang **Ủy quyền báo cáo** của Phòng Điều dưỡng có bảng **Mọi ủy quyền** của các khoa. Tài khoản có quyền quản lý báo cáo điều dưỡng (vai trò Phòng Điều dưỡng) hủy được ủy quyền chưa hết hạn.
+
+   ![Mọi ủy quyền của các khoa](huong-dan-su-dung/dd-15e-moi-uy-quyen.png)
+
+   *Hình 9.23. Phòng Điều dưỡng xem mọi ủy quyền: đang hiệu lực, sắp tới, đã hủy.*
+
+---
+
+<a id="kiem-thu"></a>
+
+## 10. Kiểm thử tính năng mới
+
+Mỗi bản cài mới được kiểm thử trên **môi trường kiểm thử UAT** (đầu trang có dải vàng **UAT**) trước khi đưa vào chạy thật (quyết định 50). Người quản lý kiểm thử **phân công từng tính năng mới cho từng người, mỗi người một khoảng thời gian**; người được phân công kiểm thử rồi **bắt buộc gửi báo cáo**. Báo cáo là căn cứ để sửa, nâng cấp phần mềm và quyết định đưa bản mới lên chạy thật (quyết định 49).
+
+| Ai | Làm gì | Ở đâu |
+|---|---|---|
+| Người quản lý kiểm thử: vai trò **Quản trị hệ thống**, hoặc vai trò được thêm quyền *Phân công kiểm thử, xem và xử lý báo cáo kiểm thử* (mục 8.3) | Phân công, theo dõi, xem báo cáo, ghi hướng xử lý, xuất Excel | **Quản trị** → **Phân công kiểm thử** |
+| Người được phân công (tài khoản bất kỳ) | Xem việc, kiểm thử, gửi báo cáo | Dòng nhắc trên trang **Tổng quan**, hoặc menu tài khoản (góc phải) → **Việc kiểm thử của tôi** |
+
+### 10.1. Phân công kiểm thử (người quản lý)
+
+1. Bấm **Quản trị** → **Phân công kiểm thử** → **Phân công mới**.
+2. Điền:
+   - **Đợt kiểm thử**: tên bản cài hoặc gói, ví dụ "Gói 72 – 25/11/2026". Gõ vài chữ để chọn lại đợt đã có.
+   - **Tính năng cần kiểm thử**.
+   - **Nội dung, cách kiểm thử**: các bước làm, dữ liệu dùng thử (giả lập), kết quả mong đợi.
+   - **Người kiểm thử và thời gian của từng người**: chọn người (gõ tên để tìm), chọn **từ ngày** và **hạn báo cáo**. Bấm **Thêm người kiểm thử** để thêm người; mỗi người một thời gian riêng.
+3. Bấm **Phân công**. Mỗi người có một việc riêng.
+
+   ![Hộp Phân công kiểm thử: đợt, tính năng, cách kiểm thử, người kiểm thử và thời gian của từng người](huong-dan-su-dung/kt-01-phan-cong.png)
+
+   *Hình 10.1. Phân công kiểm thử tính năng **Kiosk: quét CCCD bằng camera** cho hai người, mỗi người một thời gian.*
+
+4. Trang **Phân công kiểm thử** có:
+   - **Tổng hợp theo tính năng**: số người, số **Đạt**, **Đạt một phần**, **Không đạt**, **Chưa báo cáo** (kèm số quá hạn).
+   - **Phân công**: từng người, thời gian, trạng thái (**Chưa tới ngày**, **Đang kiểm thử**, **Quá hạn**, **Đã báo cáo**, **Trễ hạn** khi gửi sau hạn, **Đã hủy**) và kết quả.
+
+   Chọn đợt ở ô đầu trang để chỉ xem một đợt.
+
+   ![Trang Phân công kiểm thử: tổng hợp theo tính năng và bảng phân công](huong-dan-su-dung/kt-02-tong-hop.png)
+
+   *Hình 10.2. Tổng hợp một đợt kiểm thử: tính năng nào đã đạt, tính năng nào còn lỗi, ai chưa báo cáo.*
+
+5. **Sửa** hoặc **Hủy** phân công được khi người kiểm thử chưa gửi báo cáo.
+
+### 10.2. Kiểm thử và gửi báo cáo (người được phân công)
+
+1. Trang **Tổng quan** nhắc *"Bạn có … việc kiểm thử chưa báo cáo (… quá hạn)"*. Bấm **Xem và báo cáo**, hoặc menu tài khoản → **Việc kiểm thử của tôi**.
+
+   ![Trang Tổng quan nhắc việc kiểm thử chưa báo cáo](huong-dan-su-dung/kt-03-nhac-viec.png)
+
+   *Hình 10.3. Dòng nhắc trên trang **Tổng quan**: bấm **Xem và báo cáo** để mở việc kiểm thử của mình.*
+
+2. Mỗi việc ghi tính năng, đợt kiểm thử, thời gian và cách kiểm thử. Làm theo cách kiểm thử trên môi trường UAT.
+3. Bấm **Gửi báo cáo**:
+   - **Kết quả**: **Đạt**, **Đạt một phần** hoặc **Không đạt**.
+   - **Lỗi, vấn đề phát hiện**: bắt buộc khi chưa đạt. Ghi cách làm để gặp lỗi, màn hình, thông báo hiện ra. Không ghi thông tin người bệnh thật.
+   - **Đề xuất nâng cấp** (không bắt buộc).
+
+   ![Hộp Báo cáo kiểm thử: kết quả, lỗi phát hiện, đề xuất nâng cấp](huong-dan-su-dung/kt-04-bao-cao.png)
+
+   *Hình 10.4. Báo cáo kiểm thử "Không đạt" phải ghi lỗi phát hiện.*
+
+4. Chỉ gửi được báo cáo từ ngày bắt đầu kiểm thử. Gửi sau hạn vẫn được nhưng ghi **Trễ hạn**. Sửa được báo cáo (nút **Sửa báo cáo**) cho tới khi người quản lý ghi hướng xử lý; sau đó việc đó hiện hướng xử lý.
+
+### 10.3. Xem báo cáo, ghi hướng xử lý, xuất Excel (người quản lý)
+
+1. Ở dòng đã báo cáo, bấm **Xem báo cáo**: kết quả, lỗi phát hiện, đề xuất.
+2. Ghi **Hướng xử lý** (ví dụ "Sửa trong gói 73", "Giữ nguyên: đúng quy trình") rồi bấm **Lưu hướng xử lý**. Người kiểm thử thấy hướng xử lý và không sửa báo cáo được nữa.
+3. Bấm **Xuất Excel** ở đầu trang: mọi phân công và báo cáo của đợt đang chọn (người, thời gian, trạng thái, kết quả, lỗi, đề xuất, giờ gửi, trễ hạn, hướng xử lý), gửi nhóm phát triển để sửa và nâng cấp.
+4. Khi mọi tính năng của đợt đã **Đạt** (hoặc lỗi còn lại đã có hướng xử lý được chấp nhận), phòng CNTT cài **đúng gói đó** lên môi trường chạy thật ([hướng dẫn triển khai, mục 5.10](trien-khai.md)).
+
+---
+
+<a id="noi-kiem"></a>
+
+## 11. Sổ nội kiểm đường huyết tại giường
+
+Phần mềm thay **"Sổ theo dõi kết quả nội kiểm đường huyết tại giường"** giấy (mẫu CT-ĐHTG/BM01, lần ban hành 03) (quyết định 57). Mỗi máy đo của một khoa có **một sổ mỗi tháng**, mỗi ngày một dòng như sổ giấy. Khoa ghi kết quả; **Khoa Huyết học – Sinh hóa (Khoa HSH)** xem xét từng ngày và xác nhận sổ cuối tháng.
+
+| Ai | Làm gì | Ở đâu |
+|---|---|---|
+| Khoa HSH: vai trò **Khoa HSH (nội kiểm)** | Khai báo máy đo, lô que thử, lô dung dịch chứng; xem xét từng ngày; trả lại ngày hoặc sổ; xác nhận sổ tháng; in PDF; giám sát mọi khoa | **Nội kiểm** → **Máy đo và lô vật tư**, **Sổ nội kiểm**, **Dashboard** |
+| Điều dưỡng khoa (vai trò có quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng*, mục 8.3) | Mở sổ tháng, ghi kết quả từng ngày, ghi nguyên nhân và kết quả chạy lại, ghi điều chỉnh, gửi sổ tháng, in PDF; xem dashboard của khoa mình | **Nội kiểm** → **Sổ nội kiểm**, **Dashboard** |
+| Lãnh đạo, Phòng Điều dưỡng, QLCL (vai trò có quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)*, mục 8.3) | Xem dashboard của mọi khoa. Không ghi, không xem xét, không mở được sổ | **Nội kiểm** → **Dashboard** |
+
+**Dữ liệu không bị sửa, có xác nhận giữa hai khoa:**
+
+- Phần mềm **tự đánh giá** Đạt/Không đạt theo ngưỡng chấp nhận của lô dung dịch chứng (tính cả hai đầu ngưỡng).
+- Kết quả đã ghi **không sửa được**. Ghi sai thì **ghi điều chỉnh** (bắt buộc lý do): kết quả cũ vẫn giữ, hiện và in **gạch ngang** kèm lý do, người điều chỉnh.
+- Khoa HSH đã xem xét ngày nào thì khoa **không ghi, không điều chỉnh** ngày đó nữa. Cần sửa thì Khoa HSH **trả lại ngày** (bắt buộc lý do), khoa điều chỉnh, Khoa HSH xem xét lại. Lần xem xét cũ vẫn giữ (gạch ngang).
+- Khoa **gửi sổ tháng** thì không ghi thêm được. Khoa HSH **xác nhận sổ tháng** thì sổ khóa hẳn.
+- Người ghi kết quả của một ngày **không tự xem xét** ngày đó; người gửi sổ **không tự xác nhận** sổ.
+- Mọi lần ghi, điều chỉnh, xem xét, trả lại, gửi, xác nhận được ghi **Nhật ký hệ thống** (mục 7.1). Không có nút xóa.
+
+### 11.1. Khai báo máy đo và lô vật tư (Khoa HSH, làm trước)
+
+1. Bấm **Nội kiểm** → **Máy đo và lô vật tư**.
+2. Tab **Máy đo** → **Thêm máy đo**: chọn **khoa dùng máy**, nhập **loại máy** (hãng, đời máy) và **số seri** (không trùng máy khác). Máy hỏng, thu hồi: bấm **Sửa**, tắt **Đang dùng**. Chuyển máy sang khoa khác: **Sửa**, chọn khoa mới; sổ tháng này của khoa cũ giữ nguyên, khoa mới mở sổ mới.
+3. Tab **Lô que thử, dung dịch chứng** có hai nút:
+   - **Thêm lô que thử**: tên vật tư, số lô, hạn dùng. Que thử không có ngưỡng.
+   - **Thêm lô dung dịch chứng**: tên vật tư, số lô, hạn dùng, **mức** (Level 1, 2 hoặc 3) và **ngưỡng chấp nhận**: ô **Từ** (ngưỡng dưới), ô **Đến** (ngưỡng trên) và **đơn vị** mg/dL hoặc mmol/L, lấy theo tờ hướng dẫn của lô cho đúng mức đó (có hãng in ngưỡng trên nhãn lọ que thử). Nhập số lớn hơn 0, nhiều nhất một chữ số thập phân; ngưỡng trên phải lớn hơn ngưỡng dưới. Kết quả nằm trong khoảng, **tính cả hai đầu**, là Đạt. Cùng số lô nhưng khác mức thì khai báo hai lần (mỗi mức một dòng).
+
+   ![Danh mục lô que thử, dung dịch chứng](huong-dan-su-dung/nk-01-danh-muc.png)
+
+   *Hình 11.1. Danh mục lô: que thử, dung dịch chứng Level 1 và Level 2 kèm ngưỡng chấp nhận (dữ liệu giả lập). Hai nút **Thêm lô que thử**, **Thêm lô dung dịch chứng** ở đầu tab.*
+
+   ![Hộp Thêm lô dung dịch chứng: mức, hạn dùng, ngưỡng chấp nhận, đơn vị](huong-dan-su-dung/nk-02-them-lo.png)
+
+   *Hình 11.2. Bấm **Thêm lô dung dịch chứng**: hộp có sẵn ô **Mức (Level)** và **Ngưỡng chấp nhận** (từ – đến, đơn vị). Ví dụ lô Level 3, ngưỡng 280–380 mg/dL (dữ liệu giả lập).*
+
+4. Lô hết dùng: **Sửa**, tắt **Đang dùng**; khoa không chọn được lô đó nữa. Sửa lô (ví dụ ngưỡng) chỉ áp dụng cho kết quả ghi **sau** khi sửa; kết quả đã ghi giữ ngưỡng lúc ghi. Lô **hết hạn** trước ngày thực hiện thì khoa không ghi được kết quả với lô đó.
+
+### 11.2. Mở sổ tháng (khoa)
+
+1. Bấm **Nội kiểm** → **Sổ nội kiểm**. Chọn **tháng** ở đầu trang (mặc định tháng này). Danh sách có máy của khoa mình, trạng thái sổ, số ngày đã ghi, không đạt, Khoa HSH đã xem xét, còn chờ xem xét.
+2. Máy chưa có sổ tháng này: bấm **Mở sổ**. Sổ đã có: bấm **Xem sổ**. Mở được sổ của 12 tháng gần đây (ghi bù từ sổ giấy).
+
+   ![Danh sách sổ nội kiểm tháng của khoa](huong-dan-su-dung/nk-03-danh-sach-so.png)
+
+   *Hình 11.3. Danh sách sổ tháng 11 của khoa Nội: 21 ngày đã ghi, 1 ngày không đạt, Khoa HSH đã xem xét 15 ngày.*
+
+### 11.3. Ghi kết quả hằng ngày (khoa)
+
+1. Ở dòng ngày thực hiện, bấm **Ghi kết quả**.
+2. **Lô que thử, ngày mở hộp, lô dung dịch chứng hai mức, ngày mở lọ** được điền sẵn theo lần ghi trước của máy. Mở hộp que, lọ dung dịch chứng mới thì chọn lô mới và ngày mở mới. Hai mức như hai cột kết quả của sổ giấy:
+   - Ô **Mức thấp (cột đầu)**: lô mức thấp, thường là **Level 1**.
+   - Ô **Mức cao**: chỉ có các lô mức cao hơn ô mức thấp (thường là **Level 2**). Đổi ô mức thấp sang mức bằng hoặc cao hơn thì ô mức cao tự bỏ chọn để chọn lại.
+   - Mỗi lựa chọn ghi **Level**, số lô, tên, ngưỡng chấp nhận và hạn dùng. Danh mục chưa có đủ hai mức dung dịch chứng đang dùng thì hộp báo ngay: nhờ Khoa HSH khai báo mức còn thiếu (mục 11.1).
+3. Nhập **kết quả** hai mức. Đánh giá **Đạt/ Pass** hoặc **Không đạt/ Fail** hiện ngay bên cạnh.
+4. Bấm **Lưu kết quả**. Nhân viên thực hiện là người đăng nhập. Ghi sau ngày thực hiện (ghi bù) thì dòng đó có nhãn **Ghi muộn** (PDF có dấu `*`).
+
+   ![Hộp Ghi kết quả nội kiểm: lô điền sẵn, đánh giá hiện ngay](huong-dan-su-dung/nk-04-ghi-ket-qua.png)
+
+   *Hình 11.4. Ô **Mức thấp (cột đầu)** là Level 1, ô **Mức cao** là Level 2. Mức cao ngoài ngưỡng 100–140 mg/dL: phần mềm đánh giá **Không đạt**.*
+
+5. Kết quả **không đạt**: bấm **Ghi nguyên nhân, chạy lại**, ghi **nguyên nhân không đạt** (bắt buộc), nhập **kết quả chạy lại** hai mức (đánh giá lại hiện ngay). Không chạy lại được thì bỏ chọn **Đã chạy lại QC** và ghi nguyên nhân. Mỗi kết quả ghi nguyên nhân và chạy lại một lần.
+
+   ![Hộp ghi nguyên nhân không đạt và kết quả chạy lại](huong-dan-su-dung/nk-05-chay-lai.png)
+
+   *Hình 11.5. Ghi nguyên nhân, kết quả chạy lại đạt.*
+
+### 11.4. Ghi sai: ghi điều chỉnh (khoa)
+
+1. Ở dòng kết quả ghi sai, bấm **Ghi điều chỉnh** (chỉ có khi Khoa HSH **chưa xem xét** ngày đó và sổ chưa gửi).
+2. Ghi **lý do điều chỉnh** (bắt buộc). Kết quả cũ được điền sẵn: sửa chỗ sai (kết quả, lô, ngày mở, cả ngày thực hiện nếu ghi nhầm ngày) rồi bấm **Lưu điều chỉnh**. Ghi nhầm máy (không phải của máy này): đánh dấu **Chỉ hủy kết quả này**.
+
+   ![Hộp Ghi điều chỉnh: lý do bắt buộc, kết quả cũ được giữ lại](huong-dan-su-dung/nk-06-dieu-chinh.png)
+
+   *Hình 11.6. Ghi điều chỉnh kết quả mức 1 do đọc nhầm số trên máy.*
+
+3. Kết quả cũ vẫn hiện trên sổ: chữ xám **gạch ngang**, kèm *Đã hủy: lý do (người điều chỉnh)*; kết quả mới ngay dưới.
+
+   ![Sổ tháng của khoa: kết quả đã hủy gạch ngang, kết quả không đạt có nguyên nhân và chạy lại](huong-dan-su-dung/nk-07-so-thang.png)
+
+   *Hình 11.7. Ngày 20 và 25: kết quả ghi sai gạch ngang, kèm lý do; ngày 26 không đạt, đã ghi nguyên nhân và chạy lại đạt.*
+
+4. Ngày Khoa HSH đã xem xét thì không còn nút **Ghi điều chỉnh**: báo Khoa HSH **trả lại ngày** (mục 11.5).
+
+### 11.5. Xem xét từng ngày (Khoa HSH)
+
+1. Bấm **Nội kiểm** → **Sổ nội kiểm**, chọn tháng (chọn khoa ở ô **Khoa** nếu cần), bấm **Xem sổ** ở dòng có số ngày **Chờ xem xét**.
+2. Xem xét một ngày: bấm **Xem xét** ở dòng ngày đó. Xem xét nhiều ngày: đánh dấu các ngày (hoặc bấm **Chọn mọi ngày chờ xem xét**: chọn các ngày đã qua và các ngày đã có kết quả, không chọn hôm nay khi khoa chưa ghi), bấm **Xem xét … ngày đã chọn**.
+3. Mỗi ngày chọn kết quả xem xét, như cột cuối của sổ giấy (điền sẵn theo gợi ý của phần mềm, chỉ có các lựa chọn khớp với kết quả khoa đã ghi):
+   - **Đã kiểm - ĐẠT**: kết quả đạt, hoặc không đạt nhưng chạy lại đạt.
+   - **Đã kiểm - Không có QC ngày này**: ngày khoa không ghi kết quả.
+   - **Đã kiểm - KHÔNG ĐẠT, KHÔNG CHẠY LẠI QC**: không đạt, không chạy lại (hoặc chạy lại vẫn không đạt).
+   - **Đã kiểm - KHÔNG ĐẠT, đã chạy lại QC sau nhắc nhở**: không đạt, khoa đã chạy lại sau khi Khoa HSH nhắc.
+
+   Ghi chú (không bắt buộc) rồi bấm **Lưu xem xét**.
+
+   ![Hộp xem xét nhiều ngày: kết quả khoa ghi và kết quả xem xét điền sẵn theo gợi ý](huong-dan-su-dung/nk-08-xem-xet.png)
+
+   *Hình 11.8. Xem xét 11 ngày một lần (hôm nay khoa chưa ghi nên không được chọn sẵn); ngày 18 không đạt, không chạy lại.*
+
+4. Người ghi kết quả (hoặc ghi chạy lại) của một ngày không tự xem xét ngày đó, kể cả khi có cả hai quyền.
+5. **Trả lại ngày**: ở ngày đã xem xét, bấm **Trả lại ngày**, ghi lý do. Khoa ghi điều chỉnh ngày đó, rồi Khoa HSH xem xét lại. Sổ đã gửi thì sổ cũng được trả lại khoa.
+
+### 11.6. Gửi sổ tháng, xác nhận sổ tháng
+
+1. **Khoa**: từ **ngày cuối tháng**, bấm **Gửi sổ tháng** ở đầu trang sổ. Gửi rồi khoa không ghi thêm, không điều chỉnh được.
+2. **Khoa HSH**: xem xét đủ **mọi ngày** trong tháng, rồi bấm **Xác nhận sổ tháng**. Sổ **khóa hẳn**, không ai thay đổi được nữa. Người gửi sổ không tự xác nhận được.
+3. Sổ cần sửa: Khoa HSH bấm **Trả lại sổ** (ghi lý do). Khoa thấy lý do ở đầu trang sổ, ghi thêm hoặc điều chỉnh (với ngày đã xem xét thì Khoa HSH trả lại ngày đó), rồi gửi lại.
+
+   ![Sổ tháng 10 đã được Khoa HSH xác nhận](huong-dan-su-dung/nk-09-xac-nhan.png)
+
+   *Hình 11.9. Sổ đã xác nhận: ghi người xác nhận, thời điểm; không còn nút thao tác.*
+
+### 11.7. In sổ theo mẫu giấy
+
+Bấm **In PDF** ở đầu trang sổ (khoa và Khoa HSH đều in được). PDF khổ A4 ngang theo mẫu CT-ĐHTG/BM01: tên đơn vị, logo (lấy ở *Cấu hình hệ thống*), mã số mẫu; khoa, tháng, máy; que thử và dung dịch chứng đã dùng trong tháng (số lô, hạn dùng, ngày mở, ngưỡng chấp nhận; nhiều lô thì nối bằng " - " như sổ giấy); mỗi ngày một dòng. Kết quả đã hủy và lần xem xét đã trả lại in chữ xám **gạch ngang** kèm lý do. Cuối trang ghi trạng thái sổ (đang ghi, đã gửi, đã xác nhận: người, thời điểm).
+
+![PDF sổ nội kiểm tháng 10 theo mẫu giấy](huong-dan-su-dung/nk-10-pdf.png)
+
+*Hình 11.10. Trang đầu PDF sổ tháng 10 (đã xác nhận); ngày 9 không đạt, đã chạy lại.*
+
+![PDF sổ tháng 11, trang 2: kết quả đã hủy in gạch ngang kèm lý do](huong-dan-su-dung/nk-11-pdf-dieu-chinh.png)
+
+*Hình 11.11. Trang 2 PDF sổ tháng 11: ngày 20 và 25 có kết quả đã hủy (gạch ngang, kèm lý do), ngày 26 không đạt, đã chạy lại.*
+
+<a id="dashboard-noi-kiem"></a>
+
+### 11.8. Dashboard giám sát nội kiểm
+
+Bấm **Nội kiểm** → **Dashboard** (quyết định 59). Khoa HSH và người có quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)* thấy mọi khoa; khoa thấy khoa của mình. Chọn **tháng** ở góc trên bên phải (mặc định tháng này, xem được 24 tháng gần đây).
+
+**Cách tính tỷ lệ thực hiện:** mỗi máy, **mọi ngày** trong tháng (kể cả thứ bảy, chủ nhật) như sổ giấy.
+
+- Tháng này tính đến hôm qua; **hôm nay** chỉ tính khi khoa đã ghi kết quả. Tháng đã qua tính cả tháng.
+- Máy khai báo giữa tháng tính từ ngày khai báo. Khoa ghi bù kết quả trước ngày khai báo thì tính từ kết quả đầu tiên.
+- Máy đã ngưng sử dụng hoặc đã chuyển sang khoa khác: phần mềm không lưu ngày ngưng, ngày chuyển, nên sổ của khoa cũ chỉ tính đến ngày có kết quả cuối cùng. Khoa nhận máy tính từ ngày sau đó.
+- Máy đang dùng mà chưa mở sổ: mọi ngày đã qua là chưa ghi.
+
+Trên cùng là tám ô chỉ số của tháng:
+
+- **Tỷ lệ thực hiện**: số ngày có kết quả trên số ngày phải thực hiện.
+- **Ngày chưa ghi**: ngày đã qua chưa có kết quả.
+- **Ghi muộn**: ngày có nhãn Ghi muộn trong sổ.
+- **Không đạt**: tính ở lần chạy đầu; ô ghi thêm số lần chạy lại đạt và chạy lại vẫn không đạt.
+- **Không đạt, chưa chạy lại**: cần nhắc khoa chạy lại QC.
+- **Chờ Khoa HSH xem xét**: ngày đến hôm nay chưa xem xét, như cột *Chờ xem xét* ở danh sách sổ.
+- **Sổ đã xác nhận**: kèm số sổ chờ xác nhận, bị trả lại, đang ghi, máy chưa mở sổ.
+- **Máy đo**: số máy và số khoa.
+
+![Dashboard nội kiểm của Khoa HSH: ô chỉ số, cảnh báo, xu hướng 6 tháng](huong-dan-su-dung/nk-12-dashboard.png)
+
+*Hình 11.12. Dashboard tháng 11 của Khoa HSH, 5 khoa, 7 máy (dữ liệu giả lập): ô chỉ số, khung **Cần xử lý**, hai biểu đồ 6 tháng (rê chuột vào tháng 10).*
+
+Các phần dưới ô chỉ số:
+
+1. **Cần xử lý – tính đến hôm nay** (không theo tháng đang xem):
+   - lô que thử, dung dịch chứng **đã hết hạn** mà chưa ngưng sử dụng, hoặc **còn 30 ngày trở xuống**, kèm khoa đang dùng lô;
+   - danh mục **chưa đủ hai mức** dung dịch chứng còn hạn, hoặc không còn lô que thử còn hạn (khoa không ghi được kết quả);
+   - máy đang dùng **chưa mở sổ tháng này**;
+   - sổ của 5 tháng trước **chưa được xác nhận**: khoa chưa gửi, bị trả lại, hoặc chờ Khoa HSH xác nhận (bấm **Xem sổ** để mở).
+2. Hai biểu đồ 6 tháng (tháng đang xem ở cuối):
+   - **Tỷ lệ thực hiện**;
+   - **Tỷ lệ không đạt**: số ngày không đạt trên số ngày đã ghi.
+
+   Rê chuột vào điểm để xem số ngày; bấm **Xem bảng** để đọc số.
+3. Bảng **Theo khoa**: mỗi khoa một dòng, bấm dấu **+** để xem từng máy. Có tỷ lệ thực hiện, ngày chưa ghi (dòng máy ghi các ngày), ghi muộn, không đạt, chưa chạy lại, lần không đạt gần nhất kèm nguyên nhân (hoặc *khoa chưa ghi nguyên nhân*), chờ xem xét, trạng thái sổ. Bấm tiêu đề **Thực hiện** để xếp theo tỷ lệ (khoa thấp nhất lên đầu). Cột **Sổ tháng** của dòng máy có nút **Xem sổ** để mở sổ; người chỉ có quyền xem dashboard không có nút này.
+
+![Bảng theo khoa, mở từng máy: ngày chưa ghi, không đạt gần nhất, trạng thái sổ](huong-dan-su-dung/nk-13-theo-khoa.png)
+
+*Hình 11.13. Bảng theo khoa, mở khoa Khám bệnh và khoa Nội tổng hợp; khoa Nhi có máy mới chưa mở sổ (dữ liệu giả lập).*
+
+Người chỉ có quyền xem dashboard (lãnh đạo, Phòng Điều dưỡng, QLCL) do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Nội kiểm đường huyết**. Quyền này không cho ghi kết quả, không cho xem xét, không mở được sổ.
+
+---
+
+<a id="ket-qua-nguy-cap"></a>
+
+## 12. Kết quả nguy cấp
+
+Phần mềm thay các sổ giấy của quy trình thông báo kết quả nguy cấp (quyết định 60):
+
+- sổ của khoa cận lâm sàng (ST01);
+- sổ của khoa điều trị (ST02);
+- sổ thông báo qua điện thoại của Khoa Vi sinh.
+
+Khoa cận lâm sàng vẫn **gọi điện** báo khoa điều trị như hiện nay, rồi ghi **một lần** vào phần mềm. Sổ của khoa báo và sổ ST02 của khoa nhận cùng lấy từ hồ sơ đó. Người nghe máy ở khoa điều trị bấm xác nhận đã nhận. Bác sĩ tự ghi hướng xử trí bằng tài khoản của mình, thay chữ ký ở sổ ST02.
+
+Chưa gọi được (máy bận, không ai nghe) thì khoa cận lâm sàng chọn khoa nhận rồi bấm **Lưu, gọi sau** (quyết định 68): khoa nhận được **báo ngay trên phần mềm** (dải đỏ, chuông, màn hình theo dõi), xác nhận đã nhận và bác sĩ xử trí được ngay. Khoa cận lâm sàng gọi sau chỉ để ghi **người nhận thông tin** (mục 12.2).
+
+**Hai mốc thời gian** (thông số mặc định, QLCL sửa được ở mục 12.10):
+
+- báo khoa điều trị trong **10 phút** kể từ giờ có kết quả;
+- bác sĩ ghi hướng xử trí ban đầu trong **10 phút** kể từ giờ báo khoa điều trị (giờ gọi điện báo, hoặc lúc lưu khi báo trên phần mềm).
+
+Mỗi hồ sơ giữ thời hạn áp dụng lúc ghi: sửa thông số sau này không làm đổi hạn của hồ sơ đã có.
+
+| Ai | Làm gì | Ở đâu (menu **KQ nguy cấp**) |
+|---|---|---|
+| Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, **Ghi cuộc gọi** cho hồ sơ đã báo trên phần mềm, hủy hồ sơ báo nhầm, in sổ của khoa, xem dashboard của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp**, **Dashboard** |
+| Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi** (báo trên phần mềm: **Đã nhận thông báo**), **Không phải khoa tôi**, in sổ ST02, xem dashboard của khoa | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp**, **Dashboard** |
+| Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa, xem dashboard của khoa | **Gửi đến khoa tôi**, **Dashboard** |
+| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard toàn viện và từng khoa, màn hình theo dõi mọi khoa; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
+| Màn hình đặt tại khoa: tài khoản vai trò **Màn hình theo dõi KQNC** | Chỉ xem kết quả gửi đến khoa, không thao tác | Tự mở **màn hình theo dõi** (mục 12.7) |
+
+Quyền của điều dưỡng, bác sĩ do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**. Người dùng phải được đặt đúng khoa ở hồ sơ người dùng: mỗi khoa chỉ thấy hồ sơ của khoa mình.
+
+**Trạng thái hồ sơ:**
+
+- **Chờ gọi báo**: đã có kết quả, chưa báo khoa điều trị.
+- **Chờ khoa xác nhận**: đã gọi báo (hoặc đã báo trên phần mềm), khoa điều trị chưa bấm **Đã nhận cuộc gọi** (**Đã nhận thông báo**).
+- **Chờ bác sĩ xử trí**: khoa đã xác nhận, bác sĩ chưa ghi hướng xử trí.
+- **Hoàn tất**.
+- **Đã hủy**: báo nhầm. Hồ sơ không bị xóa (mục 12.6).
+
+Hồ sơ đã báo trên phần mềm mà khoa cận lâm sàng chưa gọi để ghi người nhận có thêm nhãn cam **Chưa gọi xác nhận**, ở bước nào cũng vậy (kể cả đã hoàn tất), tới khi ghi cuộc gọi.
+
+Mọi thao tác đều ghi **Nhật ký hệ thống** (mục 7.1). Không có nút xóa. Giờ hệ thống ghi riêng với giờ anh chị nhập. Một bước ghi sau giờ sự việc quá **30 phút** (ví dụ ghi bù khi mất mạng) thì hồ sơ có nhãn **Ghi bù**.
+
+### 12.1. Khoa tôi báo (khoa cận lâm sàng)
+
+Bấm **KQ nguy cấp** → **Khoa tôi báo**. Đây là bàn làm việc của khoa:
+
+- Bốn ô trên cùng:
+  - **Chờ gọi báo**, kèm số hồ sơ sắp quá hạn;
+  - **Chưa gọi xác nhận**: hồ sơ đã báo trên phần mềm, chưa gọi để ghi người nhận (quyết định 68);
+  - **Đã báo, khoa điều trị chưa xong**, kèm số hồ sơ bác sĩ quá hạn xử trí;
+  - **Hôm nay đã báo**, kèm thời gian trung vị từ lúc có kết quả đến lúc báo.
+- Danh sách **Đang chờ**: mỗi hồ sơ có **đồng hồ đếm ngược** đến hạn báo hoặc hạn bác sĩ xử trí. Đồng hồ màu cam khi còn ít hơn 3 phút, màu đỏ khi đã quá hạn.
+- Bảng **Vừa xong**: hồ sơ hoàn tất hoặc đã hủy trong 24 giờ. Hồ sơ hoàn tất mà còn nhãn **Chưa gọi xác nhận** thì ở lại bảng này tới khi ghi cuộc gọi.
+
+Hồ sơ **Chờ gọi báo** có nút **Ghi lần báo**. Gọi được rồi thì bấm nút này, ghi như phần 3 ở mục 12.2; chưa gọi được thì chọn khoa nhận rồi bấm **Lưu, gọi sau** trong hộp này. Hồ sơ bị khoa nhận trả lại cũng quay về đây để báo lại đúng khoa.
+
+Hồ sơ có nhãn **Chưa gọi xác nhận** có nút **Ghi cuộc gọi** (mục 12.2, phần *Chưa gọi được*).
+
+Có hồ sơ quá hạn báo thì mọi trang của tài khoản khoa báo hiện **dải màu cam** "… kết quả nguy cấp quá hạn báo", kèm nút **Xem ngay**.
+
+![Khoa tôi báo: bốn ô số, hồ sơ đang chờ có đồng hồ đếm ngược, hồ sơ chưa gọi xác nhận có nút Ghi cuộc gọi](huong-dan-su-dung/kq-01-khoa-toi-bao.png)
+
+*Hình 12.1. Khoa Huyết học – Sinh hóa: một hồ sơ chờ gọi báo; ba hồ sơ khoa điều trị chưa xong, trong đó một hồ sơ bác sĩ quá hạn xử trí và một hồ sơ báo trên phần mềm, chưa gọi xác nhận (dữ liệu giả lập).*
+
+### 12.2. Ghi kết quả nguy cấp (khoa cận lâm sàng)
+
+Bấm **Ghi kết quả nguy cấp**. Bên phải trang có:
+
+- khung **Thời hạn báo**: đồng hồ đếm ngược, tính từ giờ có kết quả;
+- khung **Kịch bản gọi điện**: 5 bước, câu nói được điền sẵn theo hồ sơ đang ghi. Đọc theo kịch bản khi gọi.
+
+1. **Người bệnh**:
+   - Nhập **Mã người bệnh**. Bệnh viện đã kết nối API thông tin người bệnh thì bấm **Tra HIS** để điền sẵn họ tên, ngày sinh, giới tính, địa chỉ; hồ sơ có nhãn **Lấy từ HIS**.
+   - HIS lỗi, không tìm thấy, hoặc bệnh viện chưa kết nối HIS: nhập tay họ tên, ngày sinh, địa chỉ. Hồ sơ có nhãn **Nhập tay**.
+   - Địa chỉ là thông tin đối chiếu thứ ba khi gọi điện (cùng họ tên, ngày sinh), mặc định bắt buộc.
+2. **Kết quả nguy cấp**:
+   - Chọn **xét nghiệm, kỹ thuật** trong danh mục. Khung bên dưới hiện **khoảng nguy cấp theo danh mục**. Người ghi tự đối chiếu như quy trình hiện nay; phần mềm không tự đánh giá giá trị.
+   - Nhập **Giá trị**, **Ngày chỉ định**, **Giờ có kết quả**. Ô **Đơn vị** điền sẵn theo danh mục. Kết quả ghi bằng chữ (ví dụ cấy máu, siêu âm) thì không có đơn vị.
+   - Xét nghiệm của sổ Khoa Vi sinh có thêm ô **SID** (bắt buộc) và **Mẫu khẩn**.
+3. **Đã báo cho khoa điều trị**:
+   - Chọn **Cách báo**: **Gọi điện**, hoặc **Trực tiếp tại khoa** khi không liên lạc được qua điện thoại và phải cử người đến khoa.
+   - Chọn **Khoa nhận**, nhập **Người nghe máy** (họ tên, chức danh như người nghe máy tự giới thiệu), **Giờ báo** (nút **Bây giờ**).
+   - **Người nhận đọc lại tên kết quả, giá trị, đơn vị**: người nhận đọc lại sai thì bấm **Không chính xác**, đọc lại kết quả, nghe người nhận đọc lại lần nữa, đúng thì bấm **Chính xác**. Chỉ lưu được khi đã chọn **Chính xác**. Số lần đọc sai vẫn lưu trong lịch sử hồ sơ.
+   - Sổ Khoa Vi sinh: đánh dấu **đã nhắc lại 2 lần** (bắt buộc).
+   - **Người báo** là tài khoản đang đăng nhập.
+4. Bấm **Lưu, đã báo**. Chưa gọi được thì chọn **Khoa nhận** rồi bấm **Lưu, gọi sau** (xem phần dưới).
+
+![Ghi kết quả nguy cấp: người bệnh, kết quả, lần báo; bên phải là thời hạn báo và kịch bản gọi điện](huong-dan-su-dung/kq-02-ghi-ket-qua.png)
+
+*Hình 12.2. Ghi kết quả Kali 6,7 mmol/L và lần báo cho Khoa Nội tổng hợp; kịch bản gọi điện điền sẵn theo hồ sơ (dữ liệu giả lập).*
+
+**Chưa gọi được: Lưu, gọi sau rồi Ghi cuộc gọi** (quyết định 68):
+
+1. Ghi phần 1, 2 như trên, chọn **Khoa nhận** ở phần 3. Không cần người nghe máy, đọc lại.
+2. Bấm **Lưu, gọi sau**. Khoa nhận được **báo ngay trên phần mềm**: dải đỏ, chuông, màn hình theo dõi; điều dưỡng bấm **Đã nhận thông báo**, bác sĩ ghi hướng xử trí được ngay.
+   - **Giờ báo** là lúc lưu. Hạn báo 10 phút tính đến giờ này; đồng hồ 10 phút của bác sĩ bắt đầu từ giờ này.
+   - Hồ sơ có nhãn **Chưa gọi xác nhận**.
+3. Gọi cho khoa nhận, đọc kết quả, nghe người nhận đọc lại như kịch bản gọi điện.
+4. Bấm **Ghi cuộc gọi**: ngay ở màn hình vừa lưu, ở **Khoa tôi báo** hoặc ở chi tiết hồ sơ. Hộp **Ghi cuộc gọi** không có ô khoa nhận:
+   - chọn **Cách báo** (**Gọi điện** hoặc **Trực tiếp tại khoa**), nhập **Người nghe máy** (hoặc **Người nhận tại khoa**), **Giờ gọi**;
+   - **Người nhận đọc lại**: như phần 3 ở trên, chỉ lưu được khi **Chính xác**; sổ Vi sinh đánh dấu **đã nhắc lại 2 lần**;
+   - **Người gọi** là tài khoản đang đăng nhập.
+5. Bấm **Lưu cuộc gọi**. Nhãn **Chưa gọi xác nhận** mất. Giờ báo của hồ sơ giữ nguyên (lúc lưu); sổ ghi cả giờ báo trên phần mềm và giờ gọi (mục 12.8).
+
+Gọi xác nhận được ở bước nào cũng vậy (khoa đã nhận, bác sĩ đã xử trí), trừ khi hồ sơ đã hủy. Khoa nhận trả lại (**Không phải khoa tôi**) thì hồ sơ về **Chờ gọi báo**, báo lại đúng khoa như cũ.
+
+![Hộp Ghi cuộc gọi: cách báo, người nghe máy, giờ gọi, người nhận đọc lại](huong-dan-su-dung/kq-17-ghi-cuoc-goi.png)
+
+*Hình 12.2a. Ghi cuộc gọi cho hồ sơ đã báo Khoa Nội tổng hợp trên phần mềm lúc lưu (dữ liệu giả lập).*
+
+### 12.3. Gửi đến khoa tôi (khoa điều trị)
+
+Bấm **KQ nguy cấp** → **Gửi đến khoa tôi**. Trang có ba cột:
+
+- **Chờ khoa xác nhận** (đỏ). Mỗi thẻ ghi người bệnh, kết quả, khoảng nguy cấp, khoa báo, người báo, giờ có kết quả, giờ báo, người nghe máy. Thẻ có đồng hồ **BS xử trí** đếm ngược. Khoa báo đã báo trên phần mềm, chưa gọi: thẻ có nhãn **Chưa gọi xác nhận** và dòng *Báo trên phần mềm: khoa báo sẽ gọi sau để ghi người nhận thông tin*.
+- **Chờ bác sĩ xử trí** (cam). Hồ sơ quá hạn có dòng nhắc: nhắc lại và báo trực tiếp bác sĩ.
+- **Vừa xong**: hồ sơ hoàn tất hoặc đã hủy trong 24 giờ.
+
+Người nghe máy làm như sau:
+
+1. Nghe máy, đọc lại kết quả cho người báo.
+2. Mở thẻ hồ sơ mới, kiểm tra đúng người bệnh của khoa, bấm **Đã nhận cuộc gọi** bằng **tài khoản của mình**.
+3. Báo ngay bác sĩ điều trị.
+
+Hồ sơ khoa báo đã báo trên phần mềm (chưa gọi): không chờ cuộc gọi. Kiểm tra đúng người bệnh của khoa, bấm **Đã nhận thông báo** bằng tài khoản của mình, báo ngay bác sĩ. Khoa báo sẽ gọi sau để ghi người nhận thông tin.
+
+![Thẻ hồ sơ báo trên phần mềm: nhãn Chưa gọi xác nhận, nút Đã nhận thông báo](huong-dan-su-dung/kq-18-bao-tren-phan-mem.png)
+
+*Hình 12.3a. Hồ sơ Khoa Huyết học – Sinh hóa báo trên phần mềm cho Khoa Nội tổng hợp, chưa gọi (dữ liệu giả lập).*
+
+Người bệnh không điều trị tại khoa, hoặc thông tin không khớp: bấm **Không phải khoa tôi**, chọn hoặc ghi lý do, bấm **Gửi trả khoa báo**. Hồ sơ trở về khoa báo để báo lại đúng khoa.
+
+![Gửi đến khoa tôi: chờ khoa xác nhận, chờ bác sĩ xử trí, vừa xong; dải đỏ trên cùng](huong-dan-su-dung/kq-03-khoa-nhan.png)
+
+*Hình 12.3. Khoa Nội tổng hợp: một hồ sơ mới chờ khoa xác nhận, một hồ sơ bác sĩ quá hạn xử trí, ba hồ sơ vừa xong (một hồ sơ đã hủy).*
+
+**Cảnh báo trên mọi trang** cho tài khoản điều dưỡng, bác sĩ của khoa nhận (tự cập nhật mỗi 15 giây):
+
+- Có hồ sơ chờ khoa xác nhận: **dải đỏ chớp tắt** "… kết quả nguy cấp chờ khoa xác nhận", ghi người bệnh, kết quả, khoa báo, thời gian bác sĩ còn lại. **Chuông** kêu khi có hồ sơ mới, nhắc lại mỗi 60 giây đến khi khoa xác nhận.
+- Có hồ sơ bác sĩ quá hạn xử trí: **dải màu cam**.
+- Bấm **Xem ngay** để mở trang **Gửi đến khoa tôi**.
+
+Về chuông:
+
+- Trình duyệt chỉ cho phát âm thanh sau khi người dùng bấm hoặc gõ phím trên trang. Sau khi đăng nhập, bấm một chỗ bất kỳ hoặc bấm nút **Bật chuông** trên dải đỏ.
+- **Tắt tiếng** chỉ tắt chuông trên máy đang dùng (máy nhớ lựa chọn này). Bấm **Bật tiếng** để nghe lại. Dải đỏ vẫn hiện.
+- Chuông, chớp tắt, nhịp nhắc lại do QLCL đặt (mục 12.10).
+
+**Tài khoản xem nhiều khoa** (quyết định 63): tài khoản QLCL, tài khoản xem toàn viện, tài khoản thuộc từ hai khoa trở lên. Để biết ngay hồ sơ của khoa nào:
+
+- Mỗi thẻ hồ sơ ở trang này (chờ khoa xác nhận, chờ bác sĩ xử trí, vừa xong) có **nhãn khoa của người bệnh**, ví dụ **Khoa Nội tổng hợp**. Khoa của người bệnh là khoa nhận (khoa được báo), như cột khoa ở sổ ST02.
+- Dải đỏ ghi khoa sau tên người bệnh, ví dụ "Người Bệnh A (Khoa Nội tổng hợp)". Có nhiều hồ sơ chờ thì dải ghi thêm các khoa có hồ sơ chờ.
+- Dải cam ghi các khoa có hồ sơ bác sĩ quá hạn xử trí.
+
+Tài khoản chỉ thuộc một khoa không có nhãn này: hồ sơ nào cũng là của khoa mình.
+
+![Tài khoản QLCL ở trang Gửi đến khoa tôi: mỗi thẻ có nhãn khoa của người bệnh](huong-dan-su-dung/kq-13-nhan-khoa.png)
+
+*Hình 12.4a. Tài khoản QLCL xem hồ sơ gửi đến mọi khoa: nhãn xanh trên mỗi thẻ là khoa của người bệnh (dữ liệu giả lập).*
+
+### 12.4. Bác sĩ ghi hướng xử trí
+
+1. Mở hồ sơ: bấm **Bác sĩ ghi hướng xử trí** trên thẻ hồ sơ, hoặc **Xem ngay** trên dải cảnh báo. Dùng được trên điện thoại.
+2. Nhập **Hướng xử trí ban đầu**.
+3. **Giờ xử trí**: **Bây giờ**, hoặc **Đã xử trí lúc khác** rồi chọn giờ. Giờ xử trí phải sau giờ báo khoa nhận.
+4. Đánh dấu **Đã ghi vào hồ sơ bệnh án** khi đã ghi.
+5. Bấm **Lưu hướng xử trí**. Bác sĩ là tài khoản đang đăng nhập (thay chữ ký cột 9 sổ ST02). Hồ sơ chuyển **Hoàn tất**. Phần mềm báo đã lưu lúc nào, sau bao nhiêu phút kể từ giờ báo khoa nhận.
+
+Bác sĩ ghi được ngay cả khi người nghe máy chưa bấm **Đã nhận cuộc gọi** (**Đã nhận thông báo**): nút là **Xác nhận đã nhận và lưu**, hồ sơ tính là khoa đã nhận lúc bác sĩ lưu. Hồ sơ báo trên phần mềm cũng vậy, không cần chờ khoa báo gọi.
+
+<img src="huong-dan-su-dung/kq-04-bac-si-dien-thoai.png" alt="Bác sĩ ghi hướng xử trí trên điện thoại" width="360">
+
+*Hình 12.4. Bác sĩ ghi hướng xử trí trên điện thoại; dải đỏ trên cùng báo còn một hồ sơ chờ khoa xác nhận.*
+
+### 12.5. Chi tiết hồ sơ
+
+Bấm **Xem hồ sơ** ở các danh sách. Trang chi tiết có:
+
+- **Diễn biến**: có kết quả, từng lần báo (người báo, người nhận, đọc lại; lần báo trên phần mềm ghi *báo trên phần mềm*), cuộc gọi xác nhận ghi sau (người gọi, người nhận, đọc lại), trả lại, khoa xác nhận, bác sĩ xử trí, hủy. Mỗi mốc ghi giờ và người làm.
+- **Hai mốc 10 phút**: báo, xử trí, mỗi mốc ghi số phút và đúng hạn hay trễ.
+- **Ghi sổ**: sổ và tháng mà hồ sơ được ghi vào. Bấm để mở sổ.
+- **Thông số áp dụng cho hồ sơ này**: thời hạn lúc ghi.
+- Các nút làm tiếp theo bước của hồ sơ và quyền của người xem: **Ghi lần báo**, **Ghi cuộc gọi**, **Hủy hồ sơ báo nhầm** (khoa báo); **Đã nhận cuộc gọi** (hoặc **Đã nhận thông báo**), **Không phải khoa tôi** (khoa nhận); khung **Bác sĩ ghi hướng xử trí** (bác sĩ).
+
+![Chi tiết hồ sơ hoàn tất: diễn biến, hai mốc 10 phút, ghi sổ](huong-dan-su-dung/kq-05-chi-tiet.png)
+
+*Hình 12.5. Hồ sơ hoàn tất: báo sau 4 phút, bác sĩ xử trí sau 7 phút, đều đúng hạn (dữ liệu giả lập).*
+
+### 12.6. Hủy hồ sơ báo nhầm (khoa báo)
+
+Ghi nhầm người bệnh, nhầm kết quả: khoa báo mở hồ sơ, bấm **Hủy hồ sơ báo nhầm**, ghi **Lý do hủy** (bắt buộc), bấm **Hủy hồ sơ**.
+
+- Hồ sơ đã báo khoa điều trị: **gọi ngay khoa nhận** để hủy thông tin đã báo, đánh dấu **Đã gọi báo … về việc hủy**, rồi mới hủy được.
+- Hồ sơ không bị xóa. Sổ in dòng này **gạch ngang** kèm lý do, người hủy, giờ hủy. Dashboard đếm hồ sơ hủy riêng, không tính vào tỷ lệ đúng hạn.
+- Ghi lại hồ sơ đúng như mục 12.2.
+
+<img src="huong-dan-su-dung/kq-06-huy.png" alt="Hộp Hủy hồ sơ báo nhầm" width="420">
+
+*Hình 12.6. Hủy hồ sơ báo nhầm: lý do và xác nhận đã gọi báo khoa nhận về việc hủy.*
+
+<a id="man-hinh-kqnc"></a>
+
+### 12.7. Màn hình theo dõi tại khoa (TV)
+
+Màn hình đặt ở khoa điều trị (TV hoặc màn hình lớn) hiện kết quả nguy cấp gửi đến khoa, **tự cập nhật** mỗi 15 giây:
+
+- **Chờ khoa xác nhận**, **Chờ bác sĩ xử trí**, mỗi hồ sơ có đồng hồ đếm ngược;
+- danh sách vừa xong, số hồ sơ hôm nay và số đã xong, đồng hồ;
+- **dải đỏ chớp tắt** "KẾT QUẢ NGUY CẤP MỚI" và chuông khi có hồ sơ chờ khoa xác nhận.
+
+Màn hình chỉ để xem, không có nút thao tác với hồ sơ. Người nghe máy vẫn bấm **Đã nhận cuộc gọi** (báo trên phần mềm: **Đã nhận thông báo**) bằng tài khoản của mình trên máy tính hoặc điện thoại. Thẻ hồ sơ báo trên phần mềm ghi *… báo trên phần mềm* thay cho tên người nghe máy. Để giữ bí mật thông tin người bệnh, màn hình chỉ hiện **tên viết tắt** (ví dụ N.T.M), năm sinh và 4 số cuối mã người bệnh. QLCL bật được họ tên đầy đủ (mục 12.10).
+
+**Màn hình của nhiều khoa** (quyết định 63, 66): màn hình dùng chung cho nhiều khoa (tài khoản màn hình gán từ hai khoa trở lên), màn hình của tài khoản thuộc nhiều khoa, và màn hình của QLCL.
+
+- Mỗi thẻ ghi thêm khoa của người bệnh.
+- Ô **Khoa** ở đầu màn hình: để trống là mọi khoa (QLCL: toàn viện; tài khoản khoa: các khoa của mình). Chọn một khoa thì các cột và số hôm nay chỉ tính khoa đó.
+- Nút **Chạy lướt từng khoa**: màn hình lần lượt hiện từng khoa, mỗi khoa 15 giây (đổi ở ô **Mỗi khoa**: 10, 15, 30 hoặc 60 giây), hết lượt quay lại khoa đầu. Có **Tạm dừng** và **Dừng chạy lướt**. QLCL chạy lướt các khoa đang có hồ sơ trên màn hình; tài khoản nhiều khoa chạy lướt các khoa của mình.
+- **Dải đỏ và chuông luôn tính mọi khoa của màn hình**, kể cả khi đang hiện một khoa. Dải đỏ ghi các khoa đang có hồ sơ chờ, nên chạy lướt không làm lỡ hồ sơ mới.
+
+Màn hình của một khoa không có ô **Khoa** và nút chạy lướt.
+
+Cách mở:
+
+- **Máy đặt cố định ở khoa:** tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy theo tài liệu triển khai, mục 5.14 (trình duyệt toàn màn hình khi bật máy, chuông tự bật, nút ghi **Chuông bật · thử chuông**).
+- **Từ máy làm việc:** điều dưỡng, bác sĩ của khoa điều trị bấm nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**, rồi bấm **F11** để toàn màn hình. Bấm vào màn hình một lần để bật chuông (dòng **Bấm để bật chuông**). Bấm **Về trang làm việc** ở chân trang để quay lại.
+- **QLCL** (quyết định 66): bấm **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi** để mở màn hình của mọi khoa. Đang chọn một khoa ở ô **Khoa nhận** thì mở màn hình của khoa đó. Màn hình của QLCL hiện **họ tên đầy đủ** như trang Gửi đến khoa tôi: chỉ mở ở phòng làm việc, không đặt nơi đông người.
+
+![Màn hình theo dõi tại khoa: tên viết tắt, đồng hồ đếm ngược, dải đỏ chớp tắt](huong-dan-su-dung/kq-07-man-hinh-khoa.png)
+
+*Hình 12.7. Màn hình theo dõi của Khoa Nội tổng hợp (1920×1080): một hồ sơ mới chờ khoa xác nhận, một hồ sơ bác sĩ quá hạn (dữ liệu giả lập).*
+
+![Màn hình theo dõi của QLCL đang chạy lướt: ô Khoa, Khoa 2/2, dải đỏ ghi hai khoa](huong-dan-su-dung/kq-16-man-hinh-chay-luot.png)
+
+*Hình 12.7a. Màn hình theo dõi của QLCL đang chạy lướt (quyết định 66): đang hiện Khoa Nội tổng hợp (khoa 2/2, mỗi khoa 10 giây); dải đỏ vẫn đếm hồ sơ chờ của cả hai khoa (dữ liệu giả lập).*
+
+### 12.8. Sổ kết quả nguy cấp, in PDF
+
+Bấm **KQ nguy cấp** → **Sổ kết quả nguy cấp**:
+
+1. Chọn **Mẫu sổ**:
+   - **ST01**: sổ của khoa cận lâm sàng báo;
+   - **ST02**: sổ của khoa điều trị nhận;
+   - **Sổ Khoa Vi sinh**.
+
+   Mỗi xét nghiệm trong danh mục ghi vào sổ ST01 hoặc sổ Khoa Vi sinh của khoa báo (mục 12.10).
+2. Chọn **Khoa** và **Tháng**. Khoa chỉ xem sổ của khoa mình. QLCL xem mọi khoa.
+3. Trang hiện sổ đúng các cột của sổ giấy, mỗi hồ sơ một dòng, lấy từ hồ sơ điện tử (không nhập lại). Hồ sơ đã hủy in **gạch ngang** kèm dòng ghi chú lý do.
+
+   Hồ sơ báo trên phần mềm (quyết định 68): cột thời gian báo là lúc lưu. Chưa gọi xác nhận thì cột người nhận và cột xác nhận lại thông tin ghi **Chưa gọi xác nhận**, ghi chú *Báo trên phần mềm lúc …, chưa gọi xác nhận người nhận*. Đã gọi thì ghi người nhận, đọc lại như thường, ghi chú *Báo trên phần mềm lúc …, gọi xác nhận lúc … (người gọi)*.
+4. Bấm **In PDF (A4 ngang)**. Tên đơn vị, logo lấy từ *Cấu hình hệ thống* (mục 8.5). Mã số sổ lấy từ thông số (mục 12.10).
+
+![Sổ ST02 của khoa điều trị: mỗi hồ sơ một dòng như sổ giấy](huong-dan-su-dung/kq-09-so-st02.png)
+
+*Hình 12.8. Sổ ST02 tháng 11 của Khoa Nội tổng hợp; dòng đã hủy in gạch ngang kèm lý do (dữ liệu giả lập).*
+
+![PDF sổ ST01 của khoa cận lâm sàng, A4 ngang](huong-dan-su-dung/kq-12-pdf-st01.png)
+
+*Hình 12.9. Trang 1 PDF sổ ST01 tháng 11 của Khoa Huyết học – Sinh hóa (tên đơn vị đang là giá trị mẫu, logo giả lập).*
+
+### 12.9. Dashboard
+
+Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**.
+
+- **QLCL**: ô **Khoa** để trống là xem **toàn viện**; chọn khoa để xem từng khoa.
+- **Tài khoản của khoa** (khoa báo, khoa nhận; quyết định 65): trang mở sẵn dashboard của khoa mình, không có toàn viện, không xem được khoa khác. Tài khoản thuộc nhiều khoa chọn khoa ở ô **Khoa**; ô này chỉ có các khoa của mình.
+
+Các phần của trang:
+
+- Năm ô chỉ số, so với mục tiêu (ô có dấu cảnh báo khi chưa đạt):
+  - **Kết quả nguy cấp**: số hồ sơ, kèm số hồ sơ đã hủy (đếm riêng, không tính vào tỷ lệ);
+  - **Báo trong 10 phút**: số hồ sơ báo đúng hạn trên số hồ sơ đã báo hoặc đã quá hạn báo;
+  - **BS xử trí trong 10 phút**: số hồ sơ bác sĩ xử trí đúng hạn trên số hồ sơ đã xử trí hoặc đã quá hạn xử trí;
+  - **Đọc lại chính xác lần đầu**: lần báo mà người nhận đọc lại đúng ngay lần đầu; lần báo trên phần mềm chưa gọi xác nhận thì chưa tính;
+  - **Hồ sơ đủ các bước**: số hồ sơ hoàn tất trên số hồ sơ đã hoàn tất hoặc đã quá hạn.
+- **Thời gian trung vị**: từ lúc có kết quả đến lúc báo, từ lúc khoa nhận đến lúc bác sĩ xử trí, kèm khoảng Q1–Q3.
+- Hai biểu đồ 12 tháng (tỷ lệ báo đúng hạn, tỷ lệ bác sĩ xử trí đúng hạn), có đường nét đứt là mục tiêu. Rê chuột vào điểm để xem số; bấm **Xem bảng** để đọc số.
+- Bảng **Theo khoa báo** (sổ ST01, sổ Vi sinh) và **Theo khoa nhận** (sổ ST02): số hồ sơ, tỷ lệ đúng hạn, trung vị, số hồ sơ đang chờ.
+- **Trường hợp quá hạn trong kỳ**: tối đa 50 trường hợp gần nhất, tên người bệnh viết tắt, mốc quá hạn. Bấm **Xem hồ sơ** để mở. Dùng cho phân tích nguyên nhân hằng quý.
+
+![Dashboard kết quả nguy cấp tháng 11](huong-dan-su-dung/kq-08-dashboard.png)
+
+*Hình 12.10. Dashboard tháng 11: 17 hồ sơ, báo đúng hạn 93,8% (chưa đạt mục tiêu 95%), bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
+
+**Dashboard từng khoa** (quyết định 64): chọn khoa ở ô **Khoa**. Tên khoa hiện ở đầu trang. Mọi phần của trang (ô chỉ số, trung vị, biểu đồ 12 tháng, hai bảng, trường hợp quá hạn) chỉ tính:
+
+- hồ sơ khoa đó báo đi (khoa cận lâm sàng);
+- hồ sơ gửi đến khoa đó (khoa điều trị).
+
+Ví dụ: dashboard Khoa Nội tổng hợp có bảng **Theo khoa báo** là các khoa cận lâm sàng đã báo cho Khoa Nội. Bấm dấu **×** ở ô **Khoa** để về toàn viện.
+
+**Chạy lướt từng khoa:** bấm nút **Chạy lướt từng khoa**. Trang lần lượt hiện dashboard của từng khoa có hồ sơ trong kỳ (khoa báo hoặc khoa nhận), xếp theo tên khoa, mỗi khoa **15 giây**. Tài khoản thuộc nhiều khoa chạy lướt các khoa của mình; tài khoản một khoa không có nút này. Hết lượt thì quay lại khoa đầu. Khung trên cùng ghi tên khoa đang hiện, thứ tự (ví dụ **Khoa 2/5**) và có các nút:
+
+- ô **Mỗi khoa**: 10, 15, 30 hoặc 60 giây;
+- **Tạm dừng**: đứng lại ở khoa đang xem; **Tiếp tục** để chạy tiếp;
+- **Dừng chạy lướt**: thôi chạy lướt, ở lại khoa đang xem. Tự chọn một khoa ở ô **Khoa** cũng thôi chạy lướt.
+
+Chạy lướt trên màn hình lớn (họp giao ban, phòng QLCL): bấm **F11** để toàn màn hình. Địa chỉ trang giữ khoa đang xem và số giây. Lưu dấu trang lúc đang chạy lướt thì lần sau mở dấu trang là chạy lướt tiếp. Khoa không có hồ sơ trong kỳ không có trong lượt chạy lướt, nhưng vẫn chọn xem được ở ô **Khoa**.
+
+![Dashboard đang chạy lướt từng khoa: khung tên khoa, Khoa 2/3, mỗi khoa 15 giây](huong-dan-su-dung/kq-14-dashboard-khoa.png)
+
+*Hình 12.10a. Chạy lướt từng khoa: đang hiện dashboard Khoa Ngoại tổng hợp, khoa thứ 2 trong 3 khoa có hồ sơ trong tháng; 6 hồ sơ, báo đúng hạn 83,3%, bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
+
+Ai xem được dashboard:
+
+- Toàn viện và mọi khoa: tài khoản có quyền **Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)**, có sẵn trong vai trò **QLCL (kết quả nguy cấp)**. Lãnh đạo, Phòng KHTH cần xem thì quản trị thêm quyền này vào vai trò của họ ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**.
+- Khoa của mình: tài khoản có quyền ghi, nhận hoặc xử trí kết quả nguy cấp (khoa cận lâm sàng, điều dưỡng, bác sĩ). Không cần gán thêm quyền. Khoa của tài khoản là khoa đặt ở hồ sơ người dùng (mục 8.1).
+
+![Dashboard của điều dưỡng Khoa Nội tổng hợp: số liệu của khoa mình, không có ô Khoa](huong-dan-su-dung/kq-15-dashboard-cua-khoa.png)
+
+*Hình 12.10b. Điều dưỡng Khoa Nội tổng hợp mở Dashboard: trang mở sẵn dashboard của khoa mình, không có toàn viện, không chọn được khoa khác (dữ liệu giả lập).*
+
+### 12.10. Danh mục và cấu hình (QLCL)
+
+Bấm **KQ nguy cấp** → **Danh mục và cấu hình**. Sửa khi vận hành, không cần cài bản mới. Mỗi lần lưu đều ghi nhật ký hệ thống (giá trị cũ và mới).
+
+**Tab Thông số vận hành.** Sửa rồi bấm **Lưu thay đổi**, hoặc bấm **Hoàn tác** để bỏ.
+
+| Thông số | Mặc định | Ý nghĩa |
+|---|---|---|
+| Thời hạn báo kết quả | 10 phút | Tính từ giờ có kết quả |
+| Thời hạn bác sĩ xử trí ban đầu | 10 phút | Tính từ giờ báo khoa nhận (gọi điện, hoặc lúc lưu khi báo trên phần mềm) |
+| Ngưỡng ghi bù | 30 phút | Ghi sau giờ sự việc quá số phút này thì hồ sơ có nhãn **Ghi bù** |
+| Báo sắp quá hạn khi còn | 3 phút | Đồng hồ chuyển màu cam; phải ít hơn cả hai thời hạn |
+| Chu kỳ tự kiểm tra hồ sơ mới | 15 giây | Dải cảnh báo, bàn làm việc, màn hình theo dõi tự cập nhật theo chu kỳ này |
+| Chuông báo; Nhắc lại chuông | Bật; 60 giây | Chuông khi có hồ sơ mới; nhắc lại khi còn hồ sơ chờ khoa xác nhận (0 là không nhắc lại) |
+| Chớp tắt dải cảnh báo; Nhịp chớp tắt | Bật; 1200 ms | Từ 1000 ms trở lên (không quá một lần mỗi giây), an toàn cho người nhạy cảm với ánh sáng nhấp nháy. Máy đặt chế độ giảm chuyển động thì dải không chớp |
+| Giữ hồ sơ hoàn tất trên bàn làm việc | 24 giờ | Sau thời gian này xem hồ sơ trong sổ |
+| Màn hình theo dõi hiện họ tên đầy đủ | Tắt (tên viết tắt) | |
+| Bắt buộc địa chỉ người bệnh | Bắt buộc | Thông tin đối chiếu thứ ba khi gọi điện |
+| Mục tiêu dashboard | 95%, 90%, 98%, 98% | Báo đúng hạn, bác sĩ xử trí đúng hạn, đọc lại chính xác lần đầu, hồ sơ đủ các bước |
+| Mã số sổ (in trên PDF) | QT-KQNC/ST01, QT-KQNC/ST02, QT-VS-21/ST02 | Theo mã số sổ giấy bệnh viện đang dùng |
+
+![Thông số vận hành](huong-dan-su-dung/kq-10-cau-hinh.png)
+
+*Hình 12.11. Tab Thông số vận hành với giá trị mặc định.*
+
+**Tab Danh mục kết quả nguy cấp.** Bấm **Thêm mục**, hoặc **Sửa** ở từng dòng:
+
+- **Xét nghiệm, kỹ thuật**;
+- **Khoảng nguy cấp: người lớn**, **trẻ em (nếu khác)**;
+- **Kiểu kết quả**: số kèm **Đơn vị**, hoặc ghi bằng chữ;
+- **Khoa thực hiện**, **Thứ tự**;
+- **Ghi vào sổ của khoa báo**: sổ ST01 hoặc sổ Khoa Vi sinh;
+- **Trạng thái**.
+
+Khi cài mới, danh mục **trống**: QLCL nhập danh mục theo phụ lục danh mục kết quả nguy cấp của quy trình đang hiệu lực trước khi các khoa dùng (khoa cận lâm sàng chưa ghi được hồ sơ khi danh mục trống). Rà soát danh mục định kỳ theo quy trình. Mục cũ thì sửa hoặc tắt **Trạng thái** (ngưng dùng), không xóa, để giữ hồ sơ đã ghi.
+
+![Danh mục kết quả nguy cấp](huong-dan-su-dung/kq-11-danh-muc.png)
+
+*Hình 12.12. Danh mục kết quả nguy cấp trên máy thử (các mục ví dụ, giả lập).*
 
 ---
 
 <a id="hoi-dap"></a>
 
-## 10. Câu hỏi thường gặp
+## 13. Câu hỏi thường gặp
 
 **Tôi quên mật khẩu thì làm sao?**
 Liên hệ bộ phận CNTT. Quản trị đặt lại mật khẩu tạm (mục 8.1). Bạn đăng nhập bằng mật khẩu tạm rồi đổi mật khẩu mới.
 
 **Tài khoản báo bị tạm khóa?**
 Do nhập sai mật khẩu 5 lần. Chờ hết thời gian khóa (mặc định 15 phút), hoặc nhờ quản trị **Mở khóa**.
+
+**Màn hình báo "Hệ thống đang bảo trì"?**
+Quản trị đang bảo trì hoặc phòng CNTT đang cài bản mới. Không cần tải lại trang hay đăng nhập lại: chờ đến giờ dự kiến xong, màn hình tự đóng (hoặc tự tải lại trang) khi xong. Dữ liệu đang nhập vẫn giữ trên màn hình. Xem mục 8.7.
+
+**Vừa cài bản mới, bấm sang trang khác thì màn hình "Máy chủ đang tạm dừng" hiện vài giây rồi trang tự tải lại?**
+Bình thường. Máy đang mở phần mềm từ trước khi cài vẫn chạy giao diện cũ, nên khi mở một trang chưa mở lần nào thì phần mềm tự tải lại để lấy giao diện mới. Nếu còn thấy trang **"Đã xảy ra lỗi – Trang không thể hiển thị"**, bấm **Tải lại trang** (hoặc **Ctrl+F5**); vẫn lỗi thì báo bộ phận CNTT.
 
 **Vì sao tôi không thấy nút "Lấy thông tin"?**
 Nút này chỉ có khi bệnh viện đã kết nối hệ thống thông tin người bệnh. Nếu chưa có, hãy quét CCCD hoặc nhập trực tiếp.
@@ -1383,3 +2191,25 @@ Thẻ chỉ có khi khoa phải gửi báo cáo, hoặc được Phòng Điều 
 
 **Phiếu mới được điền sẵn câu trả lời cũ, có cần kiểm tra không?**
 Có. Đây là chức năng kế thừa phiếu lần trước (mục 2.7). Kiểm tra lại từng câu trước khi trình ký. Ý kiến Đồng ý/Không đồng ý, lời xác nhận và chữ ký không được điền sẵn.
+
+**Không thấy menu Nội kiểm, hoặc không mở được sổ của khoa?**
+Tài khoản cần quyền *Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng* (quản trị thêm cho vai trò ở mục 8.3, ví dụ vai trò Điều dưỡng) và đúng khoa (mục 8.1); đăng xuất rồi đăng nhập lại. Khoa chưa có máy trong danh sách sổ: nhờ Khoa HSH khai báo máy đo của khoa (mục 11.1). Lãnh đạo, Phòng Điều dưỡng, QLCL chỉ cần xem số liệu: quản trị gán quyền *Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)*; menu **Nội kiểm** khi đó chỉ có **Dashboard** (mục 11.8).
+
+**Ghi nhầm kết quả nội kiểm mà không còn nút Ghi điều chỉnh?**
+Ngày đó Khoa HSH đã xem xét, hoặc khoa đã gửi sổ tháng. Báo Khoa HSH **trả lại ngày** (hoặc trả lại sổ), rồi ghi điều chỉnh có lý do (mục 11.4). Sổ đã được Khoa HSH xác nhận thì không thay đổi được nữa.
+
+**Có kết quả nguy cấp gửi đến khoa mà máy không kêu chuông?**
+Kiểm tra lần lượt:
+
+- Đã bấm vào trang ít nhất một lần sau khi mở chưa (trình duyệt chặn âm thanh trước lần bấm đầu), hoặc bấm **Bật chuông** trên dải đỏ.
+- Nút trên dải đỏ có đang ghi **Bật tiếng** không (máy này đã tắt tiếng): bấm để nghe lại.
+- Loa máy tính đã bật chưa, âm lượng của trình duyệt có bị tắt không.
+- QLCL có tắt **Chuông báo** ở thông số vận hành không (mục 12.10).
+
+Dải đỏ chớp tắt vẫn hiện dù không có chuông.
+
+**Màn hình theo dõi tại khoa không đổi, hoặc báo mất kết nối?**
+Màn hình tự cập nhật mỗi 15 giây và ghi giờ cập nhật gần nhất. Giờ đó đứng yên thì kiểm tra mạng của máy, rồi bấm F5. Trang đăng nhập hiện ra thì đăng nhập lại bằng tài khoản màn hình của khoa.
+
+**Không thấy menu KQ nguy cấp, hoặc không thấy hồ sơ gửi đến khoa?**
+Tài khoản cần quyền trong nhóm **Kết quả nguy cấp** (quản trị thêm cho vai trò ở mục 8.3) và phải được đặt đúng khoa (mục 8.1). Khoa báo chọn nhầm khoa nhận thì hồ sơ nằm ở khoa khác: khoa đó bấm **Không phải khoa tôi** để trả lại.

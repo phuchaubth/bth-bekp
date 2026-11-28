@@ -13,6 +13,35 @@ namespace Consent.Api.Controllers;
 [AllowAnonymous]
 public sealed class BrandingController(SettingsService settings) : ControllerBase
 {
+    /// <summary>
+    /// Logo bệnh viện đang dùng (tải lên ở Cấu hình hệ thống): kiểu ảnh, kích thước, thời điểm cập nhật. Chưa có → 404 (giao diện
+    /// dùng dấu nhận diện mặc định). Quyết định 61: logo phần mềm ở thanh trên, trang đăng nhập, biểu tượng thẻ trình duyệt.
+    /// </summary>
+    [HttpGet("logo")]
+    [Produces("application/json")]
+    public async Task<IActionResult> GetLogo(CancellationToken cancellationToken)
+    {
+        Response.Headers.CacheControl = "no-cache";
+        return await settings.GetLogoInfoAsync(cancellationToken).ConfigureAwait(false) is { } logo
+            ? Ok(logo)
+            : NotFound();
+    }
+
+    /// <summary>Ảnh logo. Giao diện gọi kèm <c>?v=</c> theo thời điểm cập nhật, nên trình duyệt được giữ ảnh một ngày.</summary>
+    [HttpGet("logo/image")]
+    [Produces("image/png", "image/jpeg")]
+    public async Task<IActionResult> GetLogoImage(CancellationToken cancellationToken)
+    {
+        if (await settings.ResolveLogoAsync(cancellationToken).ConfigureAwait(false) is not { } logo)
+        {
+            Response.Headers.CacheControl = "no-store";
+            return NotFound();
+        }
+
+        Response.Headers.CacheControl = "public, max-age=86400";
+        return File(logo.Content, logo.ContentType);
+    }
+
     /// <summary>Khung chữ ký đang dùng: kiểu ảnh, kích thước, thời điểm cập nhật. Chưa có → 404 (khung ký mặc định).</summary>
     [HttpGet("signature-frame")]
     [Produces("application/json")]

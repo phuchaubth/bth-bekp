@@ -7,13 +7,16 @@ using Consent.Application.Exports;
 using Consent.Application.Reports;
 using Consent.Domain.Exports;
 using Consent.Domain.Settings;
+using Consent.Domain.Testing;
 using Consent.Application.Patients;
 using Consent.Application.Users;
 using Consent.Domain.Auditing;
+using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
 using Consent.Domain.NursingReports;
 using Consent.Domain.Patients;
+using Consent.Domain.QualityControl;
 using Consent.Shared;
 using Consent.Application.ConsentForms;
 using Consent.Domain.ConsentForms;
@@ -139,6 +142,20 @@ internal sealed class InMemoryStore : IUnitOfWork
 
     public List<NursingDepartmentStatistics> NursingDepartmentStatistics { get; } = [];
 
+    public List<NursingReportDelegation> NursingDelegations { get; } = [];
+
+    public List<TestAssignment> TestAssignments { get; } = [];
+
+    public List<QcMeter> QcMeters { get; } = [];
+
+    public List<QcLot> QcLots { get; } = [];
+
+    public List<QcBook> QcBooks { get; } = [];
+
+    public List<CriticalTest> CriticalTests { get; } = [];
+
+    public List<CriticalResult> CriticalResults { get; } = [];
+
     public int SaveCount { get; private set; }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken)
@@ -156,9 +173,6 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
     public Task<User?> GetByUserNameAsync(string normalizedUserName, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Find(u => u.UserName == normalizedUserName));
 
-    public Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken) =>
-        Task.FromResult(store.Users.Exists(u => u.UserName == normalizedUserName));
-
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Exists(u => u.DepartmentIds.Contains(departmentId)));
 
@@ -170,9 +184,13 @@ internal sealed class InMemoryUserRepository(InMemoryStore store) : IUserReposit
     public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
         Task.FromResult(store.Users.Count(u => u.RoleIds.Contains(roleId)));
 
+    public Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<User>>([.. store.Users.Where(u => u.IsActive && u.RoleIds.Any(roleIds.Contains))]);
+
     public Task<PagedResult<UserListItemDto>> SearchAsync(UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
         var items = store.Users
+            .Where(u => !u.IsDeleted && (query.IsActive is null || u.IsActive == query.IsActive))
             .Where(u => query.Keyword is null || u.FullName.Contains(query.Keyword, StringComparison.OrdinalIgnoreCase))
             .Select(u => new UserListItemDto(u.Id, u.UserName, u.FullName, u.Title, u.DepartmentId, null, [], u.IsActive, u.IsLockedOut(nowUtc), u.LastLoginAtUtc, u.IsKioskLookupLocked(nowUtc)))
             .ToList();
@@ -693,4 +711,27 @@ internal sealed class RecordingPdfRenderer : IConsentPdfRenderer
         Last = document;
         return "%PDF-giả"u8.ToArray();
     }
+}
+
+internal sealed class InMemoryTestAssignmentRepository(InMemoryStore store) : ITestAssignmentRepository
+{
+    public void Add(TestAssignment assignment) => store.TestAssignments.Add(assignment);
+
+    public Task<TestAssignment?> GetAsync(Guid id, CancellationToken cancellationToken) =>
+        Task.FromResult(store.TestAssignments.Find(a => a.Id == id));
+
+    public Task<IReadOnlyList<TestAssignment>> ListAsync(string? version, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TestAssignment>>([.. store.TestAssignments
+            .Where(a => version is null || a.Version == version)
+            .OrderByDescending(a => a.CreatedAtUtc)
+            .ThenBy(a => a.Feature, StringComparer.Ordinal)]);
+
+    public Task<IReadOnlyList<TestAssignment>> ListForAssigneeAsync(Guid userId, CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<TestAssignment>>([.. store.TestAssignments.Where(a => a.AssigneeUserId == userId)]);
+
+    public Task<IReadOnlyList<string>> ListVersionsAsync(CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyList<string>>([.. store.TestAssignments
+            .GroupBy(a => a.Version)
+            .OrderByDescending(g => g.Max(a => a.CreatedAtUtc))
+            .Select(g => g.Key)]);
 }

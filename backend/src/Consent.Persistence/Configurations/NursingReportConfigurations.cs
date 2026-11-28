@@ -17,6 +17,8 @@ internal sealed class NursingDailyReportConfiguration : IEntityTypeConfiguration
         // Mỗi khoa một báo cáo mỗi ngày.
         builder.HasIndex(r => new { r.DepartmentId, r.ReportDate }).IsUnique();
         builder.HasIndex(r => r.ReportDate);
+        // Ủy quyền mà người gửi dùng (quyết định 48); ủy quyền không bị xóa, chỉ hủy.
+        builder.HasOne<NursingReportDelegation>().WithMany().HasForeignKey(r => r.SubmittedDelegationId).OnDelete(DeleteBehavior.Restrict);
         builder.Property(r => r.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(r => r.FiguresJson).IsRequired();
         builder.Property(r => r.ReopenReason).HasMaxLength(NursingDailyReport.ReopenReasonMaxLength);
@@ -66,6 +68,29 @@ internal sealed class NursingDepartmentStatisticsConfiguration : IEntityTypeConf
         builder.Property(s => s.Id).ValueGeneratedNever();
         builder.HasIndex(s => new { s.ReportDate, s.DepartmentId }).IsUnique();
         builder.Property(s => s.ValuesJson).IsRequired().HasMaxLength(NursingDepartmentStatistics.ValuesMaxLength);
+        builder.HasOne<NursingReportDelegation>().WithMany().HasForeignKey(s => s.DelegationId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasRowVersion();
+    }
+}
+
+/// <summary>
+/// Ủy quyền báo cáo điều dưỡng (quyết định 48). Không khóa ngoại sang tài khoản (như người lập, người gửi báo cáo) để xóa tài
+/// khoản không bị chặn; ủy quyền vẫn giữ để đối chiếu.
+/// </summary>
+internal sealed class NursingReportDelegationConfiguration : IEntityTypeConfiguration<NursingReportDelegation>
+{
+    public void Configure(EntityTypeBuilder<NursingReportDelegation> builder)
+    {
+        builder.ToTable("NursingReportDelegations");
+        builder.HasKey(d => d.Id);
+        builder.Property(d => d.Id).ValueGeneratedNever();
+        builder.HasOne<Department>().WithMany().HasForeignKey(d => d.DepartmentId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasIndex(d => d.DelegateUserId);
+        builder.HasIndex(d => d.DelegatorUserId);
+        builder.HasIndex(d => new { d.StartDate, d.EndDate });
+        builder.Property(d => d.Scope).HasConversion<int>();
+        builder.Property(d => d.Reason).HasMaxLength(NursingReportDelegation.ReasonMaxLength);
+        builder.Ignore(d => d.IsRevoked);
         builder.HasRowVersion();
     }
 }

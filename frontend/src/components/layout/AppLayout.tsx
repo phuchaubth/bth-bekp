@@ -1,12 +1,14 @@
-import { LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
+import { ExperimentOutlined, LogoutOutlined, MenuOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Button, Drawer, Dropdown, Grid, Layout, Menu, Space, Typography, type MenuProps } from 'antd'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { accountDepartments } from '../../api/auth'
-import { filterNavItems, flattenNavItems, navItems, type NavItem } from '../../app/navigation'
+import { filterNavItems, navItems, openNavKeys, selectedNavKey, type NavItem } from '../../app/navigation'
 import { BRAND } from '../../app/theme'
+import { CriticalAlertBanner } from '../../features/critical/CriticalAlertBanner'
 import { useAuth } from '../../auth/authContext'
 import { BrandMark } from './BrandMark'
+import { MaintenanceBanner } from './MaintenanceBanner'
 
 const { Header, Content, Footer } = Layout
 
@@ -20,12 +22,6 @@ function toMenuItems(items: NavItem[], compact = false): MenuProps['items'] {
     label: compact ? (item.shortLabel ?? item.label) : item.label,
     children: item.children ? toMenuItems(item.children) : undefined,
   }))
-}
-
-function openKeysFor(items: NavItem[], pathname: string): string[] {
-  return items
-    .filter((item) => item.children?.some((child) => pathname.startsWith(child.path)))
-    .map((item) => item.path)
 }
 
 /** Nội dung căn giữa, rộng tối đa 1280 px (giống nhau giữa thanh trên, nội dung và chân trang). */
@@ -45,12 +41,8 @@ export function AppLayout() {
   const departmentNames = accountDepartments(user).map((d) => d.name)
 
   const visibleItems = useMemo(() => filterNavItems(navItems, hasPermission), [hasPermission])
-  // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /phieu-dong-thuan/... → Phiếu đồng thuận).
-  const selectedKey =
-    flattenNavItems(visibleItems)
-      .map((item) => item.path)
-      .filter((path) => (path === '/' ? pathname === '/' : pathname === path || pathname.startsWith(`${path}/`)))
-      .sort((a, b) => b.length - a.length)[0] ?? pathname
+  // Mục đang mở: trang hiện tại hoặc trang cha của nó (ví dụ /mau-phieu/... → Mẫu phiếu, nhóm Phiếu đồng thuận gạch chân).
+  const selectedKey = selectedNavKey(visibleItems, pathname)
 
   const onNavigate: MenuProps['onClick'] = ({ key }) => {
     navigate(key)
@@ -87,12 +79,15 @@ export function AppLayout() {
   const userMenu: MenuProps = {
     items: [
       { key: 'account', icon: <UserOutlined />, label: 'Tài khoản của tôi' },
+      { key: 'testing', icon: <ExperimentOutlined />, label: 'Việc kiểm thử của tôi' },
       { type: 'divider' },
       { key: 'logout', icon: <LogoutOutlined />, label: 'Đăng xuất', danger: true },
     ],
     onClick: ({ key }) => {
       if (key === 'account') {
         navigate('/tai-khoan')
+      } else if (key === 'testing') {
+        navigate('/kiem-thu')
       } else if (key === 'logout') {
         void logout()
       }
@@ -153,7 +148,7 @@ export function AppLayout() {
             <Menu
               mode="inline"
               selectedKeys={[selectedKey]}
-              defaultOpenKeys={openKeysFor(visibleItems, pathname)}
+              defaultOpenKeys={openNavKeys(visibleItems, pathname)}
               items={toMenuItems(visibleItems)}
               onClick={onNavigate}
               style={{ borderInlineEnd: 0 }}
@@ -161,6 +156,10 @@ export function AppLayout() {
           </nav>
         </Drawer>
       )}
+      {/* Quyết định 53: tài khoản có quyền bảo trì vẫn làm việc khi đang bảo trì, thấy dải báo này. */}
+      <MaintenanceBanner />
+      {/* Quyết định 60: kết quả nguy cấp gửi đến khoa (dải đỏ chớp tắt, chuông), hồ sơ quá hạn báo của khoa báo. */}
+      <CriticalAlertBanner />
       <Content style={{ padding: isDesktop ? '28px 24px' : 16 }}>
         <main style={CONTAINER}>
           <Outlet />

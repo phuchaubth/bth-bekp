@@ -45,6 +45,12 @@ public sealed class UsersController(UserAdminService users) : ControllerBase
     public async Task<IActionResult> Unlock(Guid id, CancellationToken cancellationToken) =>
         this.ToActionResult(await users.UnlockAsync(id, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>Xóa tài khoản đã ngưng sử dụng (quyết định 51); tài khoản đang sử dụng thì báo lỗi.</summary>
+    [HttpDelete("{id:guid}")]
+    [HasPermission(Permissions.UsersManage)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken cancellationToken) =>
+        this.ToActionResult(await users.DeleteAsync(id, cancellationToken).ConfigureAwait(false));
+
     [HttpPost("{id:guid}/reset-password")]
     [HasPermission(Permissions.UsersManage)]
     public async Task<IActionResult> ResetPassword(Guid id, ResetPasswordRequest request, CancellationToken cancellationToken) =>

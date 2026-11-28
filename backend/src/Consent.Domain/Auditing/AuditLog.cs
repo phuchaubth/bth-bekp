@@ -131,4 +131,19 @@ public static class AuditActions
 
     /// <summary>Kiosk: người bệnh nộp và ký bộ phiếu.</summary>
     public const string KioskSubmitted = "Kiosk.Submitted";
+
+    /// <summary>Quản trị bật chế độ bảo trì (quyết định 53); chi tiết ghi lý do và giờ dự kiến xong.</summary>
+    public const string MaintenanceEnabled = "Maintenance.Enabled";
+
+    /// <summary>Quản trị sửa lý do hoặc giờ dự kiến xong khi đang bảo trì.</summary>
+    public const string MaintenanceUpdated = "Maintenance.Updated";
+
+    /// <summary>Quản trị tắt chế độ bảo trì; chi tiết ghi thời điểm đã bật.</summary>
+    public const string MaintenanceDisabled = "Maintenance.Disabled";
+
+    /// <summary>Sửa thông số vận hành kết quả nguy cấp (quyết định 60); chi tiết ghi từng thông số: giá trị cũ, giá trị mới.</summary>
+    public const string CriticalSettingsUpdated = "CriticalResults.SettingsUpdated";
+
+    /// <summary>Tải sổ kết quả nguy cấp (PDF); chi tiết ghi mẫu sổ, khoa, tháng (sổ có thông tin người bệnh).</summary>
+    public const string CriticalLogbookPrinted = "CriticalResults.LogbookPrinted";
 }

@@ -110,6 +110,17 @@ public sealed class SettingsService(
         return await ImageInfoAsync(stored, SettingKeys.SignatureFrameStorageKey, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Logo đang dùng (kiểu ảnh, kích thước, thời điểm cập nhật), hoặc null nếu chưa có: giao diện dùng làm logo phần mềm ở thanh
+    /// trên, trang đăng nhập và biểu tượng thẻ trình duyệt (quyết định 61). Ai cũng xem được, kể cả trang đăng nhập: đây là ảnh
+    /// nhận diện in trên mọi phiếu, không có dữ liệu người bệnh.
+    /// </summary>
+    public async Task<LogoInfoDto?> GetLogoInfoAsync(CancellationToken cancellationToken)
+    {
+        var stored = await settings.GetAllAsync(cancellationToken).ConfigureAwait(false);
+        return await ImageInfoAsync(stored, SettingKeys.LogoStorageKey, cancellationToken).ConfigureAwait(false);
+    }
+
     /// <summary>Ảnh khung chữ ký; chưa có, hoặc file mất/hỏng, thì trả về null (khung ký hiện như mặc định).</summary>
     public Task<LogoImage?> ResolveSignatureFrameAsync(CancellationToken cancellationToken) =>
         ResolveImageAsync(SettingKeys.SignatureFrameStorageKey, cancellationToken);

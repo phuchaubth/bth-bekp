@@ -24,6 +24,8 @@ namespace Consent.Persistence.Migrations
 
             modelBuilder.HasSequence("ConsentFormNumbers");
 
+            modelBuilder.HasSequence("CriticalResultNumbers");
+
             modelBuilder.Entity("Consent.Domain.Auditing.AuditLog", b =>
                 {
                     b.Property<Guid>("Id")
@@ -479,6 +481,336 @@ namespace Consent.Persistence.Migrations
                     b.ToTable("ConsentTemplateVersions", (string)null);
                 });
 
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalNotification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("AttemptNo")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("CallRecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CallRecordedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("CallRecordedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CalledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("IncorrectReadBacks")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset>("NotifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("NotifiedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("NotifiedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ReceiverName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("ReceivingDepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RejectReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("RejectedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RejectedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("RejectedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("RepeatedTwice")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("ResultId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivingDepartmentId");
+
+                    b.HasIndex("ResultId", "AttemptNo")
+                        .IsUnique();
+
+                    b.ToTable("CriticalNotifications", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalResult", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("AcknowledgedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("AcknowledgedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("AcknowledgedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ActionAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ActionByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("ActionByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("ActionDeadlineMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ActionRecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ActionSummary")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CancelledByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("LateEntryMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Logbook")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("NotifiedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("NotifyDeadlineMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateOnly>("OrderDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PatientAddress")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("PatientCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateOnly>("PatientDateOfBirth")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PatientGender")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<string>("PatientName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PatientSource")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<Guid?>("ReceivingDepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("ReceivingDepartmentInformed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("RecordedByName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("RecordedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("RecordedInMedicalRecord")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset>("ResultAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SampleId")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("SendingDepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<string>("TestAdultRange")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("TestChildRange")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid>("TestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("TestName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("TextResult")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("Urgent")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Number")
+                        .IsUnique();
+
+                    b.HasIndex("ResultAtUtc");
+
+                    b.HasIndex("TestId");
+
+                    b.HasIndex("ReceivingDepartmentId", "Status", "UpdatedAtUtc");
+
+                    b.HasIndex("SendingDepartmentId", "Status", "UpdatedAtUtc");
+
+                    b.ToTable("CriticalResults", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalTest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdultRange")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("ChildRange")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Logbook")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Section")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("TextResult")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("CriticalTests", (string)null);
+                });
+
             modelBuilder.Entity("Consent.Domain.Departments.Department", b =>
                 {
                     b.Property<Guid>("Id")
@@ -502,6 +834,10 @@ namespace Consent.Persistence.Migrations
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<string>("ShortName")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.HasKey("Id");
 
@@ -688,6 +1024,12 @@ namespace Consent.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("DeletedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("DeletedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -849,6 +1191,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid?>("SubmittedByUserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("SubmittedDelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
 
@@ -858,6 +1203,8 @@ namespace Consent.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ReportDate");
+
+                    b.HasIndex("SubmittedDelegationId");
 
                     b.HasIndex("DepartmentId", "ReportDate")
                         .IsUnique();
@@ -906,6 +1253,9 @@ namespace Consent.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("DelegationId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid>("DepartmentId")
                         .HasColumnType("uniqueidentifier");
 
@@ -930,10 +1280,66 @@ namespace Consent.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("DelegationId");
+
                     b.HasIndex("ReportDate", "DepartmentId")
                         .IsUnique();
 
                     b.ToTable("NursingDepartmentStatistics", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DelegateUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DelegatorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("EndDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTimeOffset?>("RevokedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("RevokedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<int>("Scope")
+                        .HasColumnType("int");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DelegateUserId");
+
+                    b.HasIndex("DelegatorUserId");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("StartDate", "EndDate");
+
+                    b.ToTable("NursingReportDelegations", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDepartment", b =>
@@ -951,6 +1357,9 @@ namespace Consent.Persistence.Migrations
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
 
                     b.Property<DateTimeOffset>("UpdatedAtUtc")
                         .HasColumnType("datetimeoffset");
@@ -1131,6 +1540,374 @@ namespace Consent.Persistence.Migrations
                     b.ToTable("Patients", (string)null);
                 });
 
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcBook", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ConfirmedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("MeterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("ReturnedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReturnedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTimeOffset?>("SubmittedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("SubmittedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("Year", "Month");
+
+                    b.HasIndex("MeterId", "DepartmentId", "Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("QcBooks", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcDayReview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BookId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("ReturnReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("ReturnedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReturnedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReviewedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BookId", "Date");
+
+                    b.ToTable("QcDayReviews", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcLot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int?>("Level")
+                        .HasColumnType("int");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<decimal?>("RangeHigh")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<decimal?>("RangeLow")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Kind", "LotNumber", "Level")
+                        .IsUnique();
+
+                    b.ToTable("QcLots", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcMeter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("DepartmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Model")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("SerialNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DepartmentId");
+
+                    b.HasIndex("SerialNumber")
+                        .IsUnique();
+
+                    b.ToTable("QcMeters", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcRun", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BookId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CancelReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("Control1ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Control1High")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<int>("Control1Level")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("Control1LotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Control1LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("Control1Low")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<DateOnly>("Control1OpenedOn")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Control1RepeatValue")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<string>("Control1Unit")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("Control1Value")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<DateOnly>("Control2ExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Control2High")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<int>("Control2Level")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("Control2LotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Control2LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<decimal>("Control2Low")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<DateOnly>("Control2OpenedOn")
+                        .HasColumnType("date");
+
+                    b.Property<decimal?>("Control2RepeatValue")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<string>("Control2Unit")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("nvarchar(10)");
+
+                    b.Property<decimal>("Control2Value")
+                        .HasPrecision(5, 1)
+                        .HasColumnType("decimal(5,1)");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTimeOffset?>("FollowUpAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("FollowUpByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PerformedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly>("RecordedOn")
+                        .HasColumnType("date");
+
+                    b.Property<Guid?>("ReplacedByRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReplacesRunId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly>("RunDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly>("StripExpiryDate")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("StripLotId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("StripLotNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<DateOnly>("StripOpenedOn")
+                        .HasColumnType("date");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Control1LotId");
+
+                    b.HasIndex("Control2LotId");
+
+                    b.HasIndex("StripLotId");
+
+                    b.HasIndex("BookId", "RunDate");
+
+                    b.ToTable("QcRuns", (string)null);
+                });
+
             modelBuilder.Entity("Consent.Domain.Settings.SystemSetting", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1161,6 +1938,90 @@ namespace Consent.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("SystemSettings", (string)null);
+                });
+
+            modelBuilder.Entity("Consent.Domain.Testing.TestAssignment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssigneeUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CancelledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("CancelledByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Feature")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Findings")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("FindingsEncrypted");
+
+                    b.Property<string>("Instructions")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTimeOffset?>("ReportedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateOnly?>("ReportedOn")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Result")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("ReviewNote")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReviewedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Suggestions")
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(max)")
+                        .HasColumnName("SuggestionsEncrypted");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssigneeUserId");
+
+                    b.HasIndex("Version", "CreatedAtUtc");
+
+                    b.ToTable("TestAssignments", (string)null);
                 });
 
             modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentForm", b =>
@@ -1252,6 +2113,41 @@ namespace Consent.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalNotification", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivingDepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.CriticalResults.CriticalResult", null)
+                        .WithMany("Notifications")
+                        .HasForeignKey("ResultId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalResult", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivingDepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("SendingDepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.CriticalResults.CriticalTest", null)
+                        .WithMany()
+                        .HasForeignKey("TestId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Consent.Domain.Exports.ExportJob", b =>
                 {
                     b.HasOne("Consent.Domain.Identity.User", null)
@@ -1324,6 +2220,28 @@ namespace Consent.Persistence.Migrations
                         .HasForeignKey("DepartmentId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedDelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingDepartmentStatistics", b =>
+                {
+                    b.HasOne("Consent.Domain.NursingReports.NursingReportDelegation", null)
+                        .WithMany()
+                        .HasForeignKey("DelegationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDelegation", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Consent.Domain.NursingReports.NursingReportDepartment", b =>
@@ -1352,6 +2270,66 @@ namespace Consent.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcBook", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.QualityControl.QcMeter", null)
+                        .WithMany()
+                        .HasForeignKey("MeterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcDayReview", b =>
+                {
+                    b.HasOne("Consent.Domain.QualityControl.QcBook", null)
+                        .WithMany("Reviews")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcMeter", b =>
+                {
+                    b.HasOne("Consent.Domain.Departments.Department", null)
+                        .WithMany()
+                        .HasForeignKey("DepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcRun", b =>
+                {
+                    b.HasOne("Consent.Domain.QualityControl.QcBook", null)
+                        .WithMany("Runs")
+                        .HasForeignKey("BookId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.QualityControl.QcLot", null)
+                        .WithMany()
+                        .HasForeignKey("Control1LotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.QualityControl.QcLot", null)
+                        .WithMany()
+                        .HasForeignKey("Control2LotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Consent.Domain.QualityControl.QcLot", null)
+                        .WithMany()
+                        .HasForeignKey("StripLotId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Consent.Domain.ConsentForms.ConsentForm", b =>
                 {
                     b.Navigation("Signatures");
@@ -1360,6 +2338,11 @@ namespace Consent.Persistence.Migrations
             modelBuilder.Entity("Consent.Domain.ConsentTemplates.ConsentTemplate", b =>
                 {
                     b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Consent.Domain.CriticalResults.CriticalResult", b =>
+                {
+                    b.Navigation("Notifications");
                 });
 
             modelBuilder.Entity("Consent.Domain.Identity.Role", b =>
@@ -1377,6 +2360,13 @@ namespace Consent.Persistence.Migrations
             modelBuilder.Entity("Consent.Domain.Patients.Patient", b =>
                 {
                     b.Navigation("Representatives");
+                });
+
+            modelBuilder.Entity("Consent.Domain.QualityControl.QcBook", b =>
+                {
+                    b.Navigation("Reviews");
+
+                    b.Navigation("Runs");
                 });
 #pragma warning restore 612, 618
         }

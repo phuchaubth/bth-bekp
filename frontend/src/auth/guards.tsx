@@ -1,10 +1,11 @@
 import { Flex, Spin } from 'antd'
 import type { ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router'
+import { SCREEN_PATH, isDisplayOnly } from '../features/critical/criticalUtils'
 import { SIGNING_PATH, signingSession } from '../features/signing/signingSession'
 import { ForbiddenPage } from '../pages/ForbiddenPage'
 import { useAuth } from './authContext'
-import { KIOSK_ROLE_CODE } from './permissions'
+import { KIOSK_ROLE_CODE, hasAnyPermission } from './permissions'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from './paths'
 
 export function FullPageSpinner({ tip = 'Đang tải…' }: { tip?: string }) {
@@ -45,9 +46,9 @@ export function RequireAuth({ children, allowPasswordChange = false }: { childre
 }
 
 /** Hiển thị trang 403 nếu người dùng không có quyền. */
-export function RequirePermission({ permission, children }: { permission?: string; children: ReactNode }) {
+export function RequirePermission({ permission, children }: { permission?: string | readonly string[]; children: ReactNode }) {
   const { hasPermission } = useAuth()
-  if (permission && !hasPermission(permission)) {
+  if (permission && !hasAnyPermission(permission, hasPermission)) {
     return <ForbiddenPage />
   }
   return children
@@ -58,6 +59,15 @@ export function RedirectKioskAccount({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   if (user?.roles.some((role) => role.code === KIOSK_ROLE_CODE)) {
     return <Navigate to={KIOSK_PATH} replace />
+  }
+  return children
+}
+
+/** Tài khoản màn hình theo dõi kết quả nguy cấp tại khoa (quyết định 60) chỉ dùng màn hình theo dõi. */
+export function RedirectDisplayAccount({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (isDisplayOnly(user?.permissions)) {
+    return <Navigate to={SCREEN_PATH} replace />
   }
   return children
 }

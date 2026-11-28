@@ -1,4 +1,5 @@
 using Consent.Application.Abstractions;
+using Consent.Application.CriticalResults;
 using Consent.Persistence.Auditing;
 using Consent.Persistence.Repositories;
 using Consent.Persistence.Seeding;
@@ -53,6 +54,10 @@ public static class DependencyInjection
         services.AddScoped<IConsentStatisticsRepository, ConsentStatisticsRepository>();
         services.AddScoped<ISystemSettingRepository, SystemSettingRepository>();
         services.AddScoped<INursingReportRepository, NursingReportRepository>();
+        services.AddScoped<ITestAssignmentRepository, TestAssignmentRepository>();
+        services.AddScoped<IQualityControlRepository, QualityControlRepository>();
+        services.AddScoped<ICriticalResultRepository, CriticalResultRepository>();
+        services.AddScoped<ICriticalResultNumberGenerator, CriticalResultNumberGenerator>();
 
         services.AddOptions<SeedOptions>().Bind(configuration.GetSection(SeedOptions.SectionName));
         services.AddScoped<DatabaseSeeder>();

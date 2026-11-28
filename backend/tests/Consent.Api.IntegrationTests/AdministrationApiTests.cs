@@ -137,6 +137,85 @@ public sealed class AdministrationApiTests(SqlServerFixture sql) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task User_StopThenDelete_LeavesBothTabs_CannotLogIn_KeepsTheRow_AndFreesItsDepartment()
+    {
+        // Quyết định 51: ngưng sử dụng rồi mới xóa; xóa không xóa dòng trong CSDL (lịch sử), chỉ ẩn và gỡ vai trò, khoa.
+        var nurseRoleId = await RoleIdAsync("NURSE");
+        var (_, department) = await _client.SendJsonAsync(
+            HttpMethod.Post, "/api/v1/departments", _admin, new { code = "XOATK", name = "Khoa thử xóa tài khoản (giả lập)" });
+        var departmentId = department.GetProperty("id").GetString();
+        var newUser = new
+        {
+            userName = "dieuduong.nghiviec",
+            fullName = "Điều dưỡng Nghỉ việc (giả lập)",
+            title = "Điều dưỡng",
+            departmentId,
+            roleIds = new[] { nurseRoleId },
+            password = "Mat-Khau-Tam-2026",
+        };
+        var (_, user) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/users", _admin, newUser);
+        var id = user.GetProperty("id").GetString();
+        Assert.Equal(HttpStatusCode.OK, (await _client.LoginAsync("dieuduong.nghiviec", "Mat-Khau-Tam-2026")).Status);
+
+        async Task<bool> ListedAsync(string filter)
+        {
+            var (_, page) = await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users?{filter}pageSize=100", _admin);
+            return page.GetProperty("items").EnumerateArray().Any(u => u.GetProperty("id").GetString() == id);
+        }
+
+        // Đang sử dụng thì chưa xóa được.
+        var (active, activeProblem) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/users/{id}", _admin);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, active);
+        Assert.Equal("users.delete_active", activeProblem.GetProperty("code").GetString());
+
+        // Ngưng sử dụng: sang thẻ Ngưng sử dụng.
+        Assert.Equal(HttpStatusCode.NoContent, (await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/users/{id}/lock", _admin)).Status);
+        Assert.True(await ListedAsync("isActive=false&"));
+        Assert.False(await ListedAsync("isActive=true&"));
+
+        var (deleted, _) = await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/users/{id}", _admin);
+
+        Assert.Equal(HttpStatusCode.NoContent, deleted);
+        Assert.False(await ListedAsync(string.Empty));
+        Assert.False(await ListedAsync("isActive=true&"));
+        Assert.False(await ListedAsync("isActive=false&"));
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.SendJsonAsync(HttpMethod.Get, $"/api/v1/users/{id}", _admin)).Status);
+        Assert.Equal(HttpStatusCode.NotFound, (await _client.SendJsonAsync(HttpMethod.Post, $"/api/v1/users/{id}/unlock", _admin)).Status);
+
+        // Đăng nhập như tài khoản không tồn tại; tên đăng nhập không dùng lại được.
+        Assert.Equal("auth.invalid_credentials", (await _client.LoginAsync("dieuduong.nghiviec", "Mat-Khau-Tam-2026")).Code);
+        var (reuse, reuseProblem) = await _client.SendJsonAsync(HttpMethod.Post, "/api/v1/users", _admin, newUser);
+        Assert.Equal(HttpStatusCode.Conflict, reuse);
+        Assert.Contains("tài khoản đã xóa", reuseProblem.GetProperty("title").GetString(), StringComparison.Ordinal);
+
+        // Dòng vẫn còn (phiếu, nhật ký giữ tên người làm); vai trò, khoa đã gỡ nên khoa xóa được.
+        await using (var connection = new SqlConnection(_factory.ConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = new SqlCommand(
+                "SELECT FullName, DeletedAtUtc, DepartmentId, (SELECT COUNT(*) FROM UserRoles WHERE UserId = @id) FROM Users WHERE Id = @id",
+                connection);
+            command.Parameters.AddWithValue("@id", Guid.Parse(id!));
+            await using var reader = await command.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal("Điều dưỡng Nghỉ việc (giả lập)", reader.GetString(0));
+            Assert.False(reader.IsDBNull(1));
+            Assert.True(reader.IsDBNull(2));
+            Assert.Equal(0, reader.GetInt32(3));
+        }
+
+        Assert.Equal(
+            HttpStatusCode.NoContent, (await _client.SendJsonAsync(HttpMethod.Delete, $"/api/v1/departments/{departmentId}", _admin)).Status);
+
+        // Nhật ký ghi việc xóa (người xóa, thời điểm).
+        var (_, audit) = await _client.SendJsonAsync(
+            HttpMethod.Get, $"/api/v1/audit-logs?entityType=User&entityId={id}&action=Update&pageSize=50", _admin);
+        var deletion = audit.GetProperty("items").EnumerateArray()
+            .Single(a => a.GetProperty("details").GetString()!.Contains("DeletedAtUtc", StringComparison.Ordinal));
+        Assert.Equal("admin", deletion.GetProperty("userName").GetString());
+    }
+
+    [Fact]
     public async Task RolePermissions_Update_AppliesToNewTokens_AndIsAudited()
     {
         var doctorRoleId = await RoleIdAsync("DOCTOR");

@@ -1,5 +1,6 @@
 using System.Globalization;
 using Consent.Application.NursingReports;
+using Consent.Infrastructure.Exports;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 using MigraDoc.Rendering;
@@ -84,17 +85,23 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         AddHeading(section, "A. Số liệu người bệnh nội trú");
         AddInpatientTable(section, summary);
 
+        // Bảng B–E ngắn, số dòng cố định: in liền trên một trang. Bảng F dài tùy phần khoa nhập thêm nên được tách trang; phần
+        // nhập thêm dài được chia thành nhiều dòng bảng để tách được (một dòng bảng không tách sang trang sau).
         AddHeading(section, "B. Số liệu khoa khám bệnh");
-        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Outpatient.Select(l => (l.Label, Number(l.Value))));
+        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Outpatient.Select(l => (l.Label, Number(l.Value))), keepTogether: true);
+        AddReporters(section, summary.Reporters.Outpatient);
 
         AddHeading(section, "C. Số liệu PTTT");
-        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Procedures.Select(l => (l.Label, Number(l.Value))));
+        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Procedures.Select(l => (l.Label, Number(l.Value))), keepTogether: true);
+        AddReporters(section, summary.Reporters.Procedures);
 
         AddHeading(section, "D. Số liệu CĐHA");
-        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Imaging.Select(l => (l.Label, Number(l.Value))));
+        AddLineTable(section, "NỘI DUNG", "SỐ LIỆU", summary.Imaging.Select(l => (l.Label, Number(l.Value))), keepTogether: true);
+        AddReporters(section, summary.Reporters.Imaging);
 
         AddHeading(section, "E. Tình hình trong ngày");
-        AddLineTable(section, "NỘI DUNG", "PHẦN BÁO CÁO", summary.Situation.Select(c => (c.Label, c.Text ?? string.Empty)));
+        AddLineTable(section, "NỘI DUNG", "PHẦN BÁO CÁO", summary.Situation.Select(c => (c.Label, c.Text ?? string.Empty)), keepTogether: true);
+        AddReporters(section, summary.Reporters.Situation);
 
         AddHeading(section, "F. Báo cáo cụ thể sự cố (nếu có)");
         AddLineTable(
@@ -103,10 +110,45 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
             "NỘI DUNG BÁO CÁO SỰ CỐ",
             summary.Incidents.Count == 0
                 ? [(string.Empty, "Không có.")]
-                : summary.Incidents.Select(i => (i.DepartmentName, i.Text)),
+                : NursingIncidentRows.For(summary.Incidents),
             centerFirstColumn: true);
+        AddReporters(section, summary.Reporters.Incidents);
+
+        AddSignature(section);
         return pdf;
     }
+
+    /// <summary>Dòng "Người báo cáo: …" dưới mỗi mục B–F (quyết định 44); mục chưa có số liệu ghi "chưa có".</summary>
+    private static void AddReporters(Section section, string? reporters)
+    {
+        var line = section.AddParagraph();
+        line.Format.Font.Size = TableFontSize;
+        line.Format.SpaceBefore = Unit.FromMillimeter(1);
+        line.AddFormattedText($"{NursingReportForm.ReporterHeader}: ", TextFormat.Bold);
+        line.AddFormattedText(reporters ?? "chưa có", TextFormat.Italic);
+    }
+
+    /// <summary>Chỗ Phòng Điều dưỡng ký cuối bảng tổng hợp (quyết định 44): nửa phải trang, chừa chỗ ký, không tách trang.</summary>
+    private static void AddSignature(Section section)
+    {
+        var table = section.AddTable();
+        table.AddColumn(Unit.FromMillimeter(ContentWidthMm / 2));
+        table.AddColumn(Unit.FromMillimeter(ContentWidthMm / 2));
+        var row = table.AddRow();
+        row.TopPadding = Unit.FromMillimeter(6);
+        var title = row.Cells[1].AddParagraph();
+        title.Format.Alignment = ParagraphAlignment.Center;
+        title.Format.Font.Size = 11;
+        title.AddFormattedText(NursingReportForm.SignatureTitle, TextFormat.Bold);
+        var hint = row.Cells[1].AddParagraph();
+        hint.Format.Alignment = ParagraphAlignment.Center;
+        hint.Format.Font.Size = TableFontSize;
+        hint.Format.SpaceAfter = Unit.FromMillimeter(SignatureSpaceMm);
+        hint.AddFormattedText(NursingReportForm.SignatureHint, TextFormat.Italic);
+    }
+
+    /// <summary>Khoảng trống để ký và ghi họ tên dưới chỗ ký của Phòng Điều dưỡng.</summary>
+    internal const double SignatureSpaceMm = 22;
 
     private static byte[] Render(Document document)
     {
@@ -263,15 +305,37 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         box.Color = Colors.Black;
     }
 
-    /// <summary>Bảng A: một dòng mỗi khoa, cột số theo bản giấy, dòng "Tổng" in đậm.</summary>
+    /// <summary>Cột mã khoa (tên viết tắt) và cột người báo cáo của bảng A; các cột số chia đều phần còn lại (quyết định 44).</summary>
+    internal const double CodeColumnMm = 16;
+
+    internal const double ReporterColumnMm = 24;
+
+    /// <summary>
+    /// Cỡ chữ đầu các cột số của bảng A và khoảng cách chữ tới viền ô của các cột này (các bảng khác 1 mm): 16 cột số (quyết định
+    /// 54) mỗi cột còn 8,75 mm, chữ dài nhất ("Chuyển", "(Không") vẫn nằm gọn trong ô.
+    /// </summary>
+    internal const double NumberHeaderFontSize = 6.5;
+
+    internal const double NumberColumnPaddingMm = 0.4;
+
+    /// <summary>
+    /// Bảng A: một dòng mỗi khoa (mã khoa), cột số theo bản giấy, cột người báo cáo cuối cùng (quyết định 44), dòng "Tổng" in
+    /// đậm.
+    /// </summary>
     private static void AddInpatientTable(Section section, NursingSummaryDto summary)
     {
         var numberColumns = summary.Columns.Count;
-        const double numberWidth = 11.2;
-        var widths = new List<double> { ContentWidthMm - (numberColumns * numberWidth) };
+        var numberWidth = (ContentWidthMm - CodeColumnMm - ReporterColumnMm) / numberColumns;
+        var widths = new List<double> { CodeColumnMm };
         widths.AddRange(Enumerable.Repeat(numberWidth, numberColumns));
+        widths.Add(ReporterColumnMm);
         var table = AddGrid(section, [.. widths]);
         table.Format.Font.Size = 8;
+        for (var i = 1; i <= numberColumns; i++)
+        {
+            table.Columns[i].LeftPadding = Unit.FromMillimeter(NumberColumnPaddingMm);
+            table.Columns[i].RightPadding = Unit.FromMillimeter(NumberColumnPaddingMm);
+        }
 
         var header = table.AddRow();
         header.HeadingFormat = true;
@@ -282,19 +346,23 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
         for (var i = 0; i < numberColumns; i++)
         {
             var cell = header.Cells[i + 1].AddParagraph(summary.Columns[i].Header);
-            cell.Format.Font.Size = 7.5;
+            cell.Format.Font.Size = NumberHeaderFontSize;
         }
+
+        header.Cells[numberColumns + 1].AddParagraph(NursingReportForm.ReporterHeader).Format.Font.Size = 7.5;
 
         foreach (var department in summary.Rows)
         {
             var row = table.AddRow();
             row.VerticalAlignment = VerticalAlignment.Center;
-            row.Cells[0].AddParagraph(department.DepartmentName);
+            row.Cells[0].AddParagraph(department.DepartmentCode);
             for (var i = 0; i < numberColumns; i++)
             {
                 var cell = row.Cells[i + 1].AddParagraph(Number(department.Cells[summary.Columns[i].Key]));
                 cell.Format.Alignment = ParagraphAlignment.Right;
             }
+
+            row.Cells[numberColumns + 1].AddParagraph(department.SubmittedBy ?? string.Empty).Format.Font.Size = 7.5;
         }
 
         var total = table.AddRow();
@@ -308,8 +376,16 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
     }
 
     /// <summary>Bảng hai cột "nội dung – số liệu/báo cáo" của mục B–F, dòng tiêu đề in đậm, canh giữa.</summary>
+    /// <summary>
+    /// Bảng hai cột của mục B–F. <paramref name="keepTogether"/>: cả bảng in trên một trang (dòng tiêu đề giữ với mọi dòng sau).
+    /// </summary>
     private static void AddLineTable(
-        Section section, string firstHeader, string secondHeader, IEnumerable<(string Label, string Value)> lines, bool centerFirstColumn = false)
+        Section section,
+        string firstHeader,
+        string secondHeader,
+        IEnumerable<(string Label, string Value)> lines,
+        bool centerFirstColumn = false,
+        bool keepTogether = false)
     {
         var table = AddGrid(section, 63, ContentWidthMm - 63);
         var header = table.AddRow();
@@ -328,6 +404,11 @@ internal sealed class MigraDocNursingReportPdfRenderer : INursingReportPdfRender
 
             row.Cells[0].AddParagraph(label);
             AddMultiline(row.Cells[1].AddParagraph(), value);
+        }
+
+        if (keepTogether)
+        {
+            header.KeepWith = table.Rows.Count - 1;
         }
     }
 

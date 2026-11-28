@@ -21,6 +21,15 @@ export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Đã xảy ra lỗi không xác định.'
 }
 
+/**
+ * Thông báo lỗi kèm lỗi từng trường máy chủ trả (mỗi lỗi một lần), để người dùng biết dòng nào sai thay vì chỉ thấy
+ * "Dữ liệu không hợp lệ.".
+ */
+export function errorMessageWithDetails(error: unknown): string {
+  const details = error instanceof ApiError && error.fieldErrors ? [...new Set(Object.values(error.fieldErrors).flat())] : []
+  return details.length > 0 ? `${errorMessage(error)} ${details.join(' ')}` : errorMessage(error)
+}
+
 /** Lỗi máy chủ trả cho trường <paramref name="field"/> (nếu có), nếu không thì thông báo chung của lỗi. */
 export function fieldErrorMessage(error: unknown, field: string): string {
   const messages = error instanceof ApiError ? error.fieldErrors?.[field] : undefined

@@ -2,6 +2,7 @@ import { LockOutlined, UserOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Flex, Form, Input, Typography } from 'antd'
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import { useMaintenanceState } from '../api/maintenanceStore'
 import { BRAND } from '../app/theme'
 import { useAuth } from '../auth/authContext'
 import { BrandMark } from '../components/layout/BrandMark'
@@ -21,6 +22,8 @@ export function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const redirect = safeRedirectPath(searchParams.get('redirect'))
+  // Đang bảo trì (quyết định 53): trang này chỉ hiện khi đã chọn "Đăng nhập bằng tài khoản quản trị".
+  const { notice } = useMaintenanceState()
 
   if (status === 'loading') {
     return <FullPageSpinner />
@@ -59,6 +62,15 @@ export function LoginPage() {
           <Typography.Text type="secondary">Đăng nhập bằng tài khoản được cấp</Typography.Text>
         </Flex>
 
+        {notice?.kind === 'maintenance' && (
+          <Alert
+            type="warning"
+            showIcon
+            title="Hệ thống đang bảo trì."
+            description="Trong lúc bảo trì chỉ tài khoản có quyền bảo trì hệ thống đăng nhập được."
+            style={{ marginBottom: 16 }}
+          />
+        )}
         {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} role="alert" />}
 
         <Form<LoginValues> layout="vertical" onFinish={onFinish} requiredMark={false} disabled={submitting}>

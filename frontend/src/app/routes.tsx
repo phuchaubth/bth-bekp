@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
-import type { RouteObject } from 'react-router'
-import { RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
+import { Navigate, type RouteObject } from 'react-router'
+import { RedirectDisplayAccount, RedirectKioskAccount, RequireAuth, RequirePermission } from '../auth/guards'
 import { FORCED_PASSWORD_CHANGE_PATH, KIOSK_PATH, LOGIN_PATH } from '../auth/paths'
 import { AppLayout } from '../components/layout/AppLayout'
+import { MaintenanceGate } from '../components/MaintenanceGate'
 import { PagePlaceholder } from '../components/PagePlaceholder'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ErrorPage } from '../pages/ErrorPage'
@@ -19,24 +20,41 @@ import {
   ConsentFormsPage,
   ConsentTemplateDetailPage,
   ConsentTemplatesPage,
+  CriticalDashboardPage,
+  CriticalDetailPage,
+  CriticalLogbookPage,
+  CriticalReceivedPage,
+  CriticalRecordPage,
+  CriticalScreenPage,
+  CriticalSentPage,
+  CriticalSettingsPage,
   DepartmentsPage,
   ExportsPage,
   KioskPage,
   Lazy,
+  MaintenanceSettingsPage,
+  MyTestAssignmentsPage,
+  NursingDashboardPage,
+  NursingDelegationsPage,
   NursingReportPage,
-  NursingSummaryPage,
   PatientIntakePage,
   PatientProfilePage,
   PatientsPage,
+  QcBookPage,
+  QcBooksPage,
+  QcCatalogPage,
+  QcDashboardPage,
   RemoteSigningPage,
   ReportsPage,
   RolesPage,
   SettingsPage,
   SigningKioskPage,
+  TestAssignmentsPage,
   UsersPage,
 } from './lazyPages'
 import { SIGNING_PATH } from '../features/signing/signingSession'
 import { REMOTE_SIGNING_PATH } from '../api/remoteSigning'
+import { SCREEN_PATH, SCREEN_PERMISSIONS } from '../features/critical/criticalUtils'
 
 /** Trang đã hoàn thành; các mục menu còn lại hiển thị trang "đang phát triển". */
 const implementedPages: Record<string, ReactNode> = {
@@ -47,11 +65,22 @@ const implementedPages: Record<string, ReactNode> = {
   '/bao-cao': <ReportsPage />,
   '/nhat-ky': <AuditLogsPage />,
   '/dieu-duong/bao-cao-khoa': <NursingReportPage />,
-  '/dieu-duong/tong-hop': <NursingSummaryPage />,
+  '/dieu-duong/dashboard': <NursingDashboardPage />,
+  '/dieu-duong/uy-quyen': <NursingDelegationsPage />,
+  '/noi-kiem/so': <QcBooksPage />,
+  '/noi-kiem/dashboard': <QcDashboardPage />,
+  '/noi-kiem/danh-muc': <QcCatalogPage />,
+  '/ket-qua-nguy-cap/khoa-bao': <CriticalSentPage />,
+  '/ket-qua-nguy-cap/khoa-nhan': <CriticalReceivedPage />,
+  '/ket-qua-nguy-cap/so': <CriticalLogbookPage />,
+  '/ket-qua-nguy-cap/dashboard': <CriticalDashboardPage />,
+  '/ket-qua-nguy-cap/danh-muc': <CriticalSettingsPage />,
   '/quan-tri/nguoi-dung': <UsersPage />,
   '/quan-tri/vai-tro': <RolesPage />,
   '/quan-tri/khoa-phong': <DepartmentsPage />,
   '/quan-tri/cau-hinh': <SettingsPage />,
+  '/quan-tri/bao-tri': <MaintenanceSettingsPage />,
+  '/quan-tri/kiem-thu': <TestAssignmentsPage />,
 }
 
 const featureRoutes: RouteObject[] = flattenNavItems()
@@ -69,7 +98,8 @@ const featureRoutes: RouteObject[] = flattenNavItems()
     ),
   }))
 
-export const appRoutes: RouteObject[] = [
+/** Các trang (đều nằm dưới màn hình bảo trì). */
+const pageRoutes: RouteObject[] = [
   { path: LOGIN_PATH, element: <LoginPage />, errorElement: <ErrorPage /> },
   // Chế độ ký trên điện thoại: không dùng phiên đăng nhập (chỉ có token phiên ký), không có menu.
   {
@@ -105,6 +135,21 @@ export const appRoutes: RouteObject[] = [
     ),
     errorElement: <ErrorPage />,
   },
+  // Màn hình theo dõi kết quả nguy cấp tại khoa (quyết định 60): toàn màn hình, không có menu; tài khoản màn hình theo dõi
+  // mở trang nào cũng được chuyển về đây.
+  {
+    path: SCREEN_PATH,
+    element: (
+      <RequireAuth>
+        <RequirePermission permission={SCREEN_PERMISSIONS}>
+          <Lazy>
+            <CriticalScreenPage />
+          </Lazy>
+        </RequirePermission>
+      </RequireAuth>
+    ),
+    errorElement: <ErrorPage />,
+  },
   {
     path: FORCED_PASSWORD_CHANGE_PATH,
     element: (
@@ -119,7 +164,9 @@ export const appRoutes: RouteObject[] = [
     element: (
       <RequireAuth>
         <RedirectKioskAccount>
-          <AppLayout />
+          <RedirectDisplayAccount>
+            <AppLayout />
+          </RedirectDisplayAccount>
         </RedirectKioskAccount>
       </RequireAuth>
     ),
@@ -134,7 +181,19 @@ export const appRoutes: RouteObject[] = [
           </Lazy>
         ),
       },
+      // Việc kiểm thử của tôi (quyết định 49): mọi tài khoản mở được, chỉ thấy việc được phân công cho mình.
+      {
+        path: 'kiem-thu',
+        element: (
+          <Lazy>
+            <MyTestAssignmentsPage />
+          </Lazy>
+        ),
+      },
       ...featureRoutes,
+      // Quyết định 58: trang Tổng hợp hằng ngày gộp vào Dashboard điều dưỡng (thẻ Bảng tổng hợp, mở sẵn). Đường dẫn cũ đã lưu
+      // trên trình duyệt, trong tài liệu chuyển sang Dashboard; trang Dashboard tự kiểm tra quyền.
+      { path: 'dieu-duong/tong-hop', element: <Navigate to="/dieu-duong/dashboard" replace /> },
       {
         path: 'phieu-dong-thuan/tao-moi',
         element: (
@@ -176,6 +235,38 @@ export const appRoutes: RouteObject[] = [
         ),
       },
       {
+        path: 'noi-kiem/so/:id',
+        element: (
+          <RequirePermission permission={[Permissions.QcRecord, Permissions.QcReview]}>
+            <Lazy>
+              <QcBookPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'ket-qua-nguy-cap/ghi',
+        element: (
+          <RequirePermission permission={Permissions.CriticalRecord}>
+            <Lazy>
+              <CriticalRecordPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
+        path: 'ket-qua-nguy-cap/ho-so/:id',
+        element: (
+          <RequirePermission
+            permission={[Permissions.CriticalRecord, Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor]}
+          >
+            <Lazy>
+              <CriticalDetailPage />
+            </Lazy>
+          </RequirePermission>
+        ),
+      },
+      {
         path: 'nguoi-benh/:id',
         element: (
           <RequirePermission permission={Permissions.PatientsRead}>
@@ -188,4 +279,9 @@ export const appRoutes: RouteObject[] = [
       { path: '*', element: <NotFoundPage /> },
     ],
   },
+]
+
+export const appRoutes: RouteObject[] = [
+  // Chế độ bảo trì (quyết định 53): máy chủ trả 503 thì màn hình "Hệ thống đang bảo trì" che trang đang mở (kể cả kiosk, ký QR).
+  { element: <MaintenanceGate />, errorElement: <ErrorPage />, children: pageRoutes },
 ]

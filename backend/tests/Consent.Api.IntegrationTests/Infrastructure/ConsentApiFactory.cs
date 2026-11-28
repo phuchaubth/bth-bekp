@@ -1,10 +1,12 @@
 using Consent.Application.Abstractions;
+using Consent.Application.Maintenance;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Consent.Api.IntegrationTests.Infrastructure;
 
@@ -40,7 +42,19 @@ public class ConsentApiFactory : WebApplicationFactory<Program>
         }
 
         builder.ConfigureTestServices(services =>
-            services.AddSingleton<IStartupFilter>(new ThrowingEndpointStartupFilter()));
+        {
+            services.AddSingleton<IStartupFilter>(new ThrowingEndpointStartupFilter());
+            // Không có CSDL: chế độ bảo trì (quyết định 53) luôn tắt, không đọc cấu hình trong CSDL ở mỗi yêu cầu.
+            services.Replace(ServiceDescriptor.Singleton(AlwaysOffMaintenance()));
+        });
+    }
+
+    /// <summary>Trạng thái "không bảo trì" giữ mãi trong bộ nhớ.</summary>
+    private static MaintenanceStateCache AlwaysOffMaintenance()
+    {
+        var cache = new MaintenanceStateCache(TimeSpan.MaxValue);
+        cache.Set(MaintenanceState.Off, DateTimeOffset.MinValue);
+        return cache;
     }
 
     private sealed class ThrowingEndpointStartupFilter : IStartupFilter

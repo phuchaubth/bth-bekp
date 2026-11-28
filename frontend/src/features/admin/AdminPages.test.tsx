@@ -12,7 +12,7 @@ import {
   session,
   users,
 } from '../../test/fixtures'
-import { json, mockApi, noContent, problem } from '../../test/mockApi'
+import { json, mockApi, noContent, problem, type ApiCall } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
 describe('Khoa/phòng', () => {
@@ -134,25 +134,45 @@ describe('Khoa/phòng', () => {
 })
 
 describe('Người dùng', () => {
+  /** Như máy chủ: lọc theo isActive (thẻ Đang sử dụng / Ngưng sử dụng, quyết định 51). */
+  const usersPage = (items: typeof users) => (call: ApiCall) => {
+    const active = new URLSearchParams(call.search).get('isActive')
+    const page = active === null ? items : items.filter((u) => String(u.isActive) === active)
+    return { items: page, page: 1, pageSize: 20, totalCount: page.length, totalPages: 1 }
+  }
   const userRoutes = {
-    'GET /api/v1/users': { items: users, page: 1, pageSize: 20, totalCount: 2, totalPages: 1 },
+    'GET /api/v1/users': usersPage(users),
     'GET /api/v1/departments': departments,
   }
 
-  it('liệt kê người dùng với vai trò và trạng thái', async () => {
-    mockApi({ ...baseRoutes(adminSession()), ...userRoutes })
+  it('hai thẻ Đang sử dụng và Ngưng sử dụng, có số tài khoản; mỗi thẻ có thao tác riêng', async () => {
+    const { calls } = mockApi({ ...baseRoutes(adminSession()), ...userRoutes })
     renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
 
-    expect(await screen.findByText('Tổng 2 người dùng')).toBeInTheDocument()
-    const doctorRow = screen.getByText('bacsi.demo').closest('tr')!
+    expect(await screen.findByRole('tab', { name: 'Đang sử dụng (1)' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: 'Ngưng sử dụng (1)' })).toBeInTheDocument()
+    const doctorRow = (await screen.findByText('bacsi.demo')).closest('tr')!
     expect(within(doctorRow).getByText('Hoạt động')).toBeInTheDocument()
     expect(within(doctorRow).getByText('Khoa Nội tổng hợp')).toBeInTheDocument()
-    const lockedRow = screen.getByText('tiepdon.demo').closest('tr')!
-    expect(within(lockedRow).getByText('Đã khóa')).toBeInTheDocument()
+    expect(screen.queryByText('tiepdon.demo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Trạng thái' })).not.toBeInTheDocument()
+    expect(calls.some((c) => c.path === '/api/v1/users' && c.search.includes('isActive=true'))).toBe(true)
+    expect(calls.some((c) => c.path === '/api/v1/users' && c.search.includes('isActive=false'))).toBe(true)
 
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Thao tác khác cho tiepdon.demo' }))
-    expect(await screen.findByRole('menuitem', { name: /Mở khóa/ })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: /Khóa tài khoản/ })).not.toBeInTheDocument()
+    await user.click(within(doctorRow).getByRole('button', { name: 'Thao tác khác cho bacsi.demo' }))
+    expect(await screen.findByRole('menuitem', { name: /Ngưng sử dụng/ })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Mở khóa/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /Xóa/ })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('tab', { name: 'Ngưng sử dụng (1)' }))
+    const stoppedRow = (await screen.findByText('tiepdon.demo')).closest('tr')!
+    expect(screen.queryByText('bacsi.demo')).not.toBeInTheDocument()
+    expect(screen.getByText(/Tài khoản ngưng sử dụng không đăng nhập được/)).toBeInTheDocument()
+    expect(within(stoppedRow).getByRole('button', { name: /Sử dụng lại/ })).toBeInTheDocument()
+    expect(within(stoppedRow).getByRole('button', { name: /Xóa/ })).toBeInTheDocument()
+    expect(within(stoppedRow).getByRole('button', { name: /Sửa/ })).toBeInTheDocument()
+    expect(within(stoppedRow).queryByText('Hoạt động')).not.toBeInTheDocument()
   })
 
   it('chưa tích hợp SmartCA: ẩn ô mã SmartCA khi sửa người dùng nhưng vẫn giữ giá trị đã lưu', async () => {
@@ -201,13 +221,10 @@ describe('Người dùng', () => {
     mockApi({
       ...baseRoutes(adminSession()),
       ...userRoutes,
-      'GET /api/v1/users': {
-        items: [{ ...users[0], additionalDepartmentNames: ['Khoa Khám bệnh', 'Khoa Ngoại (giả lập)'] }, users[1]],
-        page: 1,
-        pageSize: 20,
-        totalCount: 2,
-        totalPages: 1,
-      },
+      'GET /api/v1/users': usersPage([
+        { ...users[0], additionalDepartmentNames: ['Khoa Khám bệnh', 'Khoa Ngoại (giả lập)'] },
+        { ...users[1], isActive: true },
+      ]),
     })
     renderApp('/quan-tri/nguoi-dung')
 
@@ -334,7 +351,7 @@ describe('Người dùng', () => {
     const { calls } = mockApi({
       ...baseRoutes(adminSession()),
       ...userRoutes,
-      'GET /api/v1/users': { items: [kiosk], page: 1, pageSize: 20, totalCount: 1, totalPages: 1 },
+      'GET /api/v1/users': usersPage([kiosk]),
       'POST /api/v1/users/u-kiosk/unlock': () => noContent(),
     })
     renderApp('/quan-tri/nguoi-dung')
@@ -350,7 +367,7 @@ describe('Người dùng', () => {
     await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/users/u-kiosk/unlock')).toBe(true))
   })
 
-  it('khóa tài khoản sau khi xác nhận', async () => {
+  it('ngưng sử dụng tài khoản sau khi xác nhận', async () => {
     const { calls } = mockApi({
       ...baseRoutes(adminSession()),
       ...userRoutes,
@@ -360,11 +377,69 @@ describe('Người dùng', () => {
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: 'Thao tác khác cho bacsi.demo' }))
-    await user.click(await screen.findByRole('menuitem', { name: /Khóa tài khoản/ }))
+    await user.click(await screen.findByRole('menuitem', { name: /Ngưng sử dụng/ }))
     expect(await screen.findByText(/sẽ bị đăng xuất khỏi mọi thiết bị/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Khóa' }))
+    await user.click(screen.getByRole('button', { name: 'Ngưng sử dụng' }))
 
     await waitFor(() => expect(calls.some((c) => c.path === '/api/v1/users/u-bacsi/lock')).toBe(true))
+    expect(await screen.findByText('Đã ngưng sử dụng tài khoản.')).toBeInTheDocument()
+  })
+
+  it('thẻ Ngưng sử dụng: sử dụng lại tài khoản sau khi xác nhận', async () => {
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'POST /api/v1/users/u-tiepdon/unlock': () => noContent(),
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+
+    await user.click(await screen.findByRole('tab', { name: /Ngưng sử dụng/ }))
+    const row = (await screen.findByText('tiepdon.demo')).closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /Sử dụng lại/ }))
+    expect(await screen.findByText('Người dùng đăng nhập lại được ngay với mật khẩu hiện tại.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Sử dụng lại' }))
+
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/v1/users/u-tiepdon/unlock')).toBe(true))
+    expect(await screen.findByText('Đã sử dụng lại tài khoản.')).toBeInTheDocument()
+  })
+
+  it('thẻ Ngưng sử dụng: xóa tài khoản sau khi xác nhận; máy chủ từ chối thì báo lý do', { timeout: 20_000 }, async () => {
+    let refuse = true
+    const { calls } = mockApi({
+      ...baseRoutes(adminSession()),
+      ...userRoutes,
+      'DELETE /api/v1/users/u-tiepdon': () =>
+        refuse
+          ? problem(422, 'Chỉ xóa được tài khoản đã ngưng sử dụng. Bấm Ngưng sử dụng trước, rồi xóa ở thẻ Ngưng sử dụng.', {
+              code: 'users.delete_active',
+            })
+          : noContent(),
+    })
+    renderApp('/quan-tri/nguoi-dung')
+    const user = userEvent.setup()
+    const deleteCalls = () => calls.filter((c) => c.method === 'DELETE' && c.path === '/api/v1/users/u-tiepdon').length
+
+    await user.click(await screen.findByRole('tab', { name: /Ngưng sử dụng/ }))
+    const row = (await screen.findByText('tiepdon.demo')).closest('tr')!
+    await user.click(within(row).getByRole('button', { name: /Xóa/ }))
+    expect(await screen.findByText(/tên đăng nhập này không tạo lại được/)).toBeInTheDocument()
+    expect(screen.getByText(/Phiếu, báo cáo, nhật ký đã có vẫn giữ tên người này. Không hoàn tác được./)).toBeInTheDocument()
+    const listCalls = () => calls.filter((c) => c.method === 'GET' && c.path === '/api/v1/users').length
+    const listedBefore = listCalls()
+    await user.click(screen.getByRole('button', { name: 'Xóa' }))
+    expect(await screen.findByText(/Chỉ xóa được tài khoản đã ngưng sử dụng/)).toBeInTheDocument()
+    expect(deleteCalls()).toBe(1)
+    // Danh sách tải lại (trạng thái có thể vừa đổi). Hộp xác nhận đóng: đã kiểm trên Chromium (jsdom không chạy hiệu ứng đóng).
+    await waitFor(() => expect(listCalls()).toBeGreaterThan(listedBefore))
+
+    // Hộp xác nhận đã đóng (lỗi báo ở thông báo); xóa lại, lần này máy chủ đồng ý.
+    refuse = false
+    await user.click(within(row).getByRole('button', { name: /Xóa/ }))
+    await user.click((await screen.findAllByRole('button', { name: 'Xóa' })).at(-1)!)
+
+    expect(await screen.findByText('Đã xóa tài khoản.')).toBeInTheDocument()
+    expect(deleteCalls()).toBe(2)
   })
 
   it('người chỉ có quyền xem không thấy nút thao tác', async () => {
@@ -378,6 +453,11 @@ describe('Người dùng', () => {
     expect(screen.queryByRole('button', { name: /Thêm người dùng/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Sửa/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Thao tác khác/ })).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('tab', { name: /Ngưng sử dụng/ }))
+    expect(await screen.findByText('tiepdon.demo')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Sử dụng lại/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Xóa/ })).not.toBeInTheDocument()
   })
 
   it('tìm kiếm gửi từ khóa lên máy chủ', async () => {

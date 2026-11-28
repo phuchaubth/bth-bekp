@@ -22,9 +22,6 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
             .AsSingleQuery()
             .FirstOrDefaultAsync(u => u.UserName == normalizedUserName, cancellationToken);
 
-    public Task<bool> UserNameExistsAsync(string normalizedUserName, CancellationToken cancellationToken) =>
-        db.Users.AnyAsync(u => u.UserName == normalizedUserName, cancellationToken);
-
     /// <summary>Có người dùng thuộc khoa (khoa chính hoặc khoa/phòng khác).</summary>
     public Task<bool> AnyInDepartmentAsync(Guid departmentId, CancellationToken cancellationToken) =>
         db.Users.AnyAsync(
@@ -41,11 +38,24 @@ internal sealed class UserRepository(ConsentDbContext db) : IUserRepository
     public Task<int> CountUsersInRoleAsync(Guid roleId, CancellationToken cancellationToken) =>
         db.Users.CountAsync(u => u.Roles.Any(r => r.RoleId == roleId), cancellationToken);
 
+    public async Task<IReadOnlyList<User>> ListActiveInRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(roleIds);
+        return roleIds.Count == 0
+            ? []
+            : await db.Users.Include(u => u.Roles).Include(u => u.AdditionalDepartments)
+                .AsSingleQuery()
+                .Where(u => u.IsActive && u.Roles.Any(r => roleIds.Contains(r.RoleId)))
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+    }
+
     public async Task<PagedResult<UserListItemDto>> SearchAsync(
         UserQuery query, DateTimeOffset nowUtc, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(query);
-        var users = db.Users.AsNoTracking();
+        // Tài khoản đã xóa không còn trong danh sách quản trị (quyết định 51).
+        var users = db.Users.AsNoTracking().Where(u => u.DeletedAtUtc == null);
 
         if (!string.IsNullOrWhiteSpace(query.Keyword))
         {

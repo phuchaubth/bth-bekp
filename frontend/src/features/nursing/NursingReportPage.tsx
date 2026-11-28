@@ -3,21 +3,24 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Button, Card, DatePicker, Flex, Form, Popconfirm, Select, Spin, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { accountDepartments } from '../../api/auth'
 import {
   nursingKeys,
   nursingReportsApi,
+  useNursingDelegations,
   useNursingReport,
   useNursingReportForm,
+  type NursingDelegation,
   type NursingReport,
   type NursingReportFormDefinition,
 } from '../../api/nursingReports'
 import { useAuth } from '../../auth/authContext'
 import { PageHeader } from '../../components/PageHeader'
-import { errorMessage } from '../../utils/formErrors'
+import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { HisEntryCard } from './HisEntryCard'
 import { NursingReportFields, PdfModal, ReportStatus } from './NursingReportFields'
-import { toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
+import { delegationContents, delegationPeriod, formulaItems, toSaveInput, type NursingReportFormValues } from './nursingReportUtils'
 
 const DATE = 'YYYY-MM-DD'
 
@@ -25,17 +28,44 @@ const DATE = 'YYYY-MM-DD'
  * Báo cáo công tác điều dưỡng hằng ngày của khoa (quyết định 31): điều dưỡng chọn ngày, nhập theo bản giấy, lưu nháp hoặc
  * gửi Phòng Điều dưỡng. Gửi xong thì khóa; cần sửa thì đề nghị Phòng Điều dưỡng trả lại khoa. Khi HIS lỗi, khoa nhập số liệu HIS
  * thuộc nhiệm vụ của khoa ở thẻ riêng (quyết định 35); khoa không phải báo cáo nhưng được giao chỉ số thì chỉ thấy thẻ này.
- * Tài khoản thuộc nhiều khoa (quyết định 41) chọn khoa; mặc định là khoa chính.
+ * Tài khoản thuộc nhiều khoa (quyết định 41) chọn khoa; mặc định là khoa chính. Người được ủy quyền (quyết định 48) chọn được
+ * khoa được ủy quyền (hoặc mở từ trang Ủy quyền, `?khoa=`), chỉ với các ngày trong thời gian ủy quyền.
  */
 export function NursingReportPage() {
   const { user } = useAuth()
   const myDepartments = accountDepartments(user)
+  const [searchParams] = useSearchParams()
   const [date, setDate] = useState<Dayjs>(() => dayjs())
   // Chưa chọn: khoa chính (máy chủ tự lấy theo tài khoản).
-  const [departmentId, setDepartmentId] = useState<string | undefined>(undefined)
+  const [departmentId, setDepartmentId] = useState<string | undefined>(() => searchParams.get('khoa') ?? undefined)
   const reportDate = date.format(DATE)
   const definition = useNursingReportForm()
   const report = useNursingReport(reportDate, departmentId)
+  const delegations = useNursingDelegations(false)
+  // Ủy quyền đang hiệu lực mà mình là người được ủy quyền.
+  const delegated = (delegations.data ?? []).filter((d) => d.delegateUserId === user?.id && d.status === 'Active')
+  const ownIds = new Set(myDepartments.map((d) => d.id))
+  const departmentOptions = [
+    ...myDepartments.map((d) => ({ value: d.id, label: d.name })),
+    ...delegated
+      .filter((d, index) => !ownIds.has(d.departmentId) && delegated.findIndex((o) => o.departmentId === d.departmentId) === index)
+      .map((d) => ({ value: d.departmentId, label: `${d.departmentName} (được ủy quyền)` })),
+  ]
+  const selectedId = departmentId ?? myDepartments[0]?.id
+  const delegation = delegated.find((d) => d.departmentId === selectedId)
+  // Khoa chỉ làm được theo ủy quyền: chỉ chọn được ngày trong thời gian ủy quyền.
+  const onlyDelegated = (id: string | undefined) =>
+    id !== undefined && !ownIds.has(id) ? delegated.find((d) => d.departmentId === id) : undefined
+  const period = onlyDelegated(selectedId)
+  const outsidePeriod = (d: Dayjs, p: NursingDelegation) => d.isBefore(dayjs(p.startDate), 'day') || d.isAfter(dayjs(p.endDate), 'day')
+  const changeDepartment = (id: string) => {
+    setDepartmentId(id)
+    const next = onlyDelegated(id)
+    // Ngày đang chọn ở ngoài thời gian ủy quyền: chuyển về ngày bắt đầu ủy quyền (đang hiệu lực nên không sau hôm nay).
+    if (next && outsidePeriod(date, next)) {
+      setDate(dayjs(next.startDate))
+    }
+  }
 
   return (
     <>
@@ -43,12 +73,13 @@ export function NursingReportPage() {
         title="Báo cáo điều dưỡng của khoa"
         extra={
           <Flex gap={8} wrap>
-            {myDepartments.length > 1 && (
+            {departmentOptions.length > 1 && (
               <Select
                 aria-label="Khoa"
-                value={departmentId ?? myDepartments[0].id}
-                options={myDepartments.map((d) => ({ value: d.id, label: d.name }))}
-                onChange={(id: string) => setDepartmentId(id)}
+                // Mở bằng `?khoa=` khi danh sách ủy quyền chưa tải xong: chưa hiện mã khoa thô.
+                value={departmentOptions.some((o) => o.value === selectedId) ? selectedId : undefined}
+                options={departmentOptions}
+                onChange={changeDepartment}
                 style={{ minWidth: 220 }}
                 popupMatchSelectWidth={false}
               />
@@ -58,16 +89,36 @@ export function NursingReportPage() {
               format="DD/MM/YYYY"
               allowClear={false}
               aria-label="Ngày báo cáo"
-              disabledDate={(d) => d.isAfter(dayjs(), 'day')}
+              disabledDate={(d) => d.isAfter(dayjs(), 'day') || (period !== undefined && outsidePeriod(d, period))}
               onChange={(d) => d && setDate(d)}
             />
           </Flex>
         }
       />
+      {delegation && <DelegationAlert delegation={delegation} />}
       {definition.isError || report.isError ? (
         <Alert type="error" showIcon title={errorMessage(definition.error ?? report.error)} />
       ) : !definition.data || !report.data ? (
         <Spin style={{ display: 'block', padding: 48 }} />
+      ) : report.data.reportVisible === false ? (
+        <>
+          <Alert
+            type="info"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title={`Bạn chỉ được ủy quyền nhập số liệu HIS của ${report.data.departmentName}.`}
+            description="Báo cáo của khoa không thuộc nội dung được ủy quyền nên không hiện ở đây."
+          />
+          {report.data.hisEntry && (
+            <HisEntryCard
+              key={`${report.data.departmentId}-${reportDate}-${report.data.hisEntry.updatedAtUtc ?? 'new'}`}
+              report={report.data}
+              entry={report.data.hisEntry}
+              maxValue={definition.data.maxValue}
+              queryDepartmentId={departmentId}
+            />
+          )}
+        </>
       ) : !report.data.isReportingDepartment && report.data.hisEntry ? (
         <>
           <Alert
@@ -107,6 +158,19 @@ export function NursingReportPage() {
   )
 }
 
+/** Đang làm theo ủy quyền (quyết định 48): của ai, thời gian, nội dung. */
+function DelegationAlert({ delegation }: { delegation: NursingDelegation }) {
+  return (
+    <Alert
+      type="info"
+      showIcon
+      style={{ marginBottom: 12 }}
+      title={`Bạn làm thay theo ủy quyền của ${delegation.delegatorName} (${delegation.departmentName}), ${delegationPeriod(delegation)}.`}
+      description={`Nội dung được ủy quyền: ${delegationContents(delegation.contents)}. Bảng tổng hợp ghi "được ${delegation.delegatorName} ủy quyền".`}
+    />
+  )
+}
+
 function ReportEditor({
   definition,
   report,
@@ -132,8 +196,12 @@ function ReportEditor({
       void queryClient.invalidateQueries({ queryKey: nursingKeys.all })
       message.success(submit ? 'Đã gửi báo cáo cho Phòng Điều dưỡng.' : 'Đã lưu nháp.')
     },
-    onError: (e) => message.error(errorMessage(e)),
+    // Không trả về kết quả của message.error: React Query sẽ chờ thông báo đóng (3 giây) rồi mới hết trạng thái đang lưu.
+    onError: (e) => {
+      message.error(errorMessageWithDetails(e))
+    },
   })
+  const labels = Object.fromEntries(definition.sections.flatMap((s) => s.items.map((i) => [i.key, i.label] as const)))
 
   const submit = () => {
     const checks = form.getFieldValue('checks') as Record<string, string | null | undefined> | undefined
@@ -143,8 +211,24 @@ function ReportEditor({
       message.error('Chọn "Ổn" hoặc "Không ổn" cho mọi dòng của phần tick trước khi gửi.')
       return
     }
+    // Dòng tính tự động (quyết định 46) cần số gốc, ví dụ Số NB ngày hôm trước để tính Số NB hiện tại.
+    const values = form.getFieldValue('values') as NursingReportFormValues['values'] | undefined
+    const noBase = formulaItems(definition).filter((i) => typeof values?.[i.formula.base] !== 'number')
+    if (noBase.length > 0) {
+      const texts = noBase.map((i) => `Nhập ${labels[i.formula.base] ?? i.formula.base} để tính ${i.label}.`)
+      form.setFields(noBase.map((i, index) => ({ name: ['values', i.formula.base], errors: [texts[index]] })))
+      message.error(texts.join(' '))
+      return
+    }
     save.mutate(true)
   }
+  const bases = new Set(formulaItems(definition).map((i) => i.formula.base))
+  const prefilled = [
+    ...(report.carriedOverKeys.some((k) => !bases.has(k)) ? ['nhân sự và chỉ tiêu theo báo cáo đã gửi gần nhất của khoa'] : []),
+    ...report.carriedOverKeys
+      .filter((k) => bases.has(k))
+      .map((k) => `${(labels[k] ?? k).toLowerCase().replace(/^số nb/, 'số NB')} theo báo cáo đã gửi hôm trước`),
+  ]
 
   const title = `${definition.title} – ${report.departmentName}`
   return (
@@ -184,12 +268,12 @@ function ReportEditor({
           description={`Lý do: ${report.reopenReason}. Sửa rồi bấm "Gửi báo cáo" lại.`}
         />
       )}
-      {report.status === 'New' && report.carriedOverKeys.length > 0 && (
+      {report.status === 'New' && prefilled.length > 0 && (
         <Alert
           type="info"
           showIcon
           style={{ marginBottom: 12 }}
-          title="Đã điền sẵn nhân sự và chỉ tiêu theo báo cáo đã gửi gần nhất của khoa. Kiểm tra lại trước khi gửi."
+          title={`Đã điền sẵn ${prefilled.join('; ')}. Kiểm tra lại trước khi gửi.`}
         />
       )}
       {report.status === 'Submitted' && (

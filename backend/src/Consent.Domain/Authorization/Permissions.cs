@@ -45,6 +45,57 @@ public static class Permissions
 
     /// <summary>Xem dữ liệu của mọi khoa (không giới hạn theo khoa của người dùng).</summary>
     public const string ScopeAllDepartments = "scope.all_departments";
+
+    /// <summary>
+    /// Phân công kiểm thử tính năng mới cho từng người, có thời gian; xem, ghi hướng xử lý và xuất báo cáo kiểm thử (quyết định 49).
+    /// Người được phân công tự xem và báo cáo việc của mình, không cần quyền này.
+    /// </summary>
+    public const string TestingManage = "testing.manage";
+
+    /// <summary>
+    /// Bật/tắt chế độ bảo trì (quyết định 53) và vẫn đăng nhập, thao tác được khi đang bảo trì để điều chỉnh cấu hình, mẫu phiếu,
+    /// dữ liệu. Người không có quyền này (kể cả kiosk, người bệnh ký qua mã QR) không đăng nhập, không thao tác được khi đang bảo trì.
+    /// </summary>
+    public const string SystemMaintenance = "system.maintenance";
+
+    /// <summary>
+    /// Khoa lâm sàng ghi kết quả nội kiểm đường huyết tại giường vào sổ của khoa mình, ghi điều chỉnh, gửi sổ tháng (quyết định 57);
+    /// có thêm <see cref="ScopeAllDepartments"/> thì ghi được cho mọi khoa.
+    /// </summary>
+    public const string QcRecord = "qc.record";
+
+    /// <summary>Khoa HSH: xem sổ nội kiểm của mọi khoa, xem xét từng ngày, trả lại ngày hoặc sổ, xác nhận sổ tháng, in PDF.</summary>
+    public const string QcReview = "qc.review";
+
+    /// <summary>Khoa HSH: khai báo máy đo đường huyết của các khoa, lô que thử, lô dung dịch chứng và ngưỡng chấp nhận.</summary>
+    public const string QcManage = "qc.manage";
+
+    /// <summary>
+    /// Xem dashboard giám sát nội kiểm đường huyết của mọi khoa (quyết định 59), chỉ xem: dành cho lãnh đạo, Phòng Điều dưỡng, QLCL.
+    /// Không ghi kết quả, không xem xét, không mở được sổ chi tiết.
+    /// </summary>
+    public const string QcMonitor = "qc.monitor";
+
+    /// <summary>
+    /// Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh) ghi kết quả nguy cấp và lần báo cho khoa điều
+    /// trị, hủy hồ sơ báo nhầm của khoa mình (quyết định 60); có thêm <see cref="ScopeAllDepartments"/> thì ghi cho mọi khoa.
+    /// </summary>
+    public const string CriticalRecord = "critical.record";
+
+    /// <summary>Khoa điều trị: xem kết quả nguy cấp gửi đến khoa mình, xác nhận đã nhận, trả lại lần báo không đúng khoa.</summary>
+    public const string CriticalReceive = "critical.receive";
+
+    /// <summary>Bác sĩ khoa điều trị: xác nhận đã nhận và ghi hướng xử trí ban đầu bằng tài khoản của mình (thay chữ ký sổ ST02).</summary>
+    public const string CriticalTreat = "critical.treat";
+
+    /// <summary>Màn hình theo dõi tại khoa (TV): chỉ xem kết quả nguy cấp gửi đến khoa mình, không thao tác.</summary>
+    public const string CriticalDisplay = "critical.display";
+
+    /// <summary>QLCL, KHTH: xem hồ sơ, sổ, dashboard kết quả nguy cấp của mọi khoa (chỉ xem).</summary>
+    public const string CriticalMonitor = "critical.monitor";
+
+    /// <summary>QLCL: quản lý danh mục kết quả nguy cấp và thông số vận hành (thời hạn, cảnh báo, mục tiêu, mã sổ).</summary>
+    public const string CriticalManage = "critical.manage";
 }
 
 /// <summary>Mô tả một quyền để hiển thị trên ma trận phân quyền.</summary>
@@ -60,6 +111,9 @@ public static class PermissionCatalog
     private const string ReportGroup = "Báo cáo và xuất dữ liệu";
     private const string NursingGroup = "Báo cáo điều dưỡng";
     private const string ScopeGroup = "Phạm vi dữ liệu";
+    private const string TestingGroup = "Kiểm thử";
+    private const string QcGroup = "Nội kiểm đường huyết";
+    private const string CriticalGroup = "Kết quả nguy cấp";
 
     public static IReadOnlyList<PermissionDefinition> All { get; } =
     [
@@ -69,6 +123,7 @@ public static class PermissionCatalog
         new(Permissions.DepartmentsManage, "Quản lý khoa/phòng", SystemGroup),
         new(Permissions.AuditRead, "Xem nhật ký hệ thống", SystemGroup),
         new(Permissions.SettingsManage, "Cấu hình hệ thống", SystemGroup),
+        new(Permissions.SystemMaintenance, "Bảo trì hệ thống: bật/tắt, vào hệ thống khi đang bảo trì", SystemGroup),
         new(Permissions.PatientsRead, "Xem người bệnh", PatientGroup),
         new(Permissions.PatientsManage, "Thêm/sửa người bệnh", PatientGroup),
         new(Permissions.TemplatesRead, "Xem mẫu phiếu", TemplateGroup),
@@ -85,6 +140,17 @@ public static class PermissionCatalog
         new(Permissions.NursingReportsRead, "Xem báo cáo điều dưỡng mọi khoa và bảng tổng hợp", NursingGroup),
         new(Permissions.NursingReportsManage, "Phòng Điều dưỡng: mở lại báo cáo, cài khoa báo cáo, số liệu HIS", NursingGroup),
         new(Permissions.ScopeAllDepartments, "Xem dữ liệu toàn viện", ScopeGroup),
+        new(Permissions.TestingManage, "Phân công kiểm thử, xem và xử lý báo cáo kiểm thử", TestingGroup),
+        new(Permissions.QcRecord, "Ghi kết quả nội kiểm đường huyết của khoa, gửi sổ tháng", QcGroup),
+        new(Permissions.QcReview, "Khoa HSH: xem xét kết quả nội kiểm các khoa, xác nhận sổ tháng", QcGroup),
+        new(Permissions.QcManage, "Khoa HSH: khai báo máy đo, lô que thử, lô dung dịch chứng", QcGroup),
+        new(Permissions.QcMonitor, "Xem dashboard nội kiểm đường huyết mọi khoa (chỉ xem)", QcGroup),
+        new(Permissions.CriticalRecord, "Khoa cận lâm sàng: ghi kết quả nguy cấp và lần báo của khoa, hủy hồ sơ báo nhầm", CriticalGroup),
+        new(Permissions.CriticalReceive, "Khoa điều trị: xem kết quả nguy cấp gửi đến khoa, xác nhận đã nhận", CriticalGroup),
+        new(Permissions.CriticalTreat, "Bác sĩ: ghi hướng xử trí kết quả nguy cấp gửi đến khoa", CriticalGroup),
+        new(Permissions.CriticalDisplay, "Màn hình theo dõi kết quả nguy cấp tại khoa (chỉ xem)", CriticalGroup),
+        new(Permissions.CriticalMonitor, "Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)", CriticalGroup),
+        new(Permissions.CriticalManage, "QLCL: danh mục và thông số vận hành kết quả nguy cấp", CriticalGroup),
     ];
 
     private static readonly HashSet<string> Codes = new(All.Select(p => p.Code), StringComparer.Ordinal);

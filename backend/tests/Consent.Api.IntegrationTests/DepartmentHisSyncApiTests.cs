@@ -55,7 +55,7 @@ public sealed class DepartmentHisSyncApiTests(SqlServerFixture sql) : IAsyncLife
     {
         var admin = await _client.LoginAsAdministratorAsync();
         var before = await DepartmentsAsync(admin);
-        // Danh mục demo: KKB, NOI, KHTH, PDD. HIS: hai khoa cùng tên nhưng mã khác, PDD cùng mã, một khoa mới; không có KHTH.
+        // Danh mục demo: KKB, NOI, KHTH, PDD, HSH. HIS: hai khoa cùng tên nhưng mã khác, PDD cùng mã, một khoa mới; không có KHTH, HSH.
         _api.Departments =
         [
             new("K01", "Khoa Khám bệnh"),
@@ -71,11 +71,11 @@ public sealed class DepartmentHisSyncApiTests(SqlServerFixture sql) : IAsyncLife
             (4, 1, 2, 1),
             (result.GetProperty("total").GetInt32(), result.GetProperty("added").GetInt32(), result.GetProperty("updated").GetInt32(),
                 result.GetProperty("unchanged").GetInt32()));
-        Assert.Equal(["Phòng Kế hoạch tổng hợp"], result.GetProperty("deactivated").EnumerateArray().Select(d => d.GetString()));
+        Assert.Equal(["Khoa Huyết học – Sinh hóa", "Phòng Kế hoạch tổng hợp"], result.GetProperty("deactivated").EnumerateArray().Select(d => d.GetString()));
         Assert.Equal(ApiKey, _api.ApiKey);
 
         var after = await DepartmentsAsync(admin);
-        Assert.Equal(["K01", "K02", "K05", "KHTH", "PDD"], after.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["HSH", "K01", "K02", "K05", "KHTH", "PDD"], after.Keys.Order(StringComparer.Ordinal));
         Assert.Equal((before["KKB"].Id, "Khoa Khám bệnh", true), after["K01"]);
         Assert.Equal((before["NOI"].Id, "khoa nội  tổng hợp", true), after["K02"]);
         Assert.Equal((before["PDD"].Id, "Phòng Điều dưỡng", true), after["PDD"]);

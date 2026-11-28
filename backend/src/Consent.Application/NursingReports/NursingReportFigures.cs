@@ -4,11 +4,18 @@ using System.Text.Json.Nodes;
 namespace Consent.Application.NursingReports;
 
 /// <summary>
-/// Số liệu và phần tick của một báo cáo khoa, lưu dạng JSON <c>{"values":{khóa:số},"checks":{khóa:"ok"|"issue"}}</c>.
-/// Ô để trống thì không có trong <see cref="Values"/>. Khóa được sắp xếp khi ghi để nhật ký so sánh cũ/mới dễ đọc.
+/// Số liệu và phần tick của một báo cáo khoa, lưu dạng JSON
+/// <c>{"values":{khóa:số},"checks":{khóa:"ok"|"issue"},"form":phiên bản mẫu}</c>. Ô để trống thì không có trong
+/// <see cref="Values"/>. Khóa được sắp xếp khi ghi để nhật ký so sánh cũ/mới dễ đọc.
 /// </summary>
 public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Values, IReadOnlyDictionary<string, string> Checks)
 {
+    /// <summary>
+    /// Phiên bản mẫu báo cáo khoa lúc lưu (<see cref="NursingReportForm.FormVersion"/>). Số liệu lưu trước khi có phiên bản là
+    /// 1: các dòng thêm sau (<see cref="NursingReportItem.Since"/>) khoa chưa có để nhập, bảng tổng hợp để trống thay vì ghi 0.
+    /// </summary>
+    public int Version { get; init; } = NursingReportForm.FormVersion;
+
     public static NursingReportFigures Empty { get; } =
         new(new Dictionary<string, int>(StringComparer.Ordinal), new Dictionary<string, string>(StringComparer.Ordinal));
 
@@ -72,7 +79,8 @@ public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Value
             }
         }
 
-        return new NursingReportFigures(values, checks);
+        var version = root?["form"] is JsonValue form && form.TryGetValue<int>(out var formVersion) && formVersion > 0 ? formVersion : 1;
+        return new NursingReportFigures(values, checks) { Version = version };
     }
 
     public string ToJson()
@@ -89,7 +97,26 @@ public sealed record NursingReportFigures(IReadOnlyDictionary<string, int> Value
             checks[key] = value;
         }
 
-        return new JsonObject { ["values"] = values, ["checks"] = checks }.ToJsonString();
+        return new JsonObject { ["values"] = values, ["checks"] = checks, ["form"] = Version }.ToJsonString();
+    }
+
+    /// <summary>
+    /// Tính lại các dòng tính tự động (<see cref="NursingReportForm.FormulaItems"/>, quyết định 46) theo công thức, bỏ số gửi lên
+    /// cho các dòng đó; chưa tính được thì để trống.
+    /// </summary>
+    public NursingReportFigures WithFormulas()
+    {
+        var values = new Dictionary<string, int>(Values, StringComparer.Ordinal);
+        foreach (var item in NursingReportForm.FormulaItems)
+        {
+            values.Remove(item.Key);
+            if (item.Formula!.Evaluate(values) is { } result)
+            {
+                values[item.Key] = result;
+            }
+        }
+
+        return new NursingReportFigures(values, Checks) { Version = Version };
     }
 
     /// <summary>Chỉ giữ các dòng điền sẵn cho báo cáo mới (nhân sự, chỉ tiêu) từ báo cáo trước.</summary>
