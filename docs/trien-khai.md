@@ -720,6 +720,13 @@ Các mục **Danh sách phiếu**, **Người bệnh**, **Mẫu phiếu**, **Xu�
 
 Bản này cũng ẩn nút **Mở màn hình theo dõi (TV)** với tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)**: màn hình theo dõi là của khoa nhận, tài khoản QLCL bấm vào trước đây gặp trang không có quyền.
 
+### 5.16. Kết quả nguy cấp: khoa của người bệnh, dashboard từng khoa (quyết định 63, 64)
+
+- Tài khoản xem nhiều khoa (QLCL, tài khoản xem toàn viện, tài khoản thuộc từ hai khoa) thấy khoa của người bệnh trên thẻ hồ sơ, dải cảnh báo, màn hình theo dõi (hướng dẫn sử dụng, mục 12.3, 12.7).
+- Dashboard có ô **Khoa** và nút **Chạy lướt từng khoa** (hướng dẫn sử dụng, mục 12.9). API dashboard nhận thêm tham số `departmentId`.
+
+Bản này không có migration, không đổi quyền, không cần cấu hình. Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần. Màn hình lớn chạy lướt dashboard: đăng nhập bằng tài khoản có quyền xem dashboard (vai trò **QLCL (kết quả nguy cấp)**), mở **Dashboard**, bấm **Chạy lướt từng khoa**, bấm **F11**. Lưu dấu trang lúc đang chạy lướt để lần sau mở thẳng.
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).

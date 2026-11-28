@@ -338,6 +338,9 @@ export interface CriticalDashboard {
   senders: CriticalDashboardDepartment[]
   receivers: CriticalDashboardDepartment[]
   late: CriticalDashboardLate[]
+  /** Dashboard của một khoa (quyết định 64): hồ sơ khoa đó báo đi và hồ sơ gửi đến khoa đó; null là toàn viện. */
+  departmentId?: string | null
+  departmentName?: string | null
 }
 
 export interface CriticalLogbookRow {
@@ -370,8 +373,12 @@ export const criticalApi = {
   received: (departmentId: string | undefined, signal?: AbortSignal) =>
     apiRequest<CriticalResultList>(`${base}/received${departmentId ? `?departmentId=${departmentId}` : ''}`, { signal }),
   alerts: (signal?: AbortSignal) => apiRequest<CriticalAlerts>(`${base}/alerts`, { signal }),
-  dashboard: (month: string, period: 'month' | 'quarter', signal?: AbortSignal) =>
-    apiRequest<CriticalDashboard>(`${base}/dashboard?month=${month}&period=${period}`, { signal }),
+  /** departmentId: dashboard của một khoa (quyết định 64), bỏ trống là toàn viện. */
+  dashboard: (month: string, period: 'month' | 'quarter', departmentId: string | undefined, signal?: AbortSignal) =>
+    apiRequest<CriticalDashboard>(
+      `${base}/dashboard?month=${month}&period=${period}${departmentId ? `&departmentId=${encodeURIComponent(departmentId)}` : ''}`,
+      { signal },
+    ),
   logbook: (form: CriticalLogbookForm, departmentId: string, month: string, signal?: AbortSignal) =>
     apiRequest<CriticalLogbookView>(`${base}/logbook?form=${form}&departmentId=${departmentId}&month=${month}`, { signal }),
   logbookPdf: (form: CriticalLogbookForm, departmentId: string, month: string) =>
@@ -397,7 +404,8 @@ export const criticalKeys = {
   received: (departmentId: string | undefined) => ['critical', 'records', 'received', departmentId ?? ''] as const,
   alerts: ['critical', 'records', 'alerts'] as const,
   detail: (id: string) => ['critical', 'records', 'detail', id] as const,
-  dashboard: (month: string, period: string) => ['critical', 'records', 'dashboard', month, period] as const,
+  dashboard: (month: string, period: string, departmentId: string | undefined) =>
+    ['critical', 'records', 'dashboard', month, period, departmentId ?? 'all'] as const,
   logbook: (form: string, departmentId: string, month: string) => ['critical', 'records', 'logbook', form, departmentId, month] as const,
 }
 
@@ -451,10 +459,11 @@ export function useCriticalResult(id: string, pollSeconds = 15) {
   })
 }
 
-export function useCriticalDashboard(month: string, period: 'month' | 'quarter') {
+/** Dashboard toàn viện, hoặc của một khoa khi có departmentId (quyết định 64). */
+export function useCriticalDashboard(month: string, period: 'month' | 'quarter', departmentId?: string) {
   return useQuery({
-    queryKey: criticalKeys.dashboard(month, period),
-    queryFn: ({ signal }) => criticalApi.dashboard(month, period, signal),
+    queryKey: criticalKeys.dashboard(month, period, departmentId),
+    queryFn: ({ signal }) => criticalApi.dashboard(month, period, departmentId, signal),
     placeholderData: keepPreviousData,
   })
 }

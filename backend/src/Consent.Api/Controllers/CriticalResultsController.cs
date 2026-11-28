@@ -67,10 +67,11 @@ public sealed class CriticalResultsController(
     public async Task<IActionResult> Alerts(CancellationToken cancellationToken) =>
         this.ToActionResult(await results.AlertsAsync(cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Dashboard của một tháng hoặc quý (<c>period=quarter</c>), mặc định tháng này.</summary>
+    /// <summary>Dashboard của một tháng hoặc quý (<c>period=quarter</c>), mặc định tháng này; <c>departmentId</c>: một khoa.</summary>
     [HttpGet("dashboard")]
-    public async Task<IActionResult> Dashboard([FromQuery] string? month, [FromQuery] string? period, CancellationToken cancellationToken) =>
-        this.ToActionResult(await dashboard.GetAsync(month, period, cancellationToken).ConfigureAwait(false));
+    public async Task<IActionResult> Dashboard(
+        [FromQuery] string? month, [FromQuery] string? period, [FromQuery] Guid? departmentId, CancellationToken cancellationToken) =>
+        this.ToActionResult(await dashboard.GetAsync(month, period, departmentId, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Sổ một khoa một tháng (xem trước).</summary>
     [HttpGet("logbook")]

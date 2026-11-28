@@ -1747,7 +1747,7 @@ Mỗi hồ sơ giữ thời hạn áp dụng lúc ghi: sửa thông số sau nà
 | Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, hủy hồ sơ báo nhầm, in sổ của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp** |
 | Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi**, **Không phải khoa tôi**, in sổ ST02 | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp** |
 | Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa | **Gửi đến khoa tôi** |
-| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
+| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard toàn viện và từng khoa; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
 | Màn hình đặt tại khoa: tài khoản vai trò **Màn hình theo dõi KQNC** | Chỉ xem kết quả gửi đến khoa, không thao tác | Tự mở **màn hình theo dõi** (mục 12.7) |
 
 Quyền của điều dưỡng, bác sĩ do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**. Người dùng phải được đặt đúng khoa ở hồ sơ người dùng: mỗi khoa chỉ thấy hồ sơ của khoa mình.
@@ -1840,6 +1840,18 @@ Về chuông:
 - **Tắt tiếng** chỉ tắt chuông trên máy đang dùng (máy nhớ lựa chọn này). Bấm **Bật tiếng** để nghe lại. Dải đỏ vẫn hiện.
 - Chuông, chớp tắt, nhịp nhắc lại do QLCL đặt (mục 12.10).
 
+**Tài khoản xem nhiều khoa** (quyết định 63): tài khoản QLCL, tài khoản xem toàn viện, tài khoản thuộc từ hai khoa trở lên. Để biết ngay hồ sơ của khoa nào:
+
+- Mỗi thẻ hồ sơ ở trang này (chờ khoa xác nhận, chờ bác sĩ xử trí, vừa xong) có **nhãn khoa của người bệnh**, ví dụ **Khoa Nội tổng hợp**. Khoa của người bệnh là khoa nhận cuộc gọi, như cột khoa ở sổ ST02.
+- Dải đỏ ghi khoa sau tên người bệnh, ví dụ "Người Bệnh A (Khoa Nội tổng hợp)". Có nhiều hồ sơ chờ thì dải ghi thêm các khoa có hồ sơ chờ.
+- Dải cam ghi các khoa có hồ sơ bác sĩ quá hạn xử trí.
+
+Tài khoản chỉ thuộc một khoa không có nhãn này: hồ sơ nào cũng là của khoa mình.
+
+![Tài khoản QLCL ở trang Gửi đến khoa tôi: mỗi thẻ có nhãn khoa của người bệnh](huong-dan-su-dung/kq-13-nhan-khoa.png)
+
+*Hình 12.4a. Tài khoản QLCL xem hồ sơ gửi đến mọi khoa: nhãn xanh trên mỗi thẻ là khoa của người bệnh (dữ liệu giả lập).*
+
 ### 12.4. Bác sĩ ghi hướng xử trí
 
 1. Mở hồ sơ: bấm **Bác sĩ ghi hướng xử trí** trên thẻ hồ sơ, hoặc **Xem ngay** trên dải cảnh báo. Dùng được trên điện thoại.
@@ -1892,6 +1904,8 @@ Màn hình đặt ở khoa điều trị (TV hoặc màn hình lớn) hiện k�
 
 Màn hình chỉ để xem, không có nút thao tác. Người nghe máy vẫn bấm **Đã nhận cuộc gọi** bằng tài khoản của mình trên máy tính hoặc điện thoại. Để giữ bí mật thông tin người bệnh, màn hình chỉ hiện **tên viết tắt** (ví dụ N.T.M), năm sinh và 4 số cuối mã người bệnh. QLCL bật được họ tên đầy đủ (mục 12.10).
 
+Một màn hình dùng chung cho nhiều khoa (tài khoản màn hình gán từ hai khoa trở lên): mỗi thẻ ghi thêm khoa của người bệnh (quyết định 63).
+
 Cách mở:
 
 - **Máy đặt cố định ở khoa:** tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy theo tài liệu triển khai, mục 5.14 (trình duyệt toàn màn hình khi bật máy, chuông tự bật, nút ghi **Chuông bật · thử chuông**).
@@ -1926,7 +1940,7 @@ Bấm **KQ nguy cấp** → **Sổ kết quả nguy cấp**:
 
 ### 12.9. Dashboard (QLCL)
 
-Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. Các phần của trang:
+Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. Ô **Khoa** để trống là xem **toàn viện**. Các phần của trang:
 
 - Năm ô chỉ số, so với mục tiêu (ô có dấu cảnh báo khi chưa đạt):
   - **Kết quả nguy cấp**: số hồ sơ, kèm số hồ sơ đã hủy (đếm riêng, không tính vào tỷ lệ);
@@ -1942,6 +1956,27 @@ Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. C�
 ![Dashboard kết quả nguy cấp tháng 11](huong-dan-su-dung/kq-08-dashboard.png)
 
 *Hình 12.10. Dashboard tháng 11: 17 hồ sơ, báo đúng hạn 93,8% (chưa đạt mục tiêu 95%), bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
+
+**Dashboard từng khoa** (quyết định 64): chọn khoa ở ô **Khoa**. Tên khoa hiện ở đầu trang. Mọi phần của trang (ô chỉ số, trung vị, biểu đồ 12 tháng, hai bảng, trường hợp quá hạn) chỉ tính:
+
+- hồ sơ khoa đó báo đi (khoa cận lâm sàng);
+- hồ sơ gửi đến khoa đó (khoa điều trị).
+
+Ví dụ: dashboard Khoa Nội tổng hợp có bảng **Theo khoa báo** là các khoa cận lâm sàng đã báo cho Khoa Nội. Bấm dấu **×** ở ô **Khoa** để về toàn viện.
+
+**Chạy lướt từng khoa:** bấm nút **Chạy lướt từng khoa**. Trang lần lượt hiện dashboard của từng khoa có hồ sơ trong kỳ (khoa báo hoặc khoa nhận), xếp theo tên khoa, mỗi khoa **15 giây**. Hết lượt thì quay lại khoa đầu. Khung trên cùng ghi tên khoa đang hiện, thứ tự (ví dụ **Khoa 2/5**) và có các nút:
+
+- ô **Mỗi khoa**: 10, 15, 30 hoặc 60 giây;
+- **Tạm dừng**: đứng lại ở khoa đang xem; **Tiếp tục** để chạy tiếp;
+- **Dừng chạy lướt**: thôi chạy lướt, ở lại khoa đang xem. Tự chọn một khoa ở ô **Khoa** cũng thôi chạy lướt.
+
+Chạy lướt trên màn hình lớn (họp giao ban, phòng QLCL): bấm **F11** để toàn màn hình. Địa chỉ trang giữ khoa đang xem và số giây. Lưu dấu trang lúc đang chạy lướt thì lần sau mở dấu trang là chạy lướt tiếp. Khoa không có hồ sơ trong kỳ không có trong lượt chạy lướt, nhưng vẫn chọn xem được ở ô **Khoa**.
+
+![Dashboard đang chạy lướt từng khoa: khung tên khoa, Khoa 2/3, mỗi khoa 15 giây](huong-dan-su-dung/kq-14-dashboard-khoa.png)
+
+*Hình 12.10a. Chạy lướt từng khoa: đang hiện dashboard Khoa Ngoại tổng hợp, khoa thứ 2 trong 3 khoa có hồ sơ trong tháng; 6 hồ sơ, báo đúng hạn 83,3%, bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
+
+Ai xem được dashboard: tài khoản có quyền **Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)**, có sẵn trong vai trò **QLCL (kết quả nguy cấp)**. Lãnh đạo, Phòng KHTH cần xem thì quản trị thêm quyền này vào vai trò của họ ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**.
 
 ### 12.10. Danh mục và cấu hình (QLCL)
 

@@ -170,6 +170,14 @@ public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifeti
         Assert.Equal((1, 1), (kpis.GetProperty("total").GetInt32(), kpis.GetProperty("cancelled").GetInt32()));
         Assert.Equal(100.0, kpis.GetProperty("notifyOnTime").GetProperty("percent").GetDouble());
         Assert.Equal(12, dashboard.GetProperty("trend").GetArrayLength());
+        // Dashboard một khoa (quyết định 64): khoa Nội chỉ có hồ sơ được báo cho khoa; khoa không có thì báo lỗi ô departmentId.
+        var (wardStatus, ward) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={noi}", quality);
+        Assert.True(wardStatus == HttpStatusCode.OK, ward.ToString());
+        Assert.Equal(noi, ward.GetProperty("departmentId").GetGuid());
+        Assert.Equal((1, 0), (ward.GetProperty("kpis").GetProperty("total").GetInt32(), ward.GetProperty("kpis").GetProperty("cancelled").GetInt32()));
+        var (unknownStatus, unknown) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={Guid.NewGuid()}", quality);
+        Assert.Equal(HttpStatusCode.BadRequest, unknownStatus);
+        Assert.True(unknown.GetProperty("errors").TryGetProperty("departmentId", out _), unknown.ToString());
 
         // Sổ ST01 của khoa HSH (dòng hủy đánh dấu); điều dưỡng không xem sổ của khoa HSH.
         var bookUrl = $"{Base}/logbook?form=Laboratory&departmentId={hsh}&month={month}";

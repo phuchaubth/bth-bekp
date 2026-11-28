@@ -22,6 +22,20 @@ export function seesManyDepartments(user: CurrentUser | null | undefined, hasPer
   return hasPermission(Permissions.CriticalMonitor) || hasPermission(Permissions.ScopeAllDepartments) || accountDepartments(user).length > 1
 }
 
+/** Khoa có hồ sơ trong kỳ (khoa báo, khoa nhận), không trùng, xếp theo tên: thứ tự chạy lướt từng khoa (quyết định 64). */
+export function cycleDepartments(groups: readonly (readonly { departmentId: string; name: string }[])[]): { id: string; name: string }[] {
+  const byId = new Map<string, string>()
+  for (const group of groups) for (const d of group) if (!byId.has(d.departmentId)) byId.set(d.departmentId, d.name)
+  return [...byId].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+}
+
+/** Khoa kế tiếp khi chạy lướt; đang ở khoa ngoài danh sách (hoặc toàn viện) thì bắt đầu từ khoa đầu tiên. */
+export function nextInCycle(ids: readonly string[], current: string | undefined): string | undefined {
+  if (ids.length === 0) return undefined
+  const index = current ? ids.indexOf(current) : -1
+  return ids[(index + 1) % ids.length]
+}
+
 /** Tên các khoa (không trùng, giữ thứ tự gặp đầu tiên), nối bằng dấu phẩy. */
 export function departmentList(names: readonly (string | null | undefined)[]): string {
   return [...new Set(names.filter((name): name is string => Boolean(name)))].join(', ')

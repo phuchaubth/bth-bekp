@@ -284,7 +284,9 @@ public sealed record CriticalDashboardDto(
     IReadOnlyList<CriticalDashboardMonthDto> Trend,
     IReadOnlyList<CriticalDashboardDepartmentDto> Senders,
     IReadOnlyList<CriticalDashboardDepartmentDto> Receivers,
-    IReadOnlyList<CriticalDashboardLateDto> Late);
+    IReadOnlyList<CriticalDashboardLateDto> Late,
+    Guid? DepartmentId = null,
+    string? DepartmentName = null);
 
 /// <summary>Một dòng sổ: các ô theo đúng cột của mẫu; dòng của hồ sơ đã hủy in gạch ngang kèm ghi chú.</summary>
 public sealed record CriticalLogbookRow(IReadOnlyList<string> Cells, bool Cancelled, string? Note);

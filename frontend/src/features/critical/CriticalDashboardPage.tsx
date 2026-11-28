@@ -1,7 +1,9 @@
-import { CheckCircleFilled, WarningFilled } from '@ant-design/icons'
-import { Alert, Card, Col, DatePicker, Flex, Row, Segmented, Spin, Table, Typography, type TableColumnsType } from 'antd'
+import { CheckCircleFilled, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, WarningFilled } from '@ant-design/icons'
+import { Alert, Button, Card, Col, DatePicker, Flex, Row, Segmented, Select, Spin, Table, Typography, type TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { useDepartments } from '../../api/admin'
 import {
   useCriticalDashboard,
   type CriticalDashboard,
@@ -15,12 +17,16 @@ import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { CriticalSectionNav } from './CriticalParts'
-import { dateTimeOf } from './criticalUtils'
+import { cycleDepartments, dateTimeOf, nextInCycle } from './criticalUtils'
 
 const MONTH = 'YYYY-MM'
 
 /** Xem được dashboard của tối đa bấy nhiêu tháng trước (như máy chủ). */
 const MAX_MONTHS_BACK = 24
+
+/** Chạy lướt từng khoa (quyết định 64): mỗi khoa hiện bấy nhiêu giây rồi sang khoa kế tiếp. */
+const CYCLE_SECONDS = [10, 15, 30, 60] as const
+const DEFAULT_CYCLE_SECONDS = 15
 
 const GOOD = '#1d7a3a'
 const WARNING = '#b26a00'
@@ -129,21 +135,62 @@ const lateColumns: TableColumnsType<CriticalDashboardLate> = [
 /**
  * Dashboard kết quả nguy cấp cho QLCL, KHTH (quyết định 60): tháng hoặc quý; tỷ lệ báo đúng hạn, bác sĩ xử trí đúng hạn, đọc lại
  * chính xác lần đầu, đủ các bước, so với mục tiêu ở trang cấu hình; trung vị; xu hướng 12 tháng; theo khoa báo, khoa nhận; các
- * trường hợp quá hạn (tên viết tắt) để phân tích nguyên nhân.
+ * trường hợp quá hạn (tên viết tắt) để phân tích nguyên nhân. Xem toàn viện hoặc từng khoa, chạy lướt lần lượt các khoa có hồ sơ
+ * trong kỳ (quyết định 64).
  */
 export function CriticalDashboardPage() {
   const [params, setParams] = useSearchParams()
   const raw = params.get('thang')
   const month = raw && /^\d{4}-\d{2}$/.test(raw) ? raw : dayjs().format(MONTH)
   const period = params.get('ky') === 'quy' ? 'quarter' : 'month'
-  const dashboard = useCriticalDashboard(month, period)
+  // Khoa đang xem (bỏ trống là toàn viện); đang chạy lướt thì "chay" là số giây mỗi khoa. Để trên địa chỉ trang để lưu dấu trang
+  // được (màn hình lớn phòng QLCL mở thẳng chế độ chạy lướt).
+  const departmentId = params.get('khoa') || undefined
+  const cycleSeconds = CYCLE_SECONDS.find((s) => String(s) === params.get('chay'))
+  const [paused, setPaused] = useState(false)
+  const departments = useDepartments(true)
+  // Toàn viện luôn tải: các khoa để chạy lướt là các khoa có hồ sơ trong kỳ (khoa báo, khoa nhận), xếp theo tên.
+  const overall = useCriticalDashboard(month, period)
+  const dashboard = useCriticalDashboard(month, period, departmentId)
   const data = dashboard.data
+  const cycle = overall.data && !overall.isPlaceholderData ? cycleDepartments([overall.data.receivers, overall.data.senders]) : []
+  const cycleKey = cycle.map((d) => d.id).join(',')
 
-  const update = (changes: Record<string, string>) => {
+  const update = (changes: Record<string, string | undefined>) => {
     const next = new URLSearchParams(params)
-    for (const [key, value] of Object.entries(changes)) next.set(key, value)
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === undefined) next.delete(key)
+      else next.set(key, value)
+    }
     setParams(next, { replace: true })
   }
+
+  // Chạy lướt: hết số giây thì sang khoa kế tiếp, hết danh sách thì quay lại khoa đầu. Mỗi lần sang khoa (hoặc đổi số giây, tạm
+  // dừng) thì hẹn giờ lại từ đầu. Hàm chuyển khoa luôn là của lần hiển thị mới nhất để không ghi đè tháng, kỳ vừa chọn.
+  const advance = useRef(() => {})
+  useEffect(() => {
+    advance.current = () => update({ khoa: nextInCycle(cycleKey.split(','), departmentId) })
+  })
+  useEffect(() => {
+    if (!cycleSeconds || paused || !cycleKey) return
+    const timer = window.setTimeout(() => advance.current(), cycleSeconds * 1000)
+    return () => window.clearTimeout(timer)
+  }, [cycleSeconds, paused, cycleKey, departmentId])
+
+  /** Bắt đầu từ khoa đang xem nếu khoa đó có hồ sơ trong kỳ, không thì từ khoa đầu danh sách. */
+  const startCycle = () => {
+    setPaused(false)
+    update({ chay: String(DEFAULT_CYCLE_SECONDS), khoa: cycle.some((d) => d.id === departmentId) ? departmentId : cycle[0]?.id })
+  }
+  const stopCycle = () => {
+    setPaused(false)
+    update({ chay: undefined })
+  }
+
+  const departmentOptions = (departments.data ?? []).map((d) => ({ value: d.id, label: d.isActive ? d.name : `${d.name} (ngưng)` }))
+  // Tên khoa và thứ tự lấy theo số liệu đang hiện (không theo ô chọn) để tên luôn khớp với số bên dưới.
+  const shownName = data?.departmentName ?? 'Toàn viện'
+  const position = data?.departmentId ? cycle.findIndex((d) => d.id === data.departmentId) + 1 : 0
 
   return (
     <>
@@ -169,17 +216,70 @@ export function CriticalDashboardPage() {
               onChange={(value) => value && update({ thang: (value.isAfter(dayjs(), 'month') ? dayjs() : value).format(MONTH) })}
               aria-label={period === 'quarter' ? 'Quý' : 'Tháng'}
             />
+            <Select
+              showSearch
+              allowClear
+              optionFilterProp="label"
+              placeholder="Toàn viện"
+              style={{ width: 260, maxWidth: '100%' }}
+              value={departmentId}
+              options={departmentOptions}
+              onChange={(value?: string) => update({ khoa: value, chay: undefined })}
+              aria-label="Khoa"
+            />
+            {!cycleSeconds && (
+              <Button icon={<PlayCircleOutlined />} disabled={cycle.length === 0} onClick={startCycle}>
+                Chạy lướt từng khoa
+              </Button>
+            )}
           </Flex>
         }
       />
+      {cycleSeconds && (
+        <Card size="small" role="region" aria-label="Chạy lướt từng khoa" style={{ marginBottom: 16, borderColor: '#1677ff' }}>
+          <Flex justify="space-between" align="center" gap={12} wrap>
+            <div aria-live="polite">
+              <Typography.Title level={4} style={{ margin: 0, fontSize: 26 }}>
+                {shownName}
+              </Typography.Title>
+              <Typography.Text type="secondary">
+                {position > 0 ? `Khoa ${position}/${cycle.length}` : `${cycle.length} khoa có hồ sơ trong kỳ`} ·{' '}
+                {paused ? 'đã tạm dừng' : `mỗi khoa ${cycleSeconds} giây`}
+              </Typography.Text>
+            </div>
+            <Flex gap={8} wrap align="center">
+              <Select
+                value={cycleSeconds}
+                options={CYCLE_SECONDS.map((s) => ({ value: s, label: `Mỗi khoa ${s} giây` }))}
+                onChange={(s: number) => update({ chay: String(s) })}
+                aria-label="Mỗi khoa"
+                style={{ width: 170 }}
+              />
+              <Button icon={paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />} onClick={() => setPaused(!paused)}>
+                {paused ? 'Tiếp tục' : 'Tạm dừng'}
+              </Button>
+              <Button icon={<StopOutlined />} onClick={stopCycle}>
+                Dừng chạy lướt
+              </Button>
+            </Flex>
+          </Flex>
+        </Card>
+      )}
       {dashboard.isError && <Alert type="error" showIcon title={errorMessage(dashboard.error)} style={{ marginBottom: 16 }} />}
       {!data ? (
         dashboard.isLoading && <Spin style={{ display: 'block', padding: 48 }} />
       ) : (
-        <Busy busy={dashboard.isFetching}>
+        // Mờ đi khi số đang hiện là của lựa chọn trước (đổi tháng, đổi khoa); tải lại ngầm số của chính khoa đó thì không nháy.
+        <Busy busy={dashboard.isPlaceholderData}>
+          {!cycleSeconds && data.departmentName && (
+            <Typography.Title level={4} style={{ marginTop: 0 }}>
+              {data.departmentName}
+            </Typography.Title>
+          )}
           <Typography.Paragraph type="secondary">
-            {data.label} ({dayjs(data.from).format('DD/MM')} – {dayjs(data.to).format('DD/MM/YYYY')}) · mọi khoa · hồ sơ đã hủy đếm riêng,
-            không tính vào tỷ lệ. Mục tiêu và các mốc thời hạn lấy từ trang Danh mục và cấu hình.
+            {data.label} ({dayjs(data.from).format('DD/MM')} – {dayjs(data.to).format('DD/MM/YYYY')}) ·{' '}
+            {data.departmentName ? `${data.departmentName}: hồ sơ khoa này báo đi và hồ sơ gửi đến khoa này` : 'mọi khoa'} · hồ sơ
+            đã hủy đếm riêng, không tính vào tỷ lệ. Mục tiêu và các mốc thời hạn lấy từ trang Danh mục và cấu hình.
           </Typography.Paragraph>
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} lg={8} xl={5}>

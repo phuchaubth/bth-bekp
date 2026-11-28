@@ -166,7 +166,7 @@ public sealed class CriticalDashboardLogbookTests
         var (_, second, overdue, _, _) = Scenario();
         ActAs(_quality);
 
-        var month = Ok(await Dashboard.GetAsync(null, null, CancellationToken.None));
+        var month = Ok(await Dashboard.GetAsync(null, null, null, CancellationToken.None));
 
         var k = month.Kpis;
         Assert.Equal(("month", "2026-11", "Tháng 11/2026"), (month.Period, month.Month, month.Label));
@@ -211,6 +211,49 @@ public sealed class CriticalDashboardLogbookTests
     }
 
     [Fact]
+    public async Task Dashboard_ForOneDepartment_CountsRecordsItSentOrReceived_UnknownDepartmentRejected()
+    {
+        var (_, second, overdue, _, _) = Scenario();
+        ActAs(_quality);
+
+        // Khoa điều trị: hồ sơ gửi đến khoa (kể cả hồ sơ đã hủy), khoa báo là khoa cận lâm sàng đã báo cho khoa.
+        var wardA = Ok(await Dashboard.GetAsync(null, null, _wardA.Id, CancellationToken.None));
+        Assert.Equal((_wardA.Id, _wardA.Name), (wardA.DepartmentId, wardA.DepartmentName));
+        Assert.Equal((2, 1), (wardA.Kpis.Total, wardA.Kpis.Cancelled));
+        Assert.Equal(new CriticalRateDto(1, 2), wardA.Kpis.NotifyOnTime);
+        Assert.Equal(new CriticalRateDto(1, 2), wardA.Kpis.ActionOnTime);
+        Assert.Equal(new CriticalRateDto(1, 2), wardA.Kpis.ReadBackFirstTime);
+        Assert.Equal(new CriticalRateDto(2, 2), wardA.Kpis.Complete);
+        Assert.Equal([new CriticalDashboardDepartmentDto(_lab.Id, _lab.Name, 2, new(1, 2), 10.0, 0)], wardA.Senders);
+        Assert.Equal([new CriticalDashboardDepartmentDto(_wardA.Id, _wardA.Name, 2, new(1, 2), 16.0, 0)], wardA.Receivers);
+        Assert.Equal([second.Id], wardA.Late.Select(l => l.Id));
+        Assert.Equal(new CriticalDashboardMonthDto("2026-11", 2, 50.0, 50.0), wardA.Trend[^1]);
+        Assert.Equal(new CriticalDashboardMonthDto("2026-10", 1, 0.0, 100.0), wardA.Trend[^2]);
+
+        // Khoa cận lâm sàng: hồ sơ khoa báo đi, kể cả hồ sơ chưa báo (chưa có khoa nhận).
+        var lab = Ok(await Dashboard.GetAsync(null, null, _lab.Id, CancellationToken.None));
+        Assert.Equal((4, 1), (lab.Kpis.Total, lab.Kpis.Cancelled));
+        Assert.Equal([new CriticalDashboardDepartmentDto(_lab.Id, _lab.Name, 4, new(1, 3), 10.0, 2)], lab.Senders);
+        Assert.Equal([_wardA.Id], lab.Receivers.Select(r => r.DepartmentId));
+        Assert.Equal([overdue.Id, second.Id], lab.Late.Select(l => l.Id));
+
+        // Khoa khác: không lẫn hồ sơ của khoa A.
+        var wardB = Ok(await Dashboard.GetAsync(null, null, _wardB.Id, CancellationToken.None));
+        Assert.Equal((1, 0), (wardB.Kpis.Total, wardB.Kpis.Cancelled));
+        Assert.Equal([_micro.Id], wardB.Senders.Select(d => d.DepartmentId));
+        Assert.Equal([_wardB.Id], wardB.Receivers.Select(d => d.DepartmentId));
+        Assert.Empty(wardB.Late);
+
+        var hospital = Ok(await Dashboard.GetAsync(null, null, null, CancellationToken.None));
+        Assert.Equal((null, null, 5), (hospital.DepartmentId, hospital.DepartmentName, hospital.Kpis.Total));
+
+        var unknown = await Dashboard.GetAsync(null, null, Guid.NewGuid(), CancellationToken.None);
+        Assert.Contains("departmentId", Fails(unknown, ErrorType.Validation).FieldErrors!.Keys);
+        ActAs(_doctorA);
+        Fails(await Dashboard.GetAsync(null, null, _wardA.Id, CancellationToken.None), ErrorType.Forbidden);
+    }
+
+    [Fact]
     public async Task Dashboard_DoctorOverdueWithoutAction_CountsAgainstActionRate_NotYetDueDoesNot()
     {
         // Báo 9:00, khoa đã nhận, hạn bác sĩ 9:10 đã qua lúc 10:30 mà chưa xử trí: tính vào mẫu số, không đúng hạn.
@@ -222,7 +265,7 @@ public sealed class CriticalDashboardLogbookTests
         Call(pending, _wardA, At(10, 25));
         ActAs(_quality);
 
-        var month = Ok(await Dashboard.GetAsync(null, null, CancellationToken.None));
+        var month = Ok(await Dashboard.GetAsync(null, null, null, CancellationToken.None));
 
         Assert.Equal(new CriticalRateDto(0, 1), month.Kpis.ActionOnTime);
         Assert.Equal(0.0, month.Kpis.ActionOnTime.Percent);
@@ -245,7 +288,7 @@ public sealed class CriticalDashboardLogbookTests
         Scenario();
         ActAs(_quality);
 
-        var quarter = Ok(await Dashboard.GetAsync("2026-11", "QUARTER", CancellationToken.None));
+        var quarter = Ok(await Dashboard.GetAsync("2026-11", "QUARTER", null, CancellationToken.None));
 
         Assert.Equal(("quarter", "Quý IV/2026"), (quarter.Period, quarter.Label));
         Assert.Equal((new DateOnly(2026, 10, 1), new DateOnly(2026, 11, 27)), (quarter.From, quarter.To));
@@ -263,7 +306,7 @@ public sealed class CriticalDashboardLogbookTests
     {
         ActAs(_quality);
 
-        var result = await Dashboard.GetAsync(month, period, CancellationToken.None);
+        var result = await Dashboard.GetAsync(month, period, null, CancellationToken.None);
 
         Assert.Contains(field, Fails(result, ErrorType.Validation).FieldErrors!.Keys);
     }
@@ -272,11 +315,11 @@ public sealed class CriticalDashboardLogbookTests
     public async Task Dashboard_IsForQualityOnly_OldestMonthStillOpens()
     {
         ActAs(_technician);
-        var technician = await Dashboard.GetAsync(null, null, CancellationToken.None);
+        var technician = await Dashboard.GetAsync(null, null, null, CancellationToken.None);
         ActAs(_doctorA);
-        var doctor = await Dashboard.GetAsync(null, null, CancellationToken.None);
+        var doctor = await Dashboard.GetAsync(null, null, null, CancellationToken.None);
         ActAs(_quality);
-        var oldest = Ok(await Dashboard.GetAsync("2024-11", "month", CancellationToken.None));
+        var oldest = Ok(await Dashboard.GetAsync("2024-11", "month", null, CancellationToken.None));
 
         Fails(technician, ErrorType.Forbidden);
         Fails(doctor, ErrorType.Forbidden);

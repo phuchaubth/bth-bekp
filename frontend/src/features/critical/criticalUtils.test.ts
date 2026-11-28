@@ -4,9 +4,11 @@ import { Permissions } from '../../auth/permissions'
 import {
   clockState,
   countdownText,
+  cycleDepartments,
   formatCountdown,
   isDisplayOnly,
   minutesBetween,
+  nextInCycle,
   readMuted,
   secondsLeft,
   departmentList,
@@ -149,5 +151,37 @@ describe('tài khoản xem nhiều khoa (quyết định 63)', () => {
   it('danh sách khoa không trùng, giữ thứ tự gặp đầu tiên, bỏ ô trống', () => {
     expect(departmentList(['Khoa Nội tổng hợp', 'Khoa Khám bệnh', 'Khoa Nội tổng hợp', null, ''])).toBe('Khoa Nội tổng hợp, Khoa Khám bệnh')
     expect(departmentList([])).toBe('')
+  })
+})
+
+describe('chạy lướt từng khoa trên dashboard (quyết định 64)', () => {
+  it('các khoa báo và khoa nhận không trùng, xếp theo tên tiếng Việt (D trước Đ)', () => {
+    const senders = [
+      { departmentId: 'd-hsh', name: 'Khoa Huyết học – Sinh hóa' },
+      { departmentId: 'd-duoc', name: 'Khoa Dược' },
+    ]
+    const receivers = [
+      { departmentId: 'd-ub', name: 'Khoa Ung bướu' },
+      { departmentId: 'd-dy', name: 'Khoa Đông y' },
+      { departmentId: 'd-hsh', name: 'Khoa Huyết học – Sinh hóa' },
+    ]
+    expect(cycleDepartments([receivers, senders])).toEqual([
+      { id: 'd-duoc', name: 'Khoa Dược' },
+      { id: 'd-dy', name: 'Khoa Đông y' },
+      { id: 'd-hsh', name: 'Khoa Huyết học – Sinh hóa' },
+      { id: 'd-ub', name: 'Khoa Ung bướu' },
+    ])
+    expect(cycleDepartments([[], []])).toEqual([])
+  })
+
+  it('sang khoa kế tiếp, hết danh sách thì quay lại khoa đầu; đang ở toàn viện hoặc khoa ngoài danh sách thì bắt đầu từ khoa đầu', () => {
+    const ids = ['a', 'b', 'c']
+    expect(nextInCycle(ids, 'a')).toBe('b')
+    expect(nextInCycle(ids, 'b')).toBe('c')
+    expect(nextInCycle(ids, 'c')).toBe('a')
+    expect(nextInCycle(ids, undefined)).toBe('a')
+    expect(nextInCycle(ids, 'x')).toBe('a')
+    expect(nextInCycle(['a'], 'a')).toBe('a')
+    expect(nextInCycle([], 'a')).toBeUndefined()
   })
 })

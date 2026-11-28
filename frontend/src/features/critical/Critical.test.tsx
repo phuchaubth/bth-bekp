@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import dayjs from 'dayjs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -858,6 +858,137 @@ describe('Kết quả nguy cấp: QLCL', () => {
     expect(within(late).getByText('N.B.B')).toBeInTheDocument()
     expect(within(late).getByRole('link', { name: 'Xem hồ sơ' })).toHaveAttribute('href', '/ket-qua-nguy-cap/ho-so/kq-9')
     expect(screen.getByRole('cell', { name: 'Khoa Huyết học – Sinh hóa' })).toBeInTheDocument()
+  })
+
+  /** Dashboard một khoa (quyết định 64): máy chủ trả số của riêng khoa đó kèm tên khoa (số giả lập). */
+  const byDepartment = (overall: CriticalDashboard) => (c: ApiCall) => {
+    const id = new URLSearchParams(c.search).get('departmentId')
+    if (!id) return overall
+    const totals: Record<string, number> = { 'd-hsh': 4, 'd-kkb': 1, 'd-noi': 2 }
+    return {
+      ...overall,
+      departmentId: id,
+      departmentName: departments.find((d) => d.id === id)?.name ?? null,
+      kpis: { ...overall.kpis, total: totals[id] ?? 0 },
+    }
+  }
+  const kkbReceiver = {
+    departmentId: 'd-kkb',
+    name: 'Khoa Khám bệnh',
+    total: 1,
+    onTime: { numerator: 1, denominator: 1, percent: 100 },
+    medianMinutes: 12,
+    open: 0,
+  }
+  const totalTile = () => screen.getByRole('group', { name: 'Kết quả nguy cấp' })
+
+  it('Dashboard từng khoa (quyết định 64): chọn khoa thì xem số của riêng khoa đó, bỏ chọn thì về toàn viện', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({ ...common(qualitySession()), [`GET ${base}/dashboard`]: byDepartment(dashboard) })
+    renderApp('/ket-qua-nguy-cap/dashboard')
+
+    expect(within(await screen.findByRole('group', { name: 'Kết quả nguy cấp' })).getByText('5')).toBeInTheDocument()
+    expect(screen.getByText(/· mọi khoa ·/)).toBeInTheDocument()
+
+    await pick(user, document.body, 'Khoa', 'Khoa Nội tổng hợp')
+    expect(await screen.findByRole('heading', { name: 'Khoa Nội tổng hợp', level: 4 })).toBeInTheDocument()
+    await waitFor(() => expect(within(totalTile()).getByText('2')).toBeInTheDocument())
+    expect(screen.getByText(/Khoa Nội tổng hợp: hồ sơ khoa này báo đi và hồ sơ gửi đến khoa này/)).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === `${base}/dashboard`).map((c) => c.search)).toContain(
+      `?month=${now.format('YYYY-MM')}&period=month&departmentId=d-noi`,
+    )
+
+    await user.click(document.querySelector('.ant-select-clear')!)
+    expect(await screen.findByText(/· mọi khoa ·/)).toBeInTheDocument()
+    expect(within(totalTile()).getByText('5')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Khoa Nội tổng hợp' })).not.toBeInTheDocument()
+  })
+
+  it(
+    'Chạy lướt từng khoa (quyết định 64): lần lượt các khoa có hồ sơ trong kỳ theo tên; tạm dừng, đổi số giây, dừng; tự chọn khoa thì thôi chạy lướt',
+    { timeout: 30_000 },
+    async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+        mockApi({
+          ...common(qualitySession()),
+          [`GET ${base}/dashboard`]: byDepartment({ ...dashboard, receivers: [...dashboard.receivers, kkbReceiver] }),
+        })
+        const { router } = renderApp('/ket-qua-nguy-cap/dashboard')
+        const query = () => new URLSearchParams(router.state.location.search)
+        const wait = (seconds: number) =>
+          act(() => {
+            vi.advanceTimersByTime(seconds * 1000)
+          })
+        const showing = async (name: string, status: string) => {
+          const region = await screen.findByRole('region', { name: 'Chạy lướt từng khoa' })
+          expect(await within(region).findByRole('heading', { name })).toBeInTheDocument()
+          expect(within(region).getByText(status)).toBeInTheDocument()
+          return region
+        }
+
+        await user.click(await screen.findByRole('button', { name: /Chạy lướt từng khoa/ }))
+        // Theo tên: Huyết học – Sinh hóa (khoa báo), Khám bệnh, Nội tổng hợp (khoa nhận).
+        await showing('Khoa Huyết học – Sinh hóa', 'Khoa 1/3 · mỗi khoa 15 giây')
+        expect(query().get('chay')).toBe('15')
+        expect(within(totalTile()).getByText('4')).toBeInTheDocument()
+        wait(14)
+        expect(query().get('khoa')).toBe('d-hsh')
+        wait(1)
+        await showing('Khoa Khám bệnh', 'Khoa 2/3 · mỗi khoa 15 giây')
+        wait(15)
+        await showing('Khoa Nội tổng hợp', 'Khoa 3/3 · mỗi khoa 15 giây')
+        wait(15)
+        let region = await showing('Khoa Huyết học – Sinh hóa', 'Khoa 1/3 · mỗi khoa 15 giây')
+
+        await user.click(within(region).getByRole('button', { name: /Tạm dừng/ }))
+        expect(within(region).getByText('Khoa 1/3 · đã tạm dừng')).toBeInTheDocument()
+        wait(60)
+        expect(query().get('khoa')).toBe('d-hsh')
+
+        await user.click(within(region).getByRole('button', { name: /Tiếp tục/ }))
+        await pick(user, region, 'Mỗi khoa', 'Mỗi khoa 10 giây')
+        expect(query().get('chay')).toBe('10')
+        wait(10)
+        region = await showing('Khoa Khám bệnh', 'Khoa 2/3 · mỗi khoa 10 giây')
+
+        await user.click(within(region).getByRole('button', { name: /Dừng chạy lướt/ }))
+        expect(screen.queryByRole('region', { name: 'Chạy lướt từng khoa' })).not.toBeInTheDocument()
+        expect(query().get('chay')).toBeNull()
+        expect(screen.getByRole('heading', { name: 'Khoa Khám bệnh', level: 4 })).toBeInTheDocument()
+        wait(30)
+        expect(query().get('khoa')).toBe('d-kkb')
+
+        // Chạy lại thì bắt đầu từ khoa đang xem; tự chọn một khoa thì thôi chạy lướt.
+        await user.click(screen.getByRole('button', { name: /Chạy lướt từng khoa/ }))
+        await showing('Khoa Khám bệnh', 'Khoa 2/3 · mỗi khoa 15 giây')
+        await pick(user, document.body, 'Khoa', 'Khoa Nội tổng hợp')
+        expect(query().get('chay')).toBeNull()
+        expect(query().get('khoa')).toBe('d-noi')
+        expect(screen.queryByRole('region', { name: 'Chạy lướt từng khoa' })).not.toBeInTheDocument()
+        expect(await screen.findByRole('heading', { name: 'Khoa Nội tổng hợp', level: 4 })).toBeInTheDocument()
+      } finally {
+        vi.useRealTimers()
+      }
+    },
+  )
+
+  it('Chạy lướt: mở thẳng địa chỉ đã lưu thì chạy tiếp (mỗi khoa 30 giây); kỳ chưa có hồ sơ thì không chạy lướt được', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(qualitySession()),
+      [`GET ${base}/dashboard`]: byDepartment({ ...dashboard, receivers: [...dashboard.receivers, kkbReceiver] }),
+    })
+    const first = renderApp('/ket-qua-nguy-cap/dashboard?khoa=d-noi&chay=30')
+    const region = await screen.findByRole('region', { name: 'Chạy lướt từng khoa' })
+    expect(await within(region).findByText('Khoa 3/3 · mỗi khoa 30 giây')).toBeInTheDocument()
+    expect(within(region).getByRole('heading', { name: 'Khoa Nội tổng hợp' })).toBeInTheDocument()
+    first.unmount()
+
+    mockApi({ ...common(qualitySession()), [`GET ${base}/dashboard`]: { ...dashboard, senders: [], receivers: [], late: [] } })
+    renderApp('/ket-qua-nguy-cap/dashboard')
+    expect(await screen.findAllByText('Chưa có hồ sơ trong kỳ.')).toHaveLength(2)
+    expect(screen.getByRole('button', { name: /Chạy lướt từng khoa/ })).toBeDisabled()
   })
 
   it('Sổ: đúng cột của mẫu; dòng đã hủy gạch ngang kèm ghi chú', { timeout: 30_000 }, async () => {

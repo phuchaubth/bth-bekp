@@ -722,9 +722,11 @@ Lỗi:
 | POST | `/{id}/cancel` | `critical.record` (khoa báo) | `{ reason, receivingDepartmentInformed }`: hủy hồ sơ báo nhầm (bắt buộc lý do). Hồ sơ đã báo khoa nhận thì phải `receivingDepartmentInformed: true`. Hồ sơ không bị xóa: sổ in gạch ngang kèm lý do, dashboard đếm riêng |
 | GET | `/logbook?form=&departmentId=&month=` | `form=Clinical`: `critical.receive`/`critical.treat` (khoa mình); `Laboratory`, `Microbiology`: `critical.record` (khoa mình); mọi sổ: `critical.monitor` | Sổ một khoa một tháng (mặc định tháng này) `{ form, code, departmentId, departmentName, month, columns, rows: [{ cells, cancelled, note }] }`, đúng cột của sổ giấy |
 | GET | `/logbook/pdf?form=&departmentId=&month=` | Như trên | PDF A4 ngang theo mẫu sổ: logo, tên đơn vị (Cấu hình hệ thống), mã số sổ (thông số), dòng đã hủy chữ xám gạch ngang kèm ghi chú. Tên file `ket-qua-nguy-cap-so-<ST01\|ST02\|vi-sinh>-<yyyy>-<MM>.pdf`; ghi nhật ký `CriticalResults.LogbookPrinted` |
-| GET | `/dashboard?month=&period=` | `critical.monitor` | Dashboard tháng (mặc định) hoặc quý (`period=quarter`, quý chứa `month`), xem bên dưới |
+| GET | `/dashboard?month=&period=&departmentId=` | `critical.monitor` | Dashboard tháng (mặc định) hoặc quý (`period=quarter`, quý chứa `month`), xem bên dưới. `departmentId` (quyết định 64): dashboard một khoa, chỉ tính hồ sơ khoa đó báo đi hoặc gửi đến khoa đó; bỏ trống là toàn viện; khoa không có → `400 departmentId` |
 
-**Dashboard** `{ period, month, label, from, to, serverTimeUtc, targets, kpis, trend, senders, receivers, late }`:
+**Dashboard** `{ period, month, label, from, to, serverTimeUtc, targets, kpis, trend, senders, receivers, late, departmentId, departmentName }`:
+
+- `departmentId`, `departmentName`: khoa đang xem khi gọi kèm `departmentId`; toàn viện thì `null`. Mọi số bên dưới (kể cả `trend`, `senders`, `receivers`, `late`) chỉ tính hồ sơ của khoa đó.
 
 - `kpis` `{ total, cancelled, notifyOnTime, actionOnTime, readBackFirstTime, complete, medianNotifyMinutes, notifyQ1Minutes, notifyQ3Minutes, medianActionMinutes, actionQ1Minutes, actionQ3Minutes }`. Tỷ lệ là `{ numerator, denominator, percent }` (`percent` làm tròn một chữ số thập phân, 0,05 làm tròn lên; mẫu số 0 thì `null`). Hồ sơ đã hủy không tính vào tỷ lệ.
   - `notifyOnTime`: báo đúng hạn trên hồ sơ đã báo hoặc đã quá hạn báo;

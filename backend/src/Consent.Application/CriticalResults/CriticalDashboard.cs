@@ -211,7 +211,10 @@ public static class CriticalDashboardBuilder
     };
 }
 
-/// <summary>Dashboard kết quả nguy cấp cho QLCL, KHTH (<see cref="Permissions.CriticalMonitor"/>), chỉ đọc.</summary>
+/// <summary>
+/// Dashboard kết quả nguy cấp cho QLCL, KHTH (<see cref="Permissions.CriticalMonitor"/>), chỉ đọc: toàn viện, hoặc một khoa
+/// (quyết định 64: hồ sơ khoa đó báo đi và hồ sơ gửi đến khoa đó).
+/// </summary>
 public sealed class CriticalDashboardService(
     ICriticalResultRepository critical,
     IDepartmentRepository departments,
@@ -222,7 +225,7 @@ public sealed class CriticalDashboardService(
     /// <summary>Xem được bấy nhiêu tháng gần đây.</summary>
     public const int MaxMonthsBack = 24;
 
-    public async Task<Result<CriticalDashboardDto>> GetAsync(string? month, string? period, CancellationToken cancellationToken)
+    public async Task<Result<CriticalDashboardDto>> GetAsync(string? month, string? period, Guid? departmentId, CancellationToken cancellationToken)
     {
         if (!currentUser.HasPermission(Permissions.CriticalMonitor))
         {
@@ -259,8 +262,18 @@ public sealed class CriticalDashboardService(
         var results = await critical.ListByResultTimeAsync(Utc(start), Utc(end), cancellationToken).ConfigureAwait(false);
         var names = (await departments.ListAsync(includeInactive: true, cancellationToken).ConfigureAwait(false))
             .ToDictionary(d => d.Id, d => d.Name);
+        if (departmentId is { } unknown && !names.ContainsKey(unknown))
+        {
+            return Error.ValidationField("departmentId", "Không có khoa/phòng này.");
+        }
+
+        // Một khoa: hồ sơ khoa đó báo đi (khoa cận lâm sàng) và hồ sơ gửi đến khoa đó (khoa điều trị).
+        IReadOnlyList<CriticalResult> scoped = departmentId is { } department
+            ? [.. results.Where(r => r.SendingDepartmentId == department || r.ReceivingDepartmentId == department)]
+            : results;
         var values = await settings.CurrentAsync(cancellationToken).ConfigureAwait(false);
-        return CriticalDashboardBuilder.Build(first, quarter, today, now, results, names, values);
+        var dashboard = CriticalDashboardBuilder.Build(first, quarter, today, now, scoped, names, values);
+        return departmentId is { } id ? dashboard with { DepartmentId = id, DepartmentName = names[id] } : dashboard;
     }
 
     internal static DateTimeOffset Utc(DateOnly localDate) =>
