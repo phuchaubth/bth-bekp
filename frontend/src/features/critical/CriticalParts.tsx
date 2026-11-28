@@ -1,4 +1,5 @@
 import {
+  ApartmentOutlined,
   CheckCircleFilled,
   ClockCircleOutlined,
   CloseCircleFilled,
@@ -31,6 +32,16 @@ export function CriticalStatusTag({ status }: { status: CriticalStatus }) {
   return (
     <Tag color={color} icon={icon}>
       {CRITICAL_STATUS_LABELS[status]}
+    </Tag>
+  )
+}
+
+/** Khoa của người bệnh (khoa nhận) trên thẻ hồ sơ, cho tài khoản xem nhiều khoa nhận ra nhanh hồ sơ của khoa nào. */
+export function PatientDepartmentTag({ name }: { name: string | null | undefined }) {
+  if (!name) return null
+  return (
+    <Tag color="geekblue" icon={<ApartmentOutlined />} style={{ fontWeight: 600 }}>
+      {name}
     </Tag>
   )
 }

@@ -9,9 +9,12 @@ import {
   minutesBetween,
   readMuted,
   secondsLeft,
+  departmentList,
+  seesManyDepartments,
   useAlertChime,
   writeMuted,
 } from './criticalUtils'
+import type { CurrentUser } from '../../api/auth'
 
 describe('đồng hồ thời hạn kết quả nguy cấp', () => {
   const now = Date.parse('2026-11-27T03:10:00Z')
@@ -114,5 +117,37 @@ describe('chuông hồ sơ chờ khoa xác nhận', () => {
     expect(play).toHaveBeenCalledTimes(1)
     act(() => vi.advanceTimersByTime(300_000))
     expect(play).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('tài khoản xem nhiều khoa (quyết định 63)', () => {
+  const user = (departments: { id: string; name: string }[]): CurrentUser => ({
+    id: 'u-1',
+    userName: 'thu.demo',
+    fullName: 'Tài khoản Thử',
+    title: null,
+    departmentId: departments[0]?.id ?? null,
+    departmentName: departments[0]?.name ?? null,
+    departments,
+    roles: [],
+    permissions: [],
+    mustChangePassword: false,
+  })
+  const noi = { id: 'd-noi', name: 'Khoa Nội tổng hợp' }
+  const kkb = { id: 'd-kkb', name: 'Khoa Khám bệnh' }
+  const only = (granted: string[]) => (p: string) => granted.includes(p)
+
+  it('QLCL giám sát, quyền xem toàn viện, thuộc từ hai khoa trở lên thì ghi khoa của người bệnh; một khoa thì không', () => {
+    expect(seesManyDepartments(user([noi]), only([Permissions.CriticalMonitor]))).toBe(true)
+    expect(seesManyDepartments(user([noi]), only([Permissions.ScopeAllDepartments]))).toBe(true)
+    expect(seesManyDepartments(user([noi, kkb]), only([Permissions.CriticalReceive]))).toBe(true)
+    expect(seesManyDepartments(user([noi]), only([Permissions.CriticalReceive, Permissions.CriticalTreat]))).toBe(false)
+    expect(seesManyDepartments(user([]), only([Permissions.CriticalDisplay]))).toBe(false)
+    expect(seesManyDepartments(null, only([]))).toBe(false)
+  })
+
+  it('danh sách khoa không trùng, giữ thứ tự gặp đầu tiên, bỏ ô trống', () => {
+    expect(departmentList(['Khoa Nội tổng hợp', 'Khoa Khám bệnh', 'Khoa Nội tổng hợp', null, ''])).toBe('Khoa Nội tổng hợp, Khoa Khám bệnh')
+    expect(departmentList([])).toBe('')
   })
 })

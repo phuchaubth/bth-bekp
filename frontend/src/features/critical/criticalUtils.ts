@@ -1,5 +1,6 @@
 import dayjs from 'dayjs'
 import { useEffect, useRef, useState } from 'react'
+import { accountDepartments, type CurrentUser } from '../../api/auth'
 import { Permissions } from '../../auth/permissions'
 
 /** Hàm và hook dùng chung của kết quả nguy cấp (quyết định 60); tách khỏi tệp thành phần để tệp đó chỉ xuất thành phần. */
@@ -12,6 +13,19 @@ export const SCREEN_PATH = '/man-hinh-kqnc'
  * vì màn hình là của khoa nhận; dùng chung cho route và nút mở màn hình.
  */
 export const SCREEN_PERMISSIONS = [Permissions.CriticalDisplay, Permissions.CriticalReceive, Permissions.CriticalTreat] as const
+
+/**
+ * Tài khoản xem kết quả nguy cấp của nhiều khoa (QLCL giám sát, xem toàn viện, thuộc nhiều khoa): mỗi hồ sơ ghi rõ khoa của người
+ * bệnh (khoa nhận) để nhận ra nhanh. Tài khoản một khoa không cần (hồ sơ nào cũng của khoa mình).
+ */
+export function seesManyDepartments(user: CurrentUser | null | undefined, hasPermission: (permission: string) => boolean): boolean {
+  return hasPermission(Permissions.CriticalMonitor) || hasPermission(Permissions.ScopeAllDepartments) || accountDepartments(user).length > 1
+}
+
+/** Tên các khoa (không trùng, giữ thứ tự gặp đầu tiên), nối bằng dấu phẩy. */
+export function departmentList(names: readonly (string | null | undefined)[]): string {
+  return [...new Set(names.filter((name): name is string => Boolean(name)))].join(', ')
+}
 
 /** Trạng thái đồng hồ: còn hạn, sắp quá hạn (còn dưới mốc cảnh báo), quá hạn. */
 export type ClockState = 'ok' | 'warn' | 'late'

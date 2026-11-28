@@ -11,6 +11,7 @@ import {
   isDisplayOnly,
   playChime,
   secondsLeft,
+  seesManyDepartments,
   timeOf,
   unlockChime,
   useAlertChime,
@@ -65,7 +66,20 @@ function Countdown({ dueUtc, nowMs, warnMinutes, label }: { dueUtc: string; nowM
   )
 }
 
-function AlertCard({ item, nowMs, warnMinutes, variant }: { item: CriticalAlertItem; nowMs: number; warnMinutes: number; variant: 'new' | 'doctor' }) {
+function AlertCard({
+  item,
+  nowMs,
+  warnMinutes,
+  variant,
+  showDepartment,
+}: {
+  item: CriticalAlertItem
+  nowMs: number
+  warnMinutes: number
+  variant: 'new' | 'doctor'
+  /** Màn hình của nhiều khoa: ghi khoa của người bệnh (quyết định 63). */
+  showDepartment: boolean
+}) {
   const late = secondsLeft(item.actionDueAtUtc, nowMs) < 0
   const border = variant === 'new' ? '#d32f2f' : late ? DARK.late : DARK.border
   return (
@@ -82,6 +96,7 @@ function AlertCard({ item, nowMs, warnMinutes, variant }: { item: CriticalAlertI
                 ? 'QUÁ HẠN · nhắc lại, báo trực tiếp bác sĩ'
                 : `${item.acknowledgedByName ?? ''} nhận lúc ${timeOf(item.acknowledgedAtUtc)}`}
           </div>
+          {showDepartment && <div style={{ fontSize: 20, fontWeight: 700, color: '#90caf9' }}>{item.receivingDepartmentName}</div>}
           <div style={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}>{item.patientName}</div>
           <div style={{ fontSize: 16, color: DARK.muted }}>
             Năm sinh {item.patientBirthYear} · mã {item.patientCodeTail}
@@ -110,7 +125,7 @@ function AlertCard({ item, nowMs, warnMinutes, variant }: { item: CriticalAlertI
  */
 export function CriticalScreenPage() {
   const navigate = useNavigate()
-  const { user, logout } = useAuth()
+  const { user, logout, hasPermission } = useAuth()
   const alerts = useCriticalAlerts(true)
   const settings = useCriticalSettings()
   const data: CriticalAlerts | undefined = alerts.data
@@ -132,6 +147,8 @@ export function CriticalScreenPage() {
   const warn = s?.warnMinutes ?? 3
   const nearest = pending.map((p) => p.actionDueAtUtc).sort()[0]
   const initials = displayOnly && settings.data?.values.displayFullName === false
+  // Tài khoản xem nhiều khoa (quyết định 63): mỗi hồ sơ ghi khoa của người bệnh.
+  const many = seesManyDepartments(user, hasPermission)
 
   const enableSound = () => {
     void unlockChime().then((ok) => {
@@ -226,7 +243,7 @@ export function CriticalScreenPage() {
           {pending.length === 0 ? (
             <div style={{ color: DARK.muted }}>Không có kết quả nguy cấp chờ khoa xác nhận.</div>
           ) : (
-            pending.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="new" />)
+            pending.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="new" showDepartment={many} />)
           )}
           <div style={{ color: DARK.muted, fontSize: 15, marginTop: 'auto' }}>
             Người nghe máy bấm Đã nhận cuộc gọi bằng tài khoản của mình
@@ -237,7 +254,7 @@ export function CriticalScreenPage() {
           {doctor.length === 0 ? (
             <div style={{ color: DARK.muted }}>Không có hồ sơ chờ bác sĩ.</div>
           ) : (
-            doctor.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="doctor" />)
+            doctor.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="doctor" showDepartment={many} />)
           )}
         </Panel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
@@ -266,6 +283,7 @@ export function CriticalScreenPage() {
                     <span style={{ color: DARK.muted }}>{timeOf(item.actionAtUtc)}</span>
                   </div>
                   <div style={{ color: DARK.muted, fontSize: 15 }}>
+                    {many ? `${item.receivingDepartmentName} · ` : ''}
                     {item.testName} {item.value}
                     {item.unit ? ` ${item.unit}` : ''}
                   </div>

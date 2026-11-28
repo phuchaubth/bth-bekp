@@ -10,10 +10,10 @@ import { useAuth } from '../../auth/authContext'
 import { hasAnyPermission, Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
-import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
+import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, PatientDepartmentTag, ResultValue } from './CriticalParts'
 import { RejectModal } from './CriticalForms'
 import { useCriticalSaved } from './criticalHooks'
-import { dateOf, minutesBetween, SCREEN_PATH, SCREEN_PERMISSIONS, secondsLeft, timeOf, useServerNow } from './criticalUtils'
+import { dateOf, minutesBetween, SCREEN_PATH, SCREEN_PERMISSIONS, secondsLeft, seesManyDepartments, timeOf, useServerNow } from './criticalUtils'
 
 function PatientLine({ record }: { record: CriticalResult }) {
   return (
@@ -53,6 +53,8 @@ export function CriticalReceivedPage() {
   const poll = values?.pollSeconds ?? 15
   const warn = values?.warnMinutes ?? 3
   const monitor = hasPermission(Permissions.CriticalMonitor)
+  // QLCL, xem toàn viện, thuộc nhiều khoa: mỗi thẻ ghi khoa của người bệnh (quyết định 63).
+  const many = seesManyDepartments(user, hasPermission)
   const own = accountDepartments(user)
   const departments = useDepartments(false)
   const [departmentId, setDepartmentId] = useState<string | undefined>(undefined)
@@ -122,7 +124,10 @@ export function CriticalReceivedPage() {
                   {waiting.map((r) => (
                     <Card key={r.id} size="small" style={{ borderColor: '#f1b5b5', background: '#fff6f6' }} role="article" aria-label={r.patientName}>
                       <Flex justify="space-between" align="start" gap={8} wrap>
-                        <Tag color="error">MỚI · {timeOf(r.notifiedAtUtc)}</Tag>
+                        <Space size={4} wrap>
+                          <Tag color="error">MỚI · {timeOf(r.notifiedAtUtc)}</Tag>
+                          {many && <PatientDepartmentTag name={r.receivingDepartmentName} />}
+                        </Space>
                         {r.actionDueAtUtc && <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />}
                       </Flex>
                       <PatientLine record={r} />
@@ -170,10 +175,11 @@ export function CriticalReceivedPage() {
                     const late = r.actionDueAtUtc !== null && secondsLeft(r.actionDueAtUtc, nowMs) < 0
                     return (
                       <Card key={r.id} size="small" role="article" aria-label={r.patientName}>
-                        {r.actionDueAtUtc && (
-                          <div style={{ marginBottom: 4 }}>
-                            <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />
-                          </div>
+                        {(r.actionDueAtUtc || many) && (
+                          <Flex justify="space-between" align="start" gap={8} wrap style={{ marginBottom: 4 }}>
+                            {many && <PatientDepartmentTag name={r.receivingDepartmentName} />}
+                            {r.actionDueAtUtc && <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />}
+                          </Flex>
                         )}
                         <PatientLine record={r} />
                         <div style={{ margin: '6px 0' }}>
@@ -214,6 +220,11 @@ export function CriticalReceivedPage() {
                         </Link>
                         <Typography.Text type="secondary">{timeOf(r.actionAtUtc ?? r.cancelledAtUtc)}</Typography.Text>
                       </Flex>
+                      {many && (
+                        <div>
+                          <PatientDepartmentTag name={r.receivingDepartmentName} />
+                        </div>
+                      )}
                       <ResultValue testName={r.testName} value={r.value} unit={r.unit} />
                       <div>
                         {r.status === 'Cancelled' ? (

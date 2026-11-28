@@ -8,9 +8,11 @@ import { Permissions } from '../../auth/permissions'
 import {
   chimeReady,
   countdownText,
+  departmentList,
   isDisplayOnly,
   readMuted,
   secondsLeft,
+  seesManyDepartments,
   timeOf,
   unlockChime,
   useAlertChime,
@@ -42,6 +44,8 @@ export function CriticalAlertBanner() {
   const staff = hasPermission(Permissions.CriticalReceive) || hasPermission(Permissions.CriticalTreat)
   const records = hasPermission(Permissions.CriticalRecord)
   const enabled = (staff || records) && !isDisplayOnly(user?.permissions)
+  // Tài khoản xem nhiều khoa: dải ghi khoa của người bệnh (quyết định 63).
+  const many = seesManyDepartments(user, hasPermission)
   const alerts = useCriticalAlerts(enabled)
   const data = alerts.data
   const nowMs = useServerNow(data?.serverTimeUtc, alerts.dataUpdatedAt)
@@ -98,9 +102,13 @@ export function CriticalAlertBanner() {
       >
         <Space wrap size={12}>
           <ExclamationCircleFilled style={{ fontSize: 18 }} />
-          <strong aria-live="assertive">{pending.length} kết quả nguy cấp chờ khoa xác nhận</strong>
+          <strong aria-live="assertive">
+            {pending.length} kết quả nguy cấp chờ khoa xác nhận
+            {many && pending.length > 1 ? ` · ${departmentList(pending.map((p) => p.receivingDepartmentName))}` : ''}
+          </strong>
           <span>
-            {first.patientName} · {first.testName} {first.value}
+            {first.patientName}
+            {many ? ` (${first.receivingDepartmentName})` : ''} · {first.testName} {first.value}
             {first.unit ? ` ${first.unit}` : ''} · {first.sendingDepartmentName} báo lúc {timeOf(first.notifiedAtUtc)} ·{' '}
             <span role="timer" aria-live="off">
               {left < 0 ? `bác sĩ đã quá hạn xử trí ${countdownText(left).slice('Quá hạn '.length)}` : `bác sĩ còn ${countdownText(left).slice('Còn '.length)} để xử trí`}
@@ -129,7 +137,10 @@ export function CriticalAlertBanner() {
       <div role="region" aria-label="Cảnh báo kết quả nguy cấp" style={{ ...BAND, background: '#8a4b00' }}>
         <Space wrap size={12}>
           <ExclamationCircleFilled />
-          <strong>{doctorLate.length} kết quả nguy cấp bác sĩ quá hạn xử trí</strong>
+          <strong>
+            {doctorLate.length} kết quả nguy cấp bác sĩ quá hạn xử trí
+            {many ? ` · ${departmentList(doctorLate.map((a) => a.receivingDepartmentName))}` : ''}
+          </strong>
           <span>Nhắc lại và báo trực tiếp bác sĩ.</span>
         </Space>
         {pathname !== '/ket-qua-nguy-cap/khoa-nhan' && (

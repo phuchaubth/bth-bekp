@@ -14,7 +14,7 @@ import type {
 import { filterNavItems, navItems } from '../../app/navigation'
 import { Permissions } from '../../auth/permissions'
 import { baseRoutes, session } from '../../test/fixtures'
-import { mockApi, problem } from '../../test/mockApi'
+import { mockApi, problem, type ApiCall } from '../../test/mockApi'
 import { renderApp } from '../../test/renderApp'
 
 // Dữ liệu giả lập cho test (không phải dữ liệu thật): kết quả nguy cấp (quyết định 60).
@@ -332,6 +332,8 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
     renderApp('/ket-qua-nguy-cap/ghi')
 
     await user.type(await screen.findByLabelText('Mã người bệnh'), 'NB-GL-0009')
+    // Chưa nối API thông tin người bệnh: không có nút Tra HIS, nhập tay.
+    expect(screen.queryByRole('button', { name: /Tra HIS/ })).not.toBeInTheDocument()
     await user.type(screen.getByLabelText('Họ tên'), 'Người Bệnh Mới')
     await user.type(screen.getByLabelText('Ngày sinh'), '02/01/1960{Enter}')
     await user.type(screen.getByLabelText('Địa chỉ'), 'Ấp Mẫu (giả lập)')
@@ -401,6 +403,100 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
       notification: { method: 'Phone', receiverName: 'Điều dưỡng nghe máy (giả lập)', readBackCorrect: true, incorrectReadBacks: 0, repeatedTwice: true },
     })
   })
+
+  /** Đã nối API thông tin người bệnh; HIS trả người bệnh theo mã (giả lập). */
+  const hisRoutes = {
+    'GET /api/v1/features': { his: false, smartCa: false, patientSource: true, departmentsFromHis: true },
+    [`GET ${base}/patient`]: (c: ApiCall) => {
+      const code = new URLSearchParams(c.search).get('code')
+      if (code === 'NB-HIS-0001') {
+        return { status: 'Found', code, fullName: 'Người Bệnh HIS (giả lập)', dateOfBirth: '1960-01-02', gender: 'Female', address: 'Ấp HIS (giả lập)' }
+      }
+      return { status: code === 'NB-HIS-LOI' ? 'Unavailable' : 'NotFound', code, fullName: null, dateOfBirth: null, gender: null, address: null }
+    },
+  }
+
+  it('Tra HIS: nhập mã người bệnh, bấm Tra HIS điền sẵn họ tên, ngày sinh, giới tính, địa chỉ; hồ sơ ghi Lấy từ HIS', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...common(labSession()),
+      ...hisRoutes,
+      [`POST ${base}`]: (c) => record({ status: 'AwaitingNotification', receivingDepartmentId: null, notifiedAtUtc: null, notifications: [], ...(c.body as object) }),
+    })
+    renderApp('/ket-qua-nguy-cap/ghi')
+
+    // Chưa nhập mã: nhắc nhập mã, không gọi HIS.
+    await user.click(await screen.findByRole('button', { name: /Tra HIS/ }))
+    expect(await screen.findByText('Nhập mã người bệnh để tra HIS.')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === `${base}/patient`)).toBe(false)
+
+    await user.type(screen.getByLabelText('Mã người bệnh'), ' NB-HIS-0001 ')
+    await user.click(screen.getByRole('button', { name: /Tra HIS/ }))
+    await waitFor(() => expect(screen.getByLabelText('Họ tên')).toHaveValue('Người Bệnh HIS (giả lập)'))
+    expect(calls.find((c) => c.path === `${base}/patient`)!.search).toBe('?code=NB-HIS-0001')
+    expect(screen.getByLabelText('Mã người bệnh')).toHaveValue('NB-HIS-0001')
+    // Ô chọn ngày hiện giá trị sau một nhịp vẽ lại (giá trị của form đã có ngay: nhãn có số tuổi).
+    expect(screen.getByText(/^Ngày sinh \(\d+ tuổi\)$/)).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText(/^Ngày sinh/)).toHaveValue('02/01/1960'))
+    expect(screen.getByLabelText('Nữ')).toBeChecked()
+    expect(screen.getByLabelText('Địa chỉ')).toHaveValue('Ấp HIS (giả lập)')
+    expect(screen.getByText('Lấy từ HIS')).toBeInTheDocument()
+    // Kịch bản gọi điện điền theo thông tin vừa lấy.
+    expect(screen.getByText(/“Người bệnh Người Bệnh HIS \(giả lập\), sinh 02\/01\/1960, Ấp HIS \(giả lập\)\.”/)).toBeInTheDocument()
+
+    await pick(user, document.body, 'Xét nghiệm, kỹ thuật (danh mục kết quả nguy cấp)', 'Kali (K+) (giả lập) · Huyết học – Sinh hóa')
+    await user.type(screen.getByLabelText('Giá trị'), '6,8')
+    await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
+    expect((calls.find((c) => c.method === 'POST' && c.path === base)!.body as { patient: unknown }).patient).toEqual({
+      code: 'NB-HIS-0001',
+      fullName: 'Người Bệnh HIS (giả lập)',
+      dateOfBirth: '1960-01-02',
+      gender: 'Female',
+      address: 'Ấp HIS (giả lập)',
+      source: 'His',
+    })
+  })
+
+  it('Tra HIS: sửa thông tin đã lấy thì hồ sơ ghi Nhập tay; không tìm thấy hoặc HIS lỗi thì báo để nhập tay', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({ ...common(labSession()), ...hisRoutes, [`POST ${base}`]: (c) => record({ ...(c.body as object) }) })
+    renderApp('/ket-qua-nguy-cap/ghi')
+
+    await user.type(await screen.findByLabelText('Mã người bệnh'), 'NB-HIS-0001')
+    await user.click(screen.getByRole('button', { name: /Tra HIS/ }))
+    expect(await screen.findByText('Lấy từ HIS')).toBeInTheDocument()
+    await user.type(screen.getByLabelText('Địa chỉ'), ', tổ 2')
+    expect(await screen.findByText('Nhập tay')).toBeInTheDocument()
+    expect(screen.queryByText('Lấy từ HIS')).not.toBeInTheDocument()
+
+    await pick(user, document.body, 'Xét nghiệm, kỹ thuật (danh mục kết quả nguy cấp)', 'Kali (K+) (giả lập) · Huyết học – Sinh hóa')
+    await user.type(screen.getByLabelText('Giá trị'), '6,8')
+    await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
+    expect((calls.find((c) => c.method === 'POST' && c.path === base)!.body as { patient: unknown }).patient).toMatchObject({
+      address: 'Ấp HIS (giả lập), tổ 2',
+      source: 'Manual',
+    })
+  })
+
+  it('Tra HIS: không tìm thấy người bệnh hoặc HIS lỗi thì báo để nhập tay, các ô không bị xóa', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    mockApi({ ...common(labSession()), ...hisRoutes })
+    renderApp('/ket-qua-nguy-cap/ghi')
+
+    await user.type(await screen.findByLabelText('Họ tên'), 'Người Bệnh Gõ Tay')
+    await user.type(screen.getByLabelText('Mã người bệnh'), 'NB-KHONG-CO')
+    await user.click(screen.getByRole('button', { name: /Tra HIS/ }))
+    expect(await screen.findByText('Không tìm thấy người bệnh trên HIS: nhập tay.')).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText('Mã người bệnh'))
+    await user.type(screen.getByLabelText('Mã người bệnh'), 'NB-HIS-LOI')
+    await user.click(screen.getByRole('button', { name: /Tra HIS/ }))
+    expect(await screen.findByText('HIS đang lỗi: nhập tay họ tên, ngày sinh, địa chỉ.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Họ tên')).toHaveValue('Người Bệnh Gõ Tay')
+    expect(screen.getByText('Nhập tay')).toBeInTheDocument()
+  })
 })
 
 describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
@@ -441,6 +537,8 @@ describe('Kết quả nguy cấp: khoa điều trị và bác sĩ', () => {
     expect(within(banner).getByRole('button', { name: /Bật tiếng/ })).toBeInTheDocument()
 
     const card = await screen.findByRole('article', { name: 'Người Bệnh Giả Lập' })
+    // Tài khoản một khoa: thẻ không ghi tên khoa (quyết định 63 chỉ cho tài khoản xem nhiều khoa).
+    expect(within(card).queryByText('Khoa Nội tổng hợp')).not.toBeInTheDocument()
     expect(within(card).getByText(/Người nghe máy: Điều dưỡng nghe máy \(giả lập\) · đọc lại chính xác/)).toBeInTheDocument()
     expect(within(card).queryByRole('button', { name: 'Bác sĩ ghi hướng xử trí' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('article', { name: 'Người Bệnh Quá Hạn' })).getByText('Quá hạn: nhắc lại và báo trực tiếp bác sĩ.')).toBeInTheDocument()
@@ -583,6 +681,7 @@ describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
     expect(router.state.location.pathname).toBe('/man-hinh-kqnc')
     expect(screen.getByRole('status')).toHaveClass('critical-flash')
     expect(screen.getByRole('article', { name: /N\.B\.G\.L/ })).toHaveTextContent('Năm sinh 1960 · mã …0001')
+    expect(within(screen.getByRole('article', { name: /N\.B\.G\.L/ })).queryByText('Khoa Nội tổng hợp')).not.toBeInTheDocument()
     expect(screen.getByText('QUÁ HẠN · nhắc lại, báo trực tiếp bác sĩ')).toBeInTheDocument()
     expect(screen.getByText('1/1')).toBeInTheDocument()
     expect(await screen.findByText(/tên viết tắt để giữ bí mật thông tin người bệnh/)).toBeInTheDocument()
@@ -606,6 +705,93 @@ describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
     renderApp('/man-hinh-kqnc')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('MẤT KẾT NỐI · MÀN HÌNH KHÔNG CÒN CẬP NHẬT')
+  })
+})
+
+describe('Kết quả nguy cấp: khoa của người bệnh cho tài khoản xem nhiều khoa (quyết định 63)', () => {
+  const kkb = { receivingDepartmentId: 'd-kkb', receivingDepartmentName: 'Khoa Khám bệnh' }
+  const twoWards = (permissions: string[]) =>
+    session({
+      id: 'u-hai-khoa',
+      userName: 'haikhoa.demo',
+      fullName: 'Tài khoản Hai Khoa',
+      departmentId: 'd-noi',
+      departmentName: 'Khoa Nội tổng hợp',
+      departments: [
+        { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+        { id: 'd-kkb', name: 'Khoa Khám bệnh' },
+      ],
+      roles: [{ id: 'r-hai-khoa', code: 'X', name: 'Vai trò' }],
+      permissions,
+    })
+
+  it('QLCL xem mọi khoa: mỗi thẻ ở Gửi đến khoa tôi ghi khoa của người bệnh', { timeout: 30_000 }, async () => {
+    const waiting = record({ id: 'kq-1', patientName: 'Người Bệnh Khoa Nội', can: none })
+    const doctor = record({
+      id: 'kq-2',
+      status: 'AwaitingAction',
+      patientName: 'Người Bệnh Khoa Khám',
+      acknowledgedByName: 'Điều dưỡng Demo',
+      acknowledgedAtUtc: ago(4),
+      can: none,
+      ...kkb,
+    })
+    const done = record({ id: 'kq-3', status: 'Completed', patientName: 'Người Bệnh Đã Xong', actionAtUtc: ago(1), actedOnTime: true, can: none, ...kkb })
+    mockApi({ ...common(qualitySession()), [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [waiting, doctor, done] } })
+    renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    expect(within(await screen.findByRole('article', { name: 'Người Bệnh Khoa Nội' })).getByText('Khoa Nội tổng hợp')).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: 'Người Bệnh Khoa Khám' })).getByText('Khoa Khám bệnh')).toBeInTheDocument()
+    // Thẻ "Vừa xong" cũng ghi khoa: một lần ở thẻ chờ bác sĩ, một lần ở hồ sơ vừa xong.
+    expect(screen.getAllByText('Khoa Khám bệnh')).toHaveLength(2)
+  })
+
+  it('Tài khoản thuộc hai khoa: dải đỏ ghi khoa của người bệnh và các khoa đang có hồ sơ chờ', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(twoWards([Permissions.CriticalReceive])),
+      [`GET ${base}/alerts`]: alerts({
+        receivingDepartmentNames: ['Khoa Nội tổng hợp', 'Khoa Khám bệnh'],
+        awaitingAcknowledgement: [alertItem(), alertItem({ id: 'kq-9', patientName: 'Người Bệnh Khoa Khám', ...kkb }), alertItem({ id: 'kq-10', patientName: 'Người Bệnh Thứ Ba' })],
+      }),
+    })
+    renderApp('/')
+
+    const banner = await screen.findByRole('region', { name: 'Cảnh báo kết quả nguy cấp' })
+    expect(banner).toHaveTextContent('3 kết quả nguy cấp chờ khoa xác nhận · Khoa Nội tổng hợp, Khoa Khám bệnh')
+    expect(banner).toHaveTextContent(/Người Bệnh Giả Lập \(Khoa Nội tổng hợp\) · Kali \(K\+\) \(giả lập\) 6,8 mmol\/L · Khoa Huyết học – Sinh hóa báo lúc/)
+  })
+
+  it('Tài khoản thuộc hai khoa: dải cam bác sĩ quá hạn ghi các khoa có hồ sơ quá hạn', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(twoWards([Permissions.CriticalReceive])),
+      [`GET ${base}/alerts`]: alerts({
+        awaitingAction: [
+          alertItem({ id: 'kq-4', status: 'AwaitingAction', actionDueAtUtc: ago(2), ...kkb }),
+          alertItem({ id: 'kq-5', status: 'AwaitingAction', actionDueAtUtc: ago(-5) }),
+        ],
+      }),
+    })
+    renderApp('/')
+
+    const banner = await screen.findByRole('region', { name: 'Cảnh báo kết quả nguy cấp' })
+    expect(banner).toHaveTextContent('1 kết quả nguy cấp bác sĩ quá hạn xử trí · Khoa Khám bệnh')
+  })
+
+  it('Màn hình theo dõi của tài khoản nhiều khoa ghi khoa của người bệnh trên mỗi thẻ', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(twoWards([Permissions.CriticalDisplay])),
+      [`GET ${base}/alerts`]: alerts({
+        receivingDepartmentNames: ['Khoa Nội tổng hợp', 'Khoa Khám bệnh'],
+        awaitingAcknowledgement: [alertItem({ patientName: 'N.B.G.L' })],
+        awaitingAction: [
+          alertItem({ id: 'kq-3', status: 'AwaitingAction', patientName: 'N.B.K', acknowledgedByName: 'Điều dưỡng Demo', acknowledgedAtUtc: ago(4), ...kkb }),
+        ],
+      }),
+    })
+    renderApp('/man-hinh-kqnc')
+
+    expect(within(await screen.findByRole('article', { name: /N\.B\.G\.L/ })).getByText('Khoa Nội tổng hợp')).toBeInTheDocument()
+    expect(within(screen.getByRole('article', { name: /N\.B\.K/ })).getByText('Khoa Khám bệnh')).toBeInTheDocument()
   })
 })
 
