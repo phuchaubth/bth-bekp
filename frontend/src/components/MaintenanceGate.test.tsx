@@ -9,6 +9,7 @@ import { Permissions } from '../auth/permissions'
 import { adminSession, anonymous, baseRoutes, session } from '../test/fixtures'
 import { json, mockApi, problem } from '../test/mockApi'
 import { renderApp } from '../test/renderApp'
+import { handleStaleBuild, STALE_BUILD_RELOAD_KEY, STALE_BUILD_RETRY_MS, watchStaleBuild } from '../app/staleBuild'
 
 // Quyết định 53: chế độ bảo trì.
 const REASON = 'Nâng cấp phần mềm'
@@ -224,6 +225,97 @@ describe('Màn hình "Hệ thống đang bảo trì"', () => {
     await user.click(within(dialog).getByRole('button', { name: /Kiểm tra lại/ }))
 
     await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('Vừa cài gói mới, máy còn chạy giao diện cũ (không tải được file của trang)', () => {
+  const failChunk = () => window.dispatchEvent(new Event('vite:preloadError'))
+
+  it('máy chủ đã chạy gói mới: hiện màn hình "Máy chủ đang tạm dừng" rồi tải lại trang một lần', async () => {
+    const reload = vi.spyOn(maintenanceStore, 'reloadPage').mockImplementation(() => {})
+    mockApi({ ...baseRoutes(session()), 'GET /api/v1/maintenance': () => json(status(false)) })
+    const stop = watchStaleBuild()
+    try {
+      renderApp('/nguoi-benh')
+      await screen.findByPlaceholderText(/Tìm theo họ tên/)
+
+      failChunk()
+
+      expect(await maintenanceScreen()).toHaveTextContent('Máy chủ đang tạm dừng')
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+      expect(Number(window.sessionStorage.getItem(STALE_BUILD_RELOAD_KEY))).toBeGreaterThan(0)
+      // Lỗi lặp lại ngay (trang chưa kịp tải lại): không tải lại thêm.
+      failChunk()
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      expect(reload).toHaveBeenCalledTimes(1)
+    } finally {
+      stop()
+    }
+  })
+
+  it('máy chủ còn dừng (đang cài gói): giữ trang, chờ máy chủ chạy lại mới tải lại trang', async () => {
+    let stopped = true
+    const reload = vi.spyOn(maintenanceStore, 'reloadPage').mockImplementation(() => {})
+    mockApi({
+      ...baseRoutes(session()),
+      'GET /api/v1/patients': { items: [], totalCount: 0, page: 1, pageSize: 20 },
+      'GET /api/v1/maintenance': () => (stopped ? serverStopped() : json(status(false))),
+    })
+    const stop = watchStaleBuild()
+    try {
+      renderApp('/nguoi-benh')
+      const user = userEvent.setup()
+      const search = await screen.findByPlaceholderText(/Tìm theo họ tên/)
+      await user.type(search, 'Le Minh')
+
+      failChunk()
+
+      const dialog = await maintenanceScreen()
+      expect(dialog).toHaveTextContent('Máy chủ đang tạm dừng')
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      expect(reload).not.toHaveBeenCalled()
+      expect(search).toHaveValue('Le Minh')
+
+      stopped = false
+      await user.click(within(dialog).getByRole('button', { name: /Kiểm tra lại/ }))
+      await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+    } finally {
+      stop()
+    }
+  })
+
+  it('vừa tự tải lại mà vẫn lỗi (thư mục giao diện thiếu file) hoặc trình duyệt chặn lưu tạm: không tải lại mãi', () => {
+    const memory = new Map<string, string>()
+    const storage = { getItem: (k: string) => memory.get(k) ?? null, setItem: (k: string, v: string) => void memory.set(k, v) }
+    const start = 1_800_000_000_000
+
+    expect(handleStaleBuild(storage, start)).toBe(true)
+    expect(maintenanceStore.get().notice).toMatchObject({ kind: 'unavailable', reloadOnEnd: true })
+    expect(memory.get(STALE_BUILD_RELOAD_KEY)).toBe(String(start))
+
+    maintenanceStore.clear()
+    expect(handleStaleBuild(storage, start + STALE_BUILD_RETRY_MS - 1)).toBe(false)
+    expect(maintenanceStore.get().notice).toBeNull()
+    // Hết khoảng chờ (lần cài gói sau): tự tải lại được tiếp.
+    expect(handleStaleBuild(storage, start + STALE_BUILD_RETRY_MS)).toBe(true)
+    maintenanceStore.clear()
+    // Giờ máy bị chỉnh lùi: không coi là vừa tải lại.
+    expect(handleStaleBuild(storage, start)).toBe(true)
+    maintenanceStore.clear()
+    // Giá trị lạ trong lưu tạm: coi như chưa tải lại.
+    memory.set(STALE_BUILD_RELOAD_KEY, 'abc')
+    expect(handleStaleBuild(storage, start)).toBe(true)
+    maintenanceStore.clear()
+
+    expect(handleStaleBuild(null, start)).toBe(false)
+    const blocked = {
+      getItem: () => {
+        throw new Error('SecurityError')
+      },
+      setItem: () => {},
+    }
+    expect(handleStaleBuild(blocked, start)).toBe(false)
+    expect(maintenanceStore.get().notice).toBeNull()
   })
 })
 

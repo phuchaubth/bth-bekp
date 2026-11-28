@@ -2075,6 +2075,9 @@ Do nhập sai mật khẩu 5 lần. Chờ hết thời gian khóa (mặc định
 **Màn hình báo "Hệ thống đang bảo trì"?**
 Quản trị đang bảo trì hoặc phòng CNTT đang cài bản mới. Không cần tải lại trang hay đăng nhập lại: chờ đến giờ dự kiến xong, màn hình tự đóng (hoặc tự tải lại trang) khi xong. Dữ liệu đang nhập vẫn giữ trên màn hình. Xem mục 8.7.
 
+**Vừa cài bản mới, bấm sang trang khác thì màn hình "Máy chủ đang tạm dừng" hiện vài giây rồi trang tự tải lại?**
+Bình thường. Máy đang mở phần mềm từ trước khi cài vẫn chạy giao diện cũ, nên khi mở một trang chưa mở lần nào thì phần mềm tự tải lại để lấy giao diện mới. Nếu còn thấy trang **"Đã xảy ra lỗi – Trang không thể hiển thị"**, bấm **Tải lại trang** (hoặc **Ctrl+F5**); vẫn lỗi thì báo bộ phận CNTT.
+
 **Vì sao tôi không thấy nút "Lấy thông tin"?**
 Nút này chỉ có khi bệnh viện đã kết nối hệ thống thông tin người bệnh. Nếu chưa có, hãy quét CCCD hoặc nhập trực tiếp.
 
