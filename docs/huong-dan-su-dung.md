@@ -1202,6 +1202,25 @@ Dùng khi cần điều chỉnh cấu hình, mẫu phiếu, dữ liệu mà khô
 
 Mọi lần bật, sửa, tắt đều ghi **Nhật ký hệ thống**. Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì theo hướng dẫn triển khai (mục 5.12). Khi phòng CNTT cài bản mới hoặc chạy script xóa dữ liệu chạy thử, người dùng cũng thấy màn hình bảo trì vài phút; xong thì trang tự tải lại.
 
+**Phiên bản đã cài** (quyết định 67). Thẻ **Phiên bản đã cài** (dưới thẻ *Trong lúc bảo trì*) cho biết gói phần mềm đang chạy. Số gói trùng với số trong hướng dẫn cài ("Cài gói lần 97"): so số đang chạy với số của gói mới để biết đã cài gói mới chưa.
+
+- **Máy chủ (API)**: số gói, mã (7 ký tự đầu của mã commit), ngày giờ đóng gói của bản đang chạy trên máy chủ.
+- **Giao diện trên trình duyệt này**: bản giao diện mà máy đang mở trang chạy.
+- Dòng xanh **Giao diện và máy chủ cùng gói …**: đã cài xong, máy này đã tải giao diện mới.
+- Dòng vàng **Trình duyệt này đang chạy giao diện gói …, cũ hơn máy chủ**: nhấn **Ctrl+F5**. Tải lại rồi vẫn thấy dòng vàng thì báo phòng CNTT: thư mục giao diện trên máy chủ chưa được chép gói mới.
+- Dòng vàng **Máy chủ (API) đang chạy gói …, cũ hơn giao diện** hoặc **Máy chủ (API) chưa có thông tin phiên bản**: báo phòng CNTT (thư mục API chưa được chép gói mới, hoặc API chưa khởi động lại).
+- Không thấy thẻ này sau khi cài gói mới: máy đang chạy giao diện cũ, nhấn **Ctrl+F5**.
+
+Phòng CNTT so gói vừa tải về với bản đang cài trên máy chủ bằng script `xem-phien-ban.ps1` có trong gói (hướng dẫn triển khai, mục 5.17).
+
+![Phiên bản đã cài: cùng gói](huong-dan-su-dung/bt-04-phien-ban.png)
+
+*Hình 8.14. Giao diện và máy chủ cùng gói 97.*
+
+![Phiên bản đã cài: giao diện cũ hơn máy chủ](huong-dan-su-dung/bt-05-phien-ban-lech.png)
+
+*Hình 8.15. Máy này chưa tải lại giao diện sau khi cài gói 97: nhấn Ctrl+F5.*
+
 ---
 
 <a id="bao-cao-dieu-duong"></a>

@@ -125,7 +125,10 @@ Gói migration áp dụng lần lượt các migration còn thiếu (idempotent;
 | `sql\` | Máy có SSMS | `01-create-login.sql`, `02-backup.sql`, `03-restore.sql`, `04-patientinfo-reader.sql`, `05-uat-create-login.sql`; `06-xoa-du-lieu-chay-thu.sql` (dùng qua script bên dưới, mục 5.11) |
 | `cap-nhat-moi-truong.ps1` | Chạy tại thư mục gói | Cài gói lên UAT rồi Prod (mục 5.10) |
 | `xoa-du-lieu-chay-thu.ps1` | Chạy tại thư mục gói | Xóa phiếu, báo cáo điều dưỡng chạy thử trước khi dùng thật (mục 5.11) |
-| `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Mã commit và ngày đóng gói |
+| `xem-phien-ban.ps1` | Chạy tại thư mục gói | So sánh phiên bản đang cài trên máy chủ với gói này, chỉ đọc (mục 5.17) |
+| `PHIEN-BAN.txt` | Lưu vào biên bản bàn giao | Số gói, mã commit và ngày đóng gói |
+
+Mỗi thư mục `ConsentApi\`, `ConsentWeb\`, `PatientInfoApi\` có file `version.json` (số gói, mã commit, thời điểm đóng gói; quyết định 67): chép cùng thư mục, không sửa, không xóa.
 
 **Cách 2: tự build** trên một máy có .NET SDK 10 và Node.js 24.15 trở lên (kết quả giống cách 1):
 
@@ -191,6 +194,8 @@ Sao chép `artifacts/api` → `D:\Apps\ConsentApi`, `frontend/dist` → `D:\Apps
 5. Mở `https://phieudongthuan.bth.org.vn`, đăng nhập `admin`, đổi mật khẩu, vào **Quản trị → Cấu hình hệ thống** nhập tên đơn vị.
 
 ### 5.4. Nâng cấp phiên bản
+
+Trước khi cài, giải nén gói rồi chạy `xem-phien-ban.ps1` để biết gói mới hơn hay cũ hơn bản đang cài; sau khi cài, thẻ **Phiên bản đã cài** ở trang *Quản trị → Bảo trì hệ thống* phải báo giao diện và máy chủ cùng gói mới (mục 5.17).
 
 1. Sao lưu CSDL (mục 7). 2. Chạy gói migration mới (mục 4.2; bản có quyết định 41 thêm bảng `UserDepartments` và cột `Patients.CreatedByUserId`, mục 5.8). 3. Dừng Application Pool `ConsentApi`, thay thư mục `D:\Apps\ConsentApi` (giữ `web.config`), khởi động lại. 4. Thay `D:\Apps\ConsentWeb` bằng `dist` mới (giữ `web.config`). 5. Nếu có cài API thông tin người bệnh (mục 5.5): dừng Application Pool `PatientInfoApi`, thay thư mục `C:\Apps\PatientInfoApi` bằng thư mục `PatientInfoApi\` của gói mới (giữ `web.config`), khởi động lại; biến môi trường nằm ở Application Pool nên được giữ nguyên. 6. Kiểm tra `/health/ready` và đăng nhập thử.
 
@@ -563,7 +568,7 @@ Script [`cap-nhat-moi-truong.ps1`](../deploy/iis/cap-nhat-moi-truong.ps1) có tr
    .\cap-nhat-moi-truong.ps1 -MoiTruong UAT -Goi C:\Setup\goi-trien-khai-iis-<mã commit>.zip -Sha256 <mã SHA256>
    ```
 
-   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF; `web.config` của API không ghi môi trường khác); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool **API** (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" thay vì trang lỗi của IIS, quyết định 53); chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`; giao diện chỉ dừng vài giây trong lúc chép file giao diện); chạy lại API; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`. Máy đang mở phần mềm tự tải lại trang khi API chạy lại.
+   Script lần lượt: kiểm tra mã SHA256 (sai thì dừng, không đổi gì); kiểm tra cấu hình hai môi trường tách biệt (UAT phải `Staging` và có `App__EnvironmentLabel`; Prod phải `Production`, không có nhãn; hai bên không dùng chung CSDL, khóa, thư mục PDF; `web.config` của API không ghi môi trường khác); in số gói đang cài và số gói của gói này (quyết định 67; gói cũ hơn bản đang chạy thì phải gõ thêm `CAI GOI CU`, mục 5.17); hỏi gõ `UAT` để xác nhận và mật khẩu `consent_migrator_uat` (không hiện, không ghi ra file); sao lưu CSDL (`COPY_ONLY`, vào thư mục sao lưu mặc định của SQL Server) và thư mục ứng dụng vào `C:\Backup\Consent\UAT\truoc-<mã>-<thời điểm>`; dừng Application Pool **API** (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" thay vì trang lỗi của IIS, quyết định 53); chạy `efbundle.exe`; chép file mới (giữ `web.config`, thư mục `logs`; giao diện chỉ dừng vài giây trong lúc chép file giao diện); chạy lại API; chờ `/health/ready` báo `Healthy`; ghi một dòng vào `C:\Apps\lich-su-cai-dat.csv`. Máy đang mở phần mềm tự tải lại trang khi API chạy lại.
 3. **Kiểm thử trên UAT:** người quản lý kiểm thử (vai trò Quản trị, hoặc vai trò được thêm quyền `testing.manage`) vào *Quản trị → Phân công kiểm thử*, phân công từng tính năng mới cho từng người, mỗi người một thời gian (hướng dẫn sử dụng, mục 10). Người kiểm thử làm trên UAT và gửi báo cáo (bắt buộc); trang *Tổng quan* nhắc việc chưa báo cáo.
 4. **Xem kết quả:** khi mọi phân công đã có báo cáo và đạt (hoặc lỗi còn lại được chấp nhận, ghi hướng xử lý), quyết định đưa lên Prod. Bản không đạt: gửi báo cáo (xuất Excel) cho nhóm phát triển, chờ gói sửa, quay lại bước 1 với gói mới.
 5. **Cài lên Prod** (ngoài giờ cao điểm; người dùng thấy màn hình "Hệ thống đang bảo trì" vài phút) **cùng file gói, cùng mã SHA256**. Muốn kiểm tra bản mới trước khi cho mọi người vào: bật **chế độ bảo trì** trước khi chạy script, kiểm tra xong bằng tài khoản quản trị rồi tắt (mục 5.12):
@@ -729,6 +734,29 @@ Bản này cũng ẩn nút **Mở màn hình theo dõi (TV)** với tài khoản
 - Quyết định 66: QLCL mở được màn hình theo dõi của mọi khoa (nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**). Màn hình của nhiều khoa có ô **Khoa** và nút **Chạy lướt từng khoa**; máy màn hình dùng chung nhiều khoa đặt lối tắt như mục 5.14 bước 5.
 
 Bản này không có migration, không đổi quyền, không cần cấu hình. Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần. Màn hình lớn chạy lướt dashboard: đăng nhập bằng tài khoản có quyền xem dashboard (vai trò **QLCL (kết quả nguy cấp)**), mở **Dashboard**, bấm **Chạy lướt từng khoa**, bấm **F11**. Lưu dấu trang lúc đang chạy lướt để lần sau mở thẳng.
+
+### 5.17. Phiên bản đã cài, so sánh với gói mới (quyết định 67)
+
+Mỗi gói ghi **số gói** (số lần chạy quy trình *Gói triển khai IIS* trên GitHub Actions, là số trong "Cài gói lần …"), **mã commit** và **thời điểm đóng gói** vào file `version.json` trong ba thư mục `ConsentApi`, `ConsentWeb`, `PatientInfoApi`, vào giao diện (lúc build) và vào dòng `So goi` của `PHIEN-BAN.txt`. Bản cài từ gói chưa có quyết định này không có các thông tin đó: phần mềm và script ghi **Chưa rõ** cho tới lần cài gói tiếp theo.
+
+**Xem trong phần mềm.** *Quản trị → Bảo trì hệ thống*, thẻ **Phiên bản đã cài** (quyền `system.maintenance`; hướng dẫn sử dụng, mục 8.7):
+
+- **Máy chủ (API)**: phiên bản API đang chạy, đọc từ `C:\Apps\ConsentApi\version.json` lúc API khởi động (chép file mới mà chưa khởi động lại API thì vẫn báo bản cũ).
+- **Giao diện trên trình duyệt này**: phiên bản giao diện trình duyệt đang chạy.
+- Hai bên cùng gói: dòng xanh **Giao diện và máy chủ cùng gói N.** Giao diện cũ hơn: nhấn **Ctrl+F5**; tải lại rồi vẫn lệch thì thư mục `ConsentWeb` chưa được chép gói mới. Máy chủ cũ hơn hoặc **Chưa rõ**: thư mục `ConsentApi` chưa được chép gói mới, hoặc API chưa khởi động lại.
+
+**So sánh với gói mới trên máy chủ.** Giải nén gói (đã so mã SHA256, mục 5.1) rồi chạy script chỉ đọc `xem-phien-ban.ps1` của gói; không cần quyền quản trị, không dừng ứng dụng:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\Setup\goi-<mã commit>\xem-phien-ban.ps1
+# Môi trường UAT: thêm -ThuMucCai C:\Apps\UAT
+```
+
+Script in bảng từng thư mục `ConsentApi`, `ConsentWeb`, `PatientInfoApi`: phiên bản **đang cài**, phiên bản **gói này** (số gói · mã commit 7 ký tự · ngày giờ đóng gói theo giờ máy chủ) và **So sánh**: *Gói này mới hơn*, *Giống bản đang cài*, *GÓI NÀY CŨ HƠN*, *Cùng số gói, khác mã commit*, *Chưa so được* (bản đang cài chưa ghi phiên bản), *Chưa cài thư mục này*. Dưới bảng là kết luận: gói mới hơn; đã là gói này (không cần cài lại); **gói cũ hơn bản đang cài** (chỉ cài khi cố ý quay về bản cũ; nên khôi phục bản sao lưu theo mục 5.10); `ConsentApi` và `ConsentWeb` đang khác gói (lần cài trước chưa chép đủ thư mục). `PatientInfoApi` chỉ cần chép khi hướng dẫn cài gói yêu cầu, nên cũ hơn gói là bình thường.
+
+**Script cài gói** `cap-nhat-moi-truong.ps1` (mục 5.10) in *Đang cài: gói N* và *Gói này: gói M* trước khi hỏi xác nhận. Gói cũ hơn bản đang chạy thì script dừng lại hỏi: gõ đúng `CAI GOI CU` mới cài tiếp (gõ khác là hủy, chưa thay đổi gì); `lich-su-cai-dat.csv` ghi *Cai goi cu hon ban dang cai (goi N ve goi M)*. Cài gói cũ đè lên không gỡ được thay đổi CSDL của gói mới: quay về bản cũ nên khôi phục bản sao lưu.
+
+`ConsentWeb\version.json` và phiên bản trong mã giao diện là file tĩnh ai mở được trang web cũng tải được (chỉ có số gói, mã commit, ngày đóng gói, không có bí mật); API `GET /api/v1/version` chỉ trả cho người có quyền bảo trì hệ thống. Bản này không có migration, không đổi quyền, không cần cấu hình.
 
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 

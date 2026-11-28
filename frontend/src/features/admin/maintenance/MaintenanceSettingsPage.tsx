@@ -14,6 +14,7 @@ import {
 import { PageHeader } from '../../../components/PageHeader'
 import { applyServerFieldErrors, errorMessage } from '../../../utils/formErrors'
 import { formatDateTime } from '../../../utils/format'
+import { VersionCard } from './VersionCard'
 
 interface MaintenanceFormValues {
   reason: string
@@ -24,7 +25,7 @@ const TIME_FORMAT = 'HH:mm DD/MM/YYYY'
 
 /**
  * Bảo trì hệ thống (quyết định 53): người có quyền bảo trì bật chế độ bảo trì, ghi lý do và giờ dự kiến xong (hiện cho người
- * dùng), sửa khi đang bật, tắt khi xong. Có hiệu lực ngay.
+ * dùng), sửa khi đang bật, tắt khi xong. Có hiệu lực ngay. Thẻ Phiên bản đã cài (quyết định 67) cho biết gói đang chạy.
  */
 export function MaintenanceSettingsPage() {
   const settings = useMaintenanceSettings()
@@ -170,26 +171,29 @@ export function MaintenanceSettingsPage() {
           </Card>
         </Col>
         <Col xs={24} xl={10}>
-          <Card title="Trong lúc bảo trì">
-            <ul style={{ paddingInlineStart: 20, margin: 0 }}>
-              <li>
-                Người không có quyền <strong>Bảo trì hệ thống</strong> (kể cả kiosk, người bệnh ký trên máy tính bảng hoặc qua mã QR) thấy
-                màn hình "Hệ thống đang bảo trì" kèm lý do và giờ dự kiến xong; không đăng nhập, không thao tác được.
-              </li>
-              <li>
-                Phiên đăng nhập của họ không bị thu hồi; trang đang mở và dữ liệu đang nhập vẫn giữ trên màn hình. Tắt bảo trì là họ làm
-                tiếp (thao tác lúc đang bảo trì chưa được lưu thì bấm lưu lại).
-              </li>
-              <li>
-                Tài khoản có quyền Bảo trì hệ thống (vai trò Quản trị hệ thống) vẫn đăng nhập, điều chỉnh cấu hình, mẫu phiếu, dữ liệu như
-                thường. Đăng nhập trong lúc bảo trì: ở màn hình bảo trì chọn <em>Đăng nhập bằng tài khoản quản trị</em>.
-              </li>
-              <li>Mọi lần bật, sửa, tắt đều được ghi nhật ký hệ thống.</li>
-            </ul>
-            <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
-              Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì bằng SQL theo hướng dẫn triển khai (mục 5.12).
-            </Typography.Paragraph>
-          </Card>
+          <Flex vertical gap={16}>
+            <Card title="Trong lúc bảo trì">
+              <ul style={{ paddingInlineStart: 20, margin: 0 }}>
+                <li>
+                  Người không có quyền <strong>Bảo trì hệ thống</strong> (kể cả kiosk, người bệnh ký trên máy tính bảng hoặc qua mã QR)
+                  thấy màn hình "Hệ thống đang bảo trì" kèm lý do và giờ dự kiến xong; không đăng nhập, không thao tác được.
+                </li>
+                <li>
+                  Phiên đăng nhập của họ không bị thu hồi; trang đang mở và dữ liệu đang nhập vẫn giữ trên màn hình. Tắt bảo trì là họ
+                  làm tiếp (thao tác lúc đang bảo trì chưa được lưu thì bấm lưu lại).
+                </li>
+                <li>
+                  Tài khoản có quyền Bảo trì hệ thống (vai trò Quản trị hệ thống) vẫn đăng nhập, điều chỉnh cấu hình, mẫu phiếu, dữ liệu
+                  như thường. Đăng nhập trong lúc bảo trì: ở màn hình bảo trì chọn <em>Đăng nhập bằng tài khoản quản trị</em>.
+                </li>
+                <li>Mọi lần bật, sửa, tắt đều được ghi nhật ký hệ thống.</li>
+              </ul>
+              <Typography.Paragraph type="secondary" style={{ marginTop: 12, marginBottom: 0 }}>
+                Không còn tài khoản quản trị nào đăng nhập được thì phòng CNTT tắt bảo trì bằng SQL theo hướng dẫn triển khai (mục 5.12).
+              </Typography.Paragraph>
+            </Card>
+            <VersionCard />
+          </Flex>
         </Col>
       </Row>
     </>

@@ -10,6 +10,8 @@
     3. Kiểm tra hai môi trường tách biệt: UAT chạy Staging và có nhãn App__EnvironmentLabel; Prod chạy Production, không
        có nhãn; hai môi trường không dùng chung CSDL, khóa hay thư mục PDF; web.config của API không ghi đè sang môi
        trường khác (ASPNETCORE_ENVIRONMENT trong web.config được ưu tiên hơn biến của Application Pool).
+       In số gói đang cài và số gói của gói này (version.json, quyết định 67); gói cũ hơn bản đang cài thì phải gõ thêm
+       xác nhận cài gói cũ.
     4. Hỏi xác nhận (gõ đúng tên môi trường), hỏi mật khẩu tài khoản migrator (không hiện, không ghi ra file).
     5. Sao lưu CSDL (COPY_ONLY, vào thư mục sao lưu mặc định của SQL Server) và các thư mục ứng dụng đang chạy.
     6. Dừng API (giao diện vẫn chạy: người dùng thấy màn hình "Hệ thống đang bảo trì" vài phút, quyết định 53), cập nhật lược
@@ -116,6 +118,29 @@ function New-KetNoiMigrator([string]$ketNoiUngDung, [string]$taiKhoan, [string]$
     $builder['User Id'] = $taiKhoan
     $builder['Password'] = $matKhau
     return $builder.ConnectionString
+}
+
+# Số gói ghi trong version.json của một thư mục (quyết định 67); $null khi chưa có file (cài từ gói chưa ghi phiên bản), file
+# hỏng hoặc không có số gói. Hàm cùng cách đọc với xem-phien-ban.ps1.
+function Get-SoGoi([string]$thuMuc) {
+    $file = Join-Path $thuMuc 'version.json'
+    if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { return $null }
+    if ((Get-Item -LiteralPath $file).Length -gt 4096) { return $null }
+    try {
+        $json = Get-Content -LiteralPath $file -Raw -Encoding UTF8 | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+    if ($null -eq $json) { return $null }
+    $so = 0
+    if (-not [int]::TryParse([string]$json.package, [ref]$so) -or $so -le 0) { return $null }
+    return $so
+}
+
+# Gói định cài cũ hơn bản đang cài (cả hai đều biết số gói).
+function Test-GoiCuHon($dangCai, $goiNay) {
+    return ($null -ne $dangCai) -and ($null -ne $goiNay) -and ($goiNay -lt $dangCai)
 }
 
 # Gói đã cài thành công lên UAT chưa (theo nhật ký cài đặt).
@@ -342,10 +367,23 @@ function Invoke-CapNhat {
     $thuMucWeb = Join-Path $cfg.ThuMuc 'ConsentWeb'
     $thuMucHis = Join-Path $cfg.ThuMuc 'PatientInfoApi'
     $coHis = (Test-Path -LiteralPath $thuMucHis) -and (Test-Path "IIS:\AppPools\$($cfg.PoolHis)")
+    # Quyết định 67: so số gói của ConsentApi đang cài với gói này (bảng đầy đủ: xem-phien-ban.ps1).
+    $goiDangCai = Get-SoGoi $thuMucApi
+    $goiNay = Get-SoGoi (Join-Path $giaiNen 'ConsentApi')
     Write-Host "Môi trường : $MoiTruong ($($cfg.MoiTruongAsp))"
     Write-Host "CSDL       : $($ketNoi.Csdl) trên $($ketNoi.MayChu)"
     Write-Host "Thư mục    : $thuMucApi, $thuMucWeb$(if ($coHis) { ", $thuMucHis" })"
     Write-Host "Kiểm tra   : $($cfg.SucKhoe)"
+    Write-Host "Đang cài   : $(if ($goiDangCai) { "gói $goiDangCai" } else { 'chưa rõ (cài từ gói chưa ghi phiên bản)' })"
+    Write-Host "Gói này    : $(if ($goiNay) { "gói $goiNay" } else { 'chưa rõ (gói không có version.json)' })"
+
+    $ghiChuGoiCu = ''
+    if (Test-GoiCuHon $goiDangCai $goiNay) {
+        Write-Host "Gói này (gói $goiNay) CŨ HƠN bản đang cài (gói $goiDangCai). Quay về bản cũ nên khôi phục bản sao lưu (docs/trien-khai.md, mục 5.10): cài gói cũ đè lên không gỡ được thay đổi CSDL của gói mới." -ForegroundColor Red
+        $traLoiGoiCu = Read-Host 'Gõ CAI GOI CU để vẫn cài gói cũ hơn (gõ khác để hủy)'
+        if ($traLoiGoiCu -cne 'CAI GOI CU') { throw 'Đã hủy, chưa thay đổi gì.' }
+        $ghiChuGoiCu = "Cai goi cu hon ban dang cai (goi $goiDangCai ve goi $goiNay)"
+    }
 
     $tenXacNhan = $MoiTruong.ToUpperInvariant()
     if ($MoiTruong -eq 'Prod') {
@@ -411,7 +449,8 @@ function Invoke-CapNhat {
 
         Write-Buoc "7. Kiểm tra ứng dụng"
         Wait-SucKhoe $cfg.SucKhoe
-        Add-NhatKy $nhatKy $MoiTruong $sha $maCommit 'ThanhCong' $(if ($BoQuaKiemTraUAT) { 'Bo qua kiem tra UAT' } else { '' })
+        $ghiChu = @($(if ($BoQuaKiemTraUAT) { 'Bo qua kiem tra UAT' }), $ghiChuGoiCu) | Where-Object { $_ }
+        Add-NhatKy $nhatKy $MoiTruong $sha $maCommit 'ThanhCong' ($ghiChu -join '; ')
         Write-Host ''
         Write-Host "Đã cài gói $sha lên $MoiTruong. Đăng nhập thử và xem dải báo môi trường (UAT) hoặc không có dải (Prod)." -ForegroundColor Green
     }

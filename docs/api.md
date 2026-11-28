@@ -775,6 +775,7 @@ Mỗi bản ghi có thời điểm (UTC), người thực hiện, địa chỉ I
 | GET | `/health/ready` | Không cần đăng nhập | Kết nối được SQL Server (`503` nếu không) |
 | GET | `/openapi/v1.json` | Không cần đăng nhập | Chỉ có ở môi trường Development |
 | GET | `/api/v1/environment` | Không cần đăng nhập | Nhãn môi trường (quyết định 50): `{ label }`, lấy từ cấu hình `App:EnvironmentLabel` (bỏ ký tự điều khiển, khoảng trắng hai đầu, tối đa 30 ký tự). Môi trường kiểm thử (UAT) đặt `"UAT"` để giao diện hiện dải báo trên mọi trang; môi trường chạy thật không đặt nên `label: null` |
+| GET | `/api/v1/version` | `system.maintenance` | Phiên bản API đang chạy (quyết định 67): `{ package, commit, builtAtUtc }` (số gói = số lần chạy quy trình *Gói triển khai IIS*, mã commit đầy đủ 40 ký tự, thời điểm đóng gói). Đọc file `version.json` cạnh `Consent.Api.dll` **một lần lúc khởi động**: file chép đè khi API đang chạy chỉ có hiệu lực sau khi khởi động lại. Không có file (bản phát triển, cài từ gói chưa ghi phiên bản), file quá 4 KB hoặc không phải JSON thì cả ba là `null`; giá trị sai định dạng thì giá trị đó `null` (số gói phải là số nguyên dương, mã commit đúng 40 ký tự `0-9a-f`, thời điểm dạng `2026-11-28T07:05:09Z`) |
 
 ## 8a. Chế độ bảo trì (`/api/v1/maintenance`, quyết định 53)
 

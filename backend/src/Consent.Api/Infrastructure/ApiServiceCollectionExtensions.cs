@@ -27,6 +27,8 @@ internal static class ApiServiceCollectionExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddHttpContextAccessor();
+        // Phiên bản bản đang chạy (quyết định 67): đọc version.json cạnh Consent.Api.dll một lần lúc khởi động.
+        services.AddSingleton(AppVersion.Load(AppContext.BaseDirectory));
         services.AddScoped<ICurrentUser, HttpCurrentUser>();
         services.AddScoped<IRequestContext, HttpRequestContext>();
 
