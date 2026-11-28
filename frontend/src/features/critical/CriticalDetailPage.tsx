@@ -1,3 +1,4 @@
+import { PhoneOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { Alert, App, Button, Card, Col, Descriptions, Flex, Result, Row, Space, Spin, Tag, Timeline, Typography } from 'antd'
 import dayjs from 'dayjs'
@@ -5,16 +6,26 @@ import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useDepartments } from '../../api/admin'
 import { ApiError } from '../../api/http'
-import { CRITICAL_METHOD_LABELS, criticalApi, GENDER_LABELS, useCriticalResult, useCriticalSettings, type CriticalResult } from '../../api/critical'
+import {
+  CRITICAL_METHOD_LABELS,
+  criticalApi,
+  GENDER_LABELS,
+  useCriticalResult,
+  useCriticalSettings,
+  type CriticalNotification,
+  type CriticalResult,
+} from '../../api/critical'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
-import { ActionForm, CancelModal, NotifyModal, RejectModal } from './CriticalForms'
-import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
+import { ActionForm, CancelModal, ConfirmCallModal, NotifyModal, RejectModal } from './CriticalForms'
+import { CallPendingTag, CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
 import { useCriticalSaved } from './criticalHooks'
 import { dateOf, dateTimeOf, minutesBetween, timeOf, useServerNow } from './criticalUtils'
 
 interface TimelineEvent {
   at: string
+  /** Giờ dùng để xếp thứ tự khi khác giờ hiện (cuộc gọi xác nhận luôn sau lần báo của nó); bỏ trống là `at`. */
+  sortAt?: string
   title: string
   who?: string | null
   text?: ReactNode
@@ -22,7 +33,19 @@ interface TimelineEvent {
   badge?: ReactNode
 }
 
-/** Diễn biến hồ sơ theo thời gian: ghi kết quả, các lần báo (kể cả bị trả lại), xác nhận, xử trí, hủy. */
+/** Người nhận đọc lại (chính xác, số lần đọc sai, nhắc lại 2 lần với sổ Vi sinh). */
+const readBackText = (n: CriticalNotification) =>
+  `Người nhận ${n.receiverName}; đọc lại chính xác${n.incorrectReadBacks > 0 ? ` sau ${n.incorrectReadBacks} lần đọc sai` : ''}${
+    n.repeatedTwice ? '; đã nhắc lại 2 lần' : ''
+  }.`
+
+/** Lần báo trên phần mềm ("Lưu, gọi sau", quyết định 68): còn chờ gọi, hoặc đã gọi xác nhận sau. */
+const byApp = (n: CriticalNotification) => n.method === 'App' || n.calledAtUtc !== null
+
+/**
+ * Diễn biến hồ sơ theo thời gian: ghi kết quả, các lần báo (kể cả bị trả lại), cuộc gọi xác nhận người nhận khi đã báo trên phần
+ * mềm, xác nhận, xử trí, hủy.
+ */
 function eventsOf(r: CriticalResult): TimelineEvent[] {
   const events: TimelineEvent[] = [
     {
@@ -35,13 +58,22 @@ function eventsOf(r: CriticalResult): TimelineEvent[] {
   for (const n of r.notifications) {
     events.push({
       at: n.notifiedAtUtc,
-      title: `Lần báo ${n.attemptNo}: ${CRITICAL_METHOD_LABELS[n.method].toLowerCase()} cho ${n.receivingDepartmentName}`,
+      title: `Lần báo ${n.attemptNo}: ${(byApp(n) ? CRITICAL_METHOD_LABELS.App : CRITICAL_METHOD_LABELS[n.method]).toLowerCase()} cho ${n.receivingDepartmentName}`,
       who: n.notifiedByName,
-      text: `Người nhận ${n.receiverName}; đọc lại chính xác${n.incorrectReadBacks > 0 ? ` sau ${n.incorrectReadBacks} lần đọc sai` : ''}${
-        n.repeatedTwice ? '; đã nhắc lại 2 lần' : ''
-      }.`,
+      text: byApp(n) ? (n.method === 'App' ? 'Chưa gọi xác nhận người nhận thông tin.' : undefined) : readBackText(n),
       color: 'blue',
     })
+    if (n.calledAtUtc) {
+      events.push({
+        at: n.calledAtUtc,
+        // Giờ gọi lấy theo đồng hồ máy trạm, làm tròn phút: có thể sớm hơn giờ báo (lúc lưu) vài giây.
+        sortAt: Date.parse(n.calledAtUtc) < Date.parse(n.notifiedAtUtc) ? n.notifiedAtUtc : n.calledAtUtc,
+        title: `Gọi xác nhận người nhận (${CRITICAL_METHOD_LABELS[n.method].toLowerCase()})`,
+        who: `${n.callRecordedByName} · ghi lúc ${dateTimeOf(n.callRecordedAtUtc)}`,
+        text: readBackText(n),
+        color: 'blue',
+      })
+    }
     if (n.rejectedAtUtc) {
       events.push({
         at: n.rejectedAtUtc,
@@ -53,7 +85,13 @@ function eventsOf(r: CriticalResult): TimelineEvent[] {
     }
   }
   if (r.acknowledgedAtUtc) {
-    events.push({ at: r.acknowledgedAtUtc, title: 'Khoa xác nhận đã nhận cuộc gọi', who: r.acknowledgedByName, color: 'blue' })
+    const current = r.notifications.filter((n) => !n.rejectedAtUtc).at(-1)
+    events.push({
+      at: r.acknowledgedAtUtc,
+      title: current && byApp(current) ? 'Khoa xác nhận đã nhận thông báo' : 'Khoa xác nhận đã nhận cuộc gọi',
+      who: r.acknowledgedByName,
+      color: 'blue',
+    })
   }
   if (r.actionAtUtc) {
     events.push({
@@ -76,7 +114,7 @@ function eventsOf(r: CriticalResult): TimelineEvent[] {
   if (r.cancelledAtUtc) {
     events.push({ at: r.cancelledAtUtc, title: 'Hủy hồ sơ báo nhầm', who: r.cancelledByName, text: `Lý do: ${r.cancelReason}`, color: 'red' })
   }
-  return events.sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+  return events.sort((a, b) => Date.parse(a.sortAt ?? a.at) - Date.parse(b.sortAt ?? b.at))
 }
 
 /** Đường dẫn sổ chứa hồ sơ: sổ của khoa báo (ST01 hoặc Vi sinh) và ST02 của khoa nhận, tháng theo giờ có kết quả. */
@@ -107,14 +145,14 @@ export function CriticalDetailPage() {
   const record = useCriticalResult(id, settings.data?.values.pollSeconds ?? 15)
   const departments = useDepartments(false)
   const nowMs = useServerNow(undefined, 0)
-  const [dialog, setDialog] = useState<'notify' | 'reject' | 'cancel' | null>(null)
+  const [dialog, setDialog] = useState<'notify' | 'call' | 'reject' | 'cancel' | null>(null)
   const [justActed, setJustActed] = useState<CriticalResult | null>(null)
   const saved = useCriticalSaved()
   const acknowledge = useMutation({
     mutationFn: () => criticalApi.acknowledge(id),
     onSuccess: (next) => {
       saved(next)
-      void message.success('Đã xác nhận nhận cuộc gọi. Báo ngay bác sĩ điều trị.')
+      void message.success('Đã xác nhận đã nhận. Báo ngay bác sĩ điều trị.')
     },
     onError: (error) => void message.error(errorMessageWithDetails(error)),
   })
@@ -147,10 +185,16 @@ export function CriticalDetailPage() {
         extra={
           <Space wrap>
             <CriticalStatusTag status={r.status} />
+            <CallPendingTag pending={r.callPending} />
             {r.lateEntry && <Tag color="purple">Ghi bù</Tag>}
             {r.can.notify && (
               <Button type="primary" onClick={() => setDialog('notify')}>
                 Ghi lần báo
+              </Button>
+            )}
+            {r.can.confirmCall && (
+              <Button type="primary" icon={<PhoneOutlined />} onClick={() => setDialog('call')}>
+                Ghi cuộc gọi
               </Button>
             )}
             {r.can.cancel && (
@@ -190,14 +234,15 @@ export function CriticalDetailPage() {
                 style={{ borderColor: '#f1b5b5' }}
               >
                 <Typography.Paragraph type="secondary">
-                  Hạn xử trí {timeOf(r.actionDueAtUtc)}: {r.actionDeadlineMinutes} phút từ giờ khoa nhận cuộc gọi ({timeOf(r.notifiedAtUtc)}).
+                  Hạn xử trí {timeOf(r.actionDueAtUtc)}: {r.actionDeadlineMinutes} phút từ giờ báo khoa nhận ({timeOf(r.notifiedAtUtc)}).
+                  {r.callPending ? ' Khoa báo đã báo trên phần mềm, sẽ gọi sau để ghi người nhận thông tin.' : ''}
                 </Typography.Paragraph>
                 {r.can.act ? (
                   <ActionForm result={r} onSaved={setJustActed} />
                 ) : (
                   <Space wrap>
                     <Button type="primary" loading={acknowledge.isPending} onClick={() => acknowledge.mutate()}>
-                      Đã nhận cuộc gọi
+                      {r.callPending ? 'Đã nhận thông báo' : 'Đã nhận cuộc gọi'}
                     </Button>
                     {r.can.reject && (
                       <Button danger type="text" onClick={() => setDialog('reject')}>
@@ -323,6 +368,7 @@ export function CriticalDetailPage() {
         </Col>
       </Row>
       {dialog === 'notify' && <NotifyModal open result={r} departments={departments.data ?? []} onClose={() => setDialog(null)} />}
+      {dialog === 'call' && <ConfirmCallModal open result={r} onClose={() => setDialog(null)} />}
       {dialog === 'reject' && <RejectModal open result={r} onClose={() => setDialog(null)} />}
       {dialog === 'cancel' && <CancelModal open result={r} onClose={() => setDialog(null)} />}
     </>

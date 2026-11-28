@@ -27,7 +27,10 @@ public interface ICriticalResultRepository
     /// <summary>Hồ sơ kèm các lần báo.</summary>
     Task<CriticalResult?> GetAsync(Guid id, CancellationToken cancellationToken);
 
-    /// <summary>Hồ sơ của các khoa báo: đang mở, hoặc hoàn tất, hủy từ <paramref name="closedSinceUtc"/>.</summary>
+    /// <summary>
+    /// Hồ sơ của các khoa báo: đang mở, hoặc hoàn tất, hủy từ <paramref name="closedSinceUtc"/>; hồ sơ hoàn tất mà chưa gọi xác nhận
+    /// người nhận (quyết định 68) thì luôn có.
+    /// </summary>
     Task<IReadOnlyList<CriticalResult>> ListSentAsync(
         IReadOnlyCollection<Guid>? departmentIds, DateTimeOffset closedSinceUtc, CancellationToken cancellationToken);
 
@@ -85,6 +88,10 @@ public sealed record CriticalPatientLookupDto(
 public sealed record CriticalPatientRequest(
     string? Code, string? FullName, DateOnly? DateOfBirth, Gender? Gender, string? Address, CriticalPatientSource Source);
 
+/// <summary>
+/// Lần báo. <see cref="Method"/> là <see cref="CriticalNotificationMethod.App"/> (quyết định 68, "Lưu, gọi sau"): báo khoa nhận
+/// trên phần mềm lúc lưu, chỉ cần khoa nhận; các trường của cuộc gọi bỏ qua, ghi sau bằng <see cref="CriticalCallRequest"/>.
+/// </summary>
 public sealed record CriticalNotificationRequest(
     Guid ReceivingDepartmentId,
     CriticalNotificationMethod Method,
@@ -107,12 +114,25 @@ public sealed record CreateCriticalResultRequest(
     bool Urgent,
     CriticalNotificationRequest? Notification);
 
+/// <summary>Cuộc gọi xác nhận người nhận thông tin sau khi đã báo trên phần mềm (quyết định 68).</summary>
+public sealed record CriticalCallRequest(
+    CriticalNotificationMethod Method,
+    DateTimeOffset? CalledAtUtc,
+    string? ReceiverName,
+    bool ReadBackCorrect,
+    int IncorrectReadBacks,
+    bool RepeatedTwice);
+
 public sealed record CriticalReasonRequest(string? Reason);
 
 public sealed record CriticalActionRequest(string? Summary, DateTimeOffset? ActionAtUtc, bool RecordedInMedicalRecord);
 
 public sealed record CriticalCancelRequest(string? Reason, bool ReceivingDepartmentInformed);
 
+/// <param name="Method">Cách báo; <c>App</c> khi đã báo trên phần mềm, chưa gọi xác nhận (quyết định 68).</param>
+/// <param name="ReceiverName">Người nhận thông tin; <c>null</c> khi chưa gọi xác nhận.</param>
+/// <param name="CalledAtUtc">Giờ gọi xác nhận, khi đã báo trên phần mềm trước rồi gọi sau.</param>
+/// <param name="CallPending">Đã báo trên phần mềm, chưa gọi xác nhận, lần báo chưa bị trả lại.</param>
 public sealed record CriticalNotificationDto(
     Guid Id,
     int AttemptNo,
@@ -120,17 +140,22 @@ public sealed record CriticalNotificationDto(
     string ReceivingDepartmentName,
     CriticalNotificationMethod Method,
     DateTimeOffset NotifiedAtUtc,
-    string ReceiverName,
+    string? ReceiverName,
     int IncorrectReadBacks,
     bool RepeatedTwice,
     string NotifiedByName,
     DateTimeOffset RecordedAtUtc,
     DateTimeOffset? RejectedAtUtc,
     string? RejectedByName,
-    string? RejectReason);
+    string? RejectReason,
+    DateTimeOffset? CalledAtUtc,
+    string? CallRecordedByName,
+    DateTimeOffset? CallRecordedAtUtc,
+    bool CallPending);
 
 /// <summary>Người đang xem làm được gì với hồ sơ (giao diện ẩn nút; máy chủ vẫn kiểm tra).</summary>
-public sealed record CriticalResultPermissionsDto(bool Notify, bool Acknowledge, bool Reject, bool Act, bool Cancel);
+/// <param name="ConfirmCall">Ghi cuộc gọi xác nhận người nhận (khoa báo, hồ sơ chưa gọi xác nhận).</param>
+public sealed record CriticalResultPermissionsDto(bool Notify, bool Acknowledge, bool Reject, bool Act, bool Cancel, bool ConfirmCall);
 
 public sealed record CriticalResultDto(
     Guid Id,
@@ -180,6 +205,7 @@ public sealed record CriticalResultDto(
     bool? NotifiedOnTime,
     bool? ActedOnTime,
     bool LateEntry,
+    bool CallPending,
     IReadOnlyList<CriticalNotificationDto> Notifications,
     CriticalResultPermissionsDto Can);
 
@@ -188,6 +214,8 @@ public sealed record CriticalResultListDto(DateTimeOffset ServerTimeUtc, IReadOn
 
 /// <summary>Một hồ sơ trên dải cảnh báo và màn hình theo dõi tại khoa (tối thiểu thông tin cần để theo dõi).</summary>
 /// <param name="PatientName">Họ tên đầy đủ, hoặc tên viết tắt với tài khoản màn hình theo dõi (trừ khi cấu hình cho hiện đầy đủ).</param>
+/// <param name="ReceiverName">Người nhận thông tin; <c>null</c> khi khoa báo đã báo trên phần mềm, chưa gọi xác nhận.</param>
+/// <param name="CallPending">Báo trên phần mềm, khoa báo chưa gọi xác nhận (quyết định 68).</param>
 public sealed record CriticalAlertItemDto(
     Guid Id,
     string Number,
@@ -203,7 +231,8 @@ public sealed record CriticalAlertItemDto(
     string? Unit,
     DateTimeOffset NotifiedAtUtc,
     DateTimeOffset ActionDueAtUtc,
-    string ReceiverName,
+    string? ReceiverName,
+    bool CallPending,
     string NotifiedByName,
     string? AcknowledgedByName,
     DateTimeOffset? AcknowledgedAtUtc,

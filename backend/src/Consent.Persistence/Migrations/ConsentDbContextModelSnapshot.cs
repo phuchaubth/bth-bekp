@@ -489,6 +489,19 @@ namespace Consent.Persistence.Migrations
                     b.Property<int>("AttemptNo")
                         .HasColumnType("int");
 
+                    b.Property<DateTimeOffset?>("CallRecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("CallRecordedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("CallRecordedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset?>("CalledAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<int>("IncorrectReadBacks")
                         .HasColumnType("int");
 
@@ -509,7 +522,6 @@ namespace Consent.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("ReceiverName")
-                        .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 

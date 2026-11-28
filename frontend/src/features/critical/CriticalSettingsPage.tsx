@@ -56,7 +56,7 @@ const GROUPS: { title: string; note: string; fields: Field[] }[] = [
         key: 'actionMinutes',
         kind: 'number',
         label: 'Thời hạn bác sĩ xử trí ban đầu',
-        help: 'Tính từ giờ khoa nhận cuộc gọi.',
+        help: 'Tính từ giờ báo khoa nhận (gọi điện, hoặc lúc lưu khi báo trên phần mềm).',
         unit: 'phút',
         min: 1,
         max: 120,

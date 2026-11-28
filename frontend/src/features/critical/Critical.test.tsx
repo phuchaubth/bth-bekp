@@ -94,10 +94,18 @@ const call = (overrides: Partial<CriticalNotification> = {}): CriticalNotificati
   rejectedAtUtc: null,
   rejectedByName: null,
   rejectReason: null,
+  calledAtUtc: null,
+  callRecordedByName: null,
+  callRecordedAtUtc: null,
+  callPending: false,
   ...overrides,
 })
 
-const none = { notify: false, acknowledge: false, reject: false, act: false, cancel: false }
+/** Lần báo trên phần mềm ("Lưu, gọi sau", quyết định 68), chưa gọi xác nhận người nhận. */
+const appCall = (overrides: Partial<CriticalNotification> = {}): CriticalNotification =>
+  call({ method: 'App', receiverName: null, callPending: true, ...overrides })
+
+const none = { notify: false, acknowledge: false, reject: false, act: false, cancel: false, confirmCall: false }
 
 function record(overrides: Partial<CriticalResult> = {}): CriticalResult {
   return {
@@ -148,6 +156,7 @@ function record(overrides: Partial<CriticalResult> = {}): CriticalResult {
     notifiedOnTime: true,
     actedOnTime: null,
     lateEntry: false,
+    callPending: false,
     notifications: [call()],
     can: none,
     ...overrides,
@@ -170,6 +179,7 @@ const alertItem = (overrides: Partial<CriticalAlertItem> = {}): CriticalAlertIte
   notifiedAtUtc: ago(3),
   actionDueAtUtc: ago(-7),
   receiverName: 'Điều dưỡng nghe máy (giả lập)',
+  callPending: false,
   notifiedByName: 'Kỹ thuật viên Demo',
   acknowledgedByName: null,
   acknowledgedAtUtc: null,
@@ -316,18 +326,15 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
     )
   })
 
-  it('Ghi kết quả: lưu, gọi sau gửi hồ sơ không có lần báo; lưu, đã báo phải có người nhận đọc lại chính xác', { timeout: 30_000 }, async () => {
+  it('Ghi kết quả: lưu, gọi sau phải chọn khoa nhận, báo ngay trên phần mềm rồi ghi cuộc gọi sau; lưu, đã báo phải có người nhận đọc lại chính xác', { timeout: 30_000 }, async () => {
     const user = userEvent.setup()
+    // Quyết định 68: "Lưu, gọi sau" báo khoa nhận ngay trên phần mềm; hồ sơ chờ khoa xác nhận, có nhãn Chưa gọi xác nhận.
+    const saved = record({ callPending: true, notifications: [appCall()], can: { ...none, cancel: true, confirmCall: true } })
     const { calls } = mockApi({
       ...common(labSession()),
-      [`POST ${base}`]: (c) =>
-        record({
-          status: 'AwaitingNotification',
-          receivingDepartmentId: null,
-          notifiedAtUtc: null,
-          notifications: [],
-          ...(c.body as object),
-        }),
+      [`POST ${base}`]: saved,
+      [`POST ${base}/kq-1/call`]: (c) =>
+        record({ notifications: [call({ ...(c.body as object), calledAtUtc: now.toISOString() })], can: { ...none, cancel: true } }),
     })
     renderApp('/ket-qua-nguy-cap/ghi')
 
@@ -347,8 +354,15 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
     // Chưa có lần báo đọc lại chính xác: không lưu được kiểu "đã báo".
     await user.click(screen.getByRole('button', { name: 'Lưu, đã báo' }))
     expect(await screen.findByText('Chọn khoa nhận.')).toBeInTheDocument()
+    expect(screen.getByText('Chọn kết quả người nhận đọc lại.')).toBeInTheDocument()
     expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(false)
 
+    // "Lưu, gọi sau" cũng phải chọn khoa nhận (khoa được báo ngay); không cần người nhận, đọc lại.
+    await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
+    await waitFor(() => expect(screen.queryByText('Chọn kết quả người nhận đọc lại.')).not.toBeInTheDocument())
+    expect(screen.getByText('Chọn khoa nhận.')).toBeInTheDocument()
+    expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(false)
+    await pick(user, document.body, 'Khoa nhận', 'Khoa Nội tổng hợp')
     await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
     const body = calls.find((c) => c.method === 'POST' && c.path === base)!.body as Record<string, unknown>
@@ -358,12 +372,41 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
       value: '6,8',
       unit: 'mmol/L',
       urgent: false,
-      notification: null,
       patient: { code: 'NB-GL-0009', fullName: 'Người Bệnh Mới', dateOfBirth: '1960-01-02', address: 'Ấp Mẫu (giả lập)', source: 'Manual' },
     })
+    expect(body.notification).toEqual({ receivingDepartmentId: 'd-noi', method: 'App' })
     expect(body.orderDate).toBe(now.format('YYYY-MM-DD'))
-    expect(await screen.findByText('Đã lưu hồ sơ KQNC-2026-000001')).toBeInTheDocument()
+    expect(await screen.findByText('Đã lưu hồ sơ KQNC-2026-000001, báo sau 2 phút')).toBeInTheDocument()
+    expect(screen.getByText(/Khoa Nội tổng hợp đã được báo trên phần mềm, thấy hồ sơ cùng dải cảnh báo đỏ\. .*bấm Ghi cuộc gọi/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ghi kết quả khác' })).toBeInTheDocument()
+
+    // Gọi được ngay sau khi lưu: ghi người nhận thông tin, không có ô khoa nhận.
+    await user.click(screen.getByRole('button', { name: /Ghi cuộc gọi/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Ghi cuộc gọi · Người Bệnh Giả Lập/ })
+    expect(within(dialog).getByText(/trên phần mềm lúc/)).toBeInTheDocument()
+    expect(within(dialog).queryByRole('combobox', { name: 'Khoa nhận' })).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/Người gọi:/)).toHaveTextContent('Người gọi: Kỹ thuật viên Demo (tài khoản đang đăng nhập)')
+    await user.click(within(dialog).getByRole('button', { name: /Lưu cuộc gọi/ }))
+    expect(await within(dialog).findByText('Nhập họ tên người nhận.')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === `${base}/kq-1/call`)).toBe(false)
+    await user.click(within(dialog).getByText('Trực tiếp tại khoa'))
+    await user.type(within(dialog).getByLabelText('Người nhận tại khoa'), ' Điều dưỡng nhận sau (giả lập) ')
+    await user.click(within(dialog).getByRole('button', { name: /^(check )?Chính xác$/ }))
+    await user.click(within(dialog).getByRole('button', { name: /Lưu cuộc gọi/ }))
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === `${base}/kq-1/call`)?.body).toMatchObject({
+        method: 'InPerson',
+        receiverName: 'Điều dưỡng nhận sau (giả lập)',
+        readBackCorrect: true,
+        incorrectReadBacks: 0,
+        repeatedTwice: false,
+      }),
+    )
+    const calledAt = (calls.find((c) => c.path === `${base}/kq-1/call`)!.body as { calledAtUtc: string }).calledAtUtc
+    expect(Math.abs(Date.parse(calledAt) - Date.now())).toBeLessThan(5 * 60_000)
+    // Đã ghi cuộc gọi: không còn nút Ghi cuộc gọi trên màn hình đã lưu.
+    await waitFor(() => expect(screen.queryByRole('button', { name: /Ghi cuộc gọi/ })).not.toBeInTheDocument())
   })
 
   it('Ghi kết quả Vi sinh: kết quả bằng chữ, bắt buộc SID và người nhận nhắc lại 2 lần', { timeout: 30_000 }, async () => {
@@ -446,6 +489,7 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
 
     await pick(user, document.body, 'Xét nghiệm, kỹ thuật (danh mục kết quả nguy cấp)', 'Kali (K+) (giả lập) · Huyết học – Sinh hóa')
     await user.type(screen.getByLabelText('Giá trị'), '6,8')
+    await pick(user, document.body, 'Khoa nhận', 'Khoa Nội tổng hợp')
     await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
     expect((calls.find((c) => c.method === 'POST' && c.path === base)!.body as { patient: unknown }).patient).toEqual({
@@ -472,6 +516,7 @@ describe('Kết quả nguy cấp: khoa cận lâm sàng', () => {
 
     await pick(user, document.body, 'Xét nghiệm, kỹ thuật (danh mục kết quả nguy cấp)', 'Kali (K+) (giả lập) · Huyết học – Sinh hóa')
     await user.type(screen.getByLabelText('Giá trị'), '6,8')
+    await pick(user, document.body, 'Khoa nhận', 'Khoa Nội tổng hợp')
     await user.click(screen.getByRole('button', { name: 'Lưu, gọi sau' }))
     await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === base)).toBe(true))
     expect((calls.find((c) => c.method === 'POST' && c.path === base)!.body as { patient: unknown }).patient).toMatchObject({
@@ -803,6 +848,220 @@ describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
     renderApp('/man-hinh-kqnc')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('MẤT KẾT NỐI · MÀN HÌNH KHÔNG CÒN CẬP NHẬT')
+  })
+})
+
+describe('Kết quả nguy cấp: báo trên phần mềm, gọi sau để ghi người nhận (quyết định 68)', () => {
+  it('Khoa tôi báo: ô Chưa gọi xác nhận, nhãn ở hồ sơ đang chờ và vừa xong; Ghi cuộc gọi không có ô khoa nhận', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const inWard = record({
+      id: 'kq-5',
+      status: 'AwaitingAction',
+      patientName: 'Người Bệnh Chưa Gọi',
+      acknowledgedByName: 'Điều dưỡng Demo',
+      acknowledgedAtUtc: ago(2),
+      callPending: true,
+      notifications: [appCall()],
+      can: { ...none, cancel: true, confirmCall: true },
+    })
+    const done = record({
+      id: 'kq-6',
+      status: 'Completed',
+      patientName: 'Người Bệnh Xong Chưa Gọi',
+      actionAtUtc: ago(1),
+      actedOnTime: true,
+      callPending: true,
+      notifications: [appCall()],
+      can: { ...none, cancel: true, confirmCall: true },
+    })
+    const { calls } = mockApi({
+      ...common(labSession()),
+      [`GET ${base}/sent`]: { serverTimeUtc: now.toISOString(), items: [inWard, record(), done] },
+      [`POST ${base}/kq-5/call`]: (c) => record({ id: 'kq-5', status: 'AwaitingAction', notifications: [call(c.body as Partial<CriticalNotification>)] }),
+    })
+    renderApp('/ket-qua-nguy-cap/khoa-bao')
+
+    const tile = await screen.findByRole('group', { name: 'Chưa gọi xác nhận' })
+    await waitFor(() => expect(within(tile).getByText('2')).toBeInTheDocument())
+    expect(within(tile).getByText('Đã báo trên phần mềm: gọi để ghi người nhận')).toBeInTheDocument()
+    const card = screen.getByRole('article', { name: /Người Bệnh Chưa Gọi/ })
+    expect(within(card).getByText('Chưa gọi xác nhận')).toBeInTheDocument()
+    expect(within(card).getByText(/đã nhận lúc .* · chưa gọi xác nhận người nhận · chờ bác sĩ xử trí/)).toBeInTheDocument()
+    // Hồ sơ gọi điện rồi mới ghi: không có nhãn, không có nút.
+    const called = screen.getByRole('article', { name: /Người Bệnh Giả Lập/ })
+    expect(within(called).getByText(/Điều dưỡng nghe máy \(giả lập\) nghe máy · chờ khoa xác nhận/)).toBeInTheDocument()
+    expect(within(called).queryByText('Chưa gọi xác nhận')).not.toBeInTheDocument()
+    expect(within(called).queryByRole('button', { name: /Ghi cuộc gọi/ })).not.toBeInTheDocument()
+    // Hồ sơ đã hoàn tất mà chưa gọi: bảng Vừa xong có nhãn và nút.
+    const row = screen.getByRole('row', { name: /Người Bệnh Xong Chưa Gọi/ })
+    expect(within(row).getByText('Chưa gọi xác nhận')).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: /Ghi cuộc gọi/ })).toBeInTheDocument()
+
+    await user.click(within(card).getByRole('button', { name: /Ghi cuộc gọi/ }))
+    const dialog = await screen.findByRole('dialog', { name: /Ghi cuộc gọi · Người Bệnh Chưa Gọi/ })
+    expect(within(dialog).queryByRole('combobox', { name: 'Khoa nhận' })).not.toBeInTheDocument()
+    expect(within(dialog).getByRole('textbox', { name: 'Giờ gọi' })).toBeInTheDocument()
+    await user.type(within(dialog).getByLabelText('Người nghe máy'), 'Điều dưỡng nghe máy sau (giả lập)')
+    await user.click(within(dialog).getByRole('button', { name: /Không chính xác/ }))
+    await user.click(within(dialog).getByRole('button', { name: /^(check )?Chính xác$/ }))
+    await user.click(within(dialog).getByRole('button', { name: /Lưu cuộc gọi/ }))
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === `${base}/kq-5/call`)?.body).toMatchObject({
+        method: 'Phone',
+        receiverName: 'Điều dưỡng nghe máy sau (giả lập)',
+        readBackCorrect: true,
+        incorrectReadBacks: 1,
+        repeatedTwice: false,
+      }),
+    )
+  })
+
+  it('Ghi lần báo sau khi khoa nhận trả lại: Lưu, gọi sau chỉ cần khoa nhận, báo ngay trên phần mềm', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const returned = record({
+      id: 'kq-2',
+      status: 'AwaitingNotification',
+      receivingDepartmentId: null,
+      receivingDepartmentName: null,
+      notifiedAtUtc: null,
+      actionDueAtUtc: null,
+      notifiedOnTime: null,
+      patientName: 'Người Bệnh Bị Trả Lại',
+      notifications: [
+        appCall({
+          receivingDepartmentId: 'd-kkb',
+          receivingDepartmentName: 'Khoa Khám bệnh',
+          rejectedAtUtc: ago(1),
+          rejectedByName: 'Điều dưỡng Demo',
+          rejectReason: 'Người bệnh đã chuyển khoa',
+          callPending: false,
+        }),
+      ],
+      can: { ...none, notify: true, cancel: true },
+    })
+    const { calls } = mockApi({
+      ...common(labSession()),
+      [`GET ${base}/sent`]: { serverTimeUtc: now.toISOString(), items: [returned] },
+      [`POST ${base}/kq-2/notifications`]: record({ id: 'kq-2', callPending: true, notifications: [appCall()] }),
+    })
+    renderApp('/ket-qua-nguy-cap/khoa-bao')
+
+    const card = await screen.findByRole('article', { name: /Người Bệnh Bị Trả Lại/ })
+    expect(within(card).getByText(/Khoa Khám bệnh trả lại lúc .*: Người bệnh đã chuyển khoa\. Gọi lại đúng khoa\./)).toBeInTheDocument()
+    await user.click(within(card).getByRole('button', { name: 'Ghi lần báo' }))
+    const dialog = await screen.findByRole('dialog')
+    // Lỡ bấm Lưu, đã báo: báo thiếu người nhận, đọc lại; bấm Lưu, gọi sau thì chỉ còn báo thiếu khoa nhận.
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu, đã báo' }))
+    expect(await within(dialog).findByText('Nhập họ tên người nhận.')).toBeInTheDocument()
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu, gọi sau' }))
+    await waitFor(() => expect(within(dialog).queryByText('Nhập họ tên người nhận.')).not.toBeInTheDocument())
+    expect(within(dialog).queryByText('Chọn kết quả người nhận đọc lại.')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Chọn khoa nhận.')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === `${base}/kq-2/notifications`)).toBe(false)
+    await pick(user, dialog, 'Khoa nhận', 'Khoa Nội tổng hợp')
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu, gọi sau' }))
+
+    await waitFor(() =>
+      expect(calls.find((c) => c.path === `${base}/kq-2/notifications`)?.body).toEqual({ receivingDepartmentId: 'd-noi', method: 'App' }),
+    )
+    expect(await screen.findByText(/Đã báo Khoa Nội tổng hợp trên phần mềm\. Gọi cho khoa rồi bấm Ghi cuộc gọi/)).toBeInTheDocument()
+  })
+
+  it('Gửi đến khoa tôi: hồ sơ báo trên phần mềm hiện ngay với nút Đã nhận thông báo; dải đỏ ghi báo trên phần mềm', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const waiting = record({ callPending: true, notifications: [appCall()], can: { ...none, acknowledge: true, reject: true } })
+    const { calls } = mockApi({
+      ...common(nurseSession()),
+      [`GET ${base}/alerts`]: alerts({ awaitingAcknowledgement: [alertItem({ receiverName: null, callPending: true })] }),
+      [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [waiting] },
+      [`POST ${base}/kq-1/acknowledge`]: record({
+        status: 'AwaitingAction',
+        callPending: true,
+        notifications: [appCall()],
+        acknowledgedByName: 'Điều dưỡng Demo',
+        acknowledgedAtUtc: now.toISOString(),
+      }),
+    })
+    renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    const banner = await screen.findByRole('region', { name: 'Cảnh báo kết quả nguy cấp' })
+    expect(banner).toHaveTextContent(/Khoa Huyết học – Sinh hóa báo trên phần mềm lúc \d\d:\d\d/)
+    const card = await screen.findByRole('article', { name: 'Người Bệnh Giả Lập' })
+    expect(within(card).getByText('Chưa gọi xác nhận')).toBeInTheDocument()
+    expect(within(card).getByText(/Báo trên phần mềm: khoa báo sẽ gọi sau để ghi người nhận thông tin/)).toBeInTheDocument()
+    expect(within(card).queryByText(/Người nghe máy:/)).not.toBeInTheDocument()
+    expect(within(card).queryByRole('button', { name: 'Đã nhận cuộc gọi' })).not.toBeInTheDocument()
+    await user.click(within(card).getByRole('button', { name: 'Đã nhận thông báo' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === `${base}/kq-1/acknowledge`)).toBe(true))
+  })
+
+  it('Màn hình TV: hồ sơ báo trên phần mềm ghi rõ, không có tên người nghe máy', { timeout: 30_000 }, async () => {
+    mockApi({ ...common(screenSession()), [`GET ${base}/alerts`]: alerts({ awaitingAcknowledgement: [alertItem({ receiverName: null, callPending: true })] }) })
+    renderApp('/man-hinh-kqnc')
+
+    const card = await screen.findByRole('article', { name: /N\.B\.G\.L|Người Bệnh Giả Lập/ })
+    expect(card).toHaveTextContent('Khoa Huyết học – Sinh hóa · Kỹ thuật viên Demo báo trên phần mềm')
+    expect(card).not.toHaveTextContent('nghe máy')
+  })
+
+  it('Chi tiết hồ sơ chưa gọi: nhãn, diễn biến ghi báo trên phần mềm; khoa báo có nút Ghi cuộc gọi', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(labSession()),
+      [`GET ${base}/kq-7`]: record({ id: 'kq-7', callPending: true, notifications: [appCall()], can: { ...none, cancel: true, confirmCall: true } }),
+    })
+    renderApp('/ket-qua-nguy-cap/ho-so/kq-7')
+
+    expect(await screen.findByText(/Lần báo 1: báo trên phần mềm cho Khoa Nội tổng hợp/)).toBeInTheDocument()
+    expect(screen.getByText('Chưa gọi xác nhận người nhận thông tin.')).toBeInTheDocument()
+    expect(screen.getByText('Chưa gọi xác nhận')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Ghi cuộc gọi/ })).toBeInTheDocument()
+  })
+
+  it('Chi tiết hồ sơ: khoa nhận bấm Đã nhận thông báo; đồng hồ bác sĩ tính từ giờ báo trên phần mềm', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const { calls } = mockApi({
+      ...common(nurseSession()),
+      [`GET ${base}/kq-7`]: record({ id: 'kq-7', callPending: true, notifications: [appCall()], can: { ...none, acknowledge: true, reject: true } }),
+      [`POST ${base}/kq-7/acknowledge`]: record({ id: 'kq-7', status: 'AwaitingAction', callPending: true, notifications: [appCall()] }),
+    })
+    renderApp('/ket-qua-nguy-cap/ho-so/kq-7')
+
+    expect(await screen.findByText(/10 phút từ giờ báo khoa nhận \(\d\d:\d\d\)\. Khoa báo đã báo trên phần mềm, sẽ gọi sau/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Ghi cuộc gọi/ })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Đã nhận thông báo' }))
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === `${base}/kq-7/acknowledge`)).toBe(true))
+    expect(await screen.findByText('Đã xác nhận đã nhận. Báo ngay bác sĩ điều trị.')).toBeInTheDocument()
+  })
+
+  it('Chi tiết hồ sơ đã gọi xác nhận: diễn biến có lần báo trên phần mềm, cuộc gọi ghi sau và người nhận', { timeout: 30_000 }, async () => {
+    mockApi({
+      ...common(nurseSession()),
+      [`GET ${base}/kq-1`]: record({
+        status: 'AwaitingAction',
+        acknowledgedByName: 'Điều dưỡng Demo',
+        acknowledgedAtUtc: ago(2),
+        notifications: [
+          call({
+            // Giờ gọi theo đồng hồ máy trạm, sớm hơn giờ báo (lúc lưu): diễn biến vẫn ghi cuộc gọi sau lần báo.
+            calledAtUtc: ago(3.5),
+            callRecordedByName: 'Kỹ thuật viên Demo',
+            callRecordedAtUtc: ago(1),
+            receiverName: 'Điều dưỡng nghe máy sau (giả lập)',
+          }),
+        ],
+      }),
+    })
+    renderApp('/ket-qua-nguy-cap/ho-so/kq-1')
+
+    const notified = await screen.findByText(/Lần báo 1: báo trên phần mềm cho Khoa Nội tổng hợp/)
+    const confirmed = screen.getByText('Gọi xác nhận người nhận (gọi điện)')
+    expect(notified.compareDocumentPosition(confirmed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByText(/^Kỹ thuật viên Demo · ghi lúc/)).toBeInTheDocument()
+    expect(screen.getByText('Người nhận Điều dưỡng nghe máy sau (giả lập); đọc lại chính xác.')).toBeInTheDocument()
+    expect(screen.getByText('Khoa xác nhận đã nhận thông báo')).toBeInTheDocument()
+    expect(screen.queryByText('Chưa gọi xác nhận')).not.toBeInTheDocument()
+    expect(screen.queryByText('Chưa gọi xác nhận người nhận thông tin.')).not.toBeInTheDocument()
   })
 })
 

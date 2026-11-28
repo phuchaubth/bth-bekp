@@ -1,14 +1,23 @@
-import { CheckOutlined, CloseOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, PhoneOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import { Alert, App, AutoComplete, Button, Checkbox, DatePicker, Form, Input, InputNumber, Modal, Radio, Select, Space, Typography } from 'antd'
 import type { Dayjs } from 'dayjs'
 import { useState } from 'react'
-import { criticalApi, CRITICAL_METHOD_LABELS, type CriticalMethod, type CriticalResult } from '../../api/critical'
+import { CRITICAL_CALL_METHODS, criticalApi, CRITICAL_METHOD_LABELS, type CriticalCallMethod, type CriticalResult } from '../../api/critical'
 import type { Department } from '../../api/admin'
 import { useAuth } from '../../auth/authContext'
 import { errorMessageWithDetails } from '../../utils/formErrors'
 import { useCriticalSaved } from './criticalHooks'
-import { emptyNotification, nowToMinute, REJECT_REASONS, toNotificationInput, type NotificationFormValues } from './criticalInputs'
+import {
+  clearCallErrors,
+  emptyNotification,
+  nowToMinute,
+  REJECT_REASONS,
+  toAppNotificationInput,
+  toCallInput,
+  toNotificationInput,
+  type NotificationFormValues,
+} from './criticalInputs'
 import { dateTimeOf, timeOf } from './criticalUtils'
 
 const DATE_TIME = 'DD/MM/YYYY HH:mm'
@@ -47,40 +56,47 @@ function TimeWithNow({ value, onChange, label }: { value?: Dayjs; onChange?: (va
 
 /**
  * Các ô "Đã báo cho khoa điều trị" (form có trường `notification`): khoa nhận, cách báo, giờ báo, người nhận, người nhận đọc lại
- * chính xác; sổ Vi sinh thêm "người nhận nhắc lại 2 lần". Người báo là tài khoản đang đăng nhập.
+ * chính xác; sổ Vi sinh thêm "người nhận nhắc lại 2 lần". Người báo là tài khoản đang đăng nhập. Ghi cuộc gọi xác nhận (quyết
+ * định 68) dùng lại các ô này, không có ô khoa nhận (`departments` bỏ trống), giờ báo đổi thành giờ gọi.
  */
 export function NotificationFields({
   departments,
   sendingDepartmentId,
   microbiology,
+  timeLabel = 'Giờ báo',
+  actorLabel = 'Người báo',
 }: {
-  departments: Department[]
+  /** Bỏ trống: không có ô khoa nhận (đã báo khoa nhận trên phần mềm). */
+  departments?: Department[]
   sendingDepartmentId?: string
   microbiology: boolean
+  timeLabel?: string
+  actorLabel?: string
 }) {
   const form = Form.useFormInstance()
   const { user } = useAuth()
-  const method = Form.useWatch(['notification', 'method'], form) as CriticalMethod | undefined
+  const method = Form.useWatch(['notification', 'method'], form) as CriticalCallMethod | undefined
   const incorrect = (Form.useWatch(['notification', 'incorrectReadBacks'], form) as number | undefined) ?? 0
   const readBack = Form.useWatch(['notification', 'readBackCorrect'], form) as boolean | undefined
-  const options = departments
-    .filter((d) => d.isActive && d.id !== sendingDepartmentId)
-    .map((d) => ({ value: d.id, label: d.name }))
   return (
     <>
       <Form.Item name={['notification', 'method']} label="Cách báo">
-        <Radio.Group
-          optionType="button"
-          options={(Object.keys(CRITICAL_METHOD_LABELS) as CriticalMethod[]).map((m) => ({ value: m, label: CRITICAL_METHOD_LABELS[m] }))}
-        />
+        <Radio.Group optionType="button" options={CRITICAL_CALL_METHODS.map((m) => ({ value: m, label: CRITICAL_METHOD_LABELS[m] }))} />
       </Form.Item>
-      <Form.Item
-        name={['notification', 'receivingDepartmentId']}
-        label="Khoa nhận"
-        rules={[{ required: true, message: 'Chọn khoa nhận.' }]}
-      >
-        <Select showSearch optionFilterProp="label" options={options} placeholder="Khoa đang điều trị người bệnh" />
-      </Form.Item>
+      {departments && (
+        <Form.Item
+          name={['notification', 'receivingDepartmentId']}
+          label="Khoa nhận"
+          rules={[{ required: true, message: 'Chọn khoa nhận.' }]}
+        >
+          <Select
+            showSearch
+            optionFilterProp="label"
+            options={departments.filter((d) => d.isActive && d.id !== sendingDepartmentId).map((d) => ({ value: d.id, label: d.name }))}
+            placeholder="Khoa đang điều trị người bệnh"
+          />
+        </Form.Item>
+      )}
       <Form.Item
         name={['notification', 'receiverName']}
         label={method === 'InPerson' ? 'Người nhận tại khoa' : 'Người nghe máy'}
@@ -88,8 +104,8 @@ export function NotificationFields({
       >
         <Input maxLength={200} placeholder="Họ tên, chức danh" />
       </Form.Item>
-      <Form.Item name={['notification', 'notifiedAt']} label="Giờ báo" rules={[{ required: true, message: 'Nhập giờ báo.' }]}>
-        <TimeWithNow label="Giờ báo" />
+      <Form.Item name={['notification', 'notifiedAt']} label={timeLabel} rules={[{ required: true, message: `Nhập ${timeLabel.toLowerCase()}.` }]}>
+        <TimeWithNow label={timeLabel} />
       </Form.Item>
       <Form.Item
         name={['notification', 'readBackCorrect']}
@@ -129,13 +145,16 @@ export function NotificationFields({
         </Form.Item>
       )}
       <Typography.Text type="secondary">
-        Người báo: <Typography.Text strong>{user?.fullName}</Typography.Text> (tài khoản đang đăng nhập)
+        {actorLabel}: <Typography.Text strong>{user?.fullName}</Typography.Text> (tài khoản đang đăng nhập)
       </Typography.Text>
     </>
   )
 }
 
-/** Khoa báo ghi lần báo cho hồ sơ chưa báo hoặc bị khoa nhận trả lại (gọi điện xong mới ghi). */
+/**
+ * Khoa báo ghi lần báo cho hồ sơ chưa báo hoặc bị khoa nhận trả lại: gọi điện xong thì "Lưu, đã báo"; chưa gọi được thì "Lưu,
+ * gọi sau" (quyết định 68): chỉ cần khoa nhận, khoa nhận được báo ngay trên phần mềm, gọi sau để ghi người nhận.
+ */
 export function NotifyModal({
   result,
   departments,
@@ -151,27 +170,108 @@ export function NotifyModal({
   const { message } = App.useApp()
   const saved = useCriticalSaved()
   const mutation = useMutation({
-    mutationFn: (values: { notification: NotificationFormValues }) => criticalApi.notify(result.id, toNotificationInput(values.notification)),
+    mutationFn: ({ values, byApp }: { values: NotificationFormValues; byApp: boolean }) =>
+      criticalApi.notify(result.id, byApp ? toAppNotificationInput(values) : toNotificationInput(values)),
+    onSuccess: (next, { byApp }) => {
+      saved(next)
+      void message.success(
+        byApp
+          ? `Đã báo ${next.receivingDepartmentName} trên phần mềm. Gọi cho khoa rồi bấm Ghi cuộc gọi để ghi người nhận.`
+          : `Đã ghi lần báo cho ${next.receivingDepartmentName}.`,
+      )
+      onClose()
+    },
+  })
+
+  async function save(byApp: boolean) {
+    if (byApp) {
+      clearCallErrors(form)
+    }
+    try {
+      await (byApp ? form.validateFields([['notification', 'receivingDepartmentId']]) : form.validateFields())
+    } catch {
+      return
+    }
+    const values = form.getFieldsValue(true) as { notification: NotificationFormValues }
+    mutation.mutate({ values: values.notification, byApp })
+  }
+
+  return (
+    <Modal
+      open={open}
+      title={`Ghi lần báo · ${result.patientName}`}
+      onCancel={onClose}
+      destroyOnHidden
+      footer={[
+        <Button key="cancel" onClick={onClose}>
+          Thôi
+        </Button>,
+        <Button key="later" onClick={() => void save(true)} loading={mutation.isPending && mutation.variables?.byApp === true}>
+          Lưu, gọi sau
+        </Button>,
+        <Button key="called" type="primary" onClick={() => void save(false)} loading={mutation.isPending && mutation.variables?.byApp === false}>
+          Lưu, đã báo
+        </Button>,
+      ]}
+    >
+      {mutation.isError && <Alert type="error" showIcon style={{ marginBottom: 12 }} title={errorMessageWithDetails(mutation.error)} />}
+      <Form form={form} layout="vertical" initialValues={{ notification: emptyNotification() }}>
+        <NotificationFields departments={departments} sendingDepartmentId={result.sendingDepartmentId} microbiology={result.logbook === 'Microbiology'} />
+      </Form>
+      <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+        Chưa gọi được thì chọn khoa nhận rồi bấm Lưu, gọi sau: khoa nhận được báo ngay trên phần mềm (dải cảnh báo đỏ, chuông); gọi sau
+        để ghi người nhận thông tin.
+      </Typography.Paragraph>
+    </Modal>
+  )
+}
+
+/**
+ * Ghi cuộc gọi xác nhận người nhận thông tin (quyết định 68): hồ sơ đã báo khoa nhận trên phần mềm lúc lưu; khoa báo gọi cho
+ * khoa nhận, đọc kết quả, nghe đọc lại rồi ghi người nhận. Giờ báo của hồ sơ giữ nguyên.
+ */
+export function ConfirmCallModal({
+  result,
+  open,
+  onClose,
+  onSaved,
+}: {
+  result: CriticalResult
+  open: boolean
+  onClose: () => void
+  onSaved?: (result: CriticalResult) => void
+}) {
+  const [form] = Form.useForm<{ notification: NotificationFormValues }>()
+  const { message } = App.useApp()
+  const saved = useCriticalSaved()
+  const mutation = useMutation({
+    mutationFn: (values: { notification: NotificationFormValues }) => criticalApi.confirmCall(result.id, toCallInput(values.notification)),
     onSuccess: (next) => {
       saved(next)
-      void message.success(`Đã ghi lần báo cho ${next.receivingDepartmentName}.`)
+      onSaved?.(next)
+      void message.success(`Đã ghi người nhận thông tin của ${next.receivingDepartmentName}.`)
       onClose()
     },
   })
   return (
     <Modal
       open={open}
-      title={`Ghi lần báo · ${result.patientName}`}
-      okText="Lưu, đã báo"
+      title={`Ghi cuộc gọi · ${result.patientName}`}
+      okText="Lưu cuộc gọi"
+      okButtonProps={{ icon: <PhoneOutlined /> }}
       cancelText="Thôi"
       onCancel={onClose}
       onOk={() => form.submit()}
       confirmLoading={mutation.isPending}
       destroyOnHidden
     >
+      <Typography.Paragraph>
+        Đã báo <Typography.Text strong>{result.receivingDepartmentName}</Typography.Text> trên phần mềm lúc {timeOf(result.notifiedAtUtc)}. Gọi
+        cho khoa, đọc kết quả, nghe người nhận đọc lại rồi ghi người nhận thông tin. Giờ báo của hồ sơ giữ nguyên.
+      </Typography.Paragraph>
       {mutation.isError && <Alert type="error" showIcon style={{ marginBottom: 12 }} title={errorMessageWithDetails(mutation.error)} />}
       <Form form={form} layout="vertical" initialValues={{ notification: emptyNotification() }} onFinish={(values) => mutation.mutate(values)}>
-        <NotificationFields departments={departments} sendingDepartmentId={result.sendingDepartmentId} microbiology={result.logbook === 'Microbiology'} />
+        <NotificationFields microbiology={result.logbook === 'Microbiology'} timeLabel="Giờ gọi" actorLabel="Người gọi" />
       </Form>
     </Modal>
   )
@@ -322,7 +422,7 @@ export function ActionForm({ result, onSaved }: { result: CriticalResult; onSave
       </Button>
       {result.acknowledgedByName && (
         <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
-          {result.acknowledgedByName} đã xác nhận nhận cuộc gọi lúc {dateTimeOf(result.acknowledgedAtUtc)}.
+          {result.acknowledgedByName} đã xác nhận đã nhận lúc {dateTimeOf(result.acknowledgedAtUtc)}.
         </Typography.Paragraph>
       )}
     </Form>

@@ -112,6 +112,11 @@ public sealed class CriticalLogbookService(
 
     private static string WithUnit(CriticalResult r) => r.Unit is { Length: > 0 } unit ? $"{r.Value} {unit}" : r.Value;
 
+    /// <summary>Ô người nhận khi khoa báo đã báo trên phần mềm, chưa gọi xác nhận (quyết định 68).</summary>
+    internal const string CallPendingText = "Chưa gọi xác nhận";
+
+    private static string Receiver(CriticalNotification notification) => notification.ReceiverName ?? CallPendingText;
+
     private bool InScope(Guid departmentId) =>
         currentUser.HasPermission(Permissions.ScopeAllDepartments) || currentUser.DepartmentIds.Contains(departmentId);
 
@@ -179,6 +184,17 @@ public sealed class CriticalLogbookService(
             }
 
             notes.AddRange(rejected.Select(n => $"Lần báo {n.AttemptNo} cho {Name(n.ReceivingDepartmentId)} bị trả lại: {n.RejectReason}"));
+
+            // Báo trên phần mềm trước, gọi sau (quyết định 68): ghi rõ hai mốc; chưa gọi thì sổ ghi Chưa gọi xác nhận.
+            if (current is { CallPending: true })
+            {
+                notes.Add($"Báo trên phần mềm lúc {Local(current.NotifiedAtUtc)}, chưa gọi xác nhận người nhận");
+            }
+            else if (current?.CalledAtUtc is { } called)
+            {
+                notes.Add($"Báo trên phần mềm lúc {Local(current.NotifiedAtUtc)}, gọi xác nhận lúc {Local(called)} ({current.CallRecordedByName})");
+            }
+
             if (r.LateEntry)
             {
                 notes.Add("Ghi bù sau sự việc");
@@ -196,10 +212,12 @@ public sealed class CriticalLogbookService(
                     Local(r.ResultAtUtc),
                     current is null ? "Chưa báo" : Local(current.NotifiedAtUtc),
                     current?.NotifiedByName ?? string.Empty,
-                    current is null ? string.Empty : $"{current.ReceiverName} – {Name(current.ReceivingDepartmentId)}",
+                    current is null ? string.Empty : $"{Receiver(current)} – {Name(current.ReceivingDepartmentId)}",
                     current is null
                         ? string.Empty
-                        : current.IncorrectReadBacks == 0 ? "☒ Chính xác" : $"☒ Chính xác (đọc lại lần {current.IncorrectReadBacks + 1})",
+                        : current.CallPending
+                            ? CallPendingText
+                            : current.IncorrectReadBacks == 0 ? "☒ Chính xác" : $"☒ Chính xác (đọc lại lần {current.IncorrectReadBacks + 1})",
                 ],
                 CriticalLogbookForm.Clinical =>
                 [
@@ -209,7 +227,7 @@ public sealed class CriticalLogbookService(
                     WithUnit(r),
                     current is null ? string.Empty : Local(current.NotifiedAtUtc),
                     current is null ? string.Empty : $"{current.NotifiedByName} ({Name(r.SendingDepartmentId)})",
-                    current?.ReceiverName ?? string.Empty,
+                    current is null ? string.Empty : Receiver(current),
                     r.ActionAtUtc is { } acted ? Local(acted) : string.Empty,
                     r.ActionByName is { } doctor ? $"{doctor} · xác nhận {Local(r.ActionRecordedAtUtc!.Value)}" : "Chưa xử trí",
                     r.ActionSummary ?? string.Empty,
@@ -226,7 +244,7 @@ public sealed class CriticalLogbookService(
                     Local(r.ResultAtUtc),
                     current is null ? "Chưa báo" : Local(current.NotifiedAtUtc),
                     current?.NotifiedByName ?? string.Empty,
-                    current?.ReceiverName ?? string.Empty,
+                    current is null ? string.Empty : Receiver(current),
                     WithUnit(r),
                     current is { RepeatedTwice: true } ? "Đã nhắc lại 2 lần" : string.Empty,
                 ],

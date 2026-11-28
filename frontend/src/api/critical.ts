@@ -6,7 +6,10 @@ import type { HisStatus } from './patients'
 export type CriticalStatus = 'AwaitingNotification' | 'AwaitingAcknowledgement' | 'AwaitingAction' | 'Completed' | 'Cancelled'
 export type CriticalLogbook = 'Laboratory' | 'Microbiology'
 export type CriticalLogbookForm = 'Laboratory' | 'Clinical' | 'Microbiology'
-export type CriticalMethod = 'Phone' | 'InPerson'
+/** Cách gọi báo, cũng là cách xác nhận người nhận khi đã báo trên phần mềm. */
+export type CriticalCallMethod = 'Phone' | 'InPerson'
+/** App: đã báo trên phần mềm ("Lưu, gọi sau", quyết định 68), khoa báo chưa gọi xác nhận người nhận thông tin. */
+export type CriticalMethod = CriticalCallMethod | 'App'
 export type CriticalPatientSource = 'His' | 'Manual'
 export type Gender = 'Male' | 'Female'
 
@@ -18,7 +21,14 @@ export const CRITICAL_STATUS_LABELS: Record<CriticalStatus, string> = {
   Cancelled: 'Đã hủy',
 }
 
-export const CRITICAL_METHOD_LABELS: Record<CriticalMethod, string> = { Phone: 'Gọi điện', InPerson: 'Trực tiếp tại khoa' }
+export const CRITICAL_METHOD_LABELS: Record<CriticalMethod, string> = {
+  Phone: 'Gọi điện',
+  InPerson: 'Trực tiếp tại khoa',
+  App: 'Báo trên phần mềm',
+}
+
+/** Cách báo chọn được khi ghi cuộc gọi (báo trên phần mềm là nút "Lưu, gọi sau", không phải một lựa chọn trong ô này). */
+export const CRITICAL_CALL_METHODS: CriticalCallMethod[] = ['Phone', 'InPerson']
 
 export const CRITICAL_LOGBOOK_LABELS: Record<CriticalLogbook, string> = {
   Laboratory: 'Sổ khoa cận lâm sàng (ST01)',
@@ -107,8 +117,24 @@ export interface CriticalPatientInput {
 
 export interface CriticalNotificationInput {
   receivingDepartmentId: string
-  method: CriticalMethod
+  method: CriticalCallMethod
   notifiedAtUtc: string
+  receiverName: string
+  readBackCorrect: boolean
+  incorrectReadBacks: number
+  repeatedTwice: boolean
+}
+
+/** "Lưu, gọi sau" (quyết định 68): báo khoa nhận trên phần mềm ngay lúc lưu; gọi sau để ghi người nhận. */
+export interface CriticalAppNotificationInput {
+  receivingDepartmentId: string
+  method: 'App'
+}
+
+/** Cuộc gọi xác nhận người nhận thông tin cho hồ sơ đã báo trên phần mềm. */
+export interface CriticalCallInput {
+  method: CriticalCallMethod
+  calledAtUtc: string
   receiverName: string
   readBackCorrect: boolean
   incorrectReadBacks: number
@@ -125,7 +151,7 @@ export interface CreateCriticalResultInput {
   resultAtUtc: string
   sampleId: string | null
   urgent: boolean
-  notification: CriticalNotificationInput | null
+  notification: CriticalNotificationInput | CriticalAppNotificationInput | null
 }
 
 export interface CriticalActionInput {
@@ -141,7 +167,8 @@ export interface CriticalNotification {
   receivingDepartmentName: string
   method: CriticalMethod
   notifiedAtUtc: string
-  receiverName: string
+  /** null khi đã báo trên phần mềm, chưa gọi xác nhận. */
+  receiverName: string | null
   incorrectReadBacks: number
   repeatedTwice: boolean
   notifiedByName: string
@@ -149,6 +176,12 @@ export interface CriticalNotification {
   rejectedAtUtc: string | null
   rejectedByName: string | null
   rejectReason: string | null
+  /** Giờ gọi xác nhận, khi đã báo trên phần mềm trước rồi gọi sau. */
+  calledAtUtc: string | null
+  callRecordedByName: string | null
+  callRecordedAtUtc: string | null
+  /** Đã báo trên phần mềm, chưa gọi xác nhận, lần báo chưa bị trả lại. */
+  callPending: boolean
 }
 
 /** Người đang xem làm được gì (giao diện ẩn nút; máy chủ vẫn kiểm tra). */
@@ -158,6 +191,8 @@ export interface CriticalPermissions {
   reject: boolean
   act: boolean
   cancel: boolean
+  /** Ghi cuộc gọi xác nhận người nhận (khoa báo, hồ sơ chưa gọi xác nhận). */
+  confirmCall: boolean
 }
 
 export interface CriticalResult {
@@ -208,6 +243,8 @@ export interface CriticalResult {
   notifiedOnTime: boolean | null
   actedOnTime: boolean | null
   lateEntry: boolean
+  /** Đã báo khoa nhận trên phần mềm, khoa báo chưa gọi xác nhận người nhận (hồ sơ chưa hủy). */
+  callPending: boolean
   notifications: CriticalNotification[]
   can: CriticalPermissions
 }
@@ -233,7 +270,9 @@ export interface CriticalAlertItem {
   unit: string | null
   notifiedAtUtc: string
   actionDueAtUtc: string
-  receiverName: string
+  /** null khi khoa báo đã báo trên phần mềm, chưa gọi xác nhận. */
+  receiverName: string | null
+  callPending: boolean
   notifiedByName: string
   acknowledgedByName: string | null
   acknowledgedAtUtc: string | null
@@ -396,8 +435,10 @@ export const criticalApi = {
     apiBlob(`${base}/logbook/pdf?form=${form}&departmentId=${departmentId}&month=${month}`),
   get: (id: string, signal?: AbortSignal) => apiRequest<CriticalResult>(`${base}/${id}`, { signal }),
   create: (input: CreateCriticalResultInput) => apiRequest<CriticalResult>(base, { method: 'POST', body: input }),
-  notify: (id: string, input: CriticalNotificationInput) =>
+  notify: (id: string, input: CriticalNotificationInput | CriticalAppNotificationInput) =>
     apiRequest<CriticalResult>(`${base}/${id}/notifications`, { method: 'POST', body: input }),
+  /** Ghi cuộc gọi xác nhận người nhận thông tin (quyết định 68). */
+  confirmCall: (id: string, input: CriticalCallInput) => apiRequest<CriticalResult>(`${base}/${id}/call`, { method: 'POST', body: input }),
   acknowledge: (id: string) => apiRequest<CriticalResult>(`${base}/${id}/acknowledge`, { method: 'POST' }),
   reject: (id: string, reason: string) => apiRequest<CriticalResult>(`${base}/${id}/reject`, { method: 'POST', body: { reason } }),
   act: (id: string, input: CriticalActionInput) => apiRequest<CriticalResult>(`${base}/${id}/action`, { method: 'POST', body: input }),

@@ -109,7 +109,8 @@ export function CriticalAlertBanner() {
           <span>
             {first.patientName}
             {many ? ` (${first.receivingDepartmentName})` : ''} · {first.testName} {first.value}
-            {first.unit ? ` ${first.unit}` : ''} · {first.sendingDepartmentName} báo lúc {timeOf(first.notifiedAtUtc)} ·{' '}
+            {first.unit ? ` ${first.unit}` : ''} · {first.sendingDepartmentName} báo{first.callPending ? ' trên phần mềm' : ''} lúc{' '}
+            {timeOf(first.notifiedAtUtc)} ·{' '}
             <span role="timer" aria-live="off">
               {left < 0 ? `bác sĩ đã quá hạn xử trí ${countdownText(left).slice('Quá hạn '.length)}` : `bác sĩ còn ${countdownText(left).slice('Còn '.length)} để xử trí`}
             </span>

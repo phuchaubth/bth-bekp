@@ -12,7 +12,8 @@ namespace Consent.Api.IntegrationTests;
 /// Kết quả nguy cấp (quyết định 60) qua API, với SQL Server thật: KTV khoa HSH gọi điện xong ghi kết quả kèm lần báo; màn hình
 /// theo dõi tại khoa Nội thấy tên viết tắt, không mở được hồ sơ; điều dưỡng khoa Nội xác nhận đã nhận, bác sĩ ghi hướng xử trí bằng
 /// tài khoản của mình; KTV hủy hồ sơ báo nhầm; QLCL sửa thông số, xem dashboard; sổ và PDF sổ; số hồ sơ lấy từ sequence; mọi thay
-/// đổi có trong nhật ký hệ thống. Dữ liệu giả lập.
+/// đổi có trong nhật ký hệ thống; "Lưu, gọi sau" báo ngay trên phần mềm, KTV gọi sau để ghi người nhận (quyết định 68). Dữ liệu
+/// giả lập.
 /// </summary>
 [Collection(SqlServerCollection.Name)]
 public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifetime
@@ -36,6 +37,17 @@ public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifeti
     }
 
     private async Task<string> LoginAsync(string userName) => (await _client.LoginAsync(userName, TestSettings.DemoPassword)).AccessToken!;
+
+    /// <summary>Lùi giờ cập nhật cuối của hồ sơ <paramref name="days"/> ngày (như đã qua thời gian giữ trên bàn làm việc).</summary>
+    private async Task AgeAsync(string id, int days)
+    {
+        await using var connection = new SqlConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new SqlCommand("UPDATE CriticalResults SET UpdatedAtUtc = DATEADD(day, -@days, SYSDATETIMEOFFSET()) WHERE Id = @id", connection);
+        command.Parameters.Add("@days", System.Data.SqlDbType.Int).Value = days;
+        command.Parameters.Add("@id", System.Data.SqlDbType.UniqueIdentifier).Value = Guid.Parse(id);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
 
     private async Task<Guid> DepartmentIdAsync(string code)
     {
@@ -295,5 +307,167 @@ public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifeti
         Assert.Equal([1, 2], attempts.Select(n => n.GetProperty("attemptNo").GetInt32()));
         Assert.Equal("Người bệnh không nằm khoa Nội (giả lập)", attempts[0].GetProperty("rejectReason").GetString());
         Assert.Equal("Khoa Khám bệnh", again.GetProperty("receivingDepartmentName").GetString());
+    }
+    /// <summary>"Lưu, gọi sau" (quyết định 68): khoa nhận được báo ngay trên phần mềm; KTV gọi sau để ghi người nhận thông tin.</summary>
+    [Fact]
+    public async Task SaveCallLater_WardIsAlertedAtOnce_LabRecordsTheCallLater_StaysOnLabDeskUntilCalled()
+    {
+        var lab = await LoginAsync("ktv.demo");
+        var nurse = await LoginAsync("dieuduong.demo");
+        var doctor = await LoginAsync("bacsi.demo");
+        var hsh = await DepartmentIdAsync("HSH");
+        var noi = await DepartmentIdAsync("NOI");
+        var (_, tests) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/tests", lab);
+        var potassium = tests.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "Kali (K+) (giả lập)").GetProperty("id").GetString();
+        var now = DateTimeOffset.UtcNow;
+
+        var (status, created) = await _client.SendJsonAsync(HttpMethod.Post, Base, lab, new
+        {
+            sendingDepartmentId = hsh,
+            testId = potassium,
+            patient = new
+            {
+                code = "NB-GL-0003", fullName = "Người Bệnh Gọi Sau", dateOfBirth = "1970-03-04", gender = "Female", address = "Ấp Mẫu (giả lập)",
+                source = "Manual",
+            },
+            value = "6,9",
+            unit = "mmol/L",
+            orderDate = DateOnly.FromDateTime(now.AddMinutes(-3).ToOffset(Vietnam).DateTime).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            resultAtUtc = now.AddMinutes(-3),
+            notification = new { receivingDepartmentId = noi, method = "App" },
+        });
+        Assert.True(status == HttpStatusCode.OK, created.ToString());
+        var id = created.GetProperty("id").GetString();
+        var first = Assert.Single(created.GetProperty("notifications").EnumerateArray());
+        Assert.Equal(
+            ("AwaitingAcknowledgement", true, true),
+            (created.GetProperty("status").GetString(), created.GetProperty("callPending").GetBoolean(),
+                created.GetProperty("can").GetProperty("confirmCall").GetBoolean()));
+        Assert.Equal(
+            ("App", JsonValueKind.Null, true),
+            (first.GetProperty("method").GetString(), first.GetProperty("receiverName").ValueKind, first.GetProperty("callPending").GetBoolean()));
+
+        // Điều dưỡng khoa Nội thấy cảnh báo ngay và xác nhận đã nhận; không ghi được cuộc gọi thay khoa báo.
+        var (_, alerts) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts", nurse);
+        var alert = Assert.Single(alerts.GetProperty("awaitingAcknowledgement").EnumerateArray());
+        Assert.Equal(
+            (id, true, JsonValueKind.Null),
+            (alert.GetProperty("id").GetString(), alert.GetProperty("callPending").GetBoolean(), alert.GetProperty("receiverName").ValueKind));
+        var call = new
+        {
+            method = "Phone", calledAtUtc = now, receiverName = "Điều dưỡng nghe máy sau (giả lập)", readBackCorrect = true, incorrectReadBacks = 0,
+            repeatedTwice = false,
+        };
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/call", nurse, call)).Status);
+        var (ackStatus, acknowledged) = await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/acknowledge", nurse);
+        Assert.True(ackStatus == HttpStatusCode.OK, acknowledged.ToString());
+
+        // Bác sĩ xử trí ngay: hồ sơ hoàn tất nhưng còn chờ gọi xác nhận, vẫn ở bàn làm việc của khoa báo.
+        var (actStatus, acted) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{Base}/{id}/action", doctor, new { summary = "Xử trí theo phác đồ (giả lập)", recordedInMedicalRecord = true });
+        Assert.True(actStatus == HttpStatusCode.OK, acted.ToString());
+        Assert.Equal(("Completed", true), (acted.GetProperty("status").GetString(), acted.GetProperty("callPending").GetBoolean()));
+
+        // Hai ngày sau (quá 24 giờ giữ trên bàn làm việc), chưa gọi xác nhận: hồ sơ vẫn ở bàn làm việc khoa báo.
+        await AgeAsync(id!, days: 2);
+        var (_, sent) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/sent", lab);
+        var onDesk = Assert.Single(sent.GetProperty("items").EnumerateArray(), r => r.GetProperty("id").GetString() == id);
+        Assert.True(onDesk.GetProperty("can").GetProperty("confirmCall").GetBoolean());
+
+        // KTV gọi được: người nhận phải đọc lại chính xác; ghi một lần.
+        Assert.Equal(
+            HttpStatusCode.UnprocessableEntity,
+            (await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/call", lab, call with { readBackCorrect = false })).Status);
+        var (callStatus, called) = await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/call", lab, call);
+        Assert.True(callStatus == HttpStatusCode.OK, called.ToString());
+        var confirmed = Assert.Single(called.GetProperty("notifications").EnumerateArray());
+        Assert.Equal(
+            ("Completed", false, false),
+            (called.GetProperty("status").GetString(), called.GetProperty("callPending").GetBoolean(),
+                called.GetProperty("can").GetProperty("confirmCall").GetBoolean()));
+        Assert.Equal(
+            ("Phone", "Điều dưỡng nghe máy sau (giả lập)", first.GetProperty("notifiedByName").GetString(), first.GetProperty("notifiedAtUtc").GetDateTimeOffset()),
+            (confirmed.GetProperty("method").GetString(), confirmed.GetProperty("receiverName").GetString(),
+                confirmed.GetProperty("callRecordedByName").GetString(), confirmed.GetProperty("notifiedAtUtc").GetDateTimeOffset()));
+        Assert.Equal(JsonValueKind.String, confirmed.GetProperty("calledAtUtc").ValueKind);
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, (await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/call", lab, call)).Status);
+
+        // Đã gọi xác nhận: hết thời gian giữ thì hồ sơ rời bàn làm việc như hồ sơ hoàn tất khác.
+        await AgeAsync(id!, days: 2);
+        var (_, later) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/sent", lab);
+        Assert.DoesNotContain(later.GetProperty("items").EnumerateArray(), r => r.GetProperty("id").GetString() == id);
+
+        // Lưu trong SQL Server: cách báo đổi sang điện thoại, có người nhận, giờ gọi, người ghi; có trong nhật ký.
+        await using var connection = new SqlConnection(_factory.ConnectionString);
+        await connection.OpenAsync();
+        await using (var row = new SqlCommand(
+            "SELECT Method, ReceiverName, CalledAtUtc, CallRecordedByName, CallRecordedAtUtc FROM CriticalNotifications WHERE ResultId = @id", connection))
+        {
+            row.Parameters.Add("@id", System.Data.SqlDbType.UniqueIdentifier).Value = Guid.Parse(id!);
+            await using var reader = await row.ExecuteReaderAsync();
+            Assert.True(await reader.ReadAsync());
+            Assert.Equal(("Phone", "Điều dưỡng nghe máy sau (giả lập)"), (reader.GetString(0), reader.GetString(1)));
+            Assert.False(reader.IsDBNull(2));
+            Assert.Equal(first.GetProperty("notifiedByName").GetString(), reader.GetString(3));
+            Assert.False(reader.IsDBNull(4));
+            Assert.False(await reader.ReadAsync());
+        }
+
+        await using var audit = new SqlCommand(
+            "SELECT COUNT(*) FROM AuditLogs WHERE EntityType = 'CriticalNotification' AND Action = 'Update'", connection);
+        Assert.Equal(1, (int)(await audit.ExecuteScalarAsync())!);
+    }
+    /// <summary>
+    /// Lần báo trên phần mềm bị khoa nhận trả lại, khoa báo gọi lại rồi bác sĩ xử trí xong: lần báo bị trả lại không giữ hồ sơ ở bàn
+    /// làm việc khoa báo (quyết định 68).
+    /// </summary>
+    [Fact]
+    public async Task SaveCallLater_ReturnedByWard_CalledAgainAndCompleted_LeavesLabDeskAfterKeepHours()
+    {
+        var lab = await LoginAsync("ktv.demo");
+        var nurse = await LoginAsync("dieuduong.demo");
+        var doctor = await LoginAsync("bacsi.demo");
+        var hsh = await DepartmentIdAsync("HSH");
+        var noi = await DepartmentIdAsync("NOI");
+        var (_, tests) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/tests", lab);
+        var potassium = tests.EnumerateArray().Single(t => t.GetProperty("name").GetString() == "Kali (K+) (giả lập)").GetProperty("id").GetString();
+        var now = DateTimeOffset.UtcNow;
+
+        var (status, created) = await _client.SendJsonAsync(HttpMethod.Post, Base, lab, new
+        {
+            sendingDepartmentId = hsh,
+            testId = potassium,
+            patient = new
+            {
+                code = "NB-GL-0004", fullName = "Người Bệnh Trả Lại Rồi Gọi", dateOfBirth = "1966-07-08", gender = "Male", address = "Ấp Mẫu (giả lập)",
+                source = "Manual",
+            },
+            value = "2,1",
+            unit = "mmol/L",
+            orderDate = DateOnly.FromDateTime(now.AddMinutes(-4).ToOffset(Vietnam).DateTime).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            resultAtUtc = now.AddMinutes(-4),
+            notification = new { receivingDepartmentId = noi, method = "App" },
+        });
+        Assert.True(status == HttpStatusCode.OK, created.ToString());
+        var id = created.GetProperty("id").GetString()!;
+
+        // Khoa Nội trả lại lần báo trên phần mềm; KTV gọi được, ghi lần báo qua điện thoại (lần 2); bác sĩ xử trí xong.
+        var (_, rejected) = await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/reject", nurse, new { reason = "Thông tin chưa khớp (giả lập)" });
+        Assert.Equal(("AwaitingNotification", false), (rejected.GetProperty("status").GetString(), rejected.GetProperty("callPending").GetBoolean()));
+        var (_, called) = await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/notifications", lab, new
+        {
+            receivingDepartmentId = noi, method = "Phone", notifiedAtUtc = now, receiverName = "Điều dưỡng nghe máy (giả lập)", readBackCorrect = true,
+            incorrectReadBacks = 0, repeatedTwice = false,
+        });
+        Assert.Equal(["App", "Phone"], called.GetProperty("notifications").EnumerateArray().Select(n => n.GetProperty("method").GetString()));
+        var (actStatus, acted) = await _client.SendJsonAsync(
+            HttpMethod.Post, $"{Base}/{id}/action", doctor, new { summary = "Bù kali (giả lập)", recordedInMedicalRecord = true });
+        Assert.True(actStatus == HttpStatusCode.OK, acted.ToString());
+        Assert.Equal(("Completed", false), (acted.GetProperty("status").GetString(), acted.GetProperty("callPending").GetBoolean()));
+
+        // Hai ngày sau: hồ sơ rời bàn làm việc khoa báo như hồ sơ hoàn tất khác.
+        await AgeAsync(id, days: 2);
+        var (_, sent) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/sent", lab);
+        Assert.DoesNotContain(sent.GetProperty("items").EnumerateArray(), r => r.GetProperty("id").GetString() == id);
     }
 }

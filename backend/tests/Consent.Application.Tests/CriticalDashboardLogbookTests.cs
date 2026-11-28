@@ -12,8 +12,9 @@ using Consent.Shared;
 namespace Consent.Application.Tests;
 
 /// <summary>
-/// Dashboard QLCL và sổ điện tử kết quả nguy cấp (quyết định 60). Hồ sơ dựng thẳng từ domain với giờ sự việc cụ thể (ghi đúng
-/// lúc sự việc, trừ hồ sơ ghi bù); bây giờ là 10:30 ngày 27/11/2026, giờ Việt Nam. Thời hạn báo và xử trí 10 phút. Dữ liệu giả lập.
+/// Dashboard QLCL và sổ điện tử kết quả nguy cấp (quyết định 60; báo trên phần mềm rồi gọi sau, quyết định 68). Hồ sơ dựng thẳng
+/// từ domain với giờ sự việc cụ thể (ghi đúng lúc sự việc, trừ hồ sơ ghi bù); bây giờ là 10:30 ngày 27/11/2026, giờ Việt Nam. Thời
+/// hạn báo và xử trí 10 phút. Dữ liệu giả lập.
 /// </summary>
 public sealed class CriticalDashboardLogbookTests
 {
@@ -129,6 +130,20 @@ public sealed class CriticalDashboardLogbookTests
             new(ward.Id, CriticalNotificationMethod.Phone, at, "ĐD Nghe Máy (giả lập)", ReadBackCorrect: true, incorrect, twice),
             Actor(technician),
             at);
+    }
+
+    /// <summary>Báo trên phần mềm lúc lưu (quyết định 68); có <paramref name="calledAt"/> thì khoa báo đã gọi xác nhận lúc đó.</summary>
+    private void AppNotify(CriticalResult result, Department ward, DateTimeOffset at, DateTimeOffset? calledAt = null, int incorrect = 0)
+    {
+        var technician = result.SendingDepartmentId == _micro.Id ? _microTechnician : _technician;
+        result.NotifyByApp(ward.Id, Actor(technician), at);
+        if (calledAt is { } called)
+        {
+            result.ConfirmCall(
+                new(CriticalNotificationMethod.Phone, called, "ĐD Gọi Sau (giả lập)", ReadBackCorrect: true, incorrect, RepeatedTwice: false),
+                Actor(technician),
+                called);
+        }
     }
 
     /// <summary>
@@ -458,6 +473,39 @@ public sealed class CriticalDashboardLogbookTests
             ],
             Assert.Single(book.Rows).Cells);
         Assert.Empty(labBook.Rows);
+    }
+
+    [Fact]
+    public async Task Logbooks_ShowAppNotificationAsNotYetCalled_UntilTheCallIsRecorded_ReadBackRateWaitsForTheCall()
+    {
+        var pending = Seed(_lab, _potassium, "Người Bệnh Chưa Gọi", At(10, 0));
+        AppNotify(pending, _wardA, At(10, 2));
+        var called = Seed(_lab, _potassium, "Người Bệnh Gọi Sau", At(10, 3));
+        AppNotify(called, _wardA, At(10, 4), calledAt: At(10, 9), incorrect: 1);
+        var culture = Seed(_micro, _culture, "Người Bệnh Vi Sinh", At(10, 5), "Dương tính (giả lập)", sampleId: "VS-0002");
+        AppNotify(culture, _wardA, At(10, 6));
+
+        ActAs(_technician);
+        var lab = Ok(await Logbook.GetAsync(CriticalLogbookForm.Laboratory, _lab.Id, "2026-11", CancellationToken.None));
+        ActAs(_nurseA);
+        var clinical = Ok(await Logbook.GetAsync(CriticalLogbookForm.Clinical, _wardA.Id, "2026-11", CancellationToken.None));
+        ActAs(_microTechnician);
+        var micro = Ok(await Logbook.GetAsync(CriticalLogbookForm.Microbiology, _micro.Id, "2026-11", CancellationToken.None));
+        ActAs(_quality);
+        var dashboard = Ok(await Dashboard.GetAsync(null, null, null, CancellationToken.None));
+
+        Assert.Equal(["10:02 27/11/2026", "ktv.hsh Demo", $"Chưa gọi xác nhận – {_wardA.Name}", "Chưa gọi xác nhận"], lab.Rows[0].Cells.Skip(6));
+        Assert.Equal("Báo trên phần mềm lúc 10:02 27/11/2026, chưa gọi xác nhận người nhận", lab.Rows[0].Note);
+        Assert.Equal(
+            ["10:04 27/11/2026", "ktv.hsh Demo", $"ĐD Gọi Sau (giả lập) – {_wardA.Name}", "☒ Chính xác (đọc lại lần 2)"],
+            lab.Rows[1].Cells.Skip(6));
+        Assert.Equal("Báo trên phần mềm lúc 10:04 27/11/2026, gọi xác nhận lúc 10:09 27/11/2026 (ktv.hsh Demo)", lab.Rows[1].Note);
+        Assert.Equal(["Chưa gọi xác nhận", "ĐD Gọi Sau (giả lập)", "Chưa gọi xác nhận"], clinical.Rows.Select(r => r.Cells[6]));
+        Assert.Equal(("Chưa gọi xác nhận", ""), (micro.Rows[0].Cells[10], micro.Rows[0].Cells[12]));
+
+        // Đọc lại chính xác lần đầu: chỉ tính hồ sơ đã gọi (đọc lại sai 1 lần); hai hồ sơ chưa gọi chưa vào mẫu số.
+        Assert.Equal(new CriticalRateDto(0, 1), dashboard.Kpis.ReadBackFirstTime);
+        Assert.Equal(new CriticalRateDto(3, 3), dashboard.Kpis.NotifyOnTime);
     }
 
     [Fact]

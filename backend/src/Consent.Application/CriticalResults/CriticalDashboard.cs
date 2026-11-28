@@ -68,7 +68,8 @@ public static class CriticalDashboardBuilder
 
         var notifyMinutes = active.Select(NotifyMinutes).OfType<double>().OrderBy(v => v).ToList();
         var actionMinutes = active.Select(ActionMinutes).OfType<double>().OrderBy(v => v).ToList();
-        var notified = active.Where(r => r.CurrentNotification is not null).ToList();
+        // Đọc lại chính xác lần đầu: chỉ tính lần báo đã có người nhận đọc lại (báo trên phần mềm chưa gọi xác nhận thì chưa tính).
+        var notified = active.Where(r => r.CurrentNotification is { CallPending: false }).ToList();
         var completeBase = active
             .Where(r => r.Status == CriticalResultStatus.Completed || nowUtc > (r.ActionDueAtUtc ?? r.NotifyDueAtUtc))
             .ToList();

@@ -31,7 +31,14 @@ internal sealed class CriticalResultRepository(ConsentDbContext db) : ICriticalR
             query = query.Where(r => ids.Contains(r.SendingDepartmentId));
         }
 
-        return await OpenOrSince(query, closedSinceUtc).ToListAsync(cancellationToken).ConfigureAwait(false);
+        // Hồ sơ chưa gọi xác nhận người nhận (quyết định 68) ở lại bàn làm việc khoa báo đến khi ghi cuộc gọi, dù đã hoàn tất.
+        return await query
+            .Where(r => (r.Status != CriticalResultStatus.Completed && r.Status != CriticalResultStatus.Cancelled)
+                || r.UpdatedAtUtc >= closedSinceUtc
+                || (r.Status == CriticalResultStatus.Completed
+                    && r.Notifications.Any(n => n.Method == CriticalNotificationMethod.App && n.RejectedAtUtc == null)))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<CriticalResult>> ListReceivedAsync(

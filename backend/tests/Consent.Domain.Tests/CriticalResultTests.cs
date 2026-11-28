@@ -4,7 +4,10 @@ using Consent.Domain.Patients;
 
 namespace Consent.Domain.Tests;
 
-/// <summary>Kết quả nguy cấp (quyết định 60): quy tắc danh mục và hồ sơ theo QT-KQNC lần 04. Dữ liệu giả lập.</summary>
+/// <summary>
+/// Kết quả nguy cấp (quyết định 60): quy tắc danh mục và hồ sơ theo QT-KQNC lần 04; báo trên phần mềm rồi gọi sau để ghi người nhận
+/// (quyết định 68). Dữ liệu giả lập.
+/// </summary>
 public sealed class CriticalResultTests
 {
     private static readonly TimeSpan Vietnam = TimeSpan.FromHours(7);
@@ -38,6 +41,15 @@ public sealed class CriticalResultTests
     private static CriticalNotificationDetails Call(
         DateTimeOffset? at = null, Guid? ward = null, bool correct = true, int incorrect = 0, bool twice = false, string? receiver = "ĐD Giả Lập B") =>
         new(ward ?? Ward, CriticalNotificationMethod.Phone, at ?? At(10, 5), receiver, correct, incorrect, twice);
+
+    private static CriticalCallDetails Confirm(
+        DateTimeOffset? at = null,
+        bool correct = true,
+        int incorrect = 0,
+        bool twice = false,
+        string? receiver = "ĐD Giả Lập B",
+        CriticalNotificationMethod method = CriticalNotificationMethod.Phone) =>
+        new(method, at ?? At(10, 12), receiver, correct, incorrect, twice);
 
     private CriticalResult Result(CriticalDeadlines? deadlines = null, DateTimeOffset? resultAt = null, DateTimeOffset? now = null) =>
         CriticalResult.Create("KQNC-2026-000001", Lab, Patient(), _potassium, Value(resultAt), deadlines ?? Deadlines, Technician, now ?? Now, Vietnam);
@@ -241,5 +253,190 @@ public sealed class CriticalResultTests
         lateAction.RecordNotification(Call(at: At(10, 5)), Technician, Now);
         lateAction.RecordAction("Xử trí", At(10, 6), true, Doctor, At(10, 36, 1));
         Assert.True(lateAction.LateEntry);
+    }
+    [Fact]
+    public void NotifyByApp_AlertsTheWardAtSaveTime_WardAndDoctorWorkAtOnce_CallIsRecordedLater()
+    {
+        var result = Result();
+        Assert.Equal("Hồ sơ chưa báo khoa nhận.", Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(), Technician, Now)).Message);
+        Assert.Throws<DomainException>(() => result.NotifyByApp(Guid.Empty, Technician, Now));
+        Assert.Throws<DomainException>(() => result.NotifyByApp(Lab, Technician, Now));
+        Assert.Throws<DomainException>(() => result.NotifyByApp(Ward, Technician with { UserId = Guid.Empty }, Now));
+
+        // Báo trên phần mềm chỉ qua NotifyByApp: lần báo sau cuộc gọi không nhận cách báo App (hay cách báo không có).
+        Assert.Equal(
+            "Chọn cách báo.",
+            Assert.Throws<DomainException>(() => result.RecordNotification(Call() with { Method = CriticalNotificationMethod.App }, Technician, Now)).Message);
+        Assert.Throws<DomainException>(() => result.RecordNotification(Call() with { Method = (CriticalNotificationMethod)9 }, Technician, Now));
+        Assert.Empty(result.Notifications);
+        Assert.False(result.CallPending);
+
+        // "Lưu, gọi sau" lúc 10:10: khoa nhận được báo ngay, giờ báo là lúc lưu; hạn bác sĩ 10:20.
+        result.NotifyByApp(Ward, Technician, Now);
+
+        Assert.Equal(CriticalResultStatus.AwaitingAcknowledgement, result.Status);
+        Assert.Equal((Ward, Now, Now.AddMinutes(10), Now), (result.ReceivingDepartmentId, result.NotifiedAtUtc, result.ActionDueAtUtc, result.UpdatedAtUtc));
+        var notification = Assert.Single(result.Notifications);
+        Assert.Same(notification, result.CurrentNotification);
+        Assert.Equal(
+            (1, Ward, CriticalNotificationMethod.App, (string?)null, Technician.UserId, Technician.Name, Now),
+            (notification.AttemptNo, notification.ReceivingDepartmentId, notification.Method, notification.ReceiverName,
+                notification.NotifiedByUserId, notification.NotifiedByName, notification.RecordedAtUtc));
+        Assert.Equal((0, false, (DateTimeOffset?)null), (notification.IncorrectReadBacks, notification.RepeatedTwice, notification.CalledAtUtc));
+        Assert.True(notification.CallPending);
+        Assert.True(result.CallPending);
+        Assert.True(result.NotifiedOnTime);
+        Assert.False(result.LateEntry);
+        Assert.Throws<DomainException>(() => result.NotifyByApp(OtherWard, Technician, Now));
+        Assert.Throws<DomainException>(() => result.RecordNotification(Call(at: At(10, 9)), Technician, Now));
+
+        // Khoa nhận xác nhận, bác sĩ ghi hướng xử trí ngay, không chờ cuộc gọi.
+        result.Acknowledge(Nurse, Now.AddMinutes(1));
+        result.RecordAction("Xử trí theo phác đồ", Now.AddMinutes(2), true, Doctor, Now.AddMinutes(2));
+        Assert.Equal(CriticalResultStatus.Completed, result.Status);
+        Assert.True(result.ActedOnTime);
+        Assert.True(result.CallPending);
+
+        // Gọi được lúc 10:13, ghi lúc 10:14 (đã hoàn tất vẫn ghi được).
+        var later = Now.AddMinutes(4);
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(correct: false), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(receiver: " "), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(receiver: new string('B', CriticalNotification.ReceiverNameMaxLength + 1)), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(method: CriticalNotificationMethod.App), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(method: (CriticalNotificationMethod)9), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(incorrect: -1), Technician, later));
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(incorrect: CriticalNotification.MaxIncorrectReadBacks + 1), Technician, later));
+        Assert.Equal("Nhập giờ gọi.", Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm() with { CalledAtUtc = null }, Technician, later)).Message);
+        Assert.Equal("Giờ gọi phải sau giờ có kết quả.", Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(at: At(10, 0)), Technician, later)).Message);
+        Assert.Equal(
+            "Giờ gọi chưa tới.",
+            Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(at: later.AddMinutes(CriticalResult.FutureToleranceMinutes).AddSeconds(1)), Technician, later)).Message);
+        Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(), Technician with { Name = " " }, later));
+        Assert.Throws<ArgumentNullException>(() => result.ConfirmCall(null!, Technician, later));
+        Assert.True(result.CallPending);
+        Assert.Null(notification.ReceiverName);
+        Assert.Equal(Now.AddMinutes(2), result.UpdatedAtUtc);
+
+        var otherTechnician = new CriticalActor(Guid.NewGuid(), "KTV Giả Lập D");
+        result.ConfirmCall(Confirm(at: At(10, 13), incorrect: 1, receiver: " ĐD Giả Lập B "), otherTechnician, later);
+
+        Assert.Equal(
+            (CriticalNotificationMethod.Phone, "ĐD Giả Lập B", 1, At(10, 13)),
+            (notification.Method, notification.ReceiverName, notification.IncorrectReadBacks, notification.CalledAtUtc));
+        Assert.Equal(
+            (otherTechnician.UserId, otherTechnician.Name, later),
+            (notification.CallRecordedByUserId, notification.CallRecordedByName, notification.CallRecordedAtUtc));
+        Assert.Equal((Technician.Name, Now, Now), (notification.NotifiedByName, notification.NotifiedAtUtc, notification.RecordedAtUtc));
+        Assert.Equal((CriticalResultStatus.Completed, Now, later), (result.Status, result.NotifiedAtUtc, result.UpdatedAtUtc));
+        Assert.False(notification.CallPending);
+        Assert.False(result.CallPending);
+        Assert.False(result.LateEntry);
+        Assert.Equal(
+            "Lần báo này đã ghi người nhận thông tin.",
+            Assert.Throws<DomainException>(() => result.ConfirmCall(Confirm(at: At(10, 13)), Technician, later)).Message);
+    }
+
+    [Fact]
+    public void ConfirmCall_AcceptsCallAtResultTimeAndUpToTheClockTolerance_InPerson()
+    {
+        var atResult = Result();
+        atResult.NotifyByApp(Ward, Technician, Now);
+        atResult.ConfirmCall(Confirm(at: At(10, 1), method: CriticalNotificationMethod.InPerson), Technician, Now);
+        Assert.Equal((CriticalNotificationMethod.InPerson, At(10, 1)), (atResult.CurrentNotification!.Method, atResult.CurrentNotification.CalledAtUtc));
+
+        // Giờ gọi lấy theo đồng hồ máy trạm: sớm hơn lúc lưu (máy trạm chậm) hay nhanh hơn giờ máy chủ tối đa 2 phút vẫn ghi được.
+        var ahead = Result();
+        ahead.NotifyByApp(Ward, Technician, Now);
+        ahead.ConfirmCall(Confirm(at: Now.AddMinutes(CriticalResult.FutureToleranceMinutes)), Technician, Now);
+        Assert.Equal(Now.AddMinutes(CriticalResult.FutureToleranceMinutes), ahead.CurrentNotification!.CalledAtUtc);
+        var before = Result();
+        before.NotifyByApp(Ward, Technician, Now);
+        before.ConfirmCall(Confirm(at: At(10, 9)), Technician, Now.AddMinutes(1));
+        Assert.Equal(At(10, 9), before.CurrentNotification!.CalledAtUtc);
+
+        // Giờ báo của lần báo qua điện thoại cũng được đúng giờ có kết quả và đúng mốc lệch đồng hồ.
+        var phoneAtResult = Result();
+        phoneAtResult.RecordNotification(Call(at: At(10, 1)), Technician, Now);
+        Assert.Equal(At(10, 1), phoneAtResult.NotifiedAtUtc);
+        var phoneAhead = Result();
+        phoneAhead.RecordNotification(Call(at: Now.AddMinutes(CriticalResult.FutureToleranceMinutes)), Technician, Now);
+        Assert.Equal(Now.AddMinutes(CriticalResult.FutureToleranceMinutes), phoneAhead.NotifiedAtUtc);
+    }
+
+    [Fact]
+    public void NotifyByApp_TakesResultTime_WhenResultIsEnteredSlightlyAheadOfTheServerClock()
+    {
+        var ahead = Result(resultAt: Now.AddMinutes(1));
+        ahead.NotifyByApp(Ward, Technician, Now);
+        Assert.Equal(Now.AddMinutes(1), ahead.NotifiedAtUtc);
+        Assert.Equal(Now.AddMinutes(1), ahead.CurrentNotification!.NotifiedAtUtc);
+        Assert.Equal(Now, ahead.CurrentNotification.RecordedAtUtc);
+
+        var same = Result(resultAt: Now);
+        same.NotifyByApp(Ward, Technician, Now);
+        Assert.Equal(Now, same.NotifiedAtUtc);
+
+        // Ghi bù (kết quả 09:20, lưu 10:10): giờ báo vẫn là lúc lưu, nên quá hạn báo; hồ sơ ghi sau sự việc.
+        var late = Result(resultAt: At(9, 20));
+        late.NotifyByApp(Ward, Technician, Now);
+        Assert.Equal(Now, late.NotifiedAtUtc);
+        Assert.False(late.NotifiedOnTime);
+        Assert.True(late.LateEntry);
+    }
+
+    [Fact]
+    public void ConfirmCall_OnlyForAppNotification_NotAfterCancelOrReject_MicrobiologyRepeatsTwice()
+    {
+        var phone = Result();
+        phone.RecordNotification(Call(), Technician, Now);
+        Assert.False(phone.CallPending);
+        Assert.False(phone.CurrentNotification!.CallPending);
+        Assert.Equal(
+            "Lần báo này đã ghi người nhận thông tin.",
+            Assert.Throws<DomainException>(() => phone.ConfirmCall(Confirm(), Technician, Now)).Message);
+
+        // Hủy hồ sơ đã báo trên phần mềm: vẫn phải báo khoa nhận trước; hủy rồi thì không gọi xác nhận nữa.
+        var cancelled = Result();
+        cancelled.NotifyByApp(Ward, Technician, Now);
+        Assert.Throws<DomainException>(() => cancelled.Cancel("Báo nhầm người bệnh", receivingDepartmentInformed: false, Technician, Now));
+        cancelled.Cancel("Báo nhầm người bệnh", receivingDepartmentInformed: true, Technician, Now);
+        Assert.True(cancelled.CurrentNotification!.CallPending);
+        Assert.False(cancelled.CallPending);
+        Assert.Equal("Hồ sơ đã hủy.", Assert.Throws<DomainException>(() => cancelled.ConfirmCall(Confirm(), Technician, Now)).Message);
+
+        // Khoa nhận trả lại lần báo trên phần mềm: không còn chờ gọi; báo lại cho đúng khoa (lần 2).
+        var rejected = Result();
+        rejected.NotifyByApp(OtherWard, Technician, Now);
+        rejected.RejectNotification("Người bệnh không nằm khoa này", Nurse, Now.AddMinutes(1));
+        var first = Assert.Single(rejected.Notifications);
+        Assert.Equal((true, CriticalNotificationMethod.App), (first.IsRejected, first.Method));
+        Assert.False(first.CallPending);
+        Assert.False(rejected.CallPending);
+        Assert.Equal("Hồ sơ chưa báo khoa nhận.", Assert.Throws<DomainException>(() => rejected.ConfirmCall(Confirm(), Technician, Now.AddMinutes(2))).Message);
+        rejected.NotifyByApp(Ward, Technician, Now.AddMinutes(2));
+        Assert.Equal((2, Ward, Now.AddMinutes(2)), (rejected.CurrentNotification!.AttemptNo, rejected.ReceivingDepartmentId, rejected.NotifiedAtUtc));
+        Assert.True(rejected.CallPending);
+
+        var culture = CriticalResult.Create(
+            "KQNC-2026-000005", Lab, Patient(), _culture, Value(value: "Dương tính", sid: "VS-2"), Deadlines, Technician, Now, Vietnam);
+        culture.NotifyByApp(Ward, Technician, Now);
+        Assert.Throws<DomainException>(() => culture.ConfirmCall(Confirm(twice: false), Technician, Now));
+        culture.ConfirmCall(Confirm(twice: true, at: At(10, 9)), Technician, Now);
+        Assert.True(culture.CurrentNotification!.RepeatedTwice);
+    }
+
+    [Fact]
+    public void LateEntry_FlagsCallRecordedLongAfterTheCall()
+    {
+        // Gọi 10:12, ghi 10:42: đúng ngưỡng 30 phút thì chưa tính ghi bù; quá một giây thì tính.
+        var onLimit = Result();
+        onLimit.NotifyByApp(Ward, Technician, Now);
+        onLimit.ConfirmCall(Confirm(at: At(10, 12)), Technician, At(10, 42));
+        Assert.False(onLimit.LateEntry);
+
+        var late = Result();
+        late.NotifyByApp(Ward, Technician, Now);
+        late.ConfirmCall(Confirm(at: At(10, 12)), Technician, At(10, 42, 1));
+        Assert.True(late.LateEntry);
     }
 }

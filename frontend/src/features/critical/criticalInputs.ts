@@ -1,11 +1,15 @@
+import type { FormInstance } from 'antd'
 import type { Dayjs } from 'dayjs'
 import dayjs from 'dayjs'
-import type { CriticalMethod, CriticalNotificationInput } from '../../api/critical'
+import type { CriticalAppNotificationInput, CriticalCallInput, CriticalCallMethod, CriticalNotificationInput } from '../../api/critical'
 
-/** Giá trị của các ô "Đã báo cho khoa điều trị" trong form (Ant Design). */
+/**
+ * Giá trị của các ô "Đã báo cho khoa điều trị" trong form (Ant Design); dùng lại cho "Ghi cuộc gọi" (quyết định 68), khi đó
+ * `notifiedAt` là giờ gọi và không có ô khoa nhận.
+ */
 export interface NotificationFormValues {
   receivingDepartmentId?: string
-  method: CriticalMethod
+  method: CriticalCallMethod
   notifiedAt?: Dayjs
   receiverName?: string
   /** Người nhận đọc lại: đúng (true), sai (false); chỉ lưu được khi đúng. */
@@ -33,6 +37,27 @@ export function toNotificationInput(values: NotificationFormValues): CriticalNot
     incorrectReadBacks: values.incorrectReadBacks ?? 0,
     repeatedTwice: values.repeatedTwice === true,
   }
+}
+
+/** Các ô chỉ cần khi đã gọi ("Lưu, đã báo"): người nhận, giờ báo, đọc lại, nhắc lại 2 lần. */
+const CALL_ONLY_FIELDS = ['receiverName', 'notifiedAt', 'readBackCorrect', 'repeatedTwice'] as const
+
+/**
+ * Bấm "Lưu, gọi sau": xóa lỗi cũ của các ô chỉ cần khi đã gọi (lỡ bấm "Lưu, đã báo" trước đó), để không tưởng là phải điền.
+ */
+export function clearCallErrors(form: FormInstance): void {
+  form.setFields(CALL_ONLY_FIELDS.map((field) => ({ name: ['notification', field], errors: [] })))
+}
+
+/** "Lưu, gọi sau" (quyết định 68): chỉ cần khoa nhận; khoa nhận được báo ngay trên phần mềm. */
+export function toAppNotificationInput(values: NotificationFormValues): CriticalAppNotificationInput {
+  return { receivingDepartmentId: values.receivingDepartmentId!, method: 'App' }
+}
+
+/** Ghi cuộc gọi xác nhận người nhận thông tin: các ô như lần báo, giờ báo là giờ gọi. */
+export function toCallInput(values: NotificationFormValues): CriticalCallInput {
+  const { notifiedAtUtc, method, receiverName, readBackCorrect, incorrectReadBacks, repeatedTwice } = toNotificationInput(values)
+  return { method, calledAtUtc: notifiedAtUtc, receiverName, readBackCorrect, incorrectReadBacks, repeatedTwice }
 }
 
 /** Lý do hay gặp khi khoa nhận trả lại lần báo (chọn nhanh, sửa được). */

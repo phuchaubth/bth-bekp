@@ -66,6 +66,7 @@ internal sealed class CriticalResultConfiguration : IEntityTypeConfiguration<Cri
         builder.Ignore(r => r.ActionDueAtUtc);
         builder.Ignore(r => r.CurrentNotification);
         builder.Ignore(r => r.IsCancelled);
+        builder.Ignore(r => r.CallPending);
         builder.Ignore(r => r.NotifiedOnTime);
         builder.Ignore(r => r.ActedOnTime);
         builder.Ignore(r => r.LateEntry);
@@ -81,13 +82,17 @@ internal sealed class CriticalNotificationConfiguration : IEntityTypeConfigurati
         builder.HasKey(n => n.Id);
         builder.Property(n => n.Id).ValueGeneratedNever();
         builder.Property(n => n.Method).HasConversion<string>().HasMaxLength(20);
-        builder.Property(n => n.ReceiverName).HasMaxLength(CriticalNotification.ReceiverNameMaxLength).IsRequired();
+
+        // Báo trên phần mềm (quyết định 68): chưa có người nhận đến khi khoa báo ghi cuộc gọi xác nhận.
+        builder.Property(n => n.ReceiverName).HasMaxLength(CriticalNotification.ReceiverNameMaxLength);
         builder.Property(n => n.NotifiedByName).HasMaxLength(CriticalResult.ActorNameMaxLength).IsRequired();
         builder.Property(n => n.RejectedByName).HasMaxLength(CriticalResult.ActorNameMaxLength);
         builder.Property(n => n.RejectReason).HasMaxLength(CriticalNotification.ReasonMaxLength);
+        builder.Property(n => n.CallRecordedByName).HasMaxLength(CriticalResult.ActorNameMaxLength);
         builder.HasIndex(n => new { n.ResultId, n.AttemptNo }).IsUnique();
         builder.HasOne<Department>().WithMany().HasForeignKey(n => n.ReceivingDepartmentId).OnDelete(DeleteBehavior.Restrict);
         builder.Ignore(n => n.IsRejected);
+        builder.Ignore(n => n.CallPending);
         builder.HasRowVersion();
     }
 }

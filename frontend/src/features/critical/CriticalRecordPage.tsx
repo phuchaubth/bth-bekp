@@ -1,4 +1,4 @@
-import { CheckCircleFilled, SearchOutlined } from '@ant-design/icons'
+import { CheckCircleFilled, PhoneOutlined, SearchOutlined } from '@ant-design/icons'
 import { useMutation } from '@tanstack/react-query'
 import {
   Alert,
@@ -43,9 +43,16 @@ import { Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
 import { CriticalSectionNav, DeadlineClock } from './CriticalParts'
-import { NotificationFields } from './CriticalForms'
+import { ConfirmCallModal, NotificationFields } from './CriticalForms'
 import { useCriticalSaved } from './criticalHooks'
-import { emptyNotification, nowToMinute, toNotificationInput, type NotificationFormValues } from './criticalInputs'
+import {
+  clearCallErrors,
+  emptyNotification,
+  nowToMinute,
+  toAppNotificationInput,
+  toNotificationInput,
+  type NotificationFormValues,
+} from './criticalInputs'
 import { ageOf, minutesBetween, timeOf } from './criticalUtils'
 
 const DATE = 'DD/MM/YYYY'
@@ -72,7 +79,10 @@ interface RecordFormValues {
   notification: NotificationFormValues
 }
 
-/** Các ô không thuộc phần "Đã báo cho khoa điều trị": kiểm tra khi "Lưu, gọi sau". */
+/**
+ * Các ô kiểm tra khi "Lưu, gọi sau" (quyết định 68): người bệnh, kết quả và khoa nhận (khoa nhận được báo ngay trên phần mềm);
+ * các ô của cuộc gọi ghi sau.
+ */
 const RECORD_FIELDS = [
   ['sendingDepartmentId'],
   ['patient', 'code'],
@@ -86,6 +96,7 @@ const RECORD_FIELDS = [
   ['orderDate'],
   ['resultAt'],
   ['sampleId'],
+  ['notification', 'receivingDepartmentId'],
 ]
 
 const initialValues = (departmentId: string | undefined): RecordFormValues => ({
@@ -122,7 +133,8 @@ function StepTitle({ n, children }: { n: number; children: ReactNode }) {
 
 /**
  * Ghi kết quả nguy cấp (quyết định 60): KTV gọi điện cho khoa điều trị theo kịch bản bên phải rồi ghi ngay một lần (người bệnh,
- * kết quả, lần báo). Người báo là tài khoản đang đăng nhập; giờ hệ thống ghi riêng với giờ nhập.
+ * kết quả, lần báo). Người báo là tài khoản đang đăng nhập; giờ hệ thống ghi riêng với giờ nhập. Chưa gọi được thì "Lưu, gọi
+ * sau" (quyết định 68): khoa nhận được báo ngay trên phần mềm, gọi sau để ghi người nhận.
  */
 export function CriticalRecordPage() {
   const { user, hasPermission } = useAuth()
@@ -136,6 +148,7 @@ export function CriticalRecordPage() {
   const [lookup, setLookup] = useState<CriticalPatientLookup | null>(null)
   const [looking, setLooking] = useState(false)
   const [created, setCreated] = useState<CriticalResult | null>(null)
+  const [calling, setCalling] = useState(false)
   const saved = useCriticalSaved()
 
   const own = accountDepartments(user)
@@ -169,6 +182,9 @@ export function CriticalRecordPage() {
   const sendingName = sendingOptions.find((o) => o.value === values?.sendingDepartmentId)?.label ?? ''
 
   async function save(withCall: boolean) {
+    if (!withCall) {
+      clearCallErrors(form)
+    }
     try {
       await (withCall ? form.validateFields() : form.validateFields(RECORD_FIELDS))
     } catch {
@@ -194,7 +210,7 @@ export function CriticalRecordPage() {
         resultAtUtc: all.resultAt!.toISOString(),
         sampleId: all.sampleId?.trim() || null,
         urgent: microbiology && all.urgent,
-        notification: withCall ? toNotificationInput(all.notification) : null,
+        notification: withCall ? toNotificationInput(all.notification) : toAppNotificationInput(all.notification),
       },
     })
   }
@@ -231,6 +247,7 @@ export function CriticalRecordPage() {
 
   function again() {
     setCreated(null)
+    setCalling(false)
     setLookup(null)
     mutation.reset()
     form.resetFields()
@@ -243,6 +260,7 @@ export function CriticalRecordPage() {
 
   if (created) {
     const notifiedAfter = created.notifiedAtUtc ? minutesBetween(created.resultAtUtc, created.notifiedAtUtc) : null
+    const clock = `Đồng hồ ${created.actionDeadlineMinutes} phút của bác sĩ bắt đầu từ giờ báo ${timeOf(created.notifiedAtUtc)}.`
     return (
       <>
         <CriticalSectionNav />
@@ -251,12 +269,21 @@ export function CriticalRecordPage() {
           icon={<CheckCircleFilled />}
           title={`Đã lưu hồ sơ ${created.number}${notifiedAfter !== null ? `, báo sau ${notifiedAfter} phút` : ''}`}
           subTitle={
-            created.notifiedAtUtc
-              ? `${created.receivingDepartmentName} đã thấy hồ sơ cùng dải cảnh báo đỏ. Đồng hồ ${created.actionDeadlineMinutes} phút của bác sĩ bắt đầu từ giờ báo ${timeOf(created.notifiedAtUtc)}.`
-              : `Hồ sơ chờ gọi báo trong Khoa tôi báo; hạn báo ${timeOf(created.notifyDueAtUtc)}.`
+            !created.notifiedAtUtc
+              ? `Hồ sơ chờ gọi báo trong Khoa tôi báo; hạn báo ${timeOf(created.notifyDueAtUtc)}.`
+              : created.callPending
+                ? `${created.receivingDepartmentName} đã được báo trên phần mềm, thấy hồ sơ cùng dải cảnh báo đỏ. ${clock} Gọi cho khoa rồi bấm Ghi cuộc gọi để ghi người nhận thông tin (hồ sơ có nhãn Chưa gọi xác nhận tới lúc đó).`
+                : `${created.receivingDepartmentName} đã thấy hồ sơ cùng dải cảnh báo đỏ. ${clock}`
           }
           extra={[
-            <Button key="list" type="primary" onClick={() => navigate('/ket-qua-nguy-cap/khoa-bao')}>
+            ...(created.can.confirmCall
+              ? [
+                  <Button key="call" type="primary" icon={<PhoneOutlined />} onClick={() => setCalling(true)}>
+                    Ghi cuộc gọi
+                  </Button>,
+                ]
+              : []),
+            <Button key="list" type={created.can.confirmCall ? 'default' : 'primary'} onClick={() => navigate('/ket-qua-nguy-cap/khoa-bao')}>
               Về Khoa tôi báo
             </Button>,
             <Button key="again" onClick={again}>
@@ -267,6 +294,7 @@ export function CriticalRecordPage() {
             </Link>,
           ]}
         />
+        {calling && <ConfirmCallModal open result={created} onClose={() => setCalling(false)} onSaved={setCreated} />}
       </>
     )
   }
@@ -439,15 +467,20 @@ export function CriticalRecordPage() {
                 <NotificationFields departments={departments.data ?? []} sendingDepartmentId={values?.sendingDepartmentId} microbiology={microbiology} />
                 <Flex gap={8} wrap justify="flex-end" style={{ marginTop: 16 }}>
                   <Button onClick={() => navigate('/ket-qua-nguy-cap/khoa-bao')}>Hủy</Button>
-                  <Button onClick={() => void save(false)} loading={mutation.isPending && !mutation.variables?.input.notification}>
+                  <Button onClick={() => void save(false)} loading={mutation.isPending && mutation.variables?.input.notification?.method === 'App'}>
                     Lưu, gọi sau
                   </Button>
-                  <Button type="primary" onClick={() => void save(true)} loading={mutation.isPending && Boolean(mutation.variables?.input.notification)}>
+                  <Button
+                    type="primary"
+                    onClick={() => void save(true)}
+                    loading={mutation.isPending && mutation.variables?.input.notification?.method !== 'App'}
+                  >
                     Lưu, đã báo
                   </Button>
                 </Flex>
                 <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0, textAlign: 'right' }}>
-                  Chưa gọi được thì bấm Lưu, gọi sau: hồ sơ vào Khoa tôi báo, đồng hồ hạn báo vẫn chạy.
+                  Chưa gọi được thì chọn khoa nhận rồi bấm Lưu, gọi sau: khoa nhận được báo ngay trên phần mềm (dải cảnh báo đỏ, chuông),
+                  làm tiếp được ngay; gọi sau để ghi người nhận thông tin.
                 </Typography.Paragraph>
               </Card>
             </Flex>

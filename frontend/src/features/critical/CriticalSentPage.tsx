@@ -1,4 +1,4 @@
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons'
+import { PhoneOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Col, Empty, Flex, Input, Row, Select, Space, Spin, Table, Tag, Typography, type TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
 import { useMemo, useState } from 'react'
@@ -11,8 +11,8 @@ import { Permissions } from '../../auth/permissions'
 import { StatTile } from '../../components/DashboardCards'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
-import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
-import { NotifyModal } from './CriticalForms'
+import { CallPendingTag, CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, ResultValue } from './CriticalParts'
+import { ConfirmCallModal, NotifyModal } from './CriticalForms'
 import { dateOf, minutesBetween, secondsLeft, timeOf, useServerNow } from './criticalUtils'
 
 const isClosed = (r: CriticalResult) => r.status === 'Completed' || r.status === 'Cancelled'
@@ -29,21 +29,34 @@ function median(values: number[]): number | null {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
-/** Dòng mô tả bước đang chờ của hồ sơ đang mở. */
+/** Dòng mô tả bước đang chờ của hồ sơ đang mở; báo trên phần mềm thì nhắc gọi xác nhận người nhận (quyết định 68). */
 function stepLine(r: CriticalResult): string {
   const rejected = r.notifications.filter((n) => n.rejectedAtUtc).at(-1)
+  const call = r.callPending ? ' · chưa gọi xác nhận người nhận' : ''
   switch (r.status) {
     case 'AwaitingNotification':
       return rejected
         ? `${rejected.receivingDepartmentName} trả lại lúc ${timeOf(rejected.rejectedAtUtc)}: ${rejected.rejectReason}. Gọi lại đúng khoa.`
         : `Có kết quả ${timeOf(r.resultAtUtc)} · chưa báo khoa điều trị`
     case 'AwaitingAcknowledgement':
-      return `Đã báo ${r.receivingDepartmentName} lúc ${timeOf(r.notifiedAtUtc)} · ${r.notifications.at(-1)?.receiverName ?? ''} nghe máy · chờ khoa xác nhận`
+      return r.callPending
+        ? `Đã báo ${r.receivingDepartmentName} trên phần mềm lúc ${timeOf(r.notifiedAtUtc)}${call} · chờ khoa xác nhận`
+        : `Đã báo ${r.receivingDepartmentName} lúc ${timeOf(r.notifiedAtUtc)} · ${r.notifications.at(-1)?.receiverName ?? ''} nghe máy · chờ khoa xác nhận`
     case 'AwaitingAction':
-      return `${r.acknowledgedByName} (${r.receivingDepartmentName}) đã nhận lúc ${timeOf(r.acknowledgedAtUtc)} · chờ bác sĩ xử trí`
+      return `${r.acknowledgedByName} (${r.receivingDepartmentName}) đã nhận lúc ${timeOf(r.acknowledgedAtUtc)}${call} · chờ bác sĩ xử trí`
     default:
       return ''
   }
+}
+
+/** Nút ghi cuộc gọi xác nhận cho hồ sơ đã báo trên phần mềm (khoa báo). */
+function CallButton({ record, onCall }: { record: CriticalResult; onCall: (record: CriticalResult) => void }) {
+  if (!record.can.confirmCall) return null
+  return (
+    <Button size="small" icon={<PhoneOutlined />} onClick={() => onCall(record)}>
+      Ghi cuộc gọi
+    </Button>
+  )
 }
 
 function OpenRecord({
@@ -51,11 +64,13 @@ function OpenRecord({
   nowMs,
   warnMinutes,
   onNotify,
+  onCall,
 }: {
   record: CriticalResult
   nowMs: number
   warnMinutes: number
   onNotify: (record: CriticalResult) => void
+  onCall: (record: CriticalResult) => void
 }) {
   const waiting = record.status === 'AwaitingNotification'
   const due = waiting ? record.notifyDueAtUtc : (record.actionDueAtUtc ?? record.notifyDueAtUtc)
@@ -90,13 +105,17 @@ function OpenRecord({
         </Col>
         <Col xs={24} md={6}>
           <Flex vertical gap={6} align="flex-end">
-            <CriticalStatusTag status={record.status} />
+            <Space size={4} wrap style={{ justifyContent: 'flex-end' }}>
+              <CriticalStatusTag status={record.status} />
+              <CallPendingTag pending={record.callPending} />
+            </Space>
             <Space wrap style={{ justifyContent: 'flex-end' }}>
               {record.can.notify && (
                 <Button type="primary" size="small" onClick={() => onNotify(record)}>
                   Ghi lần báo
                 </Button>
               )}
+              <CallButton record={record} onCall={onCall} />
               <Link to={`/ket-qua-nguy-cap/ho-so/${record.id}`}>Xem hồ sơ</Link>
             </Space>
           </Flex>
@@ -108,7 +127,8 @@ function OpenRecord({
 
 /**
  * Khoa tôi báo (quyết định 60): bàn làm việc của khoa cận lâm sàng: hồ sơ chờ gọi báo, đã báo khoa điều trị chưa xong (hạn
- * gần nhất trước), hồ sơ vừa xong. Tự cập nhật theo chu kỳ cấu hình; đồng hồ theo giờ máy chủ.
+ * gần nhất trước), hồ sơ vừa xong. Hồ sơ đã báo trên phần mềm mà chưa gọi xác nhận người nhận có nhãn và nút Ghi cuộc gọi, ở lại
+ * đây tới khi ghi cuộc gọi (quyết định 68). Tự cập nhật theo chu kỳ cấu hình; đồng hồ theo giờ máy chủ.
  */
 export function CriticalSentPage() {
   const { user, hasPermission } = useAuth()
@@ -124,6 +144,7 @@ export function CriticalSentPage() {
   const [departmentId, setDepartmentId] = useState<string | undefined>(undefined)
   const [keyword, setKeyword] = useState('')
   const [notifying, setNotifying] = useState<CriticalResult | null>(null)
+  const [calling, setCalling] = useState<CriticalResult | null>(null)
   const list = useCriticalSent(departmentId, poll)
   const nowMs = useServerNow(list.data?.serverTimeUtc, list.dataUpdatedAt)
 
@@ -133,6 +154,7 @@ export function CriticalSentPage() {
   const all = list.data?.items ?? []
   const waiting = all.filter((r) => r.status === 'AwaitingNotification')
   const inWard = all.filter((r) => r.status === 'AwaitingAcknowledgement' || r.status === 'AwaitingAction')
+  const callPending = all.filter((r) => r.callPending)
   const soon = waiting.filter((r) => {
     const left = secondsLeft(r.notifyDueAtUtc, nowMs)
     return left >= 0 && left < warn * 60
@@ -168,7 +190,10 @@ export function CriticalSentPage() {
       key: 'status',
       render: (_, r) => (
         <>
-          <CriticalStatusTag status={r.status} />
+          <Space size={4} wrap>
+            <CriticalStatusTag status={r.status} />
+            <CallPendingTag pending={r.callPending} />
+          </Space>
           {r.cancelReason && (
             <div>
               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
@@ -195,7 +220,16 @@ export function CriticalSentPage() {
           '—'
         ),
     },
-    { title: '', key: 'view', render: (_, r) => <Link to={`/ket-qua-nguy-cap/ho-so/${r.id}`}>Xem hồ sơ</Link> },
+    {
+      title: '',
+      key: 'view',
+      render: (_, r) => (
+        <Space wrap>
+          <CallButton record={r} onCall={setCalling} />
+          <Link to={`/ket-qua-nguy-cap/ho-so/${r.id}`}>Xem hồ sơ</Link>
+        </Space>
+      ),
+    },
   ]
 
   return (
@@ -213,21 +247,26 @@ export function CriticalSentPage() {
       />
       <Typography.Paragraph type="secondary">
         {own.map((d) => d.name).join(', ') || 'Toàn viện'} · gọi điện cho khoa điều trị, rồi ghi một lần: sổ ST01 và sổ ST02 của khoa nhận
-        cùng lấy từ đây.
+        cùng lấy từ đây. Chưa gọi được thì Lưu, gọi sau: khoa nhận được báo ngay trên phần mềm, gọi sau để ghi người nhận.
       </Typography.Paragraph>
       {list.isError && <Alert type="error" showIcon title={errorMessage(list.error)} style={{ marginBottom: 16 }} />}
       <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} xl={6}>
           <StatTile label="Chờ gọi báo" value={waiting.length}>
             {overdue > 0 ? `${overdue} hồ sơ đã quá hạn báo` : soon > 0 ? `${soon} hồ sơ còn dưới ${warn} phút` : 'Không có hồ sơ sắp quá hạn'}
           </StatTile>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} xl={6}>
+          <StatTile label="Chưa gọi xác nhận" value={callPending.length}>
+            {callPending.length > 0 ? 'Đã báo trên phần mềm: gọi để ghi người nhận' : 'Không có hồ sơ chờ gọi xác nhận'}
+          </StatTile>
+        </Col>
+        <Col xs={24} sm={12} xl={6}>
           <StatTile label="Đã báo, khoa điều trị chưa xong" value={inWard.length}>
             {doctorLate > 0 ? `${doctorLate} hồ sơ bác sĩ quá hạn xử trí` : 'Không có hồ sơ quá hạn xử trí'}
           </StatTile>
         </Col>
-        <Col xs={24} sm={8}>
+        <Col xs={24} sm={12} xl={6}>
           <StatTile label="Hôm nay đã báo" value={notifiedToday.length}>
             {medianMinutes === null ? 'Chưa có lần báo hôm nay' : `trung vị ${medianMinutes} phút từ lúc có kết quả`}
           </StatTile>
@@ -267,7 +306,7 @@ export function CriticalSentPage() {
           ) : (
             <Flex vertical gap={8} style={{ marginBottom: 24 }}>
               {open.map((r) => (
-                <OpenRecord key={r.id} record={r} nowMs={nowMs} warnMinutes={warn} onNotify={setNotifying} />
+                <OpenRecord key={r.id} record={r} nowMs={nowMs} warnMinutes={warn} onNotify={setNotifying} onCall={setCalling} />
               ))}
             </Flex>
           )}
@@ -285,11 +324,13 @@ export function CriticalSentPage() {
           />
           <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 12 }}>
             Đồng hồ chạy từ giờ có kết quả. Còn dưới {warn} phút thì chuyển màu cam, quá hạn thì chuyển màu đỏ. Mốc {values?.notifyMinutes ?? 10} phút
-            và {warn} phút lấy từ trang Danh mục và cấu hình; hồ sơ hoàn tất, đã hủy còn ở đây {values?.keepHours ?? 24} giờ, sau đó xem trong Sổ kết quả nguy cấp.
+            và {warn} phút lấy từ trang Danh mục và cấu hình; hồ sơ hoàn tất, đã hủy còn ở đây {values?.keepHours ?? 24} giờ, sau đó xem trong Sổ kết quả nguy cấp
+            (hồ sơ chưa gọi xác nhận ở lại tới khi ghi cuộc gọi).
           </Typography.Paragraph>
         </>
       )}
       {notifying && <NotifyModal open result={notifying} departments={departments.data ?? []} onClose={() => setNotifying(null)} />}
+      {calling && <ConfirmCallModal open result={calling} onClose={() => setCalling(null)} />}
     </>
   )
 }

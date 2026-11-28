@@ -23,7 +23,9 @@ internal sealed class InMemoryCriticalResultRepository(InMemoryStore store) : IC
         IReadOnlyCollection<Guid>? departmentIds, DateTimeOffset closedSinceUtc, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<CriticalResult>>([.. store.CriticalResults
             .Where(r => departmentIds is null || departmentIds.Contains(r.SendingDepartmentId))
-            .Where(r => OpenOrSince(r, closedSinceUtc))]);
+            .Where(r => OpenOrSince(r, closedSinceUtc)
+                || (r.Status == CriticalResultStatus.Completed
+                    && r.Notifications.Any(n => n.Method == CriticalNotificationMethod.App && n.RejectedAtUtc is null)))]);
 
     public Task<IReadOnlyList<CriticalResult>> ListReceivedAsync(
         IReadOnlyCollection<Guid>? departmentIds, DateTimeOffset closedSinceUtc, CancellationToken cancellationToken) =>

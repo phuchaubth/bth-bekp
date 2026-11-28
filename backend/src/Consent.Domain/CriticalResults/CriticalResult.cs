@@ -44,8 +44,10 @@ public sealed record CriticalDeadlines(int NotifyMinutes, int ActionMinutes, int
 /// Hồ sơ một kết quả nguy cấp (quyết định 60, theo QT-KQNC lần 04): khoa cận lâm sàng gọi điện báo khoa điều trị rồi ghi một lần
 /// (định danh người bệnh, kết quả, lần báo, đọc lại); khoa điều trị xác nhận đã nhận; bác sĩ ghi hướng xử trí bằng tài khoản của
 /// mình (thay chữ ký cột 9 sổ ST02). Hai mốc: báo trong <see cref="NotifyDeadlineMinutes"/> phút từ lúc có kết quả, bác sĩ có
-/// hướng xử trí trong <see cref="ActionDeadlineMinutes"/> phút từ lúc khoa nhận cuộc gọi. Không sửa sau khi ghi: báo nhầm thì hủy
+/// hướng xử trí trong <see cref="ActionDeadlineMinutes"/> phút từ lúc báo khoa nhận. Không sửa sau khi ghi: báo nhầm thì hủy
 /// có lý do (hồ sơ giữ lại, sổ in gạch ngang) rồi ghi hồ sơ đúng. Giờ sự việc do người dùng nhập, giờ hệ thống lưu riêng.
+/// Chưa gọi được (quyết định 68): báo khoa nhận ngay trên phần mềm lúc lưu (<see cref="NotifyByApp"/>), gọi sau chỉ để ghi người
+/// nhận thông tin (<see cref="ConfirmCall"/>).
 /// </summary>
 public sealed class CriticalResult : Entity, IAuditableEntity
 {
@@ -183,6 +185,9 @@ public sealed class CriticalResult : Entity, IAuditableEntity
 
     public bool IsCancelled => Status == CriticalResultStatus.Cancelled;
 
+    /// <summary>Đã báo khoa nhận trên phần mềm, khoa báo chưa gọi xác nhận người nhận thông tin (hồ sơ chưa hủy).</summary>
+    public bool CallPending => !IsCancelled && CurrentNotification is { CallPending: true };
+
     /// <summary>Đã báo đúng hạn; <c>null</c> khi chưa báo.</summary>
     public bool? NotifiedOnTime => NotifiedAtUtc is { } at ? at <= NotifyDueAtUtc : null;
 
@@ -198,11 +203,15 @@ public sealed class CriticalResult : Entity, IAuditableEntity
             var notification = CurrentNotification;
             return RecordedAtUtc - ResultAtUtc > limit
                 || (notification is not null && notification.RecordedAtUtc - notification.NotifiedAtUtc > limit)
+                || (notification?.CallRecordedAtUtc is { } callRecorded && notification.CalledAtUtc is { } called && callRecorded - called > limit)
                 || (ActionRecordedAtUtc is { } recorded && ActionAtUtc is { } at && recorded - at > limit);
         }
     }
 
-    /// <summary>Khoa cận lâm sàng ghi kết quả nguy cấp (chưa báo hoặc báo ngay sau đó bằng <see cref="RecordNotification"/>).</summary>
+    /// <summary>
+    /// Khoa cận lâm sàng ghi kết quả nguy cấp (chưa báo, rồi báo ngay sau đó bằng <see cref="RecordNotification"/> hoặc
+    /// <see cref="NotifyByApp"/>).
+    /// </summary>
     /// <param name="localOffset">Múi giờ bệnh viện, để so ngày chỉ định với ngày có kết quả.</param>
     public static CriticalResult Create(
         string number,
@@ -261,47 +270,54 @@ public sealed class CriticalResult : Entity, IAuditableEntity
     {
         ArgumentNullException.ThrowIfNull(details);
         CheckActor(by);
-        if (Status != CriticalResultStatus.AwaitingNotification)
+        CheckCanNotify(details.ReceivingDepartmentId);
+        CheckReadBack(details.ReadBackCorrect, details.RepeatedTwice);
+        var notifiedAt = CheckCallTime(details.NotifiedAtUtc, "báo", nowUtc);
+        AddNotification(CriticalNotification.Create(Id, _notifications.Count + 1, details, notifiedAt, by, nowUtc), nowUtc);
+    }
+
+    /// <summary>
+    /// Chưa gọi được (quyết định 68, "Lưu, gọi sau"): báo khoa nhận ngay trên phần mềm. Khoa nhận thấy cảnh báo, xác nhận đã nhận,
+    /// bác sĩ ghi hướng xử trí như lần báo qua điện thoại; giờ báo là lúc lưu (hạn bác sĩ xử trí tính từ đây). Khoa báo gọi sau để
+    /// ghi người nhận thông tin bằng <see cref="ConfirmCall"/>.
+    /// </summary>
+    public void NotifyByApp(Guid receivingDepartmentId, CriticalActor by, DateTimeOffset nowUtc)
+    {
+        CheckActor(by);
+        CheckCanNotify(receivingDepartmentId);
+
+        // Giờ có kết quả nhập sớm hơn giờ máy chủ một chút (lệch đồng hồ máy trạm) thì giờ báo lấy giờ có kết quả.
+        var notifiedAt = nowUtc < ResultAtUtc ? ResultAtUtc : nowUtc;
+        AddNotification(
+            CriticalNotification.CreateByApp(Id, _notifications.Count + 1, receivingDepartmentId, notifiedAt, by, nowUtc), nowUtc);
+    }
+
+    /// <summary>
+    /// Khoa báo ghi cuộc gọi xác nhận người nhận thông tin cho lần báo trên phần mềm (người nhận đã đọc lại chính xác). Ghi được ở
+    /// bước nào cũng vậy (khoa nhận đã nhận, bác sĩ đã xử trí), trừ khi hồ sơ đã hủy; không đổi bước đang chờ, không đổi giờ báo.
+    /// </summary>
+    public void ConfirmCall(CriticalCallDetails details, CriticalActor by, DateTimeOffset nowUtc)
+    {
+        ArgumentNullException.ThrowIfNull(details);
+        CheckActor(by);
+        if (IsCancelled)
         {
-            throw new DomainException(IsCancelled ? "Hồ sơ đã hủy." : "Hồ sơ đã có lần báo; khoa nhận phải trả lại thì mới báo lại.");
+            throw new DomainException("Hồ sơ đã hủy.");
         }
 
-        if (details.ReceivingDepartmentId == Guid.Empty)
+        if (CurrentNotification is not { } current)
         {
-            throw new DomainException("Chọn khoa nhận.");
+            throw new DomainException(StepMessage());
         }
 
-        if (details.ReceivingDepartmentId == SendingDepartmentId)
+        if (!current.CallPending)
         {
-            throw new DomainException("Khoa nhận phải khác khoa báo.");
+            throw new DomainException("Lần báo này đã ghi người nhận thông tin.");
         }
 
-        if (!details.ReadBackCorrect)
-        {
-            throw new DomainException("Chỉ lưu lần báo khi người nhận đã đọc lại chính xác; chưa đúng thì đọc lại kết quả lần nữa.");
-        }
-
-        if (Logbook == CriticalLogbook.Microbiology && !details.RepeatedTwice)
-        {
-            throw new DomainException("Sổ Vi sinh: người nhận phải nhắc lại 2 lần.");
-        }
-
-        var notifiedAt = details.NotifiedAtUtc ?? throw new DomainException("Nhập giờ báo.");
-        if (notifiedAt < ResultAtUtc)
-        {
-            throw new DomainException("Giờ báo phải sau giờ có kết quả.");
-        }
-
-        if (notifiedAt > nowUtc.AddMinutes(FutureToleranceMinutes))
-        {
-            throw new DomainException("Giờ báo chưa tới.");
-        }
-
-        var notification = CriticalNotification.Create(Id, _notifications.Count + 1, details, notifiedAt, by, nowUtc);
-        _notifications.Add(notification);
-        ReceivingDepartmentId = details.ReceivingDepartmentId;
-        NotifiedAtUtc = notifiedAt;
-        Status = CriticalResultStatus.AwaitingAcknowledgement;
+        CheckReadBack(details.ReadBackCorrect, details.RepeatedTwice);
+        var calledAt = CheckCallTime(details.CalledAtUtc, "gọi", nowUtc);
+        current.ConfirmCall(details, calledAt, by, nowUtc);
         UpdatedAtUtc = nowUtc;
     }
 
@@ -354,7 +370,7 @@ public sealed class CriticalResult : Entity, IAuditableEntity
         var at = actionAtUtc ?? nowUtc;
         if (at < NotifiedAtUtc)
         {
-            throw new DomainException("Giờ xử trí phải sau giờ khoa nhận cuộc gọi.");
+            throw new DomainException("Giờ xử trí phải sau giờ báo khoa nhận.");
         }
 
         if (at > nowUtc.AddMinutes(FutureToleranceMinutes))
@@ -422,6 +438,64 @@ public sealed class CriticalResult : Entity, IAuditableEntity
         {
             throw new DomainException("Thông số thời hạn không hợp lệ.");
         }
+    }
+
+    private void CheckCanNotify(Guid receivingDepartmentId)
+    {
+        if (Status != CriticalResultStatus.AwaitingNotification)
+        {
+            throw new DomainException(IsCancelled ? "Hồ sơ đã hủy." : "Hồ sơ đã có lần báo; khoa nhận phải trả lại thì mới báo lại.");
+        }
+
+        if (receivingDepartmentId == Guid.Empty)
+        {
+            throw new DomainException("Chọn khoa nhận.");
+        }
+
+        if (receivingDepartmentId == SendingDepartmentId)
+        {
+            throw new DomainException("Khoa nhận phải khác khoa báo.");
+        }
+    }
+
+    private void CheckReadBack(bool readBackCorrect, bool repeatedTwice)
+    {
+        if (!readBackCorrect)
+        {
+            throw new DomainException("Chỉ lưu lần báo khi người nhận đã đọc lại chính xác; chưa đúng thì đọc lại kết quả lần nữa.");
+        }
+
+        if (Logbook == CriticalLogbook.Microbiology && !repeatedTwice)
+        {
+            throw new DomainException("Sổ Vi sinh: người nhận phải nhắc lại 2 lần.");
+        }
+    }
+
+    /// <summary>Giờ báo, giờ gọi (giờ sự việc): bắt buộc, không trước giờ có kết quả, không sau giờ hiện tại.</summary>
+    /// <param name="verb">"báo" hoặc "gọi", để ghi thông báo lỗi.</param>
+    private DateTimeOffset CheckCallTime(DateTimeOffset? at, string verb, DateTimeOffset nowUtc)
+    {
+        var value = at ?? throw new DomainException($"Nhập giờ {verb}.");
+        if (value < ResultAtUtc)
+        {
+            throw new DomainException($"Giờ {verb} phải sau giờ có kết quả.");
+        }
+
+        if (value > nowUtc.AddMinutes(FutureToleranceMinutes))
+        {
+            throw new DomainException($"Giờ {verb} chưa tới.");
+        }
+
+        return value;
+    }
+
+    private void AddNotification(CriticalNotification notification, DateTimeOffset nowUtc)
+    {
+        _notifications.Add(notification);
+        ReceivingDepartmentId = notification.ReceivingDepartmentId;
+        NotifiedAtUtc = notification.NotifiedAtUtc;
+        Status = CriticalResultStatus.AwaitingAcknowledgement;
+        UpdatedAtUtc = nowUtc;
     }
 
     private string StepMessage() => Status switch

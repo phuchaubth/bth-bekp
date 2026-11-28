@@ -36,6 +36,16 @@ export function CriticalStatusTag({ status }: { status: CriticalStatus }) {
   )
 }
 
+/** Đã báo khoa nhận trên phần mềm ("Lưu, gọi sau"), khoa báo chưa gọi xác nhận người nhận thông tin (quyết định 68). */
+export function CallPendingTag({ pending }: { pending: boolean }) {
+  if (!pending) return null
+  return (
+    <Tag color="orange" icon={<PhoneOutlined />}>
+      Chưa gọi xác nhận
+    </Tag>
+  )
+}
+
 /** Khoa của người bệnh (khoa nhận) trên thẻ hồ sơ, cho tài khoản xem nhiều khoa nhận ra nhanh hồ sơ của khoa nào. */
 export function PatientDepartmentTag({ name }: { name: string | null | undefined }) {
   if (!name) return null

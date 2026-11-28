@@ -126,7 +126,7 @@ function AlertCard({
         </span>
       </div>
       <div style={{ fontSize: 15, color: DARK.muted, marginTop: 4 }}>
-        {item.sendingDepartmentName} · {item.notifiedByName} báo → {item.receiverName} nghe máy
+        {item.sendingDepartmentName} · {item.notifiedByName} {item.callPending ? 'báo trên phần mềm' : `báo → ${item.receiverName ?? ''} nghe máy`}
       </div>
     </article>
   )
@@ -360,7 +360,7 @@ export function CriticalScreenPage() {
             ))
           )}
           <div style={{ color: DARK.muted, fontSize: 15, marginTop: 'auto' }}>
-            Người nghe máy bấm Đã nhận cuộc gọi bằng tài khoản của mình
+            Người nghe máy bấm Đã nhận cuộc gọi (báo trên phần mềm: Đã nhận thông báo) bằng tài khoản của mình
             {soundEnabled && (s?.soundRepeatSeconds ?? 0) > 0 ? `; chuông nhắc lại mỗi ${s?.soundRepeatSeconds} giây tới khi khoa xác nhận.` : '.'}
           </div>
         </Panel>

@@ -10,7 +10,7 @@ import { useAuth } from '../../auth/authContext'
 import { hasAnyPermission, Permissions } from '../../auth/permissions'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage, errorMessageWithDetails } from '../../utils/formErrors'
-import { CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, PatientDepartmentTag, ResultValue } from './CriticalParts'
+import { CallPendingTag, CriticalSectionNav, CriticalStatusTag, DeadlineClock, OnTimeTag, PatientDepartmentTag, ResultValue } from './CriticalParts'
 import { RejectModal } from './CriticalForms'
 import { useCriticalSaved } from './criticalHooks'
 import { dateOf, minutesBetween, SCREEN_PATH, SCREEN_PERMISSIONS, secondsLeft, seesManyDepartments, timeOf, useServerNow } from './criticalUtils'
@@ -42,7 +42,8 @@ function ColumnTitle({ title, count, color }: { title: string; count: number; co
 
 /**
  * Gửi đến khoa tôi (quyết định 60): người nghe máy bấm "Đã nhận cuộc gọi" bằng tài khoản của mình (hoặc trả lại khi không phải
- * khoa của người bệnh), báo trực tiếp bác sĩ; bác sĩ ghi hướng xử trí trong thời hạn tính từ giờ báo.
+ * khoa của người bệnh), báo trực tiếp bác sĩ; bác sĩ ghi hướng xử trí trong thời hạn tính từ giờ báo. Khoa báo đã báo trên phần
+ * mềm, chưa gọi (quyết định 68): khoa bấm "Đã nhận thông báo", làm tiếp như lần báo qua điện thoại; khoa báo gọi sau.
  */
 export function CriticalReceivedPage() {
   const { user, hasPermission } = useAuth()
@@ -97,8 +98,8 @@ export function CriticalReceivedPage() {
         }
       />
       <Typography.Paragraph type="secondary">
-        {own.map((d) => d.name).join(', ') || 'Toàn viện'} · người nghe máy bấm Đã nhận cuộc gọi, báo trực tiếp bác sĩ; bác sĩ ghi hướng xử trí
-        trong {values?.actionMinutes ?? 10} phút kể từ giờ báo.
+        {own.map((d) => d.name).join(', ') || 'Toàn viện'} · người nghe máy bấm Đã nhận cuộc gọi (khoa báo báo trên phần mềm thì bấm Đã nhận
+        thông báo), báo trực tiếp bác sĩ; bác sĩ ghi hướng xử trí trong {values?.actionMinutes ?? 10} phút kể từ giờ báo.
       </Typography.Paragraph>
       {departmentOptions.length > 1 && (
         <Select
@@ -130,6 +131,7 @@ export function CriticalReceivedPage() {
                         <Space size={4} wrap>
                           <Tag color="error">MỚI · {timeOf(r.notifiedAtUtc)}</Tag>
                           {many && <PatientDepartmentTag name={r.receivingDepartmentName} />}
+                          <CallPendingTag pending={r.callPending} />
                         </Space>
                         {r.actionDueAtUtc && <DeadlineClock dueUtc={r.actionDueAtUtc} nowMs={nowMs} warnMinutes={warn} label="BS xử trí" />}
                       </Flex>
@@ -147,12 +149,14 @@ export function CriticalReceivedPage() {
                         <br />
                         Giờ có KQ {timeOf(r.resultAtUtc)} · báo lúc {timeOf(r.notifiedAtUtc)} (sau {minutesBetween(r.resultAtUtc, r.notifiedAtUtc!)} phút)
                         <br />
-                        Người nghe máy: {r.notifications.at(-1)?.receiverName} · đọc lại chính xác
+                        {r.callPending
+                          ? 'Báo trên phần mềm: khoa báo sẽ gọi sau để ghi người nhận thông tin'
+                          : `Người nghe máy: ${r.notifications.at(-1)?.receiverName ?? ''} · đọc lại chính xác`}
                       </Typography.Paragraph>
                       <Space wrap>
                         {r.can.acknowledge && (
                           <Button type="primary" loading={acknowledge.isPending && acknowledge.variables?.id === r.id} onClick={() => acknowledge.mutate(r)}>
-                            Đã nhận cuộc gọi
+                            {r.callPending ? 'Đã nhận thông báo' : 'Đã nhận cuộc gọi'}
                           </Button>
                         )}
                         {r.can.act && <Button onClick={() => navigate(`/ket-qua-nguy-cap/ho-so/${r.id}`)}>Bác sĩ ghi hướng xử trí</Button>}

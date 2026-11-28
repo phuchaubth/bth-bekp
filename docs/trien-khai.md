@@ -758,6 +758,16 @@ Script in bảng từng thư mục `ConsentApi`, `ConsentWeb`, `PatientInfoApi`:
 
 `ConsentWeb\version.json` và phiên bản trong mã giao diện là file tĩnh ai mở được trang web cũng tải được (chỉ có số gói, mã commit, ngày đóng gói, không có bí mật); API `GET /api/v1/version` chỉ trả cho người có quyền bảo trì hệ thống. Bản này không có migration, không đổi quyền, không cần cấu hình.
 
+### 5.18. Kết quả nguy cấp: "Lưu, gọi sau" báo ngay cho khoa nhận (quyết định 68)
+
+- Khoa cận lâm sàng bấm **Lưu, gọi sau** phải chọn **Khoa nhận**. Khoa nhận được báo ngay trên phần mềm (dải đỏ, chuông, màn hình theo dõi), bấm **Đã nhận thông báo**, bác sĩ ghi hướng xử trí được ngay. Giờ báo là lúc lưu: hạn báo và đồng hồ của bác sĩ tính theo giờ này.
+- Khoa cận lâm sàng gọi sau chỉ để ghi người nhận thông tin: nút **Ghi cuộc gọi** (người nghe máy, giờ gọi, người nhận đọc lại chính xác). Tới khi ghi, hồ sơ có nhãn **Chưa gọi xác nhận**, ở lại bàn làm việc **Khoa tôi báo** kể cả khi đã hoàn tất; sổ ghi **Chưa gọi xác nhận** ở cột người nhận (hướng dẫn sử dụng, mục 12.2, 12.8).
+- Bản này kèm migration `AddCriticalCallConfirmation`: bảng `CriticalNotifications` thêm 4 cột `CalledAtUtc`, `CallRecordedByUserId`, `CallRecordedByName`, `CallRecordedAtUtc`; cột `ReceiverName` cho phép để trống (lần báo trên phần mềm chưa có người nhận). Chỉ thêm, không đổi dữ liệu cũ: các lần báo đã ghi giữ nguyên. Chạy `efbundle.exe` (mục 4.2) trước khi thay thư mục `ConsentApi`.
+- Không thêm quyền: ghi cuộc gọi dùng quyền `critical.record` có sẵn của vai trò **Khoa cận lâm sàng (KQNC)**. API mới `POST /api/v1/critical-results/{id}/call`; lần báo trên phần mềm có `method` là `App` (tài liệu API, mục 6k).
+- **Quay về gói cũ hơn** sau khi đã có lần báo trên phần mềm: bản cũ không đọc được lần báo `App` (chưa có người nhận). Phải khôi phục bản sao lưu CSDL lúc trước khi cài (mục 5.10), không cài gói cũ đè lên.
+
+Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần.
+
 ## 6. Hình thức B — Docker + SQL Server có sẵn
 
 1. Trên máy chủ Docker, sao chép repo (hoặc chỉ thư mục `backend`, `frontend`, `deploy`).

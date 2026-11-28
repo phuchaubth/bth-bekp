@@ -14,7 +14,8 @@ namespace Consent.Application.CriticalResults;
 /// mình) gọi điện rồi ghi kết quả và lần báo, hủy hồ sơ báo nhầm; khoa điều trị (<see cref="Permissions.CriticalReceive"/>) xác
 /// nhận đã nhận hoặc trả lại lần báo không đúng khoa; bác sĩ (<see cref="Permissions.CriticalTreat"/>) ghi hướng xử trí bằng tài
 /// khoản của mình; màn hình theo dõi tại khoa (<see cref="Permissions.CriticalDisplay"/>) chỉ đọc cảnh báo; QLCL
-/// (<see cref="Permissions.CriticalMonitor"/>) xem mọi hồ sơ. Quy tắc của hồ sơ nằm ở <see cref="CriticalResult"/>.
+/// (<see cref="Permissions.CriticalMonitor"/>) xem mọi hồ sơ. Chưa gọi được thì khoa báo báo khoa nhận trên phần mềm rồi gọi sau
+/// để ghi người nhận thông tin (quyết định 68). Quy tắc của hồ sơ nằm ở <see cref="CriticalResult"/>.
 /// </summary>
 public sealed class CriticalResultService(
     ICriticalResultRepository critical,
@@ -63,7 +64,10 @@ public sealed class CriticalResultService(
             patient?.CurrentAddress ?? patient?.PermanentAddress);
     }
 
-    /// <summary>Khoa cận lâm sàng ghi kết quả nguy cấp; có lần báo thì ghi luôn (thường ghi sau khi gọi điện xong).</summary>
+    /// <summary>
+    /// Khoa cận lâm sàng ghi kết quả nguy cấp; có lần báo thì ghi luôn: sau khi gọi điện xong, hoặc báo trên phần mềm khi chưa gọi
+    /// được (quyết định 68).
+    /// </summary>
     public async Task<Result<CriticalResultDto>> CreateAsync(CreateCriticalResultRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -118,7 +122,7 @@ public sealed class CriticalResultService(
                 ConsentFormService.VietnamOffset);
             if (request.Notification is { } call)
             {
-                result.RecordNotification(Details(call), actor, now);
+                Notify(result, call, actor, now);
             }
         }
         catch (DomainException ex)
@@ -131,7 +135,7 @@ public sealed class CriticalResultService(
         return ToDto(result, all);
     }
 
-    /// <summary>Khoa cận lâm sàng ghi lần báo (sau cuộc gọi) cho hồ sơ chưa báo hoặc bị khoa nhận trả lại.</summary>
+    /// <summary>Khoa cận lâm sàng ghi lần báo (sau cuộc gọi, hoặc báo trên phần mềm) cho hồ sơ chưa báo hoặc bị khoa nhận trả lại.</summary>
     public Task<Result<CriticalResultDto>> NotifyAsync(Guid id, CriticalNotificationRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -142,7 +146,22 @@ public sealed class CriticalResultService(
                 return Error.ValidationField("receivingDepartmentId", "Chọn khoa nhận đang sử dụng.");
             }
 
-            r.RecordNotification(Details(request), actor, now);
+            Notify(r, request, actor, now);
+            return null;
+        }, cancellationToken);
+    }
+
+    /// <summary>Khoa báo ghi cuộc gọi xác nhận người nhận thông tin cho hồ sơ đã báo trên phần mềm (quyết định 68).</summary>
+    public Task<Result<CriticalResultDto>> ConfirmCallAsync(Guid id, CriticalCallRequest request, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return ChangeAsync(id, r => CanRecord(r.SendingDepartmentId), (r, actor, now, _) =>
+        {
+            r.ConfirmCall(
+                new CriticalCallDetails(
+                    request.Method, request.CalledAtUtc, request.ReceiverName, request.ReadBackCorrect, request.IncorrectReadBacks, request.RepeatedTwice),
+                actor,
+                now);
             return null;
         }, cancellationToken);
     }
@@ -313,14 +332,27 @@ public sealed class CriticalResultService(
     internal static DateOnly LocalDate(DateTimeOffset utc) =>
         DateOnly.FromDateTime(utc.ToOffset(ConsentFormService.VietnamOffset).DateTime);
 
-    private static CriticalNotificationDetails Details(CriticalNotificationRequest request) => new(
-        request.ReceivingDepartmentId,
-        request.Method,
-        request.NotifiedAtUtc,
-        request.ReceiverName,
-        request.ReadBackCorrect,
-        request.IncorrectReadBacks,
-        request.RepeatedTwice);
+    /// <summary>Báo trên phần mềm (chưa gọi được) hoặc ghi lần báo sau cuộc gọi.</summary>
+    private static void Notify(CriticalResult result, CriticalNotificationRequest request, CriticalActor actor, DateTimeOffset now)
+    {
+        if (request.Method == CriticalNotificationMethod.App)
+        {
+            result.NotifyByApp(request.ReceivingDepartmentId, actor, now);
+            return;
+        }
+
+        result.RecordNotification(
+            new CriticalNotificationDetails(
+                request.ReceivingDepartmentId,
+                request.Method,
+                request.NotifiedAtUtc,
+                request.ReceiverName,
+                request.ReadBackCorrect,
+                request.IncorrectReadBacks,
+                request.RepeatedTwice),
+            actor,
+            now);
+    }
 
     private static string Name(IReadOnlyDictionary<Guid, Department> all, Guid id) =>
         all.TryGetValue(id, out var department) ? department.Name : "Không rõ";
@@ -345,6 +377,7 @@ public sealed class CriticalResultService(
             r.NotifiedAtUtc!.Value,
             r.ActionDueAtUtc!.Value,
             notification.ReceiverName,
+            notification.CallPending,
             notification.NotifiedByName,
             r.AcknowledgedByName,
             r.AcknowledgedAtUtc,
@@ -440,7 +473,8 @@ public sealed class CriticalResultService(
             Reject: r.Status == CriticalResultStatus.AwaitingAcknowledgement && CanReceiveResult(r),
             Act: r.Status is CriticalResultStatus.AwaitingAcknowledgement or CriticalResultStatus.AwaitingAction
                 && receiving is { } d && CanTreat(d),
-            Cancel: r.Status != CriticalResultStatus.Cancelled && CanRecord(r.SendingDepartmentId));
+            Cancel: r.Status != CriticalResultStatus.Cancelled && CanRecord(r.SendingDepartmentId),
+            ConfirmCall: r.CallPending && CanRecord(r.SendingDepartmentId));
         return new CriticalResultDto(
             r.Id,
             r.Number,
@@ -489,6 +523,7 @@ public sealed class CriticalResultService(
             r.NotifiedOnTime,
             r.ActedOnTime,
             r.LateEntry,
+            r.CallPending,
             [.. r.Notifications.OrderBy(n => n.AttemptNo).Select(n => new CriticalNotificationDto(
                 n.Id,
                 n.AttemptNo,
@@ -503,7 +538,11 @@ public sealed class CriticalResultService(
                 n.RecordedAtUtc,
                 n.RejectedAtUtc,
                 n.RejectedByName,
-                n.RejectReason))],
+                n.RejectReason,
+                n.CalledAtUtc,
+                n.CallRecordedByName,
+                n.CallRecordedAtUtc,
+                n.CallPending))],
             can);
     }
 }

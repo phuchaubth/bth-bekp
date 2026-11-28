@@ -107,6 +107,12 @@ public sealed class CriticalResultsController(
     public async Task<IActionResult> Notify(Guid id, CriticalNotificationRequest request, CancellationToken cancellationToken) =>
         this.ToActionResult(await results.NotifyAsync(id, request, cancellationToken).ConfigureAwait(false));
 
+    /// <summary>Ghi cuộc gọi xác nhận người nhận thông tin cho hồ sơ đã báo trên phần mềm (quyết định 68).</summary>
+    [HttpPost("{id:guid}/call")]
+    [HasPermission(Permissions.CriticalRecord)]
+    public async Task<IActionResult> ConfirmCall(Guid id, CriticalCallRequest request, CancellationToken cancellationToken) =>
+        this.ToActionResult(await results.ConfirmCallAsync(id, request, cancellationToken).ConfigureAwait(false));
+
     [HttpPost("{id:guid}/acknowledge")]
     public async Task<IActionResult> Acknowledge(Guid id, CancellationToken cancellationToken) =>
         this.ToActionResult(await results.AcknowledgeAsync(id, cancellationToken).ConfigureAwait(false));

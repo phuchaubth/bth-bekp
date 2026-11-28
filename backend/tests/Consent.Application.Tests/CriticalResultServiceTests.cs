@@ -14,7 +14,8 @@ namespace Consent.Application.Tests;
 /// <summary>
 /// Kết quả nguy cấp (quyết định 60): danh mục, thông số vận hành, khoa cận lâm sàng ghi và báo, khoa điều trị xác nhận hoặc trả
 /// lại, bác sĩ xử trí bằng tài khoản của mình, hủy hồ sơ báo nhầm, bàn làm việc hai khoa, cảnh báo (tên viết tắt trên màn hình
-/// theo dõi tại khoa), tra người bệnh. Ngày 27/11/2026, giờ Việt Nam. Dữ liệu giả lập.
+/// theo dõi tại khoa), tra người bệnh; "Lưu, gọi sau" báo ngay trên phần mềm rồi gọi sau để ghi người nhận (quyết định 68). Ngày
+/// 27/11/2026, giờ Việt Nam. Dữ liệu giả lập.
 /// </summary>
 public sealed class CriticalResultServiceTests
 {
@@ -81,6 +82,13 @@ public sealed class CriticalResultServiceTests
 
     private static CriticalNotificationRequest Call(Guid ward, DateTimeOffset? at = null, int incorrect = 0, bool twice = false) =>
         new(ward, CriticalNotificationMethod.Phone, at ?? At(10, 5), "ĐD Nghe Máy (giả lập)", ReadBackCorrect: true, incorrect, twice);
+
+    /// <summary>"Lưu, gọi sau" (quyết định 68): báo khoa nhận trên phần mềm, chỉ cần khoa nhận.</summary>
+    private static CriticalNotificationRequest App(Guid ward) =>
+        new(ward, CriticalNotificationMethod.App, null, null, ReadBackCorrect: false, 0, false);
+
+    private static CriticalCallRequest Confirm(DateTimeOffset? at = null, bool correct = true) =>
+        new(CriticalNotificationMethod.Phone, at ?? At(10, 8), "ĐD Nghe Máy Sau (giả lập)", correct, 0, false);
 
     private void ActAs(User user, params Guid[] otherDepartments)
     {
@@ -187,7 +195,7 @@ public sealed class CriticalResultServiceTests
         Assert.True(later.NotifiedOnTime);
         Assert.Equal("ktv.hsh Demo", Assert.Single(later.Notifications).NotifiedByName);
         Assert.Equal(saves + 1, savesAfterCreate);
-        Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, Cancel: true), created.Can);
+        Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, Cancel: true, ConfirmCall: false), created.Can);
     }
 
     [Fact]
@@ -326,9 +334,134 @@ public sealed class CriticalResultServiceTests
         Assert.Equal(CriticalResultStatus.Cancelled, cancelled.Status);
         Assert.True(cancelled.ReceivingDepartmentInformed);
         Assert.Equal("ktv.hsh Demo", cancelled.CancelledByName);
-        Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, false), cancelled.Can);
+        Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, false, false), cancelled.Can);
         Fails(twice, ErrorType.BusinessRule);
         Fails(acknowledge, ErrorType.BusinessRule);
+    }
+
+    [Fact]
+    public async Task SaveCallLater_WardIsAlertedAtOnce_NurseAndDoctorWork_LabRecordsTheCallLater()
+    {
+        await CatalogAsync();
+
+        // 10:06 KTV bấm "Lưu, gọi sau": khoa Nội A được báo ngay trên phần mềm, giờ báo là lúc lưu, chưa có người nhận.
+        var created = await RecordAsync(App(_wardA.Id));
+        ActAs(_nurseA);
+        var alert = Assert.Single(Ok(await Results.AlertsAsync(null, false, CancellationToken.None)).AwaitingAcknowledgement);
+        var seen = Ok(await Results.GetAsync(created.Id, CancellationToken.None));
+        var nurseCalls = await Results.ConfirmCallAsync(created.Id, Confirm(), CancellationToken.None);
+        _ctx.Clock.UtcNow = At(10, 7);
+        var acknowledged = Ok(await Results.AcknowledgeAsync(created.Id, CancellationToken.None));
+        ActAs(_technician);
+        var lab = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
+        var labSees = Ok(await Results.GetAsync(created.Id, CancellationToken.None));
+        ActAs(_microTechnician);
+        var otherLab = await Results.ConfirmCallAsync(created.Id, Confirm(), CancellationToken.None);
+
+        // 10:09 KTV gọi được (giờ gọi 10:08), ghi người nhận đã đọc lại chính xác.
+        ActAs(_technician);
+        _ctx.Clock.UtcNow = At(10, 9);
+        var notReadBack = await Results.ConfirmCallAsync(created.Id, Confirm(correct: false), CancellationToken.None);
+        var saves = _ctx.Store.SaveCount;
+        var called = Ok(await Results.ConfirmCallAsync(created.Id, Confirm(), CancellationToken.None));
+        var savesAfterCall = _ctx.Store.SaveCount;
+        var again = await Results.ConfirmCallAsync(created.Id, Confirm(), CancellationToken.None);
+        var missing = await Results.ConfirmCallAsync(Guid.NewGuid(), Confirm(), CancellationToken.None);
+
+        Assert.Equal(CriticalResultStatus.AwaitingAcknowledgement, created.Status);
+        Assert.Equal((At(10, 6), At(10, 16), true), (created.NotifiedAtUtc, created.ActionDueAtUtc, created.NotifiedOnTime));
+        Assert.True(created.CallPending);
+        var notification = Assert.Single(created.Notifications);
+        Assert.Equal(
+            (CriticalNotificationMethod.App, (string?)null, true, (DateTimeOffset?)null, "ktv.hsh Demo"),
+            (notification.Method, notification.ReceiverName, notification.CallPending, notification.CalledAtUtc, notification.NotifiedByName));
+        Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, Cancel: true, ConfirmCall: true), created.Can);
+        Assert.Equal((created.Id, true, (string?)null, "ktv.hsh Demo"), (alert.Id, alert.CallPending, alert.ReceiverName, alert.NotifiedByName));
+        Assert.True(seen.Can.Acknowledge);
+        Assert.False(seen.Can.ConfirmCall);
+        Fails(nurseCalls, ErrorType.Forbidden);
+        Assert.Equal(CriticalResultStatus.AwaitingAction, acknowledged.Status);
+        Assert.Equal((0, 0), (lab.AwaitingNotification, lab.OverdueNotification));
+        Assert.True(labSees.Can.ConfirmCall);
+        Fails(otherLab, ErrorType.NotFound);
+        Assert.Equal("critical.rule", Fails(notReadBack, ErrorType.BusinessRule).Code);
+        Assert.Equal((CriticalResultStatus.AwaitingAction, At(10, 6), false), (called.Status, called.NotifiedAtUtc, called.CallPending));
+        var confirmed = Assert.Single(called.Notifications);
+        Assert.Equal(
+            (CriticalNotificationMethod.Phone, "ĐD Nghe Máy Sau (giả lập)", At(10, 8), "ktv.hsh Demo", At(10, 9), false),
+            (confirmed.Method, confirmed.ReceiverName, confirmed.CalledAtUtc, confirmed.CallRecordedByName, confirmed.CallRecordedAtUtc, confirmed.CallPending));
+        Assert.False(called.Can.ConfirmCall);
+        Assert.Equal(saves + 1, savesAfterCall);
+        Assert.Equal("critical.rule", Fails(again, ErrorType.BusinessRule).Code);
+        Fails(missing, ErrorType.NotFound);
+    }
+
+    [Fact]
+    public async Task SaveCallLater_NeedsActiveReceivingDepartment_AndCanNotifyAgainAfterTheWardReturnsIt()
+    {
+        await CatalogAsync();
+        ActAs(_technician);
+        Task<Result<CriticalResultDto>> Create(Guid ward) => Results.CreateAsync(
+            new(_lab.Id, _potassium.Id, Patient(), "6,8", "mmol/L", new DateOnly(2026, 11, 27), At(10, 1), null, false, App(ward)),
+            CancellationToken.None);
+
+        var noWard = await Create(Guid.Empty);
+        var closedWard = await Create(_closed.Id);
+        var ownLab = await Create(_lab.Id);
+
+        Assert.Contains("notification.receivingDepartmentId", Fails(noWard, ErrorType.Validation).FieldErrors!.Keys);
+        Assert.Contains("notification.receivingDepartmentId", Fails(closedWard, ErrorType.Validation).FieldErrors!.Keys);
+        Assert.Equal("critical.rule", Fails(ownLab, ErrorType.BusinessRule).Code);
+        Assert.Empty(_ctx.Store.CriticalResults);
+
+        // Khoa Ngoại B trả lại; KTV báo lại trên phần mềm cho khoa Nội A (lần 2), lần 1 không còn chờ gọi.
+        var created = await RecordAsync(App(_wardB.Id));
+        ActAs(_doctorB);
+        Ok(await Results.RejectAsync(created.Id, new("Người bệnh đã chuyển khoa Nội A"), CancellationToken.None));
+        ActAs(_technician);
+        var returnedCall = await Results.ConfirmCallAsync(created.Id, Confirm(), CancellationToken.None);
+        var closed = await Results.NotifyAsync(created.Id, App(_closed.Id), CancellationToken.None);
+        _ctx.Clock.UtcNow = At(10, 8);
+        var again = Ok(await Results.NotifyAsync(created.Id, App(_wardA.Id), CancellationToken.None));
+
+        Assert.Equal("critical.rule", Fails(returnedCall, ErrorType.BusinessRule).Code);
+        Assert.Contains("receivingDepartmentId", Fails(closed, ErrorType.Validation).FieldErrors!.Keys);
+        Assert.Equal((CriticalResultStatus.AwaitingAcknowledgement, _wardA.Id, At(10, 8)), (again.Status, again.ReceivingDepartmentId, again.NotifiedAtUtc));
+        Assert.Equal([CriticalNotificationMethod.App, CriticalNotificationMethod.App], again.Notifications.Select(n => n.Method));
+        Assert.Equal([false, true], again.Notifications.Select(n => n.CallPending));
+        Assert.True(again.CallPending);
+        Assert.True(again.Can.ConfirmCall);
+    }
+
+    [Fact]
+    public async Task SentList_KeepsCompletedRecordOnLabDesk_UntilTheCallIsRecorded()
+    {
+        await CatalogAsync();
+        var pending = await RecordAsync(App(_wardA.Id), "Người Bệnh Chưa Gọi");
+        var calledFirst = await RecordAsync(Call(_wardA.Id), "Người Bệnh Đã Gọi");
+        ActAs(_doctorA);
+        Ok(await Results.ActAsync(pending.Id, new("Xử trí", null, true), CancellationToken.None));
+        Ok(await Results.ActAsync(calledFirst.Id, new("Xử trí", null, true), CancellationToken.None));
+
+        // Hôm sau, quá thời gian giữ trên bàn làm việc (24 giờ).
+        _ctx.Clock.UtcNow = At(10, 6).AddHours(24).AddMinutes(1);
+        ActAs(_technician);
+        var nextDay = Ok(await Results.ListSentAsync(_lab.Id, CancellationToken.None));
+        ActAs(_nurseA);
+        var ward = Ok(await Results.ListReceivedAsync(null, CancellationToken.None));
+        ActAs(_technician);
+        var called = Ok(await Results.ConfirmCallAsync(pending.Id, Confirm(at: At(10, 30)), CancellationToken.None));
+        var rightAfter = Ok(await Results.ListSentAsync(_lab.Id, CancellationToken.None));
+        _ctx.Clock.UtcNow = _ctx.Clock.UtcNow.AddHours(24).AddMinutes(1);
+        var later = Ok(await Results.ListSentAsync(_lab.Id, CancellationToken.None));
+
+        Assert.Equal([pending.Id], nextDay.Items.Select(r => r.Id));
+        Assert.Equal(CriticalResultStatus.Completed, nextDay.Items[0].Status);
+        Assert.True(nextDay.Items[0].Can.ConfirmCall);
+        Assert.Empty(ward.Items);
+        Assert.True(called.LateEntry);
+        Assert.Equal([pending.Id], rightAfter.Items.Select(r => r.Id));
+        Assert.Empty(later.Items);
     }
 
     [Fact]
@@ -384,7 +517,7 @@ public sealed class CriticalResultServiceTests
         Assert.Equal([toA.Id], nurse.Items.Select(r => r.Id));
         Fails(nurseAsksB, ErrorType.Forbidden);
         Assert.Equal([toB.Id], quality.Items.Select(r => r.Id));
-        Assert.All(quality.Items, r => Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, false), r.Can));
+        Assert.All(quality.Items, r => Assert.Equal(new CriticalResultPermissionsDto(false, false, false, false, false, false), r.Can));
         Fails(screen, ErrorType.Forbidden);
         Fails(technician, ErrorType.Forbidden);
     }
