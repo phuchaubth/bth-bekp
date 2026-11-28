@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useDepartments } from '../../api/admin'
+import { accountDepartments } from '../../api/auth'
 import {
   useCriticalDashboard,
   type CriticalDashboard,
@@ -11,6 +12,8 @@ import {
   type CriticalDashboardLate,
   type CriticalRate,
 } from '../../api/critical'
+import { useAuth } from '../../auth/authContext'
+import { Permissions } from '../../auth/permissions'
 import { Busy, ChartCard, StatTile } from '../../components/DashboardCards'
 import type { LineChartProps } from '../../components/LineChart'
 import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
@@ -136,24 +139,36 @@ const lateColumns: TableColumnsType<CriticalDashboardLate> = [
  * Dashboard kết quả nguy cấp cho QLCL, KHTH (quyết định 60): tháng hoặc quý; tỷ lệ báo đúng hạn, bác sĩ xử trí đúng hạn, đọc lại
  * chính xác lần đầu, đủ các bước, so với mục tiêu ở trang cấu hình; trung vị; xu hướng 12 tháng; theo khoa báo, khoa nhận; các
  * trường hợp quá hạn (tên viết tắt) để phân tích nguyên nhân. Xem toàn viện hoặc từng khoa, chạy lướt lần lượt các khoa có hồ sơ
- * trong kỳ (quyết định 64).
+ * trong kỳ (quyết định 64). Tài khoản của khoa (khoa báo, khoa nhận) chỉ xem các khoa của mình, không có toàn viện; tài khoản
+ * nhiều khoa chạy lướt các khoa của mình (quyết định 65).
  */
 export function CriticalDashboardPage() {
+  const { user, hasPermission } = useAuth()
+  // QLCL và tài khoản xem mọi khoa: toàn viện và mọi khoa. Tài khoản của khoa: các khoa của mình (máy chủ cũng chặn khoa khác).
+  const everyDepartment = hasPermission(Permissions.CriticalMonitor) || hasPermission(Permissions.ScopeAllDepartments)
+  const own = accountDepartments(user)
   const [params, setParams] = useSearchParams()
   const raw = params.get('thang')
   const month = raw && /^\d{4}-\d{2}$/.test(raw) ? raw : dayjs().format(MONTH)
   const period = params.get('ky') === 'quy' ? 'quarter' : 'month'
   // Khoa đang xem (bỏ trống là toàn viện); đang chạy lướt thì "chay" là số giây mỗi khoa. Để trên địa chỉ trang để lưu dấu trang
   // được (màn hình lớn phòng QLCL mở thẳng chế độ chạy lướt).
-  const departmentId = params.get('khoa') || undefined
+  const requested = params.get('khoa') || undefined
+  // Tài khoản của khoa: khoa trên địa chỉ trang phải là khoa của mình, không thì xem khoa đầu tiên của mình.
+  const departmentId = everyDepartment || own.some((d) => d.id === requested) ? requested : own[0]?.id
   const cycleSeconds = CYCLE_SECONDS.find((s) => String(s) === params.get('chay'))
   const [paused, setPaused] = useState(false)
   const departments = useDepartments(true)
-  // Toàn viện luôn tải: các khoa để chạy lướt là các khoa có hồ sơ trong kỳ (khoa báo, khoa nhận), xếp theo tên.
-  const overall = useCriticalDashboard(month, period)
-  const dashboard = useCriticalDashboard(month, period, departmentId)
+  // QLCL: toàn viện luôn tải, các khoa để chạy lướt là các khoa có hồ sơ trong kỳ (khoa báo, khoa nhận). Tài khoản của khoa không
+  // tải toàn viện (không có quyền), chạy lướt các khoa của mình. Cả hai xếp theo tên khoa.
+  const overall = useCriticalDashboard(month, period, undefined, everyDepartment)
+  const dashboard = useCriticalDashboard(month, period, departmentId, everyDepartment || Boolean(departmentId))
   const data = dashboard.data
-  const cycle = overall.data && !overall.isPlaceholderData ? cycleDepartments([overall.data.receivers, overall.data.senders]) : []
+  const cycle = everyDepartment
+    ? overall.data && !overall.isPlaceholderData
+      ? cycleDepartments([overall.data.receivers, overall.data.senders])
+      : []
+    : cycleDepartments([own.map((d) => ({ departmentId: d.id, name: d.name }))])
   const cycleKey = cycle.map((d) => d.id).join(',')
 
   const update = (changes: Record<string, string | undefined>) => {
@@ -187,9 +202,11 @@ export function CriticalDashboardPage() {
     update({ chay: undefined })
   }
 
-  const departmentOptions = (departments.data ?? []).map((d) => ({ value: d.id, label: d.isActive ? d.name : `${d.name} (ngưng)` }))
+  const departmentOptions = everyDepartment
+    ? (departments.data ?? []).map((d) => ({ value: d.id, label: d.isActive ? d.name : `${d.name} (ngưng)` }))
+    : cycle.map((d) => ({ value: d.id, label: d.name }))
   // Tên khoa và thứ tự lấy theo số liệu đang hiện (không theo ô chọn) để tên luôn khớp với số bên dưới.
-  const shownName = data?.departmentName ?? 'Toàn viện'
+  const shownName = data?.departmentName ?? (everyDepartment ? 'Toàn viện' : (own.find((d) => d.id === departmentId)?.name ?? ''))
   const position = data?.departmentId ? cycle.findIndex((d) => d.id === data.departmentId) + 1 : 0
 
   return (
@@ -216,18 +233,20 @@ export function CriticalDashboardPage() {
               onChange={(value) => value && update({ thang: (value.isAfter(dayjs(), 'month') ? dayjs() : value).format(MONTH) })}
               aria-label={period === 'quarter' ? 'Quý' : 'Tháng'}
             />
-            <Select
-              showSearch
-              allowClear
-              optionFilterProp="label"
-              placeholder="Toàn viện"
-              style={{ width: 260, maxWidth: '100%' }}
-              value={departmentId}
-              options={departmentOptions}
-              onChange={(value?: string) => update({ khoa: value, chay: undefined })}
-              aria-label="Khoa"
-            />
-            {!cycleSeconds && (
+            {(everyDepartment || own.length > 1) && (
+              <Select
+                showSearch
+                allowClear={everyDepartment}
+                optionFilterProp="label"
+                placeholder={everyDepartment ? 'Toàn viện' : undefined}
+                style={{ width: 260, maxWidth: '100%' }}
+                value={departmentId}
+                options={departmentOptions}
+                onChange={(value?: string) => update({ khoa: value, chay: undefined })}
+                aria-label="Khoa"
+              />
+            )}
+            {!cycleSeconds && (everyDepartment || own.length > 1) && (
               <Button icon={<PlayCircleOutlined />} disabled={cycle.length === 0} onClick={startCycle}>
                 Chạy lướt từng khoa
               </Button>
@@ -264,6 +283,14 @@ export function CriticalDashboardPage() {
             </Flex>
           </Flex>
         </Card>
+      )}
+      {!everyDepartment && own.length === 0 && (
+        <Alert
+          type="warning"
+          showIcon
+          title="Tài khoản chưa được gán khoa nên chưa xem được dashboard của khoa. Liên hệ quản trị để gán khoa."
+          style={{ marginBottom: 16 }}
+        />
       )}
       {dashboard.isError && <Alert type="error" showIcon title={errorMessage(dashboard.error)} style={{ marginBottom: 16 }} />}
       {!data ? (

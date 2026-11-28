@@ -133,7 +133,11 @@ const SECTION_LINKS: SectionLink[] = [
     label: 'Sổ kết quả nguy cấp',
     permission: [Permissions.CriticalRecord, Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor],
   },
-  { path: '/ket-qua-nguy-cap/dashboard', label: 'Dashboard', permission: [Permissions.CriticalMonitor] },
+  {
+    path: '/ket-qua-nguy-cap/dashboard',
+    label: 'Dashboard',
+    permission: [Permissions.CriticalRecord, Permissions.CriticalReceive, Permissions.CriticalTreat, Permissions.CriticalMonitor],
+  },
   { path: '/ket-qua-nguy-cap/danh-muc', label: 'Danh mục và cấu hình', permission: [Permissions.CriticalManage] },
 ]
 

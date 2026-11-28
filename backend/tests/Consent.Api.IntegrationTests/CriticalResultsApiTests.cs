@@ -178,6 +178,14 @@ public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifeti
         var (unknownStatus, unknown) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={Guid.NewGuid()}", quality);
         Assert.Equal(HttpStatusCode.BadRequest, unknownStatus);
         Assert.True(unknown.GetProperty("errors").TryGetProperty("departmentId", out _), unknown.ToString());
+        // Tài khoản của khoa (quyết định 65): dashboard của khoa mình; khoa khác, toàn viện thì không có quyền.
+        var (ownStatus, own) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={hsh}", lab);
+        Assert.True(ownStatus == HttpStatusCode.OK, own.ToString());
+        Assert.Equal((hsh, 1), (own.GetProperty("departmentId").GetGuid(), own.GetProperty("kpis").GetProperty("total").GetInt32()));
+        var (nurseStatus, nurseView) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={noi}", nurse);
+        Assert.True(nurseStatus == HttpStatusCode.OK, nurseView.ToString());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={noi}", lab)).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/dashboard?month={month}&departmentId={hsh}", nurse)).Status);
 
         // Sổ ST01 của khoa HSH (dòng hủy đánh dấu); điều dưỡng không xem sổ của khoa HSH.
         var bookUrl = $"{Base}/logbook?form=Laboratory&departmentId={hsh}&month={month}";

@@ -2,6 +2,7 @@ using Consent.Application.ConsentForms;
 using Consent.Application.CriticalResults;
 using Consent.Application.Tests.Fakes;
 using Consent.Domain.Auditing;
+using Consent.Domain.Authorization;
 using Consent.Domain.CriticalResults;
 using Consent.Domain.Departments;
 using Consent.Domain.Identity;
@@ -249,8 +250,55 @@ public sealed class CriticalDashboardLogbookTests
 
         var unknown = await Dashboard.GetAsync(null, null, Guid.NewGuid(), CancellationToken.None);
         Assert.Contains("departmentId", Fails(unknown, ErrorType.Validation).FieldErrors!.Keys);
+    }
+
+    [Fact]
+    public async Task Dashboard_DepartmentAccountsSeeOnlyTheirOwnDepartments_NeverTheWholeHospital()
+    {
+        Scenario();
+        async Task<Result<CriticalDashboardDto>> View(User user, Guid? department)
+        {
+            ActAs(user);
+            return await Dashboard.GetAsync(null, null, department, CancellationToken.None);
+        }
+
+        // Quyết định 65: khoa báo, khoa nhận (điều dưỡng, bác sĩ) xem dashboard của khoa mình, số như QLCL xem khoa đó.
+        Assert.Equal((4, 1), (Ok(await View(_technician, _lab.Id)).Kpis.Total, Ok(await View(_technician, _lab.Id)).Kpis.Cancelled));
+        Assert.Equal((2, 1), (Ok(await View(_nurseA, _wardA.Id)).Kpis.Total, Ok(await View(_nurseA, _wardA.Id)).Kpis.Cancelled));
+        Assert.Equal(_wardA.Name, Ok(await View(_doctorA, _wardA.Id)).DepartmentName);
+        Assert.Equal(1, Ok(await View(_doctorB, _wardB.Id)).Kpis.Total);
+
+        // Không xem khoa khác, không xem toàn viện; khoa không có cũng chỉ báo không có quyền.
+        Fails(await View(_technician, _wardA.Id), ErrorType.Forbidden);
+        Fails(await View(_technician, null), ErrorType.Forbidden);
+        Fails(await View(_nurseA, _wardB.Id), ErrorType.Forbidden);
+        Fails(await View(_nurseA, _lab.Id), ErrorType.Forbidden);
+        Fails(await View(_doctorB, _wardA.Id), ErrorType.Forbidden);
+        Fails(await View(_nurseA, Guid.NewGuid()), ErrorType.Forbidden);
+        // Tài khoản màn hình theo dõi không có dashboard, kể cả khoa của mình.
+        Fails(await View(_screen, _wardA.Id), ErrorType.Forbidden);
+        // Chỉ có quyền bác sĩ xử trí vẫn là tài khoản của khoa.
         ActAs(_doctorA);
-        Fails(await Dashboard.GetAsync(null, null, _wardA.Id, CancellationToken.None), ErrorType.Forbidden);
+        _ctx.CurrentUser.Permissions.Remove(Permissions.CriticalReceive);
+        Assert.Equal(2, Ok(await Dashboard.GetAsync(null, null, _wardA.Id, CancellationToken.None)).Kpis.Total);
+
+        // Thuộc hai khoa: xem được cả hai khoa của mình, vẫn không xem khoa khác hay toàn viện.
+        ActAs(_nurseA);
+        _ctx.CurrentUser.AdditionalDepartmentIds.Add(_wardB.Id);
+        Assert.Equal(1, Ok(await Dashboard.GetAsync(null, null, _wardB.Id, CancellationToken.None)).Kpis.Total);
+        Assert.Equal(2, Ok(await Dashboard.GetAsync(null, null, _wardA.Id, CancellationToken.None)).Kpis.Total);
+        Fails(await Dashboard.GetAsync(null, null, _lab.Id, CancellationToken.None), ErrorType.Forbidden);
+        Fails(await Dashboard.GetAsync(null, null, null, CancellationToken.None), ErrorType.Forbidden);
+
+        // Có thêm quyền xem mọi khoa thì xem như QLCL: mọi khoa và toàn viện.
+        _ctx.CurrentUser.AdditionalDepartmentIds.Clear();
+        _ctx.CurrentUser.Permissions.Add(Permissions.ScopeAllDepartments);
+        Assert.Equal(5, Ok(await Dashboard.GetAsync(null, null, null, CancellationToken.None)).Kpis.Total);
+        Assert.Equal(4, Ok(await Dashboard.GetAsync(null, null, _lab.Id, CancellationToken.None)).Kpis.Total);
+        // Quyền xem mọi khoa mà không có quyền kết quả nguy cấp nào thì không có dashboard.
+        _ctx.CurrentUser.Permissions.Clear();
+        _ctx.CurrentUser.Permissions.Add(Permissions.ScopeAllDepartments);
+        Fails(await Dashboard.GetAsync(null, null, _lab.Id, CancellationToken.None), ErrorType.Forbidden);
     }
 
     [Fact]
@@ -312,7 +360,7 @@ public sealed class CriticalDashboardLogbookTests
     }
 
     [Fact]
-    public async Task Dashboard_IsForQualityOnly_OldestMonthStillOpens()
+    public async Task Dashboard_WholeHospitalIsForQualityOnly_OldestMonthStillOpens()
     {
         ActAs(_technician);
         var technician = await Dashboard.GetAsync(null, null, null, CancellationToken.None);

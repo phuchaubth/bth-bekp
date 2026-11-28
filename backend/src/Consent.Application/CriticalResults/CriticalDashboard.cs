@@ -212,8 +212,9 @@ public static class CriticalDashboardBuilder
 }
 
 /// <summary>
-/// Dashboard kết quả nguy cấp cho QLCL, KHTH (<see cref="Permissions.CriticalMonitor"/>), chỉ đọc: toàn viện, hoặc một khoa
-/// (quyết định 64: hồ sơ khoa đó báo đi và hồ sơ gửi đến khoa đó).
+/// Dashboard kết quả nguy cấp, chỉ đọc: toàn viện, hoặc một khoa (quyết định 64: hồ sơ khoa đó báo đi và hồ sơ gửi đến khoa
+/// đó). QLCL, KHTH (<see cref="Permissions.CriticalMonitor"/>) xem mọi khoa; tài khoản của khoa (ghi, nhận, xử trí kết quả nguy
+/// cấp) chỉ xem dashboard của các khoa mình thuộc về, không xem toàn viện (quyết định 65), trừ khi có quyền xem mọi khoa.
 /// </summary>
 public sealed class CriticalDashboardService(
     ICriticalResultRepository critical,
@@ -227,9 +228,23 @@ public sealed class CriticalDashboardService(
 
     public async Task<Result<CriticalDashboardDto>> GetAsync(string? month, string? period, Guid? departmentId, CancellationToken cancellationToken)
     {
-        if (!currentUser.HasPermission(Permissions.CriticalMonitor))
+        var staff = currentUser.HasPermission(Permissions.CriticalRecord)
+            || currentUser.HasPermission(Permissions.CriticalReceive)
+            || currentUser.HasPermission(Permissions.CriticalTreat);
+        var everyDepartment = currentUser.HasPermission(Permissions.CriticalMonitor)
+            || (staff && currentUser.HasPermission(Permissions.ScopeAllDepartments));
+        if (!everyDepartment)
         {
-            return Error.Forbidden("critical.forbidden", "Dashboard kết quả nguy cấp dành cho người được cấp quyền xem mọi khoa (QLCL, KHTH).");
+            if (!staff)
+            {
+                return Error.Forbidden("critical.forbidden", "Không có quyền xem dashboard kết quả nguy cấp.");
+            }
+
+            // Tài khoản của khoa: chỉ dashboard của khoa mình (khoa báo hoặc khoa nhận), không có toàn viện.
+            if (departmentId is not { } own || !currentUser.DepartmentIds.Contains(own))
+            {
+                return Error.Forbidden("critical.forbidden", "Tài khoản của khoa chỉ xem dashboard kết quả nguy cấp của khoa mình.");
+            }
         }
 
         var now = clock.UtcNow;

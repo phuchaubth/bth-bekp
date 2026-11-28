@@ -459,12 +459,13 @@ export function useCriticalResult(id: string, pollSeconds = 15) {
   })
 }
 
-/** Dashboard toàn viện, hoặc của một khoa khi có departmentId (quyết định 64). */
-export function useCriticalDashboard(month: string, period: 'month' | 'quarter', departmentId?: string) {
+/** Dashboard toàn viện, hoặc của một khoa khi có departmentId (quyết định 64); tài khoản của khoa không tải toàn viện (65). */
+export function useCriticalDashboard(month: string, period: 'month' | 'quarter', departmentId?: string, enabled = true) {
   return useQuery({
     queryKey: criticalKeys.dashboard(month, period, departmentId),
     queryFn: ({ signal }) => criticalApi.dashboard(month, period, departmentId, signal),
     placeholderData: keepPreviousData,
+    enabled,
   })
 }
 

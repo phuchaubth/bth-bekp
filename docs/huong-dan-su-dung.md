@@ -1744,9 +1744,9 @@ Mỗi hồ sơ giữ thời hạn áp dụng lúc ghi: sửa thông số sau nà
 
 | Ai | Làm gì | Ở đâu (menu **KQ nguy cấp**) |
 |---|---|---|
-| Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, hủy hồ sơ báo nhầm, in sổ của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp** |
-| Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi**, **Không phải khoa tôi**, in sổ ST02 | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp** |
-| Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa | **Gửi đến khoa tôi** |
+| Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, hủy hồ sơ báo nhầm, in sổ của khoa, xem dashboard của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp**, **Dashboard** |
+| Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi**, **Không phải khoa tôi**, in sổ ST02, xem dashboard của khoa | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp**, **Dashboard** |
+| Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa, xem dashboard của khoa | **Gửi đến khoa tôi**, **Dashboard** |
 | Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard toàn viện và từng khoa; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
 | Màn hình đặt tại khoa: tài khoản vai trò **Màn hình theo dõi KQNC** | Chỉ xem kết quả gửi đến khoa, không thao tác | Tự mở **màn hình theo dõi** (mục 12.7) |
 
@@ -1938,9 +1938,14 @@ Bấm **KQ nguy cấp** → **Sổ kết quả nguy cấp**:
 
 *Hình 12.9. Trang 1 PDF sổ ST01 tháng 11 của Khoa Huyết học – Sinh hóa (tên đơn vị đang là giá trị mẫu, logo giả lập).*
 
-### 12.9. Dashboard (QLCL)
+### 12.9. Dashboard
 
-Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. Ô **Khoa** để trống là xem **toàn viện**. Các phần của trang:
+Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**.
+
+- **QLCL**: ô **Khoa** để trống là xem **toàn viện**; chọn khoa để xem từng khoa.
+- **Tài khoản của khoa** (khoa báo, khoa nhận; quyết định 65): trang mở sẵn dashboard của khoa mình, không có toàn viện, không xem được khoa khác. Tài khoản thuộc nhiều khoa chọn khoa ở ô **Khoa**; ô này chỉ có các khoa của mình.
+
+Các phần của trang:
 
 - Năm ô chỉ số, so với mục tiêu (ô có dấu cảnh báo khi chưa đạt):
   - **Kết quả nguy cấp**: số hồ sơ, kèm số hồ sơ đã hủy (đếm riêng, không tính vào tỷ lệ);
@@ -1964,7 +1969,7 @@ Bấm **KQ nguy cấp** → **Dashboard**. Chọn **Tháng** hoặc **Quý**. Ô
 
 Ví dụ: dashboard Khoa Nội tổng hợp có bảng **Theo khoa báo** là các khoa cận lâm sàng đã báo cho Khoa Nội. Bấm dấu **×** ở ô **Khoa** để về toàn viện.
 
-**Chạy lướt từng khoa:** bấm nút **Chạy lướt từng khoa**. Trang lần lượt hiện dashboard của từng khoa có hồ sơ trong kỳ (khoa báo hoặc khoa nhận), xếp theo tên khoa, mỗi khoa **15 giây**. Hết lượt thì quay lại khoa đầu. Khung trên cùng ghi tên khoa đang hiện, thứ tự (ví dụ **Khoa 2/5**) và có các nút:
+**Chạy lướt từng khoa:** bấm nút **Chạy lướt từng khoa**. Trang lần lượt hiện dashboard của từng khoa có hồ sơ trong kỳ (khoa báo hoặc khoa nhận), xếp theo tên khoa, mỗi khoa **15 giây**. Tài khoản thuộc nhiều khoa chạy lướt các khoa của mình; tài khoản một khoa không có nút này. Hết lượt thì quay lại khoa đầu. Khung trên cùng ghi tên khoa đang hiện, thứ tự (ví dụ **Khoa 2/5**) và có các nút:
 
 - ô **Mỗi khoa**: 10, 15, 30 hoặc 60 giây;
 - **Tạm dừng**: đứng lại ở khoa đang xem; **Tiếp tục** để chạy tiếp;
@@ -1976,7 +1981,14 @@ Chạy lướt trên màn hình lớn (họp giao ban, phòng QLCL): bấm **F11
 
 *Hình 12.10a. Chạy lướt từng khoa: đang hiện dashboard Khoa Ngoại tổng hợp, khoa thứ 2 trong 3 khoa có hồ sơ trong tháng; 6 hồ sơ, báo đúng hạn 83,3%, bác sĩ xử trí đúng hạn 80% (dữ liệu giả lập).*
 
-Ai xem được dashboard: tài khoản có quyền **Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)**, có sẵn trong vai trò **QLCL (kết quả nguy cấp)**. Lãnh đạo, Phòng KHTH cần xem thì quản trị thêm quyền này vào vai trò của họ ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**.
+Ai xem được dashboard:
+
+- Toàn viện và mọi khoa: tài khoản có quyền **Xem hồ sơ, sổ, dashboard kết quả nguy cấp mọi khoa (chỉ xem)**, có sẵn trong vai trò **QLCL (kết quả nguy cấp)**. Lãnh đạo, Phòng KHTH cần xem thì quản trị thêm quyền này vào vai trò của họ ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**.
+- Khoa của mình: tài khoản có quyền ghi, nhận hoặc xử trí kết quả nguy cấp (khoa cận lâm sàng, điều dưỡng, bác sĩ). Không cần gán thêm quyền. Khoa của tài khoản là khoa đặt ở hồ sơ người dùng (mục 8.1).
+
+![Dashboard của điều dưỡng Khoa Nội tổng hợp: số liệu của khoa mình, không có ô Khoa](huong-dan-su-dung/kq-15-dashboard-cua-khoa.png)
+
+*Hình 12.10b. Điều dưỡng Khoa Nội tổng hợp mở Dashboard: trang mở sẵn dashboard của khoa mình, không có toàn viện, không chọn được khoa khác (dữ liệu giả lập).*
 
 ### 12.10. Danh mục và cấu hình (QLCL)
 

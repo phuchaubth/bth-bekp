@@ -974,6 +974,58 @@ describe('Kết quả nguy cấp: QLCL', () => {
     },
   )
 
+  it('Tài khoản một khoa (quyết định 65): xem dashboard của khoa mình, không có toàn viện, không chọn khoa khác', { timeout: 30_000 }, async () => {
+    const { calls } = mockApi({ ...common(nurseSession()), [`GET ${base}/dashboard`]: byDepartment(dashboard) })
+    // Địa chỉ trang trỏ sang khoa khác: vẫn chỉ xem khoa của mình.
+    renderApp('/ket-qua-nguy-cap/dashboard?khoa=d-hsh')
+
+    expect(await screen.findByRole('heading', { name: 'Khoa Nội tổng hợp', level: 4 })).toBeInTheDocument()
+    await waitFor(() => expect(within(totalTile()).getByText('2')).toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: 'Dashboard' })).toHaveAttribute('aria-selected', 'true')
+    const requested = calls.filter((c) => c.path === `${base}/dashboard`).map((c) => new URLSearchParams(c.search).get('departmentId'))
+    expect(requested.length).toBeGreaterThan(0)
+    expect(requested.every((id) => id === 'd-noi')).toBe(true)
+    expect(screen.queryByRole('combobox', { name: 'Khoa' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Chạy lướt từng khoa/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/· mọi khoa ·/)).not.toBeInTheDocument()
+  })
+
+  it('Tài khoản hai khoa (quyết định 65): ô Khoa chỉ có hai khoa của mình, không bỏ chọn được; chạy lướt hai khoa đó', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const twoWards = session({
+      id: 'u-hai-khoa',
+      userName: 'haikhoa.demo',
+      fullName: 'Điều dưỡng Hai Khoa',
+      departmentId: 'd-noi',
+      departmentName: 'Khoa Nội tổng hợp',
+      departments: [
+        { id: 'd-noi', name: 'Khoa Nội tổng hợp' },
+        { id: 'd-kkb', name: 'Khoa Khám bệnh' },
+      ],
+      roles: [{ id: 'r-hai-khoa', code: 'X', name: 'Vai trò' }],
+      permissions: [Permissions.CriticalReceive],
+    })
+    const { calls } = mockApi({ ...common(twoWards), [`GET ${base}/dashboard`]: byDepartment(dashboard) })
+    renderApp('/ket-qua-nguy-cap/dashboard')
+
+    expect(await screen.findByRole('heading', { name: 'Khoa Nội tổng hợp', level: 4 })).toBeInTheDocument()
+    await user.click(screen.getByRole('combobox', { name: 'Khoa' }))
+    await waitFor(() => expect(document.querySelectorAll('.ant-select-item-option').length).toBeGreaterThan(0))
+    const options = Array.from(document.querySelectorAll('.ant-select-item-option'), (o) => o.getAttribute('title'))
+    expect(options).toEqual(['Khoa Khám bệnh', 'Khoa Nội tổng hợp'])
+    expect(document.querySelector('.ant-select-clear')).toBeNull()
+    await pick(user, document.body, 'Khoa', 'Khoa Khám bệnh')
+    expect(await screen.findByRole('heading', { name: 'Khoa Khám bệnh', level: 4 })).toBeInTheDocument()
+    await waitFor(() => expect(within(totalTile()).getByText('1')).toBeInTheDocument())
+
+    // Chạy lướt: hai khoa của mình, xếp theo tên, bắt đầu từ khoa đang xem.
+    await user.click(screen.getByRole('button', { name: /Chạy lướt từng khoa/ }))
+    const region = await screen.findByRole('region', { name: 'Chạy lướt từng khoa' })
+    expect(await within(region).findByText('Khoa 1/2 · mỗi khoa 15 giây')).toBeInTheDocument()
+    expect(within(region).getByRole('heading', { name: 'Khoa Khám bệnh' })).toBeInTheDocument()
+    expect(calls.filter((c) => c.path === `${base}/dashboard`).every((c) => /departmentId=d-(noi|kkb)/.test(c.search))).toBe(true)
+  })
+
   it('Chạy lướt: mở thẳng địa chỉ đã lưu thì chạy tiếp (mỗi khoa 30 giây); kỳ chưa có hồ sơ thì không chạy lướt được', { timeout: 30_000 }, async () => {
     mockApi({
       ...common(qualitySession()),
@@ -1066,8 +1118,10 @@ describe('Kết quả nguy cấp: menu', () => {
       ?.children?.map((c) => c.label)
 
   it('khoa báo, khoa nhận, QLCL thấy đúng mục; màn hình theo dõi không có menu', () => {
-    expect(critical([Permissions.CriticalRecord])).toEqual(['Khoa tôi báo', 'Sổ kết quả nguy cấp'])
-    expect(critical([Permissions.CriticalReceive])).toEqual(['Gửi đến khoa tôi', 'Sổ kết quả nguy cấp'])
+    // Khoa báo, khoa nhận có Dashboard của khoa mình (quyết định 65).
+    expect(critical([Permissions.CriticalRecord])).toEqual(['Khoa tôi báo', 'Sổ kết quả nguy cấp', 'Dashboard'])
+    expect(critical([Permissions.CriticalReceive])).toEqual(['Gửi đến khoa tôi', 'Sổ kết quả nguy cấp', 'Dashboard'])
+    expect(critical([Permissions.CriticalTreat])).toEqual(['Gửi đến khoa tôi', 'Sổ kết quả nguy cấp', 'Dashboard'])
     expect(critical([Permissions.CriticalMonitor, Permissions.CriticalManage])).toEqual([
       'Khoa tôi báo',
       'Gửi đến khoa tôi',
