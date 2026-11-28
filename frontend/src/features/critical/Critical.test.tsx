@@ -655,12 +655,110 @@ describe('Kết quả nguy cấp: màn hình theo dõi tại khoa', () => {
     expect(await screen.findByText('Không có kết quả nguy cấp chờ khoa xác nhận.')).toBeInTheDocument()
   })
 
-  it('QLCL chỉ giám sát không thấy nút mở màn hình theo dõi (màn hình là của khoa nhận, bấm vào sẽ không có quyền)', async () => {
-    mockApi({ ...common(qualitySession()), [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] } })
-    renderApp('/ket-qua-nguy-cap/khoa-nhan')
+  it('QLCL mở màn hình theo dõi của mọi khoa (quyết định 66): thẻ ghi khoa; chọn một khoa thì cột chỉ còn khoa đó, dải đỏ vẫn tính mọi khoa', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    const kkb = { receivingDepartmentId: 'd-kkb', receivingDepartmentName: 'Khoa Khám bệnh' }
+    const waiting = [alertItem({ patientName: 'Người Bệnh Khoa Nội' }), alertItem({ id: 'kq-9', patientName: 'Người Bệnh Khoa Khám', ...kkb })]
+    const { calls } = mockApi({
+      ...common(qualitySession()),
+      [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] },
+      [`GET ${base}/alerts`]: (c: ApiCall) => {
+        const id = new URLSearchParams(c.search).get('departmentId')
+        return id
+          ? alerts({
+              receivingDepartmentNames: [departments.find((d) => d.id === id)!.name],
+              awaitingAcknowledgement: waiting.filter((a) => a.receivingDepartmentId === id),
+              todayReceived: 1,
+            })
+          : alerts({ receivingDepartmentNames: ['Toàn viện'], awaitingAcknowledgement: waiting, todayReceived: 2 })
+      },
+    })
+    const { router } = renderApp('/ket-qua-nguy-cap/khoa-nhan')
 
-    expect(await screen.findByRole('heading', { name: 'Gửi đến khoa tôi' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Mở màn hình theo dõi/ })).not.toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: /Mở màn hình theo dõi \(TV\)/ }))
+    expect(router.state.location.pathname).toBe('/man-hinh-kqnc')
+    expect(await screen.findByText('Toàn viện')).toBeInTheDocument()
+    expect(within(await screen.findByRole('article', { name: /Người Bệnh Khoa Khám/ })).getByText('Khoa Khám bệnh')).toBeInTheDocument()
+    expect(calls.some((c) => c.path === `${base}/alerts` && c.search === '?allDepartments=true')).toBe(true)
+    const band = /KẾT QUẢ NGUY CẤP MỚI · 2 hồ sơ chờ khoa xác nhận · Khoa Nội tổng hợp, Khoa Khám bệnh/
+    expect(screen.getByText(band)).toBeInTheDocument()
+
+    await pick(user, document.body, 'Khoa', 'Khoa Khám bệnh')
+    await waitFor(() => expect(screen.queryByRole('article', { name: /Người Bệnh Khoa Nội/ })).not.toBeInTheDocument())
+    expect(within(screen.getByRole('article', { name: /Người Bệnh Khoa Khám/ })).queryByText('Khoa Khám bệnh')).not.toBeInTheDocument()
+    expect(new URLSearchParams(router.state.location.search).get('khoa')).toBe('d-kkb')
+    expect(calls.some((c) => c.path === `${base}/alerts` && c.search === '?departmentId=d-kkb')).toBe(true)
+    // Dải đỏ vẫn là của mọi khoa: hồ sơ mới ở khoa khác không bị lỡ khi đang xem một khoa.
+    expect(screen.getByText(band)).toBeInTheDocument()
+  })
+
+  it('Đang chọn một khoa ở trang Gửi đến khoa tôi thì nút TV mở màn hình của khoa đó (quyết định 66)', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    mockApi({ ...common(qualitySession()), [`GET ${base}/received`]: { serverTimeUtc: now.toISOString(), items: [] } })
+    const { router } = renderApp('/ket-qua-nguy-cap/khoa-nhan')
+
+    await pick(user, document.body, 'Khoa nhận', 'Khoa Nội tổng hợp')
+    await user.click(screen.getByRole('button', { name: /Mở màn hình theo dõi \(TV\)/ }))
+    expect(router.state.location.pathname).toBe('/man-hinh-kqnc')
+    expect(router.state.location.search).toBe('?khoa=d-noi')
+  })
+
+  it('Màn hình của QLCL: địa chỉ lưu sẵn một khoa đã xóa thì hiện mọi khoa, không báo mất kết nối; khoa ngưng dùng ghi (ngưng)', { timeout: 30_000 }, async () => {
+    const old = { id: 'd-cu', code: 'CU', name: 'Khoa Cũ', isActive: false }
+    const { calls } = mockApi({
+      ...common(qualitySession()),
+      // Khoa ngưng dùng chỉ có khi hỏi cả khoa ngưng dùng.
+      'GET /api/v1/departments': (c: ApiCall) => (c.search.includes('includeInactive=true') ? [...departments, old] : departments),
+      [`GET ${base}/alerts`]: (c: ApiCall) => {
+        const id = new URLSearchParams(c.search).get('departmentId')
+        if (id === 'd-da-xoa') return problem(400, 'Dữ liệu không hợp lệ.', { errors: { departmentId: ['Không có khoa/phòng này.'] } })
+        return alerts({ receivingDepartmentNames: [id ? [...departments, old].find((d) => d.id === id)!.name : 'Toàn viện'] })
+      },
+    })
+    const { router } = renderApp('/man-hinh-kqnc?khoa=d-da-xoa')
+
+    expect(await screen.findByText('Toàn viện')).toBeInTheDocument()
+    expect(screen.queryByText(/MẤT KẾT NỐI/)).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Khoa' }).closest('.ant-select')).toHaveTextContent('Mọi khoa')
+
+    const before = calls.length
+    await act(() => router.navigate('/man-hinh-kqnc?khoa=d-cu'))
+    expect(await screen.findByText('Khoa Cũ')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Khoa' }).closest('.ant-select')).toHaveTextContent('Khoa Cũ (ngưng)')
+    expect(calls.slice(before).some((c) => c.search === '?departmentId=d-da-xoa')).toBe(false)
+  })
+
+  it('Đang tải khoa vừa chọn: tiêu đề là khoa mới, các cột đang hiện mờ đi, không thoáng hiện cột trống (quyết định 66)', { timeout: 30_000 }, async () => {
+    const user = userEvent.setup()
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    mockApi({
+      ...common(qualitySession()),
+      [`GET ${base}/alerts`]: async (c: ApiCall) => {
+        if (new URLSearchParams(c.search).get('departmentId') === 'd-kkb') {
+          await gate
+          return alerts({ receivingDepartmentNames: ['Khoa Khám bệnh'] })
+        }
+        return alerts({ receivingDepartmentNames: ['Toàn viện'], awaitingAcknowledgement: [alertItem({ patientName: 'Người Bệnh Khoa Nội' })] })
+      },
+    })
+    renderApp('/man-hinh-kqnc')
+    expect(await screen.findByRole('article', { name: /Người Bệnh Khoa Nội/ })).toBeInTheDocument()
+    const columns = () => document.querySelector('main > div[aria-busy]')!
+    expect(columns().getAttribute('aria-busy')).toBe('false')
+
+    await pick(user, document.body, 'Khoa', 'Khoa Khám bệnh')
+    expect(await screen.findByText('Khoa Khám bệnh', { selector: 'header div' })).toBeInTheDocument()
+    expect(columns().getAttribute('aria-busy')).toBe('true')
+    expect(columns()).toHaveStyle({ opacity: '0.6' })
+    expect(screen.getByRole('article', { name: /Người Bệnh Khoa Nội/ })).toBeInTheDocument()
+    expect(screen.queryByText('Không có kết quả nguy cấp chờ khoa xác nhận.')).not.toBeInTheDocument()
+
+    release()
+    await waitFor(() => expect(screen.queryByRole('article', { name: /Người Bệnh Khoa Nội/ })).not.toBeInTheDocument())
+    expect(columns().getAttribute('aria-busy')).toBe('false')
+    expect(columns()).toHaveStyle({ opacity: '1' })
+    expect(screen.getByText('Không có kết quả nguy cấp chờ khoa xác nhận.')).toBeInTheDocument()
   })
 
   it('Tài khoản màn hình mở trang nào cũng về màn hình theo dõi: tên viết tắt, không có nút thao tác', { timeout: 30_000 }, async () => {
@@ -775,6 +873,55 @@ describe('Kết quả nguy cấp: khoa của người bệnh cho tài khoản xe
 
     const banner = await screen.findByRole('region', { name: 'Cảnh báo kết quả nguy cấp' })
     expect(banner).toHaveTextContent('1 kết quả nguy cấp bác sĩ quá hạn xử trí · Khoa Khám bệnh')
+  })
+
+  it('Màn hình theo dõi dùng chung hai khoa (quyết định 66): ô Khoa chỉ có hai khoa, chạy lướt hai khoa, dải đỏ vẫn tính cả hai khoa', { timeout: 30_000 }, async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+      const waiting = [alertItem({ patientName: 'N.B.N' }), alertItem({ id: 'kq-9', patientName: 'N.B.K', ...kkb })]
+      const { calls } = mockApi({
+        ...common(twoWards([Permissions.CriticalDisplay])),
+        [`GET ${base}/alerts`]: (c: ApiCall) => {
+          const id = new URLSearchParams(c.search).get('departmentId')
+          return alerts({
+            receivingDepartmentNames: id ? [departments.find((d) => d.id === id)!.name] : ['Khoa Nội tổng hợp', 'Khoa Khám bệnh'],
+            awaitingAcknowledgement: id ? waiting.filter((a) => a.receivingDepartmentId === id) : waiting,
+          })
+        },
+      })
+      // Địa chỉ trang trỏ khoa không phải của mình: vẫn xem cả hai khoa của mình.
+      const { router } = renderApp('/man-hinh-kqnc?khoa=d-hsh')
+      const query = () => new URLSearchParams(router.state.location.search)
+
+      expect(await screen.findByRole('article', { name: /N\.B\.K/ })).toBeInTheDocument()
+      expect(screen.getByRole('article', { name: /N\.B\.N/ })).toBeInTheDocument()
+      expect(calls.some((c) => c.search.includes('d-hsh'))).toBe(false)
+      await user.click(screen.getByRole('combobox', { name: 'Khoa' }))
+      await waitFor(() => expect(document.querySelectorAll('.ant-select-item-option').length).toBe(2))
+      expect(Array.from(document.querySelectorAll('.ant-select-item-option'), (o) => o.getAttribute('title'))).toEqual([
+        'Khoa Khám bệnh',
+        'Khoa Nội tổng hợp',
+      ])
+      await user.keyboard('{Escape}')
+
+      await user.click(screen.getByRole('button', { name: /Chạy lướt từng khoa/ }))
+      expect(await screen.findByText('Khoa 1/2 · mỗi khoa 15 giây')).toBeInTheDocument()
+      expect(query().get('khoa')).toBe('d-kkb')
+      await waitFor(() => expect(screen.queryByRole('article', { name: /N\.B\.N/ })).not.toBeInTheDocument())
+      act(() => {
+        vi.advanceTimersByTime(15_000)
+      })
+      expect(query().get('khoa')).toBe('d-noi')
+      expect(await screen.findByText('Khoa 2/2 · mỗi khoa 15 giây')).toBeInTheDocument()
+      expect(await screen.findByRole('article', { name: /N\.B\.N/ })).toBeInTheDocument()
+      // Dải đỏ tính cả hai khoa; chỉ gọi khoa của mình.
+      expect(screen.getByText(/KẾT QUẢ NGUY CẤP MỚI · 2 hồ sơ chờ khoa xác nhận · Khoa Nội tổng hợp, Khoa Khám bệnh/)).toBeInTheDocument()
+      expect(calls.filter((c) => c.path === `${base}/alerts`).every((c) => c.search === '' || /departmentId=d-(noi|kkb)$/.test(c.search))).toBe(true)
+      expect(calls.some((c) => c.path === `${base}/alerts` && c.search === '?departmentId=d-noi')).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('Màn hình theo dõi của tài khoản nhiều khoa ghi khoa của người bệnh trên mỗi thẻ', { timeout: 30_000 }, async () => {

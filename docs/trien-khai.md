@@ -703,6 +703,7 @@ Sau khi cài, quản trị làm một lần:
      - Cờ này cho trình duyệt tự phát âm thanh, nên chuông bật ngay mỗi lần máy khởi động lại, không cần ai bấm. Nút trên màn hình ghi **Chuông bật · thử chuông**.
      - Chỉ đặt cờ cho lối tắt của máy màn hình theo dõi, không đặt cho máy làm việc.
      - Không đặt cờ thì sau mỗi lần mở phải bấm vào màn hình một lần (nút ghi **Bấm để bật chuông**). Trước khi chạy lối tắt mới, đóng hết cửa sổ trình duyệt đang mở để cờ có hiệu lực.
+   - **Màn hình dùng chung cho nhiều khoa** (quyết định 63, 66): ở tài khoản màn hình, **Khoa** là một khoa, ô **Khoa/phòng khác** chọn các khoa còn lại (hướng dẫn sử dụng, mục 8.1). Muốn màn hình tự chạy lướt từng khoa khi bật máy thì thêm `?chay=15` vào địa chỉ trong lối tắt: `https://<địa chỉ phần mềm>/man-hinh-kqnc?chay=15` (15 là số giây mỗi khoa: 10, 15, 30 hoặc 60).
    - **Lần đầu:** đăng nhập bằng tài khoản màn hình. Phiên đăng nhập tự gia hạn khi máy chạy. Máy tắt quá 12 giờ thì mở lại sẽ hiện trang đăng nhập: đăng nhập lại.
    - **Thử trên UAT** (dữ liệu giả lập): tài khoản khoa cận lâm sàng ghi một hồ sơ gửi đến khoa. Màn hình phải hiện dải đỏ chớp tắt, chuông kêu và nhắc lại mỗi 60 giây đến khi khoa bấm **Đã nhận cuộc gọi**.
 
@@ -718,13 +719,14 @@ Lưu ý:
 
 Các mục **Danh sách phiếu**, **Người bệnh**, **Mẫu phiếu**, **Xuất dữ liệu**, **Báo cáo thống kê** nằm chung menu **Phiếu đồng thuận**; **Nhật ký** chuyển sang cạnh **Quản trị** (hướng dẫn sử dụng, mục 1.3). Bản này chỉ đổi giao diện: không có migration, không đổi quyền, không cần cấu hình. Đường dẫn các trang giữ nguyên nên lối tắt, dấu trang đã lưu vẫn dùng được. Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần để tải giao diện mới.
 
-Bản này cũng ẩn nút **Mở màn hình theo dõi (TV)** với tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)**: màn hình theo dõi là của khoa nhận, tài khoản QLCL bấm vào trước đây gặp trang không có quyền.
+Bản này cũng ẩn nút **Mở màn hình theo dõi (TV)** với tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)**: màn hình theo dõi là của khoa nhận, tài khoản QLCL bấm vào trước đây gặp trang không có quyền. Từ quyết định 66, QLCL có màn hình theo dõi của mọi khoa và nút này hiện lại (mục 5.16).
 
-### 5.16. Kết quả nguy cấp: khoa của người bệnh, dashboard từng khoa (quyết định 63–65)
+### 5.16. Kết quả nguy cấp: khoa của người bệnh, dashboard và màn hình theo dõi từng khoa (quyết định 63–66)
 
 - Tài khoản xem nhiều khoa (QLCL, tài khoản xem toàn viện, tài khoản thuộc từ hai khoa) thấy khoa của người bệnh trên thẻ hồ sơ, dải cảnh báo, màn hình theo dõi (hướng dẫn sử dụng, mục 12.3, 12.7).
 - Dashboard có ô **Khoa** và nút **Chạy lướt từng khoa** (hướng dẫn sử dụng, mục 12.9). API dashboard nhận thêm tham số `departmentId`.
 - Quyết định 65: khoa cận lâm sàng, điều dưỡng, bác sĩ thấy mục **Dashboard** và xem dashboard của khoa mình (không có toàn viện). Không cần gán thêm quyền; tài khoản phải được đặt đúng khoa ở hồ sơ người dùng.
+- Quyết định 66: QLCL mở được màn hình theo dõi của mọi khoa (nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**). Màn hình của nhiều khoa có ô **Khoa** và nút **Chạy lướt từng khoa**; máy màn hình dùng chung nhiều khoa đặt lối tắt như mục 5.14 bước 5.
 
 Bản này không có migration, không đổi quyền, không cần cấu hình. Sau khi cài, báo người dùng bấm **Ctrl + F5** một lần. Màn hình lớn chạy lướt dashboard: đăng nhập bằng tài khoản có quyền xem dashboard (vai trò **QLCL (kết quả nguy cấp)**), mở **Dashboard**, bấm **Chạy lướt từng khoa**, bấm **F11**. Lưu dấu trang lúc đang chạy lướt để lần sau mở thẳng.
 

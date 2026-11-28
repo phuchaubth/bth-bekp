@@ -372,7 +372,18 @@ export const criticalApi = {
     apiRequest<CriticalResultList>(`${base}/sent${departmentId ? `?departmentId=${departmentId}` : ''}`, { signal }),
   received: (departmentId: string | undefined, signal?: AbortSignal) =>
     apiRequest<CriticalResultList>(`${base}/received${departmentId ? `?departmentId=${departmentId}` : ''}`, { signal }),
-  alerts: (signal?: AbortSignal) => apiRequest<CriticalAlerts>(`${base}/alerts`, { signal }),
+  /**
+   * Cảnh báo của tài khoản (dải đỏ, màn hình theo dõi). Màn hình theo dõi (quyết định 66): `departmentId` là một khoa,
+   * `allDepartments` là mọi khoa (QLCL, tài khoản xem mọi khoa); bỏ trống là các khoa của mình.
+   */
+  alerts: (view: CriticalAlertsView, signal?: AbortSignal) => {
+    const query = view.departmentId
+      ? `?departmentId=${encodeURIComponent(view.departmentId)}`
+      : view.allDepartments
+        ? '?allDepartments=true'
+        : ''
+    return apiRequest<CriticalAlerts>(`${base}/alerts${query}`, { signal })
+  },
   /** departmentId: dashboard của một khoa (quyết định 64), bỏ trống là toàn viện. */
   dashboard: (month: string, period: 'month' | 'quarter', departmentId: string | undefined, signal?: AbortSignal) =>
     apiRequest<CriticalDashboard>(
@@ -402,7 +413,8 @@ export const criticalKeys = {
   records: ['critical', 'records'] as const,
   sent: (departmentId: string | undefined) => ['critical', 'records', 'sent', departmentId ?? ''] as const,
   received: (departmentId: string | undefined) => ['critical', 'records', 'received', departmentId ?? ''] as const,
-  alerts: ['critical', 'records', 'alerts'] as const,
+  alerts: (view: CriticalAlertsView = {}) =>
+    ['critical', 'records', 'alerts', view.departmentId ?? (view.allDepartments ? 'all' : 'mine')] as const,
   detail: (id: string) => ['critical', 'records', 'detail', id] as const,
   dashboard: (month: string, period: string, departmentId: string | undefined) =>
     ['critical', 'records', 'dashboard', month, period, departmentId ?? 'all'] as const,
@@ -436,14 +448,22 @@ export function useCriticalReceived(departmentId: string | undefined, pollSecond
   })
 }
 
+/** Phạm vi cảnh báo của màn hình theo dõi (quyết định 66); bỏ trống là các khoa của mình như dải cảnh báo. */
+export interface CriticalAlertsView {
+  departmentId?: string
+  allDepartments?: boolean
+}
+
 /**
  * Cảnh báo của tài khoản đang đăng nhập. Chu kỳ hỏi lại lấy từ lần trả lời trước (thông số cấu hình), 15 giây khi chưa có;
  * vẫn hỏi khi thẻ trình duyệt ở nền (màn hình theo dõi, máy trực).
  */
-export function useCriticalAlerts(enabled: boolean) {
+export function useCriticalAlerts(enabled: boolean, view: CriticalAlertsView = {}) {
   return useQuery({
-    queryKey: criticalKeys.alerts,
-    queryFn: ({ signal }) => criticalApi.alerts(signal),
+    queryKey: criticalKeys.alerts(view),
+    queryFn: ({ signal }) => criticalApi.alerts(view, signal),
+    // Màn hình theo dõi chạy lướt từng khoa: giữ số của khoa trước tới khi có số của khoa mới (không nháy trống).
+    placeholderData: keepPreviousData,
     enabled,
     refetchInterval: (query) => (query.state.data?.settings.pollSeconds ?? 15) * 1000,
     refetchIntervalInBackground: true,

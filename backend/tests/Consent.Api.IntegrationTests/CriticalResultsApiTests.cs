@@ -116,6 +116,15 @@ public sealed class CriticalResultsApiTests(SqlServerFixture sql) : IAsyncLifeti
         Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts", reception)).Status);
         var (_, labAlerts) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts", lab);
         Assert.Equal(1, labAlerts.GetProperty("awaitingNotification").GetInt32());
+        // Màn hình theo dõi (quyết định 66): QLCL xem mọi khoa, một khoa; tài khoản màn hình chỉ khoa của mình.
+        var (everyStatus, every) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts?allDepartments=true", quality);
+        Assert.True(everyStatus == HttpStatusCode.OK, every.ToString());
+        Assert.Equal(id, Assert.Single(every.GetProperty("awaitingAcknowledgement").EnumerateArray()).GetProperty("id").GetString());
+        Assert.Equal("Toàn viện", Assert.Single(every.GetProperty("receivingDepartmentNames").EnumerateArray()).GetString());
+        var (_, oneWard) = await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts?departmentId={noi}", quality);
+        Assert.Single(oneWard.GetProperty("awaitingAcknowledgement").EnumerateArray());
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts?departmentId={hsh}", screen)).Status);
+        Assert.Equal(HttpStatusCode.Forbidden, (await _client.SendJsonAsync(HttpMethod.Get, $"{Base}/alerts?allDepartments=true", screen)).Status);
 
         // Điều dưỡng khoa Nội xác nhận đã nhận; chỉ bác sĩ ghi được hướng xử trí.
         var (ackStatus, acknowledged) = await _client.SendJsonAsync(HttpMethod.Post, $"{Base}/{id}/acknowledge", nurse);

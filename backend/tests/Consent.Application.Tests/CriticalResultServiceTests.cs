@@ -397,25 +397,26 @@ public sealed class CriticalResultServiceTests
         var acknowledged = await RecordAsync(Call(_wardA.Id, At(10, 3)), "Người Bệnh Thứ Hai", At(10, 0));
         var done = await RecordAsync(Call(_wardA.Id, At(10, 4)), "Người Bệnh Thứ Ba", At(10, 2));
         await RecordAsync(null, "Người Bệnh Chưa Báo", At(9, 50));
-        await RecordAsync(Call(_wardB.Id), "Người Bệnh Khoa Khác");
+        var other = await RecordAsync(Call(_wardB.Id), "Người Bệnh Khoa Khác");
         ActAs(_nurseA);
         Ok(await Results.AcknowledgeAsync(acknowledged.Id, CancellationToken.None));
         ActAs(_doctorA);
         Ok(await Results.ActAsync(done.Id, new("Xử trí", null, true), CancellationToken.None));
 
         ActAs(_screen);
-        var screen = Ok(await Results.AlertsAsync(CancellationToken.None));
+        var screen = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
         var detail = await Results.GetAsync(waiting.Id, CancellationToken.None);
         ActAs(_nurseA);
-        var nurse = Ok(await Results.AlertsAsync(CancellationToken.None));
+        var nurse = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
         ActAs(_technician);
-        var lab = Ok(await Results.AlertsAsync(CancellationToken.None));
+        var lab = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
         ActAs(_quality);
         var values = Ok(await Settings.GetAsync(CancellationToken.None)).Values;
         Ok(await Settings.UpdateAsync(values with { DisplayFullName = true, PollSeconds = 10, SoundEnabled = false }, CancellationToken.None));
-        var noAlerts = await Results.AlertsAsync(CancellationToken.None);
+        // QLCL không có khoa nhận: mặc định như cũ (khoa của mình, không có hồ sơ); màn hình theo dõi mọi khoa (quyết định 66).
+        var qualityOwn = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
         ActAs(_screen);
-        var fullNames = Ok(await Results.AlertsAsync(CancellationToken.None));
+        var fullNames = Ok(await Results.AlertsAsync(null, false, CancellationToken.None));
 
         var first = Assert.Single(screen.AwaitingAcknowledgement);
         Assert.Equal(waiting.Id, first.Id);
@@ -434,10 +435,52 @@ public sealed class CriticalResultServiceTests
         Assert.Equal("Người Bệnh Giả Lập", Assert.Single(nurse.AwaitingAcknowledgement).PatientName);
         Assert.Empty(lab.AwaitingAcknowledgement);
         Assert.Equal((1, 1), (lab.AwaitingNotification, lab.OverdueNotification));
-        Fails(noAlerts, ErrorType.Forbidden);
+        Assert.Empty(qualityOwn.AwaitingAcknowledgement);
         Assert.Equal("Người Bệnh Giả Lập", fullNames.AwaitingAcknowledgement[0].PatientName);
         Assert.Equal(10, fullNames.Settings.PollSeconds);
         Assert.False(fullNames.Settings.SoundEnabled);
+    }
+
+    [Fact]
+    public async Task Alerts_ScreenOfOneDepartmentOrEveryDepartment_FollowsTheAccountScope()
+    {
+        await CatalogAsync();
+        var waitingA = await RecordAsync(Call(_wardA.Id), "Người Bệnh Khoa A");
+        var waitingB = await RecordAsync(Call(_wardB.Id), "Người Bệnh Khoa B");
+        async Task<Result<CriticalAlertsDto>> As(User user, Guid? department, bool every, params Guid[] otherDepartments)
+        {
+            ActAs(user, otherDepartments);
+            return await Results.AlertsAsync(department, every, CancellationToken.None);
+        }
+
+        // Quyết định 66, QLCL: màn hình theo dõi mọi khoa (họ tên đầy đủ, ghi khoa nhận), hoặc một khoa bất kỳ.
+        var every = Ok(await As(_quality, null, true));
+        Assert.Equal(["Toàn viện"], every.ReceivingDepartmentNames);
+        Assert.Equal(new HashSet<Guid> { waitingA.Id, waitingB.Id }, every.AwaitingAcknowledgement.Select(a => a.Id).ToHashSet());
+        Assert.Equal(
+            ("Người Bệnh Khoa B", _wardB.Name),
+            every.AwaitingAcknowledgement.Where(a => a.Id == waitingB.Id).Select(a => (a.PatientName, a.ReceivingDepartmentName)).Single());
+        var wardB = Ok(await As(_quality, _wardB.Id, false));
+        Assert.Equal([_wardB.Name], wardB.ReceivingDepartmentNames);
+        Assert.Equal([waitingB.Id], wardB.AwaitingAcknowledgement.Select(a => a.Id));
+        Assert.Equal(1, wardB.TodayReceived);
+        Assert.Contains("departmentId", Fails(await As(_quality, Guid.NewGuid(), false), ErrorType.Validation).FieldErrors!.Keys);
+
+        // Tài khoản của khoa: khoa của mình; khoa khác, mọi khoa thì không có quyền.
+        Assert.Equal([waitingA.Id], Ok(await As(_nurseA, _wardA.Id, false)).AwaitingAcknowledgement.Select(a => a.Id));
+        Fails(await As(_nurseA, _wardB.Id, false), ErrorType.Forbidden);
+        Fails(await As(_nurseA, null, true), ErrorType.Forbidden);
+        Fails(await As(_technician, null, true), ErrorType.Forbidden);
+
+        // Màn hình theo dõi dùng chung hai khoa: mặc định cả hai khoa, chọn được từng khoa của mình (tên viết tắt).
+        var both = Ok(await As(_screen, null, false, _wardB.Id));
+        Assert.Equal([_wardA.Name, _wardB.Name], both.ReceivingDepartmentNames);
+        Assert.Equal(2, both.AwaitingAcknowledgement.Count);
+        var onlyB = Ok(await As(_screen, _wardB.Id, false, _wardB.Id));
+        Assert.Equal([_wardB.Name], onlyB.ReceivingDepartmentNames);
+        Assert.Equal("N.B.K.B", Assert.Single(onlyB.AwaitingAcknowledgement).PatientName);
+        Fails(await As(_screen, _lab.Id, false, _wardB.Id), ErrorType.Forbidden);
+        Fails(await As(_screen, null, true, _wardB.Id), ErrorType.Forbidden);
     }
 
     [Fact]

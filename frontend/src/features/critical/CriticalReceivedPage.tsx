@@ -85,9 +85,12 @@ export function CriticalReceivedPage() {
       <PageHeader
         title="Gửi đến khoa tôi"
         extra={
-          // Chỉ hiện với tài khoản mở được màn hình (QLCL chỉ giám sát thì không: bấm vào sẽ ra trang không có quyền).
+          // Chỉ hiện với tài khoản mở được màn hình (QLCL mở được từ quyết định 66); đang chọn một khoa thì mở màn hình của khoa đó.
           hasAnyPermission(SCREEN_PERMISSIONS, hasPermission) && (
-            <Button icon={<DesktopOutlined />} onClick={() => navigate(SCREEN_PATH)}>
+            <Button
+              icon={<DesktopOutlined />}
+              onClick={() => navigate(departmentId ? `${SCREEN_PATH}?khoa=${encodeURIComponent(departmentId)}` : SCREEN_PATH)}
+            >
               Mở màn hình theo dõi (TV)
             </Button>
           )

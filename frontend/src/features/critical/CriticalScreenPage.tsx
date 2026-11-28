@@ -1,13 +1,26 @@
-import { CheckCircleFilled, CloseCircleFilled, SoundOutlined, WifiOutlined } from '@ant-design/icons'
-import { Button } from 'antd'
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  PauseCircleOutlined,
+  PlayCircleOutlined,
+  SoundOutlined,
+  StopOutlined,
+  WifiOutlined,
+} from '@ant-design/icons'
+import { Button, Select } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
+import { useDepartments } from '../../api/admin'
+import { accountDepartments } from '../../api/auth'
 import { useCriticalAlerts, useCriticalSettings, type CriticalAlertItem, type CriticalAlerts } from '../../api/critical'
 import { useAuth } from '../../auth/authContext'
+import { Permissions } from '../../auth/permissions'
 import {
   clockState,
   countdownText,
+  cycleDepartments,
+  departmentList,
   isDisplayOnly,
   playChime,
   secondsLeft,
@@ -19,6 +32,7 @@ import {
   useServerNow,
   type ClockState,
 } from './criticalUtils'
+import { CYCLE_SECONDS, useDepartmentCycle } from './departmentCycle'
 import './critical.css'
 
 /** Màu trên nền tối (đủ tương phản cho chữ nhìn từ xa); luôn kèm chữ, không chỉ dựa vào màu. */
@@ -118,37 +132,76 @@ function AlertCard({
   )
 }
 
+/** Các khoa có hồ sơ trên màn hình (chờ xác nhận, chờ bác sĩ, vừa xong), không trùng, xếp theo tên. */
+const departmentsOnScreen = (data: CriticalAlerts | undefined) =>
+  cycleDepartments(
+    [data?.awaitingAcknowledgement ?? [], data?.awaitingAction ?? [], data?.recentlyCompleted ?? []].map((list) =>
+      list.map((item) => ({ departmentId: item.receivingDepartmentId, name: item.receivingDepartmentName })),
+    ),
+  )
+
 /**
  * Màn hình theo dõi kết quả nguy cấp tại khoa (quyết định 60): TV đặt ở khoa, chỉ để theo dõi (không có nút thao tác). Tự cập
  * nhật theo chu kỳ cấu hình; có hồ sơ mới thì dải đỏ chớp tắt và chuông kêu, nhắc lại tới khi khoa xác nhận; mất kết nối thì báo
- * rõ trên màn hình. Tài khoản màn hình theo dõi thấy tên viết tắt (trừ khi cấu hình cho hiện họ tên đầy đủ).
+ * rõ trên màn hình. Tài khoản màn hình theo dõi thấy tên viết tắt (trừ khi cấu hình cho hiện họ tên đầy đủ). Quyết định 66: QLCL
+ * xem màn hình của mọi khoa; QLCL và tài khoản nhiều khoa chọn từng khoa hoặc chạy lướt từng khoa; dải đỏ, chuông vẫn tính mọi
+ * khoa của tài khoản khi đang hiện một khoa, để chạy lướt không làm lỡ hồ sơ mới.
  */
 export function CriticalScreenPage() {
   const navigate = useNavigate()
   const { user, logout, hasPermission } = useAuth()
-  const alerts = useCriticalAlerts(true)
+  const everyDepartment = hasPermission(Permissions.CriticalMonitor) || hasPermission(Permissions.ScopeAllDepartments)
+  const own = accountDepartments(user)
+  const [params] = useSearchParams()
+  const departments = useDepartments(true)
+  const requested = params.get('khoa') || undefined
+  // Khoa đang hiện (bỏ trống là tất cả); tài khoản của khoa chỉ chọn được khoa của mình. Địa chỉ lưu sẵn một khoa đã xóa thì hiện
+  // mọi khoa (khi danh sách khoa đã tải), không để màn hình báo mất kết nối.
+  const known = (id: string) => (everyDepartment ? (departments.data?.some((d) => d.id === id) ?? true) : own.some((d) => d.id === id))
+  const departmentId = requested && known(requested) ? requested : undefined
+  // Toàn bộ phạm vi của tài khoản (QLCL: mọi khoa): dải đỏ, chuông, mất kết nối. Một khoa: các cột hồ sơ, số hôm nay.
+  const alerts = useCriticalAlerts(true, { allDepartments: everyDepartment })
+  const shown = useCriticalAlerts(Boolean(departmentId), { departmentId })
   const settings = useCriticalSettings()
   const data: CriticalAlerts | undefined = alerts.data
+  // Lần đầu sang một khoa, trong lúc tải: giữ số liệu đang hiện và làm mờ đi (như dashboard), không để màn hình thoáng hiện cột
+  // trống "không có kết quả nguy cấp" hay số của khoa trước như số của khoa mới.
+  const loading = Boolean(departmentId) && (shown.isPending || shown.isPlaceholderData)
+  const view: CriticalAlerts | undefined = departmentId ? (shown.data ?? data) : data
+  const chosenName = departmentId ? (everyDepartment ? departments.data : own)?.find((d) => d.id === departmentId)?.name : undefined
   const nowMs = useServerNow(data?.serverTimeUtc, alerts.dataUpdatedAt)
   const clientNow = useNow()
   const [audioOn, setAudioOn] = useState(false)
   const s = data?.settings
-  const pending = data?.awaitingAcknowledgement ?? []
-  const doctor = data?.awaitingAction ?? []
-  const recent = data?.recentlyCompleted ?? []
+  const waiting = data?.awaitingAcknowledgement ?? []
+  const pending = view?.awaitingAcknowledgement ?? []
+  const doctor = view?.awaitingAction ?? []
+  const recent = view?.recentlyCompleted ?? []
   const soundEnabled = Boolean(s?.soundEnabled)
   useAlertChime(
-    pending.map((p) => p.id),
+    waiting.map((p) => p.id),
     soundEnabled && audioOn,
     s?.soundRepeatSeconds ?? 0,
   )
   const displayOnly = isDisplayOnly(user?.permissions)
-  const stale = alerts.isError || (alerts.dataUpdatedAt > 0 && clientNow - alerts.dataUpdatedAt > staleAfterMs(s?.pollSeconds ?? 15))
+  const stale =
+    alerts.isError ||
+    (Boolean(departmentId) && shown.isError) ||
+    (alerts.dataUpdatedAt > 0 && clientNow - alerts.dataUpdatedAt > staleAfterMs(s?.pollSeconds ?? 15))
   const warn = s?.warnMinutes ?? 3
-  const nearest = pending.map((p) => p.actionDueAtUtc).sort()[0]
+  const nearest = waiting.map((p) => p.actionDueAtUtc).sort()[0]
   const initials = displayOnly && settings.data?.values.displayFullName === false
-  // Tài khoản xem nhiều khoa (quyết định 63): mỗi hồ sơ ghi khoa của người bệnh.
+  // Tài khoản xem nhiều khoa (quyết định 63): mỗi hồ sơ ghi khoa của người bệnh (đang hiện một khoa thì không cần).
   const many = seesManyDepartments(user, hasPermission)
+  // Chọn khoa, chạy lướt (quyết định 66): QLCL chạy lướt các khoa đang có hồ sơ trên màn hình; tài khoản nhiều khoa chạy lướt các
+  // khoa của mình. Tài khoản một khoa không có.
+  const choosing = everyDepartment || own.length > 1
+  const cycle = everyDepartment ? departmentsOnScreen(data) : choosing ? cycleDepartments([own.map((d) => ({ departmentId: d.id, name: d.name }))]) : []
+  const cycling = useDepartmentCycle(cycle, departmentId)
+  const position = cycling.positionOf(departmentId)
+  const departmentOptions = everyDepartment
+    ? (departments.data ?? []).map((d) => ({ value: d.id, label: d.isActive ? d.name : `${d.name} (ngưng)` }))
+    : cycle.map((d) => ({ value: d.id, label: d.name }))
 
   const enableSound = () => {
     void unlockChime().then((ok) => {
@@ -187,7 +240,7 @@ export function CriticalScreenPage() {
     <main style={page} onClick={() => !audioOn && soundEnabled && enableSound()}>
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
         <div>
-          <div style={{ fontSize: 34, fontWeight: 700 }}>{data?.receivingDepartmentNames.join(', ') || 'Kết quả nguy cấp'}</div>
+          <div style={{ fontSize: 34, fontWeight: 700 }}>{chosenName || view?.receivingDepartmentNames.join(', ') || 'Kết quả nguy cấp'}</div>
           <div style={{ color: DARK.muted }}>
             Màn hình theo dõi kết quả nguy cấp · chỉ để theo dõi{initials ? ' · tên viết tắt để giữ bí mật thông tin người bệnh' : ''}
           </div>
@@ -215,7 +268,52 @@ export function CriticalScreenPage() {
         </div>
       </header>
 
-      {pending.length > 0 && (
+      {choosing && (
+        <nav
+          aria-label="Chọn khoa trên màn hình"
+          style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', color: DARK.muted }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Select
+            showSearch
+            allowClear
+            optionFilterProp="label"
+            placeholder={everyDepartment ? 'Mọi khoa' : 'Mọi khoa của tôi'}
+            style={{ width: 280 }}
+            value={departmentId}
+            options={departmentOptions}
+            onChange={(value?: string) => cycling.choose(value)}
+            aria-label="Khoa"
+          />
+          {cycling.seconds ? (
+            <>
+              <span role="status" aria-live="polite" style={{ color: DARK.text, fontSize: 20, fontWeight: 600 }}>
+                {position > 0 ? `Khoa ${position}/${cycle.length}` : `${cycle.length} khoa`} ·{' '}
+                {cycling.paused ? 'đã tạm dừng' : `mỗi khoa ${cycling.seconds} giây`}
+              </span>
+              <Select
+                value={cycling.seconds}
+                options={CYCLE_SECONDS.map((seconds) => ({ value: seconds, label: `Mỗi khoa ${seconds} giây` }))}
+                onChange={(seconds: number) => cycling.setSeconds(seconds)}
+                aria-label="Mỗi khoa"
+                style={{ width: 170 }}
+              />
+              <Button ghost icon={cycling.paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />} onClick={cycling.togglePause}>
+                {cycling.paused ? 'Tiếp tục' : 'Tạm dừng'}
+              </Button>
+              <Button ghost icon={<StopOutlined />} onClick={cycling.stop}>
+                Dừng chạy lướt
+              </Button>
+            </>
+          ) : (
+            <Button ghost icon={<PlayCircleOutlined />} disabled={cycle.length === 0} onClick={cycling.start}>
+              Chạy lướt từng khoa
+            </Button>
+          )}
+        </nav>
+      )}
+
+      {waiting.length > 0 && (
         <div
           role="status"
           className={s?.flashEnabled ? 'critical-flash' : undefined}
@@ -233,17 +331,33 @@ export function CriticalScreenPage() {
             color: '#fff',
           }}
         >
-          <span>KẾT QUẢ NGUY CẤP MỚI · {pending.length} hồ sơ chờ khoa xác nhận</span>
+          <span>
+            KẾT QUẢ NGUY CẤP MỚI · {waiting.length} hồ sơ chờ khoa xác nhận
+            {many ? ` · ${departmentList(waiting.map((p) => p.receivingDepartmentName))}` : ''}
+          </span>
           {nearest && <span style={{ fontVariantNumeric: 'tabular-nums' }}>Bác sĩ {countdownText(secondsLeft(nearest, nowMs)).toLowerCase()}</span>}
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 5fr) minmax(0, 3fr)', gap: 18, flex: 1, minHeight: 0 }}>
+      <div
+        aria-busy={loading}
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 5fr) minmax(0, 5fr) minmax(0, 3fr)',
+          gap: 18,
+          flex: 1,
+          minHeight: 0,
+          opacity: loading ? 0.6 : 1,
+          transition: 'opacity 0.2s',
+        }}
+      >
         <Panel title="Chờ khoa xác nhận" count={pending.length} color="#ff8a80">
           {pending.length === 0 ? (
             <div style={{ color: DARK.muted }}>Không có kết quả nguy cấp chờ khoa xác nhận.</div>
           ) : (
-            pending.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="new" showDepartment={many} />)
+            pending.map((item) => (
+              <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="new" showDepartment={many && !departmentId} />
+            ))
           )}
           <div style={{ color: DARK.muted, fontSize: 15, marginTop: 'auto' }}>
             Người nghe máy bấm Đã nhận cuộc gọi bằng tài khoản của mình
@@ -254,19 +368,21 @@ export function CriticalScreenPage() {
           {doctor.length === 0 ? (
             <div style={{ color: DARK.muted }}>Không có hồ sơ chờ bác sĩ.</div>
           ) : (
-            doctor.map((item) => <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="doctor" showDepartment={many} />)
+            doctor.map((item) => (
+              <AlertCard key={item.id} item={item} nowMs={nowMs} warnMinutes={warn} variant="doctor" showDepartment={many && !departmentId} />
+            ))
           )}
         </Panel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
           <Panel title="Hôm nay">
             <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontSize: 44, fontWeight: 700 }}>{data?.todayReceived ?? 0}</div>
+                <div style={{ fontSize: 44, fontWeight: 700 }}>{view?.todayReceived ?? 0}</div>
                 <div style={{ color: DARK.muted }}>kết quả nguy cấp</div>
               </div>
               <div>
                 <div style={{ fontSize: 44, fontWeight: 700 }}>
-                  {data?.todayActedOnTime ?? 0}/{data?.todayActed ?? 0}
+                  {view?.todayActedOnTime ?? 0}/{view?.todayActed ?? 0}
                 </div>
                 <div style={{ color: DARK.muted }}>BS xử trí đúng hạn</div>
               </div>
@@ -283,7 +399,7 @@ export function CriticalScreenPage() {
                     <span style={{ color: DARK.muted }}>{timeOf(item.actionAtUtc)}</span>
                   </div>
                   <div style={{ color: DARK.muted, fontSize: 15 }}>
-                    {many ? `${item.receivingDepartmentName} · ` : ''}
+                    {many && !departmentId ? `${item.receivingDepartmentName} · ` : ''}
                     {item.testName} {item.value}
                     {item.unit ? ` ${item.unit}` : ''}
                   </div>

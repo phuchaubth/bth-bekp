@@ -242,23 +242,41 @@ public sealed class CriticalResultService(
     /// <summary>
     /// Cảnh báo cho dải đỏ trên mọi trang và màn hình theo dõi tại khoa: hồ sơ gửi đến khoa của mình chờ xác nhận, chờ bác sĩ, vừa
     /// hoàn tất; số hồ sơ khoa báo của mình chưa báo. Tài khoản chỉ có quyền màn hình theo dõi thấy tên viết tắt (trừ khi cấu hình
-    /// cho hiện đầy đủ).
+    /// cho hiện đầy đủ). Màn hình theo dõi (quyết định 66): <paramref name="departmentId"/> là một khoa (khoa của mình; QLCL, tài
+    /// khoản xem mọi khoa thì khoa bất kỳ); <paramref name="allDepartments"/> là mọi khoa, chỉ cho QLCL và tài khoản xem mọi khoa.
+    /// Bỏ trống cả hai là các khoa của mình như cũ (dải cảnh báo trên các trang làm việc không đổi).
     /// </summary>
-    public async Task<Result<CriticalAlertsDto>> AlertsAsync(CancellationToken cancellationToken)
+    public async Task<Result<CriticalAlertsDto>> AlertsAsync(Guid? departmentId, bool allDepartments, CancellationToken cancellationToken)
     {
         var staff = currentUser.HasPermission(Permissions.CriticalReceive) || currentUser.HasPermission(Permissions.CriticalTreat);
         var display = currentUser.HasPermission(Permissions.CriticalDisplay);
         var records = currentUser.HasPermission(Permissions.CriticalRecord);
-        if (!staff && !display && !records)
+        if (!staff && !display && !records && !CanMonitor)
         {
             return Forbidden;
+        }
+
+        var everyDepartment = AllDepartments || CanMonitor;
+        if (allDepartments && !everyDepartment)
+        {
+            return Error.Forbidden("critical.forbidden", "Chỉ QLCL, tài khoản xem mọi khoa xem được màn hình theo dõi của mọi khoa.");
+        }
+
+        if (departmentId is { } only && !everyDepartment && !currentUser.DepartmentIds.Contains(only))
+        {
+            return Error.Forbidden("critical.forbidden", "Chỉ xem được màn hình theo dõi của khoa mình.");
         }
 
         var current = await settings.CurrentAsync(cancellationToken).ConfigureAwait(false);
         var now = clock.UtcNow;
         var all = await DepartmentsAsync(cancellationToken).ConfigureAwait(false);
-        IReadOnlyCollection<Guid>? scope = AllDepartments ? null : currentUser.DepartmentIds;
-        IReadOnlyList<CriticalResult> received = staff || display
+        if (departmentId is { } unknown && !all.ContainsKey(unknown))
+        {
+            return Error.ValidationField("departmentId", "Không có khoa/phòng này.");
+        }
+
+        IReadOnlyCollection<Guid>? scope = departmentId is { } one ? [one] : allDepartments || AllDepartments ? null : currentUser.DepartmentIds;
+        IReadOnlyList<CriticalResult> received = staff || display || CanMonitor
             ? await critical.ListReceivedAsync(scope, now.AddHours(-current.KeepHours), cancellationToken).ConfigureAwait(false)
             : [];
         IReadOnlyList<CriticalResult> sent = records

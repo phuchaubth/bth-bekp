@@ -1747,7 +1747,7 @@ Mỗi hồ sơ giữ thời hạn áp dụng lúc ghi: sửa thông số sau nà
 | Khoa cận lâm sàng (xét nghiệm, vi sinh, giải phẫu bệnh, chẩn đoán hình ảnh): vai trò **Khoa cận lâm sàng (KQNC)** | Ghi kết quả và lần báo, ghi lần báo cho hồ sơ chưa báo hoặc bị trả lại, hủy hồ sơ báo nhầm, in sổ của khoa, xem dashboard của khoa | **Khoa tôi báo**, **Sổ kết quả nguy cấp**, **Dashboard** |
 | Điều dưỡng khoa điều trị (người nghe máy) | Xem kết quả gửi đến khoa, **Đã nhận cuộc gọi**, **Không phải khoa tôi**, in sổ ST02, xem dashboard của khoa | **Gửi đến khoa tôi**, **Sổ kết quả nguy cấp**, **Dashboard** |
 | Bác sĩ khoa điều trị | Ghi hướng xử trí ban đầu, xem kết quả gửi đến khoa, xem dashboard của khoa | **Gửi đến khoa tôi**, **Dashboard** |
-| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard toàn viện và từng khoa; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
+| Phòng Quản lý chất lượng: vai trò **QLCL (kết quả nguy cấp)** | Xem hồ sơ, sổ của mọi khoa, dashboard toàn viện và từng khoa, màn hình theo dõi mọi khoa; sửa danh mục và thông số | Mọi trang, **Dashboard**, **Danh mục và cấu hình** |
 | Màn hình đặt tại khoa: tài khoản vai trò **Màn hình theo dõi KQNC** | Chỉ xem kết quả gửi đến khoa, không thao tác | Tự mở **màn hình theo dõi** (mục 12.7) |
 
 Quyền của điều dưỡng, bác sĩ do quản trị gán ở *Vai trò và quyền* (mục 8.3), nhóm **Kết quả nguy cấp**. Người dùng phải được đặt đúng khoa ở hồ sơ người dùng: mỗi khoa chỉ thấy hồ sơ của khoa mình.
@@ -1902,19 +1902,30 @@ Màn hình đặt ở khoa điều trị (TV hoặc màn hình lớn) hiện k�
 - danh sách vừa xong, số hồ sơ hôm nay và số đã xong, đồng hồ;
 - **dải đỏ chớp tắt** "KẾT QUẢ NGUY CẤP MỚI" và chuông khi có hồ sơ chờ khoa xác nhận.
 
-Màn hình chỉ để xem, không có nút thao tác. Người nghe máy vẫn bấm **Đã nhận cuộc gọi** bằng tài khoản của mình trên máy tính hoặc điện thoại. Để giữ bí mật thông tin người bệnh, màn hình chỉ hiện **tên viết tắt** (ví dụ N.T.M), năm sinh và 4 số cuối mã người bệnh. QLCL bật được họ tên đầy đủ (mục 12.10).
+Màn hình chỉ để xem, không có nút thao tác với hồ sơ. Người nghe máy vẫn bấm **Đã nhận cuộc gọi** bằng tài khoản của mình trên máy tính hoặc điện thoại. Để giữ bí mật thông tin người bệnh, màn hình chỉ hiện **tên viết tắt** (ví dụ N.T.M), năm sinh và 4 số cuối mã người bệnh. QLCL bật được họ tên đầy đủ (mục 12.10).
 
-Một màn hình dùng chung cho nhiều khoa (tài khoản màn hình gán từ hai khoa trở lên): mỗi thẻ ghi thêm khoa của người bệnh (quyết định 63).
+**Màn hình của nhiều khoa** (quyết định 63, 66): màn hình dùng chung cho nhiều khoa (tài khoản màn hình gán từ hai khoa trở lên), màn hình của tài khoản thuộc nhiều khoa, và màn hình của QLCL.
+
+- Mỗi thẻ ghi thêm khoa của người bệnh.
+- Ô **Khoa** ở đầu màn hình: để trống là mọi khoa (QLCL: toàn viện; tài khoản khoa: các khoa của mình). Chọn một khoa thì các cột và số hôm nay chỉ tính khoa đó.
+- Nút **Chạy lướt từng khoa**: màn hình lần lượt hiện từng khoa, mỗi khoa 15 giây (đổi ở ô **Mỗi khoa**: 10, 15, 30 hoặc 60 giây), hết lượt quay lại khoa đầu. Có **Tạm dừng** và **Dừng chạy lướt**. QLCL chạy lướt các khoa đang có hồ sơ trên màn hình; tài khoản nhiều khoa chạy lướt các khoa của mình.
+- **Dải đỏ và chuông luôn tính mọi khoa của màn hình**, kể cả khi đang hiện một khoa. Dải đỏ ghi các khoa đang có hồ sơ chờ, nên chạy lướt không làm lỡ hồ sơ mới.
+
+Màn hình của một khoa không có ô **Khoa** và nút chạy lướt.
 
 Cách mở:
 
 - **Máy đặt cố định ở khoa:** tài khoản chỉ có vai trò **Màn hình theo dõi KQNC** đăng nhập thì tự mở màn hình này. Phòng CNTT cài máy theo tài liệu triển khai, mục 5.14 (trình duyệt toàn màn hình khi bật máy, chuông tự bật, nút ghi **Chuông bật · thử chuông**).
 - **Từ máy làm việc:** điều dưỡng, bác sĩ của khoa điều trị bấm nút **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi**, rồi bấm **F11** để toàn màn hình. Bấm vào màn hình một lần để bật chuông (dòng **Bấm để bật chuông**). Bấm **Về trang làm việc** ở chân trang để quay lại.
-- Màn hình là của khoa nhận: tài khoản chỉ có vai trò **QLCL (kết quả nguy cấp)** không có nút này. QLCL xem mọi khoa ở trang **Gửi đến khoa tôi** và **Dashboard**.
+- **QLCL** (quyết định 66): bấm **Mở màn hình theo dõi (TV)** ở trang **Gửi đến khoa tôi** để mở màn hình của mọi khoa. Đang chọn một khoa ở ô **Khoa nhận** thì mở màn hình của khoa đó. Màn hình của QLCL hiện **họ tên đầy đủ** như trang Gửi đến khoa tôi: chỉ mở ở phòng làm việc, không đặt nơi đông người.
 
 ![Màn hình theo dõi tại khoa: tên viết tắt, đồng hồ đếm ngược, dải đỏ chớp tắt](huong-dan-su-dung/kq-07-man-hinh-khoa.png)
 
 *Hình 12.7. Màn hình theo dõi của Khoa Nội tổng hợp (1920×1080): một hồ sơ mới chờ khoa xác nhận, một hồ sơ bác sĩ quá hạn (dữ liệu giả lập).*
+
+![Màn hình theo dõi của QLCL đang chạy lướt: ô Khoa, Khoa 2/2, dải đỏ ghi hai khoa](huong-dan-su-dung/kq-16-man-hinh-chay-luot.png)
+
+*Hình 12.7a. Màn hình theo dõi của QLCL đang chạy lướt (quyết định 66): đang hiện Khoa Nội tổng hợp (khoa 2/2, mỗi khoa 10 giây); dải đỏ vẫn đếm hồ sơ chờ của cả hai khoa (dữ liệu giả lập).*
 
 ### 12.8. Sổ kết quả nguy cấp, in PDF
 

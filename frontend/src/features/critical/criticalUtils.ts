@@ -9,10 +9,15 @@ import { Permissions } from '../../auth/permissions'
 export const SCREEN_PATH = '/man-hinh-kqnc'
 
 /**
- * Quyền mở màn hình theo dõi: tài khoản màn hình, người của khoa điều trị. QLCL chỉ giám sát (critical.monitor) không mở được
- * vì màn hình là của khoa nhận; dùng chung cho route và nút mở màn hình.
+ * Quyền mở màn hình theo dõi: tài khoản màn hình, người của khoa điều trị; QLCL giám sát xem màn hình của mọi khoa (quyết định
+ * 66). Dùng chung cho route và nút mở màn hình.
  */
-export const SCREEN_PERMISSIONS = [Permissions.CriticalDisplay, Permissions.CriticalReceive, Permissions.CriticalTreat] as const
+export const SCREEN_PERMISSIONS = [
+  Permissions.CriticalDisplay,
+  Permissions.CriticalReceive,
+  Permissions.CriticalTreat,
+  Permissions.CriticalMonitor,
+] as const
 
 /**
  * Tài khoản xem kết quả nguy cấp của nhiều khoa (QLCL giám sát, xem toàn viện, thuộc nhiều khoa): mỗi hồ sơ ghi rõ khoa của người

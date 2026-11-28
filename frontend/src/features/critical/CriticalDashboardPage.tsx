@@ -1,7 +1,6 @@
 import { CheckCircleFilled, PauseCircleOutlined, PlayCircleOutlined, StopOutlined, WarningFilled } from '@ant-design/icons'
 import { Alert, Button, Card, Col, DatePicker, Flex, Row, Segmented, Select, Spin, Table, Typography, type TableColumnsType } from 'antd'
 import dayjs from 'dayjs'
-import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { useDepartments } from '../../api/admin'
 import { accountDepartments } from '../../api/auth'
@@ -20,16 +19,13 @@ import { SERIES_COLORS, formatNumber } from '../../components/chartUtils'
 import { PageHeader } from '../../components/PageHeader'
 import { errorMessage } from '../../utils/formErrors'
 import { CriticalSectionNav } from './CriticalParts'
-import { cycleDepartments, dateTimeOf, nextInCycle } from './criticalUtils'
+import { cycleDepartments, dateTimeOf } from './criticalUtils'
+import { CYCLE_SECONDS, useDepartmentCycle } from './departmentCycle'
 
 const MONTH = 'YYYY-MM'
 
 /** Xem được dashboard của tối đa bấy nhiêu tháng trước (như máy chủ). */
 const MAX_MONTHS_BACK = 24
-
-/** Chạy lướt từng khoa (quyết định 64): mỗi khoa hiện bấy nhiêu giây rồi sang khoa kế tiếp. */
-const CYCLE_SECONDS = [10, 15, 30, 60] as const
-const DEFAULT_CYCLE_SECONDS = 15
 
 const GOOD = '#1d7a3a'
 const WARNING = '#b26a00'
@@ -147,7 +143,7 @@ export function CriticalDashboardPage() {
   // QLCL và tài khoản xem mọi khoa: toàn viện và mọi khoa. Tài khoản của khoa: các khoa của mình (máy chủ cũng chặn khoa khác).
   const everyDepartment = hasPermission(Permissions.CriticalMonitor) || hasPermission(Permissions.ScopeAllDepartments)
   const own = accountDepartments(user)
-  const [params, setParams] = useSearchParams()
+  const [params] = useSearchParams()
   const raw = params.get('thang')
   const month = raw && /^\d{4}-\d{2}$/.test(raw) ? raw : dayjs().format(MONTH)
   const period = params.get('ky') === 'quy' ? 'quarter' : 'month'
@@ -156,8 +152,6 @@ export function CriticalDashboardPage() {
   const requested = params.get('khoa') || undefined
   // Tài khoản của khoa: khoa trên địa chỉ trang phải là khoa của mình, không thì xem khoa đầu tiên của mình.
   const departmentId = everyDepartment || own.some((d) => d.id === requested) ? requested : own[0]?.id
-  const cycleSeconds = CYCLE_SECONDS.find((s) => String(s) === params.get('chay'))
-  const [paused, setPaused] = useState(false)
   const departments = useDepartments(true)
   // QLCL: toàn viện luôn tải, các khoa để chạy lướt là các khoa có hồ sơ trong kỳ (khoa báo, khoa nhận). Tài khoản của khoa không
   // tải toàn viện (không có quyền), chạy lướt các khoa của mình. Cả hai xếp theo tên khoa.
@@ -169,45 +163,17 @@ export function CriticalDashboardPage() {
       ? cycleDepartments([overall.data.receivers, overall.data.senders])
       : []
     : cycleDepartments([own.map((d) => ({ departmentId: d.id, name: d.name }))])
-  const cycleKey = cycle.map((d) => d.id).join(',')
-
-  const update = (changes: Record<string, string | undefined>) => {
-    const next = new URLSearchParams(params)
-    for (const [key, value] of Object.entries(changes)) {
-      if (value === undefined) next.delete(key)
-      else next.set(key, value)
-    }
-    setParams(next, { replace: true })
-  }
-
-  // Chạy lướt: hết số giây thì sang khoa kế tiếp, hết danh sách thì quay lại khoa đầu. Mỗi lần sang khoa (hoặc đổi số giây, tạm
-  // dừng) thì hẹn giờ lại từ đầu. Hàm chuyển khoa luôn là của lần hiển thị mới nhất để không ghi đè tháng, kỳ vừa chọn.
-  const advance = useRef(() => {})
-  useEffect(() => {
-    advance.current = () => update({ khoa: nextInCycle(cycleKey.split(','), departmentId) })
-  })
-  useEffect(() => {
-    if (!cycleSeconds || paused || !cycleKey) return
-    const timer = window.setTimeout(() => advance.current(), cycleSeconds * 1000)
-    return () => window.clearTimeout(timer)
-  }, [cycleSeconds, paused, cycleKey, departmentId])
-
-  /** Bắt đầu từ khoa đang xem nếu khoa đó có hồ sơ trong kỳ, không thì từ khoa đầu danh sách. */
-  const startCycle = () => {
-    setPaused(false)
-    update({ chay: String(DEFAULT_CYCLE_SECONDS), khoa: cycle.some((d) => d.id === departmentId) ? departmentId : cycle[0]?.id })
-  }
-  const stopCycle = () => {
-    setPaused(false)
-    update({ chay: undefined })
-  }
+  // Chạy lướt từng khoa (dùng chung với màn hình theo dõi): khoa, số giây trên địa chỉ trang.
+  const cycling = useDepartmentCycle(cycle, departmentId)
+  const cycleSeconds = cycling.seconds
+  const update = cycling.update
 
   const departmentOptions = everyDepartment
     ? (departments.data ?? []).map((d) => ({ value: d.id, label: d.isActive ? d.name : `${d.name} (ngưng)` }))
     : cycle.map((d) => ({ value: d.id, label: d.name }))
   // Tên khoa và thứ tự lấy theo số liệu đang hiện (không theo ô chọn) để tên luôn khớp với số bên dưới.
   const shownName = data?.departmentName ?? (everyDepartment ? 'Toàn viện' : (own.find((d) => d.id === departmentId)?.name ?? ''))
-  const position = data?.departmentId ? cycle.findIndex((d) => d.id === data.departmentId) + 1 : 0
+  const position = cycling.positionOf(data?.departmentId)
 
   return (
     <>
@@ -242,12 +208,12 @@ export function CriticalDashboardPage() {
                 style={{ width: 260, maxWidth: '100%' }}
                 value={departmentId}
                 options={departmentOptions}
-                onChange={(value?: string) => update({ khoa: value, chay: undefined })}
+                onChange={(value?: string) => cycling.choose(value)}
                 aria-label="Khoa"
               />
             )}
             {!cycleSeconds && (everyDepartment || own.length > 1) && (
-              <Button icon={<PlayCircleOutlined />} disabled={cycle.length === 0} onClick={startCycle}>
+              <Button icon={<PlayCircleOutlined />} disabled={cycle.length === 0} onClick={cycling.start}>
                 Chạy lướt từng khoa
               </Button>
             )}
@@ -263,21 +229,21 @@ export function CriticalDashboardPage() {
               </Typography.Title>
               <Typography.Text type="secondary">
                 {position > 0 ? `Khoa ${position}/${cycle.length}` : `${cycle.length} khoa có hồ sơ trong kỳ`} ·{' '}
-                {paused ? 'đã tạm dừng' : `mỗi khoa ${cycleSeconds} giây`}
+                {cycling.paused ? 'đã tạm dừng' : `mỗi khoa ${cycleSeconds} giây`}
               </Typography.Text>
             </div>
             <Flex gap={8} wrap align="center">
               <Select
                 value={cycleSeconds}
                 options={CYCLE_SECONDS.map((s) => ({ value: s, label: `Mỗi khoa ${s} giây` }))}
-                onChange={(s: number) => update({ chay: String(s) })}
+                onChange={(s: number) => cycling.setSeconds(s)}
                 aria-label="Mỗi khoa"
                 style={{ width: 170 }}
               />
-              <Button icon={paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />} onClick={() => setPaused(!paused)}>
-                {paused ? 'Tiếp tục' : 'Tạm dừng'}
+              <Button icon={cycling.paused ? <PlayCircleOutlined /> : <PauseCircleOutlined />} onClick={cycling.togglePause}>
+                {cycling.paused ? 'Tiếp tục' : 'Tạm dừng'}
               </Button>
-              <Button icon={<StopOutlined />} onClick={stopCycle}>
+              <Button icon={<StopOutlined />} onClick={cycling.stop}>
                 Dừng chạy lướt
               </Button>
             </Flex>

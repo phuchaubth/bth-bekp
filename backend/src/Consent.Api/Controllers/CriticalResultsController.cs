@@ -62,10 +62,13 @@ public sealed class CriticalResultsController(
     public async Task<IActionResult> ListReceived([FromQuery] Guid? departmentId, CancellationToken cancellationToken) =>
         this.ToActionResult(await results.ListReceivedAsync(departmentId, cancellationToken).ConfigureAwait(false));
 
-    /// <summary>Cảnh báo của tài khoản đang đăng nhập (dải đỏ, màn hình theo dõi tại khoa); giao diện hỏi lại theo chu kỳ cấu hình.</summary>
+    /// <summary>
+    /// Cảnh báo của tài khoản đang đăng nhập (dải đỏ, màn hình theo dõi tại khoa); giao diện hỏi lại theo chu kỳ cấu hình.
+    /// <c>departmentId</c>: một khoa, <c>allDepartments</c>: mọi khoa (màn hình theo dõi, quyết định 66).
+    /// </summary>
     [HttpGet("alerts")]
-    public async Task<IActionResult> Alerts(CancellationToken cancellationToken) =>
-        this.ToActionResult(await results.AlertsAsync(cancellationToken).ConfigureAwait(false));
+    public async Task<IActionResult> Alerts([FromQuery] Guid? departmentId, [FromQuery] bool allDepartments, CancellationToken cancellationToken) =>
+        this.ToActionResult(await results.AlertsAsync(departmentId, allDepartments, cancellationToken).ConfigureAwait(false));
 
     /// <summary>Dashboard của một tháng hoặc quý (<c>period=quarter</c>), mặc định tháng này; <c>departmentId</c>: một khoa.</summary>
     [HttpGet("dashboard")]
